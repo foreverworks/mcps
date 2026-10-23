@@ -1,7 +1,8 @@
 # <img src="icons/icon.svg" width="36" height="36" alt="Device broker icon"> Device broker MCP server
 
 Give several AI agents fair turns on your own Android emulators, iOS
-simulators, Mac and Windows desktops, and build slots. An agent gets a lease
+simulators, Mac and Windows desktops, Batocera retro-gaming boxes, and build
+slots. An agent gets a lease
 with the address its tools use (adb, simctl, ssh), a place in a fair queue, or
 the reason nothing can serve it (a Mac asleep, a host short of memory). The
 broker starts an emulator when its host has room and stops or resets every
@@ -103,7 +104,8 @@ invented.
     "android-phone": "Android 14 (API 34) emulator, 1080x2400 at 420 dpi",
     "android-phone-15": "Android 15 (API 35) emulator, 1080x2400 at 420 dpi",
     "ios-phone": "iPhone 16 on the newest installed iOS runtime",
-    "ios-watch": "iPhone 16 with an Apple Watch paired, newest iOS and watchOS runtimes"
+    "ios-watch": "iPhone 16 with an Apple Watch paired, newest iOS and watchOS runtimes",
+    "batocera": "Batocera on a VM, a fresh box from the stock image for every lease"
   },
   "default_profiles": { "ios": "ios-phone" },
   "hosts": [
@@ -118,6 +120,10 @@ invented.
       "variants": [{ "profile": "android-phone-15", "instance": "phone1api35" }] },
     { "id": "emulator-5556", "platform": "android", "host": "android-host", "profile": "android-phone",
       "mode": "spawn", "maestro": true, "instance": "phone2", "adb": { "port": 5037, "serial": "emulator-5556" } },
+    { "id": "batocera-1", "platform": "batocera", "host": "android-host", "profile": "batocera", "mode": "spawn",
+      "instance": "bato1", "probe": "unit", "cost_mib": 4096,
+      "ssh": { "target": "root@127.0.0.1", "port": 2223, "jump": "builder@android-host.example.com" },
+      "screenshot": "ffmpeg -loglevel error -f x11grab -i :0 -frames:v 1 -f image2pipe -c:v png -" },
     { "id": "dev-iphone", "platform": "ios", "host": "mac-1", "profile": "ios-phone", "mode": "fixed", "maestro": true,
       "simulator": { "name": "dev-iphone", "type": "iPhone 16" } },
     { "id": "spare-iphone-1", "platform": "ios", "host": "mac-1", "profile": "ios-phone", "mode": "spawn", "maestro": true,
@@ -140,7 +146,7 @@ Top level:
 | `box` | The name `status` gives this broker. Default: `DEVICES_BOX`, else the hostname. |
 | `note` | For a catalog with no hosts on purpose: said in every answer instead (`"devices are brokered on broker-1"`). |
 | `session_hint` | Where an agent on this deployment finds its session id, written into every `session` argument's description. Default: any stable id per agent session. |
-| `wrappers` | Per platform (`ios`, `android`, `macos`, `windows`), commands on this deployment that take a lease for their user and renew it on every call. The server's instructions, `acquire`, `renew`, `session` and each grant's `next` name them. Default: none, and no description mentions any. |
+| `wrappers` | Per platform (`ios`, `android`, `macos`, `windows`, `batocera`), commands on this deployment that take a lease for their user and renew it on every call. The server's instructions, `acquire`, `renew`, `session` and each grant's `next` name them. Default: none, and no description mentions any. |
 | `profiles` | Profile name to a line saying what it is. Every device names one; `acquire` takes one. |
 | `default_profiles` | Platform to the profile a request that names none gets. A device of that platform on another profile (a tablet, a phone with a watch) is then leased only to a request that names its profile, so a wrapper asking for a phone never gets one. Must be declared and served by some device of the platform. Default: none, and a request without a profile takes any device of the platform. |
 | `forms` | Profile to its form, for a profile that is not its platform's usual device (`{ "wear-os": "watch" }`). A session holds one device per platform and form, so a phone and the watch it pairs with are leased together. Each profile declared. Default: none. |
@@ -151,7 +157,7 @@ A host:
 | Field | Default | Meaning |
 |---|---|---|
 | `id`, `label` | | A stable id (in build slot names: `builder:ios@mac-1`), and the name reasons use. |
-| `platform` | | `android` or `ios`: what its phones and builds are, and how it is probed. A desktop device may sit on either. |
+| `platform` | | `android` or `ios`: what its phones and builds are, and how it is probed. A device reached over ssh may sit on either. |
 | `ssh` | | The ssh target, `user@host`. Also handed to an iOS lease's holder as `IOS_SIM_MAC`. |
 | `requires_ac` | `false` | A Mac laptop: nothing is built on it on battery. (Nothing is ever started on a Mac on battery, whatever this says: it sleeps a minute after it goes idle, so the broker reports it degraded.) |
 | `spawn_max` | `0` | How many devices the broker may have started on it at once. |
@@ -165,24 +171,25 @@ A device:
 | Field | Default | Meaning |
 |---|---|---|
 | `id` | | Stable and unique: a serial, a simulator's name. |
-| `platform`, `host`, `profile` | | `ios`, `android`, `macos` or `windows`; a declared host of the same platform (desktops aside, below); a declared profile. |
+| `platform`, `host`, `profile` | | `ios`, `android`, `macos`, `windows` or `batocera`; a declared host of the same platform (devices reached over ssh aside, below); a declared profile. |
 | `mode` | | `fixed`: exists and stays, leased as it is. `spawn`: started (an emulator, a VM) or created (a simulator) for a lease, stopped after it. `reserved`: shown, never leased. |
 | `maestro` | `false` | Whether a Maestro flow can drive it (`acquire` can ask for one). |
 | `adb` | | Android, required: `{ "port", "serial" }`, how its holder reaches it with adb. |
-| `instance` | | A started slot (Android or Windows, `spawn`), required: the name the host's control command starts and stops, `^[a-z][a-z0-9]{0,15}$`, unique per host. |
+| `instance` | | A started slot (Android, Windows or Batocera, `spawn`), required: the name the host's control command starts and stops, `^[a-z][a-z0-9]{0,15}$`, unique per host. |
 | `variants` | | A started slot only: its other system images, `[{ "profile", "instance" }]`, each started instead of `instance` for a lease that asks for its profile. Each profile declared and served once by the slot; each instance unique per host. |
 | `probe` | | A started slot only: how the broker tells it has booted, and clears it after a dirty lease. Absent: the adb server at `adb.port` on the broker's loopback. `{ "door": <port> }`: the device's own adbd, through a tunnel at that port on the broker's loopback (one device per port). `"unit"`: the control command's `status` says `active` only once it has booted, for a device whose adbd the broker cannot reach (its data is then not cleared after a dirty lease, and only its own tenant ever gets it). |
 | `simulator` | | iOS, required: `{ "name", "type", "watch"? }`, the simulator's name (unique on its Mac, a watch's included) and the device type `simctl create` takes. `watch`, on a `spawn` device only, is `{ "name", "type" }` of a watch the broker creates and pairs with the phone. |
-| `ssh` | | A desktop, required (and refused on a phone): `{ "target", "port"?, "jump"? }`, how its holder reaches it with ssh. |
+| `ssh` | | A device reached over ssh (`macos`, `windows`, `batocera`), required (and refused on a phone): `{ "target", "port"?, "jump"? }`, how its holder reaches it with ssh. |
+| `screenshot` | | A device reached over ssh only: one line, a command that, run on the device over its `ssh` address, writes a PNG of its screen to stdout. Its holder gets it as `address.screenshot` and `DEVICE_SCREENSHOT`. The broker never runs it, and has no default: what grabs a screen depends on what the device runs (`ffmpeg ... -f x11grab` for an X display, in the example above). |
 | `cost_mib` | host's | A `spawn` slot that costs its host more or less memory than the host's `cost_mib` (a VM beside emulators). |
 | `tenant` | `default` | Whom it serves: `default` or `guest:<id>` ([Tenants](#tenants)). |
 | `note` | | One line shown in `status`. |
 
 A `macos` device is a Mac's desktop session: `fixed`, on an `ios` host. A
-`windows` VM the broker starts is a `spawn` slot with an `instance` and probe
-`"unit"`, on an `android` host, the only kind whose probe reads the control
-command. The catalog is checked at start against every rule above; if it
-breaks one, every tool says which.
+`windows` VM or a `batocera` box the broker starts is a `spawn` slot with an
+`instance` and probe `"unit"`, on an `android` host, the only kind whose probe
+reads the control command. The catalog is checked at start against every rule
+above; if it breaks one, every tool says which.
 
 ### The control command
 
@@ -196,6 +203,11 @@ its own emulators. It must answer three calls:
 | `<control> start <instance>` | Exit 0 once the start is under way; it need not wait for the boot (the broker polls for it). Starting a running instance succeeds. | 90 s |
 | `<control> stop <instance>` | Exit 0 once the emulator has stopped (saving a snapshot on the way is fine). Stopping a stopped instance succeeds. | 240 s |
 | `<control> status` | Exit 0 and one line per instance, `<instance> <state>`. `active`, `activating`, `deactivating` and `reloading` count as running (and for a `"unit"` probe, `active` must mean booted); anything else (`inactive`, `failed`) is stopped. Lines that do not parse are ignored. Run on every probe, once a minute: keep it cheap. | 20 s |
+
+A `batocera` instance is a fresh box on every start: `start` boots it from the
+stock image on a new disk (an overlay over the image, say) and `stop` throws
+that disk away. The broker stops a box after every lease, so that stop is its
+reset, and the next holder never sees what the last one did.
 
 A slot's variants are instances like any other; `status` lists a slot's
 `profiles` and the one it `runs`. Only one runs at a time (they share the
@@ -244,7 +256,7 @@ stop or reset one.
 |---|---|---|
 | `health` | read | Whether the broker works (catalog loaded, state readable), with each host's last probe; a host that is down is reported, not a fault. |
 | `status` | read | Your tenant's hosts and their health, every device and who holds it, build slots, the queue, recent events; with `session`, your own leases and their addresses. |
-| `acquire` | write | A device (`ios`, `android`, `macos`, `windows`) or a build slot (`builder:ios`, `builder:android`): granted, queued (a ticket) or unavailable (the reason). Takes a `profile`, `maestro`, `minutes` (default 45, 30 for a build slot, at most 240) and `priority` (`interactive`, or `background` for a loop). A started device is `booting`, then `ready`; `until_booted` waits up to that many seconds (10 to 300) for the boot, reporting progress. |
+| `acquire` | write | A device (`ios`, `android`, `macos`, `windows`, `batocera`) or a build slot (`builder:ios`, `builder:android`): granted, queued (a ticket) or unavailable (the reason). Takes a `profile`, `maestro`, `minutes` (default 45, 30 for a build slot, at most 240) and `priority` (`interactive`, or `background` for a loop). A started device is `booting`, then `ready`; `until_booted` waits up to that many seconds (10 to 300) for the boot, reporting progress. |
 | `wait` | write | Long-polls a ticket for up to 50 s (default 45), reporting your place in the queue; claims the grant when the queue reaches it. |
 | `renew` | write | Extends a lease you hold to now plus `minutes`, at most 4 h after it was granted. |
 | `pause` | write | Hands your device to a person without losing it: the lease holds without your calls for `minutes` (default 60, at most 4 h a call, never past 8 h from the grant), shown as paused with your note, and ends if the pause runs out. Build slots are not paused. |
@@ -283,7 +295,7 @@ A granted device lease carries `address`, whose `env` its holder exports:
 |---|---|
 | Android | `DEVICE_ID`, `ANDROID_SERIAL`, `ANDROID_ADB_SERVER_PORT` (adb reads the last two itself) |
 | iOS | `DEVICE_ID`, `IOS_SIM_MAC` (the host's ssh target), `IOS_SIM_DEVICE` (the simulator's UDID, or its name before the broker has seen it), and for a phone with a paired watch `IOS_SIM_WATCH` (the watch's UDID, or its name) |
-| macOS, Windows | `DEVICE_ID`, `DEVICE_SSH` (an ssh destination), and `DEVICE_SSH_PORT` and `DEVICE_SSH_JUMP` where the catalog sets them: `ssh ${DEVICE_SSH_JUMP:+-J "$DEVICE_SSH_JUMP"} -p "${DEVICE_SSH_PORT:-22}" "$DEVICE_SSH"` |
+| macOS, Windows, Batocera | `DEVICE_ID`, `DEVICE_SSH` (an ssh destination), and `DEVICE_SSH_PORT`, `DEVICE_SSH_JUMP` and `DEVICE_SCREENSHOT` where the catalog sets them: `ssh ${DEVICE_SSH_JUMP:+-J "$DEVICE_SSH_JUMP"} -p "${DEVICE_SSH_PORT:-22}" "$DEVICE_SSH"`, and for a screenshot `ssh ... "$DEVICE_SSH" "$DEVICE_SCREENSHOT" > screen.png` |
 
 ## Troubleshooting
 
@@ -353,10 +365,12 @@ by hand.
   probe saw running with no lease and no work in progress (once per probe), so
   a host returns to zero emulators whatever started one: a failed stop, a
   broker restart, a hand.
-- **Desktops.** A `macos` device is present while the host's ssh account has a
-  desktop session (`launchctl print gui/<uid>`), which the broker never starts
-  or ends. A `windows` VM is started and stopped like an emulator, but with no
-  adb, `dirty` clears nothing on it.
+- **Desktops and Batocera boxes.** A `macos` device is present while the
+  host's ssh account has a desktop session (`launchctl print gui/<uid>`),
+  which the broker never starts or ends. A `windows` VM or a `batocera` box is
+  started and stopped like an emulator, but with no adb, `dirty` clears
+  nothing on it; a Batocera box needs nothing cleared, since its stop throws
+  it away ([the control command](#the-control-command)).
 - **Simulators are found by name**, and handed out only when exactly one of
   that name exists on the Mac: with two, a holder may drive the wrong one. A
   spare is created on the newest installed iOS runtime when first granted, and

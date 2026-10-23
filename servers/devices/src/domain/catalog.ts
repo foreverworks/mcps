@@ -5,17 +5,20 @@
  */
 
 /**
- * What a device is: a phone (an iOS simulator, an Android emulator) or a desktop (a Mac's desktop
- * session, a Windows machine). A desktop is reached over ssh; a phone through its host's tooling.
+ * What a device is: a phone (an iOS simulator, an Android emulator), a desktop (a Mac's desktop
+ * session, a Windows machine) or a console (a Batocera retro-gaming box). A phone is reached through
+ * its host's tooling; every other device over ssh, at an address of its own.
  */
-export type Platform = "ios" | "android" | "macos" | "windows";
+export type Platform = "ios" | "android" | "macos" | "windows" | "batocera";
 
-export const PLATFORMS: readonly Platform[] = ["ios", "android", "macos", "windows"];
+export const PLATFORMS: readonly Platform[] = ["ios", "android", "macos", "windows", "batocera"];
 
-/** The platforms whose devices are desktops: each reached at its own ssh address, on whatever host carries it. */
-export const DESKTOPS: readonly Platform[] = ["macos", "windows"];
+/** The platforms whose devices their holder reaches over ssh, each at its own address, on whatever host carries it. */
+export type SshPlatform = "macos" | "windows" | "batocera";
 
-export const isDesktop = (p: Platform): boolean => DESKTOPS.includes(p);
+export const SSH_PLATFORMS: readonly SshPlatform[] = ["macos", "windows", "batocera"];
+
+export const reachedOverSsh = (p: Platform): p is SshPlatform => (SSH_PLATFORMS as readonly Platform[]).includes(p);
 
 /**
  * Whom a device serves: `default` (the deployment's own agents) or `guest:<id>` (another workspace). A
@@ -39,7 +42,7 @@ export type Host = {
   /**
    * The platform its phones and builds are for, which also decides how it is probed: `ios` (a Mac:
    * simulators, power, a desktop session) or `android` (a Linux host: memory, its control command).
-   * A desktop device may sit on either.
+   * A device reached over ssh may sit on either.
    */
   readonly platform: Platform;
   /** The ssh target the broker reaches it at (`user@host`), with no password prompt. */
@@ -89,8 +92,9 @@ export type AdbAddress = {
 export type Probe = { readonly kind: "door"; readonly port: number } | { readonly kind: "unit" };
 
 /**
- * How a desktop device is reached by its HOLDER: an ssh destination (`user@host`), its port when not 22,
- * and a host to jump through when the machine is only reachable from there (a VM on its host's loopback).
+ * How a device of an SSH_PLATFORMS platform (a desktop, a Batocera box) is reached by its HOLDER: an ssh
+ * destination (`user@host`), its port when not 22, and a host to jump through when the machine is only
+ * reachable from there (a VM on its host's loopback).
  */
 export type SshAddress = {
   readonly target: string;
@@ -155,8 +159,13 @@ export type Device = {
    */
   readonly variants?: readonly SlotVariant[];
   readonly simulator?: SimulatorSpec;
-  /** A desktop: where its holder reaches it. Required for macos and windows, and only for them. */
+  /** Where its holder reaches it over ssh. Required for the SSH_PLATFORMS, and only for them. */
   readonly ssh?: SshAddress;
+  /**
+   * A device reached over ssh: one line its holder runs on it, over `ssh`, that writes a PNG of its screen
+   * to stdout. The catalog's, never the broker's: what grabs a screen depends on what the device runs.
+   */
+  readonly screenshot?: string;
   /** A spawn slot that costs its host more or less than the host's `costMiB` (a VM beside emulators). */
   readonly costMiB?: number;
   /** One line shown in status: why it is reserved, what it is for. */
@@ -196,7 +205,7 @@ export type Catalog = {
   readonly clients: Clients;
 };
 
-export const NO_CLIENTS: Clients = { wrappers: { ios: [], android: [], macos: [], windows: [] } };
+export const NO_CLIENTS: Clients = { wrappers: { ios: [], android: [], macos: [], windows: [], batocera: [] } };
 
 /** A catalog with nothing in it: the broker answers, and every request is unavailable with this reason. */
 export const emptyCatalog = (box: string): Catalog => ({ box, hosts: [], devices: [], profiles: {}, defaultProfiles: {}, forms: {}, clients: NO_CLIENTS });
@@ -219,11 +228,17 @@ export const hostOf = (catalog: Catalog, id: string): Host | undefined => catalo
 export const deviceOf = (catalog: Catalog, id: string): Device | undefined => catalog.devices.find((d) => d.id === id);
 
 /** The platforms whose spawn slots the host's control command starts and stops: emulators and VMs. */
-const STARTED: readonly Platform[] = ["android", "windows"];
+const STARTED: readonly Platform[] = ["android", "windows", "batocera"];
+
+/**
+ * The platforms whose spawn slots are VMs: no adb, so a boot is read from the unit, through a host whose
+ * probe reads the control command. A Batocera box is one whose stop throws it away (the README's contract).
+ */
+const VMS: readonly Platform[] = ["windows", "batocera"];
 
 /**
  * A slot the broker starts through its host's control command for a lease and stops after it: a spawned
- * Android emulator or Windows VM with an instance.
+ * Android emulator, Windows VM or Batocera box with an instance.
  */
 export const isStartedSlot = (d: Device): boolean => STARTED.includes(d.platform) && d.mode === "spawn" && d.instance !== undefined;
 
@@ -271,21 +286,25 @@ export const catalogProblems = (catalog: Catalog): readonly string[] => {
   for (const d of catalog.devices) {
     const host = hostOf(catalog, d.host);
     if (host === undefined) problems.push(`device ${d.id} names host ${d.host}, which is not declared`);
-    else if (host.platform !== d.platform && !isDesktop(d.platform)) problems.push(`device ${d.id} is ${d.platform} on ${host.id}, a ${host.platform} host`);
+    else if (host.platform !== d.platform && !reachedOverSsh(d.platform)) problems.push(`device ${d.id} is ${d.platform} on ${host.id}, a ${host.platform} host`);
     if (d.platform === "android" && d.adb === undefined) problems.push(`android device ${d.id} has no adb address`);
     if (STARTED.includes(d.platform) && d.mode === "spawn" && d.instance === undefined) problems.push(`${d.platform} device ${d.id} is a spawn slot with no instance to start`);
     if (d.instance !== undefined && !STARTED.includes(d.platform)) problems.push(`device ${d.id} has an instance but is not an emulator or a VM`);
-    // A desktop is reached over ssh; a phone is not.
-    if (isDesktop(d.platform) && d.ssh === undefined) problems.push(`${d.platform} device ${d.id} has no ssh address for its holder`);
-    if (!isDesktop(d.platform) && d.ssh !== undefined) problems.push(`device ${d.id} has an ssh address but is not a desktop`);
+    // A desktop or a console is reached over ssh; a phone is not.
+    if (reachedOverSsh(d.platform) && d.ssh === undefined) problems.push(`${d.platform} device ${d.id} has no ssh address for its holder`);
+    if (!reachedOverSsh(d.platform) && d.ssh !== undefined) problems.push(`device ${d.id} has an ssh address but is a phone, reached through its host's tooling`);
+    // A screenshot command runs on the device over that address, as one argument to ssh.
+    if (d.screenshot !== undefined && !reachedOverSsh(d.platform)) problems.push(`device ${d.id} has a screenshot command but is not reached over ssh`);
+    if (d.screenshot !== undefined && d.screenshot.trim() === "") problems.push(`device ${d.id} has an empty screenshot command`);
+    if (d.screenshot !== undefined && /[\r\n]/.test(d.screenshot)) problems.push(`device ${d.id} has a screenshot command of more than one line`);
     if (d.ssh?.port !== undefined && (!Number.isInteger(d.ssh.port) || d.ssh.port < 1 || d.ssh.port > 65535)) problems.push(`device ${d.id} has ssh port ${d.ssh.port}`);
     // The Mac's own desktop session is there or not: nothing starts one.
     if (d.platform === "macos" && d.mode === "spawn") problems.push(`macos device ${d.id} is a spawn slot: a Mac's desktop session is fixed, there or not`);
     if (d.platform === "macos" && host !== undefined && host.platform !== "ios") problems.push(`macos device ${d.id} is on ${host.id}, which is not a Mac (an ios host), so nothing probes its desktop session`);
     // A VM has no adb: its boot can only be read from its unit, through a host whose probe reads the control command.
-    if (d.platform === "windows" && d.mode === "spawn" && d.probe?.kind !== "unit") problems.push(`windows device ${d.id} is a spawn slot without probe "unit": a VM's boot is read from its unit`);
-    if (d.platform === "windows" && d.mode === "spawn" && host !== undefined && host.platform !== "android")
-      problems.push(`windows device ${d.id} is started on ${host.id}, whose probe does not read the control command (only an android host's does)`);
+    if (VMS.includes(d.platform) && d.mode === "spawn" && d.probe?.kind !== "unit") problems.push(`${d.platform} device ${d.id} is a spawn slot without probe "unit": a VM's boot is read from its unit`);
+    if (VMS.includes(d.platform) && d.mode === "spawn" && host !== undefined && host.platform !== "android")
+      problems.push(`${d.platform} device ${d.id} is started on ${host.id}, whose probe does not read the control command (only an android host's does)`);
     if (d.costMiB !== undefined && (d.mode !== "spawn" || !Number.isInteger(d.costMiB) || d.costMiB < 0)) problems.push(`device ${d.id} has a cost but is not a spawn slot, or the cost is not a whole number of MiB`);
     if (d.instance !== undefined && !INSTANCE.test(d.instance)) problems.push(`device ${d.id} has instance ${JSON.stringify(d.instance)}, not ${INSTANCE.source}`);
     if (d.instance !== undefined && host !== undefined && host.control === undefined) problems.push(`device ${d.id} is started on ${host.id}, which has no control command`);
@@ -297,7 +316,7 @@ export const catalogProblems = (catalog: Catalog): readonly string[] => {
     if (d.probe !== undefined && d.instance === undefined) problems.push(`device ${d.id} has a probe but no instance: only an emulator the broker starts is probed that way`);
     if (!Object.hasOwn(catalog.profiles, d.profile)) problems.push(`device ${d.id} has profile ${d.profile}, which is not declared`);
     if (d.variants === undefined) continue;
-    if (!isStartedSlot(d)) problems.push(`device ${d.id} has variants but is not a slot the broker starts (android or windows, spawn, with an instance)`);
+    if (!isStartedSlot(d)) problems.push(`device ${d.id} has variants but is not a slot the broker starts (${STARTED.join(", ")}; spawn, with an instance)`);
     for (const v of d.variants) {
       if (!INSTANCE.test(v.instance)) problems.push(`device ${d.id} has variant instance ${JSON.stringify(v.instance)}, not ${INSTANCE.source}`);
       if (!Object.hasOwn(catalog.profiles, v.profile)) problems.push(`device ${d.id} has a variant of profile ${v.profile}, which is not declared`);

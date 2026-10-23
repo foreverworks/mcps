@@ -126,7 +126,7 @@ export const makeBroker = (deps: Deps) => {
     );
   };
 
-  /** The hosts a request for this platform depends on: those of its builds and phones, and those carrying a desktop of it. */
+  /** The hosts a request for this platform depends on: those of its builds and phones, and those carrying a device of it reached over ssh. */
   const hostsFor = (platform: Platform): readonly string[] =>
     catalog.hosts.filter((h) => h.platform === platform || catalog.devices.some((d) => d.host === h.id && d.platform === platform)).map((h) => h.id);
 

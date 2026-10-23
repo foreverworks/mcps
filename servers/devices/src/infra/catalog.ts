@@ -2,7 +2,7 @@ import { readFile } from "node:fs/promises";
 
 import { z } from "zod";
 
-import { catalogProblems, DEFAULT_TENANT, emptyCatalog, type Catalog, type Probe } from "../domain/catalog.js";
+import { catalogProblems, DEFAULT_TENANT, emptyCatalog, PLATFORMS, type Catalog, type Probe } from "../domain/catalog.js";
 import { asAppError, configError, fail } from "../domain/errors.js";
 
 /**
@@ -10,7 +10,7 @@ import { asAppError, configError, fail } from "../domain/errors.js";
  * runs a broker with no devices can be given a file with no hosts and a `note` saying where devices
  * are brokered instead, so every answer there says so instead of failing.
  */
-const platform = z.enum(["ios", "android", "macos", "windows"]);
+const platform = z.enum(PLATFORMS);
 
 const commands = z.array(z.string().trim().min(1).max(60)).max(10).default([]);
 
@@ -18,7 +18,9 @@ const schema = z.object({
   box: z.string().min(1).optional(),
   note: z.string().optional(),
   session_hint: z.string().trim().min(1).max(300).optional(),
-  wrappers: z.object({ ios: commands, android: commands, macos: commands, windows: commands }).default({ ios: [], android: [], macos: [], windows: [] }),
+  wrappers: z
+    .object({ ios: commands, android: commands, macos: commands, windows: commands, batocera: commands })
+    .default({ ios: [], android: [], macos: [], windows: [], batocera: [] }),
   profiles: z.record(z.string(), z.string()).default({}),
   // The profile a request that names none gets, per platform; a device on another profile is then leased only by name.
   default_profiles: z.partialRecord(platform, z.string().min(1)).default({}),
@@ -59,8 +61,10 @@ const schema = z.object({
         variants: z.array(z.object({ profile: z.string().min(1), instance: z.string().min(1) })).optional(),
         // A watch to create and pair with the simulator: `{ name, type }`, as the simulator's own.
         simulator: z.object({ name: z.string().min(1), type: z.string().min(1), watch: z.object({ name: z.string().min(1), type: z.string().min(1) }).optional() }).optional(),
-        // A desktop's address for its holder: an ssh destination, its port, a host to jump through.
+        // Where its holder reaches a desktop or a Batocera box: an ssh destination, its port, a host to jump through.
         ssh: z.object({ target: z.string().min(1), port: z.number().int().min(1).max(65535).optional(), jump: z.string().min(1).optional() }).optional(),
+        // One line its holder runs on the device over ssh, writing a PNG of its screen to stdout.
+        screenshot: z.string().optional(),
         // A spawn slot's own memory cost when it differs from its host's (a VM beside emulators).
         cost_mib: z.number().int().min(0).optional(),
         note: z.string().optional(),
@@ -125,6 +129,7 @@ export const parseCatalog = (text: string, box: string): LoadedCatalog => {
       ...(d.ssh === undefined
         ? {}
         : { ssh: { target: d.ssh.target, ...(d.ssh.port === undefined ? {} : { port: d.ssh.port }), ...(d.ssh.jump === undefined ? {} : { jump: d.ssh.jump }) } }),
+      ...(d.screenshot === undefined ? {} : { screenshot: d.screenshot }),
       ...(d.cost_mib === undefined ? {} : { costMiB: d.cost_mib }),
       ...(d.note === undefined ? {} : { note: d.note }),
     })),

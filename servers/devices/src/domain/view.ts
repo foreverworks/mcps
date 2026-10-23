@@ -2,7 +2,7 @@
  * How a lease, a device and the whole broker are shown to an agent: compact,
  * with everything a wrapper needs to reach the device and nothing it does not.
  */
-import { deviceOf, DEFAULT_TENANT, hostOf, instancesOf, isStartedSlot, profilesOf, variantsOf, type Catalog, type Device, type Tenant } from "./catalog.js";
+import { deviceOf, DEFAULT_TENANT, hostOf, instancesOf, isStartedSlot, profilesOf, reachedOverSsh, variantsOf, type Catalog, type Device, type SshPlatform, type Tenant } from "./catalog.js";
 import type { HostHealth } from "./place.js";
 import { endsAt, eventTenant, isCallers, leaseVariant, positionOf, queueOrder, short, type BrokerState, type Lease, type Ticket } from "./state.js";
 
@@ -11,8 +11,10 @@ const iso = (ms: number): string => new Date(ms).toISOString().replace(/\.\d{3}Z
 /**
  * How to reach a device, and the environment a tool reads to target it: adb's own ANDROID_SERIAL and
  * ANDROID_ADB_SERVER_PORT, for a simulator the Mac's ssh target and the simulator's UDID (and its paired
- * watch's, IOS_SIM_WATCH), and for a desktop its ssh destination (DEVICE_SSH), port (DEVICE_SSH_PORT) and
- * jump host (DEVICE_SSH_JUMP). A UDID not seen yet is given as the simulator's name, which simctl also takes.
+ * watch's, IOS_SIM_WATCH), and for a device reached over ssh (a desktop, a Batocera box) its ssh destination
+ * (DEVICE_SSH), port (DEVICE_SSH_PORT), jump host (DEVICE_SSH_JUMP) and the command that writes a PNG of its
+ * screen to stdout (DEVICE_SCREENSHOT), where the catalog gives them. A UDID not seen yet is given as the
+ * simulator's name, which simctl also takes.
  */
 export type Address =
   | { readonly platform: "android"; readonly adbPort: number; readonly serial: string; readonly env: Readonly<Record<string, string>> }
@@ -24,7 +26,14 @@ export type Address =
       readonly watch?: { readonly name: string; readonly udid?: string };
       readonly env: Readonly<Record<string, string>>;
     }
-  | { readonly platform: "macos" | "windows"; readonly ssh: string; readonly port?: number; readonly jump?: string; readonly env: Readonly<Record<string, string>> };
+  | {
+      readonly platform: SshPlatform;
+      readonly ssh: string;
+      readonly port?: number;
+      readonly jump?: string;
+      readonly screenshot?: string;
+      readonly env: Readonly<Record<string, string>>;
+    };
 
 export const addressOf = (catalog: Catalog, state: BrokerState, health: Readonly<Record<string, HostHealth>>, device: Device): Address | undefined => {
   const host = hostOf(catalog, device.host);
@@ -56,15 +65,24 @@ export const addressOf = (catalog: Catalog, state: BrokerState, health: Readonly
       env,
     };
   }
-  if ((device.platform === "macos" || device.platform === "windows") && device.ssh !== undefined) {
+  if (reachedOverSsh(device.platform) && device.ssh !== undefined) {
     const { target, port, jump } = device.ssh;
+    const screenshot = device.screenshot;
     const env: Record<string, string> = {
       DEVICE_ID: device.id,
       DEVICE_SSH: target,
       ...(port === undefined ? {} : { DEVICE_SSH_PORT: String(port) }),
       ...(jump === undefined ? {} : { DEVICE_SSH_JUMP: jump }),
+      ...(screenshot === undefined ? {} : { DEVICE_SCREENSHOT: screenshot }),
     };
-    return { platform: device.platform, ssh: target, ...(port === undefined ? {} : { port }), ...(jump === undefined ? {} : { jump }), env };
+    return {
+      platform: device.platform,
+      ssh: target,
+      ...(port === undefined ? {} : { port }),
+      ...(jump === undefined ? {} : { jump }),
+      ...(screenshot === undefined ? {} : { screenshot }),
+      env,
+    };
   }
   return undefined;
 };

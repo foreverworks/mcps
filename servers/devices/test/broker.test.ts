@@ -6,7 +6,11 @@ import { RULES } from "../src/domain/state.js";
 import { POLICY } from "../src/mcp/policy.js";
 import {
   as,
+  BATOCERA,
+  BATOCERA_INSTANCES,
   bootAll,
+  BOX,
+  BOX_EPHEMERAL,
   brokerFor,
   CATALOG,
   DESKTOP_INSTANCES,
@@ -17,6 +21,7 @@ import {
   POOL_VARIANT_SLOTS,
   POOL_VARIANTS,
   rawBrokerFor,
+  SCREENSHOT,
   settled,
   VARIANT_INSTANCES,
   VARIANTS,
@@ -750,6 +755,66 @@ describe("desktops: a Mac's desktop session and a Windows VM", () => {
     // The emulator granted since the probe counts at its own cost against the next spawn.
     const third = await broker.acquire({ want: android, session: C, purpose: "another phone" });
     expect((third as { reason: string }).reason).toMatch(/has 16 GiB available \(counting 1 device\(s\) starting\); emulator-5556 costs 6 GiB/);
+  });
+});
+
+describe("a Batocera box: a VM like the Windows one, fresh for every lease, with a screenshot command", () => {
+  const batocera = { kind: "device", platform: "batocera" } as const;
+  const boxes = () => {
+    const world = makeWorld(BATOCERA_INSTANCES);
+    return { world, broker: brokerFor(world, BATOCERA) };
+  };
+  const address = {
+    platform: "batocera",
+    ssh: "root@127.0.0.1",
+    port: 2223,
+    jump: "builder@emu-1.example.com",
+    screenshot: SCREENSHOT,
+    env: { DEVICE_ID: "batocera-1", DEVICE_SSH: "root@127.0.0.1", DEVICE_SSH_PORT: "2223", DEVICE_SSH_JUMP: "builder@emu-1.example.com", DEVICE_SCREENSHOT: SCREENSHOT },
+  };
+
+  it("starts the box for a lease, booting until its unit is active, hands out its ssh address and screenshot command, and stops it after", async () => {
+    const { world, broker } = boxes();
+    const r = await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" });
+    expect(r).toMatchObject({ status: "granted", resource: "batocera-1", profile: "batocera", state: "booting", address });
+    expect(world.calls).toEqual([`start ${BOX}`]);
+    // Activating is not booted: the box stays booting until its unit says active.
+    world.clock += 61_000;
+    await broker.tick();
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "held", state: "booting" });
+    bootAll(world);
+    world.clock += 61_000;
+    await broker.tick();
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "held", state: "ready", address });
+    // status hands its holder the same address.
+    const s = (await broker.status({ session: A })) as { mine: { resource: string; address: unknown }[] };
+    expect(s.mine).toMatchObject([{ resource: "batocera-1", address }]);
+    // The stop after the lease is the reset: the control command throws the box away.
+    expect(await broker.release({ session: A, want: batocera, state: "dirty" })).toMatchObject({ status: "released", then: "stopped" });
+    await settled();
+    expect(world.calls).toEqual([`start ${BOX}`, `stop ${BOX}`]);
+    expect(world.emulators[BOX]).toBe("stopped");
+  });
+
+  it("starts the variant's instance for a lease that asks for its profile", async () => {
+    const { world, broker } = boxes();
+    const ephemeral = { ...batocera, profile: "batocera-ephemeral" } as const;
+    expect(await broker.acquire({ want: ephemeral, session: A, purpose: "a quick look" })).toMatchObject({
+      status: "granted",
+      resource: "batocera-1",
+      profile: "batocera-ephemeral",
+      state: "booting",
+      address,
+    });
+    expect(world.calls).toEqual([`start ${BOX_EPHEMERAL}`]);
+    bootAll(world);
+    world.clock += 61_000;
+    await broker.tick();
+    expect(await broker.acquire({ want: ephemeral, session: A, purpose: "a quick look" })).toMatchObject({ status: "held", state: "ready" });
+    expect(await broker.release({ session: A, want: batocera, state: "clean" })).toMatchObject({ status: "released", then: "stopped" });
+    await settled();
+    expect(world.calls).toEqual([`start ${BOX_EPHEMERAL}`, `stop ${BOX_EPHEMERAL}`]);
+    expect(world.emulators[BOX]).toBe("stopped");
   });
 });
 

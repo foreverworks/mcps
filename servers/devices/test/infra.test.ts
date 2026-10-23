@@ -445,14 +445,69 @@ describe("catalog", () => {
         }
         return "accepted";
       })(),
-    ).toMatch(/dev-iphone has an ssh address but is not a desktop/);
+    ).toMatch(/dev-iphone has an ssh address but is a phone/);
+  });
+
+  it("parses a Batocera box like a Windows VM, with an ephemeral variant and a screenshot command, and refuses the same misuses", () => {
+    const emu = { id: "emu-1", label: "emu-1", platform: "android", ssh: "builder@emu-1.example.com", spawn_max: 5, cost_mib: 6144, reserve_mib: 12288, control: "/usr/local/bin/emulator-ctl" };
+    const box = {
+      id: "batocera-1",
+      platform: "batocera",
+      host: "emu-1",
+      profile: "batocera",
+      mode: "spawn",
+      probe: "unit",
+      instance: "bato1",
+      variants: [{ profile: "batocera-ephemeral", instance: "bato1eph" }],
+      ssh: { target: "root@127.0.0.1", port: 2223, jump: "builder@emu-1.example.com" },
+      screenshot: "grab-screen --format png",
+      cost_mib: 4096,
+    };
+    const ok = { ...base, profiles: { ...base.profiles, batocera: "Batocera", "batocera-ephemeral": "Batocera, nothing kept" }, hosts: [...base.hosts, emu], devices: [...base.devices, box] };
+    const { catalog } = parseCatalog(JSON.stringify(ok), "broker-1");
+    expect(catalog.devices[1]).toEqual({
+      id: "batocera-1",
+      platform: "batocera",
+      host: "emu-1",
+      profile: "batocera",
+      mode: "spawn",
+      maestro: false,
+      probe: { kind: "unit" },
+      tenant: "default",
+      instance: "bato1",
+      variants: [{ profile: "batocera-ephemeral", instance: "bato1eph" }],
+      ssh: { target: "root@127.0.0.1", port: 2223, jump: "builder@emu-1.example.com" },
+      screenshot: "grab-screen --format png",
+      costMiB: 4096,
+    });
+    const refused = (devices: readonly object[]): string => {
+      try {
+        parseCatalog(JSON.stringify({ ...ok, devices }), "broker-1");
+      } catch (e) {
+        return (e as { error: { message: string } }).error.message;
+      }
+      return "accepted";
+    };
+    const changed = (change: object) => refused([...base.devices, { ...box, ...change }]);
+    // What a Windows slot is refused for, a Batocera slot is too.
+    expect(changed({ probe: undefined })).toMatch(/batocera device batocera-1 is a spawn slot without probe "unit": a VM's boot is read from its unit/);
+    expect(changed({ host: "mac-1" })).toMatch(/batocera device batocera-1 is started on mac-1, whose probe does not read the control command/);
+    expect(changed({ instance: undefined, probe: undefined, variants: undefined })).toMatch(/batocera device batocera-1 is a spawn slot with no instance/);
+    expect(changed({ ssh: undefined, screenshot: undefined })).toMatch(/batocera device batocera-1 has no ssh address for its holder/);
+    // A screenshot command is one line, run over the device's ssh address.
+    expect(changed({ screenshot: "grab-screen\nreboot" })).toMatch(/batocera-1 has a screenshot command of more than one line/);
+    expect(changed({ screenshot: "  " })).toMatch(/batocera-1 has an empty screenshot command/);
+    expect(refused([{ ...base.devices[0], screenshot: "grab-screen --format png" }])).toMatch(/dev-iphone has a screenshot command but is not reached over ssh/);
+    expect(refused([...base.devices, { id: "emulator-5554", platform: "android", host: "emu-1", profile: "ios-phone", mode: "fixed", adb: { port: 5037, serial: "emulator-5554" }, screenshot: "screencap -p" }])).toMatch(
+      /emulator-5554 has a screenshot command but is not reached over ssh/,
+    );
   });
 
   it("names the box from the caller when the catalog does not, and reads the deployment's clients", () => {
     const { catalog } = parseCatalog(JSON.stringify({ ...base, box: undefined, session_hint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"] } }), "broker-9");
     expect(catalog.box).toBe("broker-9");
-    expect(catalog.clients).toEqual({ sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: [], macos: [], windows: [] } });
-    expect(parseCatalog(JSON.stringify(base), "broker-9").catalog.clients).toEqual({ wrappers: { ios: [], android: [], macos: [], windows: [] } });
+    expect(catalog.clients).toEqual({ sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: [], macos: [], windows: [], batocera: [] } });
+    expect(parseCatalog(JSON.stringify(base), "broker-9").catalog.clients).toEqual({ wrappers: { ios: [], android: [], macos: [], windows: [], batocera: [] } });
   });
 
   it("refuses a tenant name it does not know", () => {

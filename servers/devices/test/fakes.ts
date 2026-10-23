@@ -30,7 +30,7 @@ export const CATALOG: Catalog = {
   profiles: { "android-phone": "API 34, 1080x2400", "ios-phone": "iPhone 17 Pro" },
   defaultProfiles: {},
   forms: {},
-  clients: { sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: ["apk-run", "flow-run"], macos: [], windows: [] } },
+  clients: { sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: ["apk-run", "flow-run"], macos: [], windows: [], batocera: [] } },
   hosts: [
     {
       id: "emu-1",
@@ -134,6 +134,39 @@ export const DESKTOPS: Catalog = {
   ],
 };
 export const DESKTOP_INSTANCES = [...EMULATORS, VM] as const;
+
+/**
+ * A Batocera box on the Linux host, mechanically a VM like windows-1 (started through the control command,
+ * read by its unit, reached over ssh through the host, at its own memory cost), with an ephemeral mode as
+ * its own profile and instance, and a command that writes a PNG of its screen to stdout.
+ */
+export const BOX = "bato1";
+export const BOX_EPHEMERAL = "bato1eph";
+export const SCREENSHOT = "grab-screen --format png";
+export const BATOCERA: Catalog = {
+  ...CATALOG,
+  profiles: { ...CATALOG.profiles, batocera: "Batocera, stock image", "batocera-ephemeral": "Batocera, nothing kept on disk" },
+  hosts: CATALOG.hosts.map((h) => (h.id === "emu-1" ? { ...h, spawnMax: 5 } : h)),
+  devices: [
+    ...CATALOG.devices,
+    {
+      id: "batocera-1",
+      platform: "batocera",
+      host: "emu-1",
+      profile: "batocera",
+      mode: "spawn",
+      maestro: false,
+      probe: { kind: "unit" },
+      tenant: DEFAULT_TENANT,
+      instance: BOX,
+      variants: [{ profile: "batocera-ephemeral", instance: BOX_EPHEMERAL }],
+      ssh: { target: "root@127.0.0.1", port: 2223, jump: "builder@emu-1.example.com" },
+      screenshot: SCREENSHOT,
+      costMiB: 4096,
+    },
+  ],
+};
+export const BATOCERA_INSTANCES = [...EMULATORS, BOX, BOX_EPHEMERAL] as const;
 
 /**
  * The Mac's other spares: a tablet and a phone with a paired watch, each on a profile of its own that a

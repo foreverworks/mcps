@@ -2,13 +2,13 @@ import { type McpServer, requestContext } from "@foreverworks/mcp-kit";
 import { z } from "zod";
 
 import type { Broker } from "../app/broker.js";
-import type { Catalog, Tenant } from "../domain/catalog.js";
+import { PLATFORMS, type Catalog, type Tenant } from "../domain/catalog.js";
 import type { Want } from "../domain/state.js";
 import { tenantOfClient } from "../domain/tenant.js";
 import { agree, profilesFor, sessionFor, wrappersAcquire, wrappersOf } from "./describe.js";
 import { handled } from "./envelope.js";
 
-const wantName = z.enum(["ios", "android", "macos", "windows", "builder:ios", "builder:android"]);
+const wantName = z.enum([...PLATFORMS, "builder:ios", "builder:android"]);
 
 const purpose = z.string().trim().min(1).max(200).describe("What you are doing, in a few words; shown to whoever waits behind you.");
 
@@ -59,11 +59,14 @@ export const registerAll = (server: McpServer, broker: Broker, catalog: Catalog,
     {
       title: "Lease a device or a build slot",
       description:
-        "Ask for a device (ios: a simulator on a Mac; android: an emulator; macos: a Mac's desktop session; windows: a Windows machine) or a build slot (builder:ios, builder:android). " +
+        "Ask for a device (ios: a simulator on a Mac; android: an emulator; macos: a Mac's desktop session; windows: a Windows machine; " +
+        "batocera: a fresh Batocera retro-gaming box (a VM) reached over ssh as root, every lease starting from the stock image and its release throwing the box away) " +
+        "or a build slot (builder:ios, builder:android). " +
         "Answers granted (with the device's address and the environment a tool reads to reach it: ANDROID_SERIAL and ANDROID_ADB_SERVER_PORT for adb, " +
-        "IOS_SIM_MAC (the Mac's ssh target) and IOS_SIM_DEVICE (the simulator's UDID) for simctl, DEVICE_SSH with DEVICE_SSH_PORT and DEVICE_SSH_JUMP where set for a desktop), " +
+        "IOS_SIM_MAC (the Mac's ssh target) and IOS_SIM_DEVICE (the simulator's UDID) for simctl, DEVICE_SSH with DEVICE_SSH_PORT and DEVICE_SSH_JUMP where set for a device reached over ssh, " +
+        "whose address may also carry screenshot (and DEVICE_SCREENSHOT): a command to run on it over ssh that writes a PNG of its screen to stdout), " +
         "queued (a ticket: call wait), or unavailable (with the reason, e.g. its host is asleep). " +
-        "An Android emulator or a Windows VM slot is started for your lease and stopped after it: a granted lease says state booting until the device has " +
+        "An Android emulator, a Windows VM or a Batocera box is started for your lease and stopped after it: a granted lease says state booting until the device has " +
         "booted (about a minute for an emulator), and asking again returns the same lease with its state; with until_booted, acquire waits for the boot " +
         "itself and reports progress meanwhile. " +
         "One device per platform and form per session (a phone and a Wear OS watch are two forms): asking again returns the one you hold and extends it, and asking for a profile it does not run is refused (release it first). A lease ends by release, after 20 min without " +
@@ -182,8 +185,8 @@ export const registerAll = (server: McpServer, broker: Broker, catalog: Catalog,
       title: "Give a device back",
       description:
         "End a lease you hold. state: clean (leave it as it is, app data kept), dirty (reset it: the apps you installed uninstalled on iOS, app data cleared on Android), " +
-        "or broken (quarantine it with your note; nothing leases it until someone checks it and calls clear). iOS simulators are shut down, and Android emulators and Windows VMs the broker started are stopped, after every lease; " +
-        "a Mac's desktop session is left as it is.",
+        "or broken (quarantine it with your note; nothing leases it until someone checks it and calls clear). iOS simulators are shut down, and Android emulators, Windows VMs and Batocera boxes the broker started are stopped, after every lease " +
+        "(a Batocera box is thrown away, so the next lease gets a fresh one); a Mac's desktop session is left as it is.",
       inputSchema: {
         session,
         lease: leaseId.optional(),
