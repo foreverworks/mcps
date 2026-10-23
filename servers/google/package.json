@@ -1,7 +1,6 @@
 {
   "name": "@foreverworks/mcp-google",
   "version": "0.1.0",
-  "private": true,
   "description": "MCP server for several Google accounts at once: Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, contacts and Meet transcripts",
   "mcpName": "com.foreverworks/google",
   "mcp": {

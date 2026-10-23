@@ -26,9 +26,6 @@ you share. Uploads take files up to 20 MiB (5 MiB on Notion's Free plan).
 <!-- install:begin -->
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=notion&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22notion_tokens_dir%22%2C%22description%22%3A%22A%20folder%20holding%20one%20file%20per%20workspace%2C%20notion-%3Clabel%3E%2C%20each%20with%20that%20workspace's%20integration%20token%20or%20personal%20access%20token.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-notion%22%5D%2C%22env%22%3A%7B%22NOTION_TOKENS_DIR%22%3A%22%24%7Binput%3Anotion_tokens_dir%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=notion&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLW5vdGlvbiJdLCJlbnYiOnsiTk9USU9OX1RPS0VOU19ESVIiOiIke2VudjpOT1RJT05fVE9LRU5TX0RJUn0ifX0%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-notion.mcpb)
 
-> [!NOTE]
-> `@foreverworks/mcp-notion` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
-
 With Claude Code:
 
 ```bash

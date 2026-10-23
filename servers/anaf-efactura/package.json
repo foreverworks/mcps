@@ -1,7 +1,6 @@
 {
   "name": "@foreverworks/mcp-anaf-efactura",
   "version": "0.1.0",
-  "private": true,
   "description": "MCP server for Romania's ANAF e-Factura and e-Transport: read the invoices a company received and sent, check and render them, file new invoices and e-Transport declarations, and look up companies in the VAT registry",
   "mcpName": "com.foreverworks/anaf-efactura",
   "mcp": {
