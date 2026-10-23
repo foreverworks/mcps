@@ -90,13 +90,21 @@ Once only, in order:
    run creates `release` with no protection rule.
 7. **Give the workflow a token, once.** npm's trusted publishing needs a
    package that exists, so each first publish needs a token. On npmjs.com,
-   create a granular access token that can publish to the `@foreverworks`
-   scope and expires in a few days, and save it as the repository secret
+   create a granular access token with "Bypass two-factor authentication"
+   (the workflow cannot answer a 2FA prompt), "Read and write (publish and
+   stage)" on the `@foreverworks` scope only, no access to organizations,
+   and the shortest expiry, and save it as the repository secret
    `NPM_TOKEN`:
 
    ```bash
    gh secret set NPM_TOKEN -R foreverworks/mcps
    ```
+
+   npm refuses to make a token while the account is suspended, as it is for
+   72 hours after a two-factor recovery code is used. npm says such tokens
+   lose direct publishing in January 2027; from then on a token can only
+   stage a version, which a maintainer approves on npmjs.com before it is
+   published.
 
 8. **Release** as in [Cutting a release](#cutting-a-release).
 9. **Trust the workflow** for each package published. On your own machine,
