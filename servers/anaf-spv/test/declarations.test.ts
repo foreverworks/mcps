@@ -13,6 +13,7 @@ import { makeHttp } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
 import { dukVerdict, factsOf, filingLine, kitFor } from "../src/domain/declarations.js";
+import { elementsOf } from "../src/domain/declarations/xml.js";
 import { makeKits } from "../src/infra/duk/kit.js";
 import { unzip } from "../src/infra/duk/zip.js";
 import { embeddedFiles } from "../src/infra/pdf.js";
@@ -79,6 +80,14 @@ describe("a declaration's XML", () => {
     expect((await errorOf(() => factsOf('<d212 an_r="x"/>', "D212")))?.message).toContain("an_r");
     expect(kitFor("D212", { year: 2023, month: 12 }).zip).toBe("D212_20231002.zip");
     expect((await errorOf(() => kitFor("D212", { year: 2019, month: 12 })))?.message).toContain("2020, 2021");
+  });
+
+  it("is read as a parser reads it: whichever of a comment, a processing instruction or CDATA opens first, and never with a DOCTYPE", async () => {
+    const root = '<d212 xmlns="mfp:anaf:dgti:d212:declaratie:v8" an_r="2025" cif="2990101999999" rectif1="0">';
+    expect(factsOf(`<?xml version="1.0"?><!-- <? -->${root}<!-- ?> --></d212>`, "D212")).toMatchObject({ year: 2025, cif: "2990101999999" });
+    expect(elementsOf(`${root}<!-- <? --><x><![CDATA[ ?> <cap14 tara="XX"/> ]]></x></d212>`).map((e) => e.name)).toEqual(["d212", "x"]);
+    const doctype = `<!DOCTYPE d212 [<!ENTITY n SYSTEM "file:///dev/null">]>${root.replace("2990101999999", "&n;")}</d212>`;
+    expect((await errorOf(() => factsOf(doctype, "D212")))?.message).toContain("DOCTYPE");
   });
 
   it("is confirmed by one line naming what is filed, for whom, and that it stays", () => {
