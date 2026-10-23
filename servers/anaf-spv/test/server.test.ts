@@ -458,7 +458,7 @@ describe("declarations", () => {
     const ok = await w.call("validate_declaration", { xml: "D212.xml" });
     expect(ok).toMatchObject({ ok: true, valid: true, form: "D212", year: 2025, cif: CNP, namespace: "mfp:anaf:dgti:d212:declaratie:v8", errors: "ok", pdf: { embedded_xml_identical: true } });
     expect(ok.xml.sha256).toBe(createHash("sha256").update(d212()).digest("hex"));
-    expect(ok.pdf.path).toMatch(new RegExp(`/D212_an-2025_${ok.xml.sha256.slice(0, 12)}\.pdf$`));
+    expect(ok.pdf.path).toMatch(new RegExp(`/D212_an-2025_${ok.xml.sha256.slice(0, 12)}\\.pdf$`));
     expect(ok.next).toContain("confirm: true");
     expect(duk.runs).toEqual([{ form: "D212", zip: "D212Validator_01082025.zip", pdf: true }]);
     expect((await w.call("validate_declaration", { xml: "D212.xml", year: 2024 })).error).toMatchObject({ kind: "input", message: expect.stringContaining("declares reporting year 2025, not year 2024") });
@@ -722,7 +722,7 @@ describe("the contact form", () => {
       cif_ales: CNP,
       categSolicit: "3",
       subcategSolicit: "0",
-      textintrebare: TEXT.replace("\n", "\r\n"),
+      textintrebare: TEXT.replaceAll("\n", "\r\n"),
       submit: "submit",
     });
     expect(w.spv.state.contacts[0]?.file).toBeUndefined();

@@ -14,7 +14,7 @@ import { buildDeps } from "../src/composition.js";
 import { connect, json, keyFiles, stubFetch } from "./harness.js";
 
 const API = "https://api.porkbun.com/api/json/v3";
-const DKIM = generateKeyPairSync("rsa", { modulusLength: 1024 }).publicKey.export({ type: "spki", format: "der" }).toString("base64");
+const DKIM = generateKeyPairSync("rsa", { modulusLength: 2048 }).publicKey.export({ type: "spki", format: "der" }).toString("base64");
 
 afterEach(() => {
   vi.unstubAllGlobals();

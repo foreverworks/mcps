@@ -46,6 +46,12 @@ describe("judgeGrant", () => {
     expect(v).toMatchObject({ ok: true, canWrite: true, role: "modify" });
   });
 
+  it("counts a scope only when it is granted whole: a scope that merely contains the full-access URL grants nothing", () => {
+    const lookalike = "https://mail.google.com.example.net/ https://example.net/https://mail.google.com/";
+    const v = judgeGrant("modify", { clientId: "client-a", scopes: [] }, { aud: "client-a", scope: lookalike }, profile);
+    expect(v).toMatchObject({ ok: false, canWrite: false });
+  });
+
   it("fails the server's own grant when it lacks gmail.modify, even if the file agrees", () => {
     const v = judgeGrant("modify", declared, { aud: "client-a", scope: READONLY }, profile);
     expect(v.ok).toBe(false);
