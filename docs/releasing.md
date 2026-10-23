@@ -34,16 +34,29 @@ what ([What the workflow does](#what-the-workflow-does)).
    Review the diff and commit it.
 3. **Check the plan.** `npx tsx scripts/release.ts plan` lists what would go
    to npm and to the registry, and sends nothing.
-4. **Tag and push.** Push `main`, then tag the release commit:
+4. **Rehearse it**, if anything about the release itself changed (a package
+   made public, the workflow, a script it runs): push `main`, then
+
+   ```bash
+   gh workflow run release.yml -R foreverworks/mcps -f rehearse=true
+   ```
+
+   runs everything a release runs before it sends anything, then npm's dry
+   run of each publish and a login to the registry with its key. It sends
+   nothing, and it works while the repository is private.
+5. **Tag and push.** Push `main`, then tag the release commit:
 
    ```bash
    tag="release-$(date -u +%F)"
+   git rev-parse -q --verify "refs/tags/$tag" >/dev/null && tag="$tag.2"
    git tag "$tag" && git push origin "$tag"
    ```
 
-5. **Watch it** with `gh run watch` or in the Actions tab. If the `release`
+   A third release on the same day takes `.3`.
+
+6. **Watch it** with `gh run watch` or in the Actions tab. If the `release`
    environment requires a reviewer, the run waits for one.
-6. **If a step failed,** fix the cause and run it again: `scripts/release.ts`
+7. **If a step failed,** fix the cause and run it again: `scripts/release.ts`
    skips every version npm or the registry already has, so nothing is sent
    twice.
 
@@ -51,26 +64,31 @@ what ([What the workflow does](#what-the-workflow-does)).
 
 Once only, in order:
 
-1. **Go public.** Work through
-   [Before the repository goes public](#before-the-repository-goes-public),
-   then change the repository's visibility.
-2. **Protect the environment.** In the repository's Settings, Environments,
-   create `release`, with required reviewers if every release should wait for
-   a person. If you skip this, the first run creates `release` with no
-   protection rule.
-3. **Choose the first version**; `0.x` is the conservative choice while
-   interfaces may change. Each CHANGELOG.md opens with an entry for the
-   version in its package.json: to start at another, change both.
-   `npm run release:version` would apply the changesets already pending on top
-   of it (a `major` one turns 1.0.0 into 2.0.0), so fold them into the first
-   entry and delete them, or release them as versions.
-4. **Choose what ships.** Remove `"private": true` from each server that
+1. **The first version** is 0.1.0 for every package, as each CHANGELOG.md's
+   first entry says: `0.x` while interfaces may still change. The changesets
+   pending before it are folded into those entries. To start at another
+   version, change both the package.json and the entry.
+2. **Choose what ships.** Remove `"private": true` from each server that
    ships, and from the toolkit packages they depend on: every server needs
    `mcp-kit`, and `bolt-food` and `glovo` need `receipts`. A public package
    that depends on a private one is refused before anything is sent. Then run
    `npx tsx scripts/check-docs.ts --write`, which drops the "not on npm yet"
-   note from those servers' install blocks, and commit.
-5. **Give the workflow a token, once.** npm's trusted publishing needs a
+   note from those servers' install blocks, and commit. Nothing is published
+   while the repository is private, so this can come first.
+3. **The registry key.** Set the repository secret `MCP_REGISTRY_PRIVATE_KEY`
+   ([below](#the-registry-namespace-comforeverworks)).
+4. **Rehearse** as in [Cutting a release](#cutting-a-release), step 4. It is
+   the first run of the release workflow, so let it find what is wrong while
+   nothing can be sent.
+5. **Go public.** Work through
+   [Before the repository goes public](#before-the-repository-goes-public),
+   then change the repository's visibility.
+6. **Protect the environment.** In the repository's Settings, Environments,
+   create `release`, with required reviewers if every release should wait for
+   a person. A private repository on GitHub's free plan cannot have
+   environments, so this comes after going public. If you skip it, the first
+   run creates `release` with no protection rule.
+7. **Give the workflow a token, once.** npm's trusted publishing needs a
    package that exists, so each first publish needs a token. On npmjs.com,
    create a granular access token that can publish to the `@foreverworks`
    scope and expires in a few days, and save it as the repository secret
@@ -80,25 +98,28 @@ Once only, in order:
    gh secret set NPM_TOKEN -R foreverworks/mcps
    ```
 
-6. **Release** as in [Cutting a release](#cutting-a-release).
-7. **Trust the workflow** for each package published (here, oblio), with npm
-   11.15.0 or newer and two-factor authentication on your npm account:
+8. **Release** as in [Cutting a release](#cutting-a-release).
+9. **Trust the workflow** for each package published. On your own machine,
+   signed in to npm (`npm login`) with two-factor authentication on your
+   account and npm 11.15.0 or newer, in a clone of `main`:
 
    ```bash
-   npm trust github @foreverworks/mcp-oblio --file release.yml \
-     --repo foreverworks/mcps --env release --allow-publish --yes
+   npx tsx scripts/release.ts trust
    ```
 
+   For each public package on npm that does not trust it yet, it runs
+   `npm trust github <package> --file release.yml --repo foreverworks/mcps
+   --env release --allow-publish --yes`; `--dry-run` shows what it would do.
    Without `--allow-publish`, a connection made after 2026-09-03 allows only
-   staged publishing, and the workflow runs `npm publish`. A new connection
-   lapses unless a publish through it succeeds within two days; delete a
-   lapsed one and make it again.
-8. **Retire the token.** Delete the secret
-   (`gh secret delete NPM_TOKEN -R foreverworks/mcps`) and revoke the token on
-   npmjs.com. From then on the workflow publishes with its OIDC token alone.
-
-The registry's key is the repository secret `MCP_REGISTRY_PRIVATE_KEY`
-(below); set it on the repository before the first release.
+   staged publishing, and the workflow runs `npm publish`. A granular token
+   that bypasses two-factor authentication cannot make these connections.
+10. **Retire the token.** Delete the secret
+    (`gh secret delete NPM_TOKEN -R foreverworks/mcps`) and revoke the token on
+    npmjs.com. From then on the workflow publishes with its OIDC token alone.
+11. **Prove it within two days.** A new connection lapses unless a publish
+    through it succeeds within two days, so release a patch (a changeset, then
+    [Cutting a release](#cutting-a-release)) with no token in place. If one
+    lapsed, delete it on npmjs.com and run step 9 again.
 
 ## Before the repository goes public
 
@@ -133,9 +154,11 @@ The registry's key is the repository secret `MCP_REGISTRY_PRIVATE_KEY`
 ## What the workflow does
 
 `.github/workflows/release.yml` starts when a `release-*` tag is pushed, or by
-hand from the Actions tab. It runs only on a public repository, on a
+hand from the Actions tab. It publishes only from a public repository, on a
 GitHub-hosted runner (npm's trusted publishing refuses self-hosted ones), in
-the GitHub environment `release`, one run at a time. In order, it:
+the GitHub environment `release`, one run at a time. Steps 1 to 4 and the plan
+are `.github/actions/prepare-release`, which the rehearsal runs too. In order,
+it:
 
 1. installs npm 12.2.1, runs `npm ci` and `npm run check` (typecheck, tests,
    build, the docs and pack checks) on Node 24;
@@ -151,6 +174,12 @@ the GitHub environment `release`, one run at a time. In order, it:
    before each entry because a registry login lasts five minutes;
 6. on a tag only, creates the GitHub release named after the tag, with every
    bundle. A run started by hand publishes the same but attaches no bundles.
+
+Started by hand with `rehearse`, it runs a separate job instead, on any
+repository and outside the `release` environment: steps 1 to 4 and the plan,
+then `scripts/release.ts rehearse`, which logs in to the registry with the
+key (proving the secret and the DNS record) and runs `npm publish --dry-run`
+for each package npm lacks. It holds no npm token and sends nothing.
 
 ## The registry namespace: com.foreverworks
 

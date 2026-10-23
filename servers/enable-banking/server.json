@@ -3,7 +3,7 @@
   "name": "com.foreverworks/enable-banking",
   "title": "Enable Banking",
   "description": "MCP server for bank accounts through Enable Banking's PSD2 API",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/enable-banking#readme",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-enable-banking",
-      "version": "1.0.0",
+      "version": "0.1.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

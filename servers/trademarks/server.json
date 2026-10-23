@@ -3,7 +3,7 @@
   "name": "com.foreverworks/trademarks",
   "title": "Trademark search",
   "description": "MCP server for trademark registers",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/trademarks#readme",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-trademarks",
-      "version": "1.0.0",
+      "version": "0.1.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

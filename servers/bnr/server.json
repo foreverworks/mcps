@@ -3,7 +3,7 @@
   "name": "com.foreverworks/bnr",
   "title": "BNR exchange rates",
   "description": "MCP server for the National Bank of Romania's exchange rates",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/bnr#readme",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-bnr",
-      "version": "1.0.0",
+      "version": "0.1.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

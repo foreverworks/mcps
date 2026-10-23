@@ -7,7 +7,11 @@
  * .github/workflows/release.yml; docs/releasing.md is the procedure.
  *
  *   npx tsx scripts/release.ts plan      what would be published, nothing sent
+ *   npx tsx scripts/release.ts rehearse  the plan, npm's dry run of each publish and a
+ *                                        registry login, nothing sent (CI, by hand)
  *   npx tsx scripts/release.ts publish   publish it (CI only)
+ *   npx tsx scripts/release.ts trust     make each published package trust the release
+ *                                        workflow (a maintainer, signed in to npm)
  *
  * It can be run again after a failure: a version npm or the registry already
  * has is skipped, never sent twice.
@@ -89,10 +93,64 @@ const unpublishable = (all: readonly Workspace[]): readonly string[] => {
   );
 };
 
+/** The workflow, repository and environment npm's trusted publisher names: release.yml's own. */
+const WORKFLOW = "release.yml";
+const ENVIRONMENT = "release";
+/** `npm trust` needs this npm or newer. */
+const NPM_TRUST = [11, 15, 0] as const;
+
+const repository = (): string => {
+  const pkg = JSON.parse(readFileSync(join(ROOT, "package.json"), "utf8")) as { readonly repository: { readonly url: string } };
+  const slug = /github\.com\/([^/]+\/[^/.]+)/.exec(pkg.repository.url)?.[1];
+  if (slug === undefined) throw new Error(`package.json's repository is not on GitHub: ${pkg.repository.url}`);
+  return slug;
+};
+
+const npmIsAtLeast = (wanted: readonly number[]): boolean => {
+  const have = execFileSync("npm", ["--version"], { encoding: "utf8" }).trim().split(".").map(Number);
+  for (const [i, part] of wanted.entries()) {
+    if ((have[i] ?? 0) !== part) return (have[i] ?? 0) > part;
+  }
+  return true;
+};
+
+/**
+ * Connects each published package to the release workflow, once per package;
+ * a package that already names the workflow is left alone. npm asks for the
+ * maintainer's second factor, so this runs on their machine, never in CI.
+ */
+const trust = (shipping: readonly Workspace[], dryRun: boolean): void => {
+  if (!npmIsAtLeast(NPM_TRUST)) throw new Error(`npm trust needs npm ${NPM_TRUST.join(".")} or newer: npm install -g npm@latest`);
+  const repo = repository();
+  for (const w of shipping) {
+    if (!onNpm(w)) {
+      console.log(`${w.name}: not on npm yet, so it cannot trust a workflow; publish it first`);
+      continue;
+    }
+    const listed = spawnSync("npm", ["trust", "list", w.name, "--json"], { cwd: ROOT, encoding: "utf8" });
+    if (listed.status === 0 && listed.stdout.includes(WORKFLOW)) {
+      console.log(`${w.name}: already trusts ${WORKFLOW}`);
+      continue;
+    }
+    run("npm", ["trust", "github", w.name, "--file", WORKFLOW, "--repo", repo, "--env", ENVIRONMENT, "--allow-publish", "--yes", ...(dryRun ? ["--dry-run"] : [])]);
+  }
+};
+
+const MODES = ["plan", "rehearse", "publish", "trust"] as const;
+type Mode = (typeof MODES)[number];
+
+const isMode = (value: string | undefined): value is Mode => MODES.some((m) => m === value);
+
+const loginToRegistry = (key: string): void => {
+  if (key === "") throw new Error("MCP_REGISTRY_PRIVATE_KEY is not set: the registry entries need the namespace's key (docs/releasing.md)");
+  const login = ["login", "dns", "--domain", DOMAIN, "--private-key"];
+  run("mcp-publisher", [...login, key], [...login, "***"]);
+};
+
 const main = async (): Promise<void> => {
   const mode = process.argv[2];
-  if (mode !== "plan" && mode !== "publish") {
-    console.error("usage: npx tsx scripts/release.ts plan|publish");
+  if (!isMode(mode)) {
+    console.error(`usage: npx tsx scripts/release.ts ${MODES.join("|")}`);
     process.exit(2);
   }
   const all = workspaces();
@@ -102,6 +160,13 @@ const main = async (): Promise<void> => {
     process.exit(1);
   }
   const shipping = all.filter((w) => !w.private);
+  if (mode === "trust") {
+    trust(shipping, process.argv.includes("--dry-run"));
+    return;
+  }
+  const key = process.env["MCP_REGISTRY_PRIVATE_KEY"]?.trim() ?? "";
+  // The key and the namespace's DNS record, proved before a release needs them.
+  if (mode === "rehearse") loginToRegistry(key);
   for (const w of all.filter((w) => w.private)) console.log(`${w.name}: private, not published`);
   if (shipping.length === 0) {
     console.log("nothing to publish: every package is private (removing that flag is the decision to publish it)");
@@ -110,21 +175,18 @@ const main = async (): Promise<void> => {
   for (const w of shipping) {
     if (onNpm(w)) console.log(`${w.name}@${w.version}: already on npm`);
     else if (mode === "plan") console.log(`${w.name}@${w.version}: would be published to npm`);
-    else run("npm", ["publish", "-w", w.dir, "--access", "public", "--provenance"]);
+    else run("npm", ["publish", "-w", w.dir, "--access", "public", ...(mode === "rehearse" ? ["--dry-run"] : ["--provenance"])]);
   }
-  const key = process.env["MCP_REGISTRY_PRIVATE_KEY"]?.trim() ?? "";
   for (const w of shipping.filter((w) => w.mcpName !== undefined)) {
     if (await inRegistry(w)) {
       console.log(`${w.mcpName}@${w.version}: already in the MCP Registry`);
       continue;
     }
-    if (mode === "plan") {
+    if (mode !== "publish") {
       console.log(`${w.mcpName}@${w.version}: would be published to the MCP Registry`);
       continue;
     }
-    if (key === "") throw new Error("MCP_REGISTRY_PRIVATE_KEY is not set: the registry entries need the namespace's key (docs/releasing.md)");
-    const login = ["login", "dns", "--domain", DOMAIN, "--private-key"];
-    run("mcp-publisher", [...login, key], [...login, "***"]);
+    loginToRegistry(key);
     run("mcp-publisher", ["publish", join(w.dir, "server.json")]);
   }
 };

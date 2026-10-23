@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-typesafe",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "MCP server for TypeSafe's Jev: typed, calibrated judgments over text or JSON (a yes or no with its probability, one of a set, a score), one at a time or in batches",
   "mcpName": "com.foreverworks/typesafe",
@@ -55,7 +55,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^1.0.0",
+    "@foreverworks/mcp-kit": "^0.1.0",
     "@typesafe-ai/sdk": "0.7.0",
     "zod": "^4.6.7"
   }

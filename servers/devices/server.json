@@ -3,7 +3,7 @@
   "name": "com.foreverworks/devices",
   "title": "Device broker",
   "description": "MCP device broker for shared Android emulators, iOS simulators, build slots and desktops",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/devices#readme",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-devices",
-      "version": "1.0.0",
+      "version": "0.1.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-notion",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "MCP server for one or more Notion workspaces: search, pages read and written as Markdown, typed database queries, saved views, comments and files",
   "mcpName": "com.foreverworks/notion",
@@ -55,7 +55,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^1.0.0",
+    "@foreverworks/mcp-kit": "^0.1.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {

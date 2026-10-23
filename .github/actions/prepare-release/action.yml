@@ -1,0 +1,42 @@
+name: prepare-release
+description: >
+  Everything a release runs before it sends anything, shared by the release
+  and its rehearsal (.github/workflows/release.yml): the checks, the registry's
+  validation of every entry, every public server's desktop bundle, and the plan.
+  The repository must be checked out with its tags first.
+
+runs:
+  using: composite
+  steps:
+    - uses: actions/setup-node@v7
+      with:
+        node-version: 24
+        registry-url: https://registry.npmjs.org
+    # Trusted publishing needs npm 11.5.1 or newer; Node's own may be older.
+    - run: npm install -g npm@12.2.1
+      shell: bash
+    - run: npm ci
+      shell: bash
+    - run: npm run check
+      shell: bash
+    - run: npx tsx scripts/access-changes.ts --check
+      shell: bash
+    # Pinned and checked: this binary holds the registry key while it runs.
+    - name: Install mcp-publisher 1.8.1
+      shell: bash
+      run: |
+        curl -fsSL -o "$RUNNER_TEMP/mcp-publisher.tar.gz" \
+          https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+        echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  $RUNNER_TEMP/mcp-publisher.tar.gz" | sha256sum -c -
+        mkdir -p "$RUNNER_TEMP/bin"
+        tar xzf "$RUNNER_TEMP/mcp-publisher.tar.gz" -C "$RUNNER_TEMP/bin" mcp-publisher
+        echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+    # The registry's own check of every entry, before anything is published.
+    - run: for entry in servers/*/server.json; do mcp-publisher validate "$entry"; done
+      shell: bash
+    # Every public server's desktop bundle, built before anything is
+    # published, so a bundle that cannot be built stops the release.
+    - run: npx tsx scripts/bundle.ts --public --out bundles
+      shell: bash
+    - run: npx tsx scripts/release.ts plan
+      shell: bash

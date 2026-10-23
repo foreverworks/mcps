@@ -24,6 +24,10 @@ At release time, `npm run release:version` turns the pending changesets into
 each package's new version and changelog entry
 ([docs/releasing.md](../docs/releasing.md)).
 
+**Until the first release** there is no earlier version to change from: edit
+the package's 0.1.0 entry in its `CHANGELOG.md` instead, if someone installing
+it for the first time needs to know, and add no changeset.
+
 ## Writing the entry
 
 Write for the person upgrading, not the reviewer: what they can do now or

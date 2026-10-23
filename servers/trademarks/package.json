@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-trademarks",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "MCP server for trademark registers: whether a name is already a registered or pending mark, by office and Nice class (USPTO, EUIPO), and a US mark's history and documents",
   "mcpName": "com.foreverworks/trademarks",
@@ -68,7 +68,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^1.0.0",
+    "@foreverworks/mcp-kit": "^0.1.0",
     "zod": "^4.6.7"
   }
 }

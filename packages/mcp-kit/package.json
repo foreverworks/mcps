@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-kit",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "Shared toolkit for MCP servers: stdio and HTTP transports with per-client tokens, a guard that classifies, audits and can confirm every tool call, an HTTP and OAuth stack, exact decimals, and byte-exact file inputs",
   "keywords": [

@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-anaf-spv",
-  "version": "1.0.0",
+  "version": "0.1.0",
   "private": true,
   "description": "MCP server for ANAF's Spațiul Privat Virtual (pfinternet.anaf.ro): download what ANAF posts to a taxpayer, request new documents, validate declarations and file a D212; it signs in by itself",
   "mcpName": "com.foreverworks/anaf-spv",
@@ -82,7 +82,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^1.0.0",
+    "@foreverworks/mcp-kit": "^0.1.0",
     "zod": "^4.6.7"
   }
 }
