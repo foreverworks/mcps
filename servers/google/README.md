@@ -34,7 +34,7 @@ a Google Workspace account.
 ## Install
 
 <!-- install:begin -->
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=google&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_oauth_client_file%22%2C%22description%22%3A%22Path%20of%20your%20OAuth%20client's%20JSON%20(a%20Desktop%20app%20client%20from%20the%20Google%20Cloud%20console).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_addresses%22%2C%22description%22%3A%22Each%20account's%20label%20and%20address%2C%20e.g.%20personal%3Dana%40example.com%2Cwork%3Dana%40example.org.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_modify_accounts%22%2C%22description%22%3A%22Where%20each%20mailbox's%20Gmail%20grant%20is%20kept%2C%20e.g.%20personal%3D%2Fpath%2Fto%2Fgrants%2Fgmail-personal.json%3B%20consent%20writes%20it%20there.%20Without%20it%20the%20other%20products%20work%2C%20but%20no%20mailbox%20does.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22calendar_time_zone%22%2C%22description%22%3A%22Optional.%20The%20time%20zone%20a%20time%20without%20an%20offset%20is%20read%20in%2C%20e.g.%20Europe%2FParis.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-google%22%5D%2C%22env%22%3A%7B%22GOOGLE_OAUTH_CLIENT_FILE%22%3A%22%24%7Binput%3Agoogle_oauth_client_file%7D%22%2C%22GMAIL_ADDRESSES%22%3A%22%24%7Binput%3Agmail_addresses%7D%22%2C%22GMAIL_MODIFY_ACCOUNTS%22%3A%22%24%7Binput%3Agmail_modify_accounts%7D%22%2C%22CALENDAR_TIME_ZONE%22%3A%22%24%7Binput%3Acalendar_time_zone%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=google&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWdvb2dsZSJdLCJlbnYiOnsiR09PR0xFX09BVVRIX0NMSUVOVF9GSUxFIjoiJHtlbnY6R09PR0xFX09BVVRIX0NMSUVOVF9GSUxFfSIsIkdNQUlMX0FERFJFU1NFUyI6IiR7ZW52OkdNQUlMX0FERFJFU1NFU30iLCJHTUFJTF9NT0RJRllfQUNDT1VOVFMiOiIke2VudjpHTUFJTF9NT0RJRllfQUNDT1VOVFN9IiwiQ0FMRU5EQVJfVElNRV9aT05FIjoiJHtlbnY6Q0FMRU5EQVJfVElNRV9aT05FfSJ9fQ%3D%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-google.mcpb)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=google&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_oauth_client_file%22%2C%22description%22%3A%22Path%20of%20your%20OAuth%20client's%20JSON%20(a%20Desktop%20app%20client%20from%20the%20Google%20Cloud%20console).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_addresses%22%2C%22description%22%3A%22Each%20account's%20label%20and%20address%2C%20e.g.%20personal%3Dana%40example.com%2Cwork%3Dana%40example.org.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_modify_accounts%22%2C%22description%22%3A%22Where%20each%20mailbox's%20Gmail%20grant%20is%20kept%2C%20e.g.%20personal%3D%2Fpath%2Fto%2Fgrants%2Fgmail-personal.json%3B%20consent%20writes%20it%20there.%20Without%20it%20the%20other%20products%20work%2C%20but%20no%20mailbox%20does.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22calendar_time_zone%22%2C%22description%22%3A%22Optional.%20The%20time%20zone%20a%20time%20without%20an%20offset%20is%20read%20in%2C%20e.g.%20Europe%2FParis.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_toolsets%22%2C%22description%22%3A%22Optional.%20The%20products%20whose%20tools%20the%20server%20loads%2C%20separated%20by%20commas%2C%20e.g.%20gmail%2Ccalendar.%20Empty%20loads%20every%20product.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-google%22%5D%2C%22env%22%3A%7B%22GOOGLE_OAUTH_CLIENT_FILE%22%3A%22%24%7Binput%3Agoogle_oauth_client_file%7D%22%2C%22GMAIL_ADDRESSES%22%3A%22%24%7Binput%3Agmail_addresses%7D%22%2C%22GMAIL_MODIFY_ACCOUNTS%22%3A%22%24%7Binput%3Agmail_modify_accounts%7D%22%2C%22CALENDAR_TIME_ZONE%22%3A%22%24%7Binput%3Acalendar_time_zone%7D%22%2C%22GOOGLE_TOOLSETS%22%3A%22%24%7Binput%3Agoogle_toolsets%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=google&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWdvb2dsZSJdLCJlbnYiOnsiR09PR0xFX09BVVRIX0NMSUVOVF9GSUxFIjoiJHtlbnY6R09PR0xFX09BVVRIX0NMSUVOVF9GSUxFfSIsIkdNQUlMX0FERFJFU1NFUyI6IiR7ZW52OkdNQUlMX0FERFJFU1NFU30iLCJHTUFJTF9NT0RJRllfQUNDT1VOVFMiOiIke2VudjpHTUFJTF9NT0RJRllfQUNDT1VOVFN9IiwiQ0FMRU5EQVJfVElNRV9aT05FIjoiJHtlbnY6Q0FMRU5EQVJfVElNRV9aT05FfSIsIkdPT0dMRV9UT09MU0VUUyI6IiR7ZW52OkdPT0dMRV9UT09MU0VUU30ifX0%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-google.mcpb)
 
 > [!NOTE]
 > `@foreverworks/mcp-google` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
@@ -125,12 +125,78 @@ variable below moves a product's part.
 | `MEET_ROOT` | The same for Meet's records; default `<GOOGLE_STATE_DIR>/meet`. |
 | `GOOGLE_CONSENT_REDIRECT_URI` | The loopback address a consent redirects to; default `http://localhost:8123/`. |
 | `GOOGLE_STATE_DIR` | The root of all of the above. |
+| `GOOGLE_TOOLSETS` | The products whose tools the server loads, separated by commas; default every one ([Toolsets](#toolsets)). |
 
 </details>
 
 The variables every server shares (`MCP_HTTP_PORT`, `MCP_MAX_ACCESS`,
 `MCP_FILE_ROOTS`, `MCP_FILE_SCRIPT` and the rest) are in
 [docs/configuration.md](../../docs/configuration.md).
+
+### Toolsets
+
+Every tool definition the server hands your client travels with each request
+the client makes, so a client that only needs mail and calendars pays for
+Drive, Docs, Sheets and the rest all the same. `GOOGLE_TOOLSETS` names the
+products to load, separated by commas, the way GitHub's MCP server takes
+`GITHUB_TOOLSETS`. The tools of a product not loaded are not there at all:
+not in the tool list, not in the server's instructions, not in
+`list_accounts` or `health`. Unset, empty or `all`, every product is loaded,
+as before.
+
+| Toolset | What it loads |
+|---|---|
+| `gmail` | Mail: search, read, drafts, sending, labels, filters and attachments. |
+| `calendar` | Events, free/busy, finding a time, and answering invitations. |
+| `drive` | Drive's files and folders: paths, changes, upload and download. |
+| `docs` | Google Docs, simple edits and the full API, with `editors_api_reference`. |
+| `sheets` | Google Sheets, rows and ranges and the full API, with `editors_api_reference`. |
+| `slides` | Google Slides, decks from an outline and the full API, with `editors_api_reference`. |
+| `collaboration` | Comments, sharing and revisions on any Drive file. |
+| `tasks` | Google Tasks. |
+| `contacts` | `find_people`: contacts, saved addresses and a Workspace directory. |
+| `meet` | Meet's meetings, transcripts and smart notes. |
+
+`list_accounts`, `health`, `begin_consent` and `complete_consent` are always
+loaded: every other tool takes a label `list_accounts` names, every remedy
+points to `health`, and consent is how any grant is made, including one a
+loaded product leans on (Meet reads a calendar event through the Calendar
+grant). A name that is not a toolset stops the server at start, with a
+message listing the ones there are. Measured with
+`scripts/measure-tokens.ts` on 2026-10-23 (GPT-4 tokenizer), the tool list is
+115 tools and about 84,800 tokens with every toolset (39,200 without the
+product icons, which a client may not show the model), 43 tools and 35,600
+(16,100) with `gmail,calendar`, and 46 tools and 32,400 (15,200) with
+`drive,docs,sheets`.
+
+To load mail and calendars only, with Claude Code:
+
+```bash
+claude mcp add google -e GOOGLE_TOOLSETS=gmail,calendar -e GOOGLE_OAUTH_CLIENT_FILE="<path to OAuth client file>" -e GMAIL_ADDRESSES="<Accounts and their addresses>" -e GMAIL_MODIFY_ACCOUNTS="<Where Gmail grants are kept>" -- npx -y @foreverworks/mcp-google
+```
+
+Or in Claude Desktop's configuration:
+
+```json
+{
+  "mcpServers": {
+    "google": {
+      "command": "npx",
+      "args": ["-y", "@foreverworks/mcp-google"],
+      "env": {
+        "GOOGLE_TOOLSETS": "gmail,calendar",
+        "GOOGLE_OAUTH_CLIENT_FILE": "/path/to/oauth-client.json",
+        "GMAIL_ADDRESSES": "personal=ana@example.com,work=ana@example.org",
+        "GMAIL_MODIFY_ACCOUNTS": "personal=/path/to/grants/gmail-personal.json,work=/path/to/grants/gmail-work.json"
+      }
+    }
+  }
+}
+```
+
+A toolset removes tools; `MCP_MAX_ACCESS=read` keeps every tool listed and
+refuses the writes. The shell's `--health` checks every product whatever
+`GOOGLE_TOOLSETS` says; name a product to narrow it.
 
 ### Getting the OAuth client
 
@@ -206,7 +272,9 @@ for a timer.
 ## Tools
 
 **read** changes nothing in your accounts (the download tools save a local
-copy); **write** changes something in one of them.
+copy); **write** changes something in one of them. With `GOOGLE_TOOLSETS`
+set, only the tables of the [toolsets](#toolsets) loaded apply; the accounts
+and consent tools are always there.
 
 Every tool takes `account`, a label from `list_accounts`, except Drive's (Drive
 holds one grant), `list_accounts`, `complete_consent` and

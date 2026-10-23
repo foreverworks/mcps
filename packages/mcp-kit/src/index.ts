@@ -69,6 +69,7 @@ export {
 } from "./serve.js";
 export type { Product } from "./serve/icons.js";
 export { idempotentWrites, isIdempotent, mergePolicies, needsPerson, summaryFrom, unclassified, type Access, type Confirmation, type ConfirmedRule, type ToolArgs, type ToolPolicy, type ToolRule } from "./policy.js";
+export { ALL_TOOLSETS, toolsetPolicy, toolsetsFrom, type Toolsets } from "./toolsets.js";
 export { ACCESS_META, annotationsFor, auditText, guard, registeredNames, REQUIRES_USER_META, requestContext, type AuditLine, type GuardOptions, type ServerVocabulary } from "./serve/guard.js";
 export {
   ACCESS_ORDER,

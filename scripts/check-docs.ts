@@ -52,7 +52,7 @@ const sources = (dir: string): readonly string[] =>
 const ENV_READS = [
   /env\[\s*"([A-Z][A-Z0-9_]+)"\s*\]/g,
   /env\.([A-Z][A-Z0-9_]+)\b/g,
-  /(?:envPath|unsetPath|timeZoneOf|stateDirOf)\([^)]*?"([A-Z][A-Z0-9_]+)"/g,
+  /(?:envPath|unsetPath|timeZoneOf|stateDirOf|toolsetsFrom)\([^)]*?"([A-Z][A-Z0-9_]+)"/g,
   /\b(?:file|value):\s*"([A-Z][A-Z0-9_]+)"/g,
 ];
 

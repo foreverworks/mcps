@@ -5,6 +5,8 @@
  * it), so both read exactly what a client is handed. `era` is the protocol
  * generation the client speaks: 2025-11-25 (`legacy`, the default) or
  * 2026-07-28 (`modern`); check-docs asks in both and holds them equal.
+ * `env` adds variables to that empty environment, for measure-tokens to weigh
+ * a configuration (a server's toolsets), never for check-docs.
  */
 import { mkdtempSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
@@ -15,12 +17,12 @@ import { Client, type Implementation, type ProtocolEra, StdioClientTransport, ty
 /** `home` is the temporary HOME the server ran with (gone by now), which a description may name. */
 export type Listed = { readonly tools: readonly Tool[]; readonly instructions: string; readonly server?: Implementation; readonly home: string };
 
-export const listServer = async (dir: string, era: ProtocolEra = "legacy"): Promise<Listed> => {
+export const listServer = async (dir: string, era: ProtocolEra = "legacy", env: Readonly<Record<string, string>> = {}): Promise<Listed> => {
   const home = mkdtempSync(join(tmpdir(), "listed-"));
   const client = new Client({ name: "repository-check", version: "0" }, era === "modern" ? { versionNegotiation: { mode: { pin: "2026-07-28" } } } : {});
   try {
     await client.connect(
-      new StdioClientTransport({ command: process.execPath, args: ["dist/index.js"], cwd: dir, env: { PATH: process.env["PATH"] ?? "", HOME: home }, stderr: "pipe" }),
+      new StdioClientTransport({ command: process.execPath, args: ["dist/index.js"], cwd: dir, env: { ...env, PATH: process.env["PATH"] ?? "", HOME: home }, stderr: "pipe" }),
     );
     const { tools } = await client.listTools();
     const server = client.getServerVersion();

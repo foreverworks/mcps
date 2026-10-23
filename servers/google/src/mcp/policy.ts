@@ -1,4 +1,4 @@
-import { mergePolicies, type ToolPolicy } from "@foreverworks/mcp-kit";
+import { mergePolicies, toolsetPolicy, type ToolPolicy, type Toolsets } from "@foreverworks/mcp-kit";
 
 import { COLLABORATION } from "../collaboration/policy.js";
 import { CONSENT } from "../consent/policy.js";
@@ -95,4 +95,42 @@ const DRIVE: ToolPolicy = {
  */
 export const PRODUCTS: Readonly<Record<string, ToolPolicy>> = { gmail: GMAIL, calendar: CALENDAR, drive: DRIVE, docs: DOCS, sheets: SHEETS, slides: SLIDES, tasks: TASKS, contacts: CONTACTS, meet: MEET };
 
-export const POLICY: ToolPolicy = mergePolicies(SERVER, CONSENT, GMAIL, CALENDAR, DRIVE, EDITORS, DOCS, SHEETS, SLIDES, COLLABORATION, TASKS, CONTACTS, MEET);
+/**
+ * What every toolset needs, so no toolset holds it: list_accounts names the
+ * labels every other tool takes, health is where every remedy points, and
+ * consent is how any product's missing or lapsed grant is made, including a
+ * grant another product leans on (Meet reads an event through the Calendar
+ * grant; Docs, Sheets and Slides may run on Drive's).
+ */
+export const ALWAYS: ToolPolicy = mergePolicies(SERVER, CONSENT);
+
+/**
+ * The toolsets GOOGLE_TOOLSETS chooses from (packages/mcp-kit toolsets.ts),
+ * one per product folder of src/, in the order the README lists them. The
+ * editors' API reference serves the batch tools of Docs, Sheets and Slides,
+ * so it is in all three and loads with any of them; collaboration (comments,
+ * sharing, revisions) acts on any Drive file and is its own.
+ */
+export const TOOLSETS = {
+  gmail: GMAIL,
+  calendar: CALENDAR,
+  drive: DRIVE,
+  docs: { ...DOCS, ...EDITORS },
+  sheets: { ...SHEETS, ...EDITORS },
+  slides: { ...SLIDES, ...EDITORS },
+  collaboration: COLLABORATION,
+  tasks: TASKS,
+  contacts: CONTACTS,
+  meet: MEET,
+} as const satisfies Toolsets;
+
+export type Toolset = keyof typeof TOOLSETS;
+
+/** Every toolset, which is what an unset GOOGLE_TOOLSETS loads. */
+export const ALL_TOOLSETS: readonly Toolset[] = Object.keys(TOOLSETS) as Toolset[];
+
+/** The policy of a server that loads these toolsets. */
+export const policyFor = (loaded: readonly Toolset[]): ToolPolicy => toolsetPolicy(ALWAYS, TOOLSETS, loaded);
+
+/** Every tool of the server: the policy with every toolset loaded, which also refuses a tool two products classify. */
+export const POLICY: ToolPolicy = policyFor(ALL_TOOLSETS);

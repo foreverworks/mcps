@@ -17,7 +17,11 @@
  * schemas; trademarks 3 tools 927 -> 2,288; eas 19 tools 5,102 -> 6,738 (its
  * seven lists).
  *
- *   npx tsx scripts/measure-tokens.ts [server ...]
+ * A `NAME=value` argument starts each server with that variable set, to weigh
+ * a configuration, such as a server's toolsets (2026-10-23, google: every
+ * toolset, gmail,calendar and drive,docs,sheets; the README has the numbers).
+ *
+ *   npx tsx scripts/measure-tokens.ts [server ...] [NAME=value ...]
  */
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
@@ -45,10 +49,13 @@ const main = async (): Promise<void> => {
     const text = JSON.stringify(value);
     return `${Buffer.byteLength(text)} B${encode === undefined ? "" : ` ${encode(text).length} tok`}`;
   };
-  const asked = process.argv.slice(2);
+  const isSetting = (arg: string): boolean => /^[A-Z][A-Z0-9_]*=/.test(arg);
+  const args = process.argv.slice(2);
+  const env = Object.fromEntries(args.filter(isSetting).map((arg) => [arg.slice(0, arg.indexOf("=")), arg.slice(arg.indexOf("=") + 1)]));
+  const asked = args.filter((arg) => !isSetting(arg));
   const servers = asked.length > 0 ? asked : readdirSync(join(ROOT, "servers")).sort();
   for (const server of servers) {
-    const { tools } = await listServer(join(ROOT, "servers", server));
+    const { tools } = await listServer(join(ROOT, "servers", server), "legacy", env);
     const typed = tools.filter((t) => t.outputSchema !== undefined);
     const without = tools.map(({ outputSchema: _o, ...rest }) => rest);
     console.log(`${server}: ${tools.length} tools, ${weigh(tools)}; without output schemas ${weigh(without)}; ${typed.length} with one`);

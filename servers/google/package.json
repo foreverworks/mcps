@@ -31,6 +31,12 @@
         "type": "text",
         "required": false,
         "description": "The time zone a time without an offset is read in, e.g. Europe/Paris."
+      },
+      "GOOGLE_TOOLSETS": {
+        "title": "Products to load",
+        "type": "text",
+        "required": false,
+        "description": "The products whose tools the server loads, separated by commas, e.g. gmail,calendar. Empty loads every product."
       }
     }
   },

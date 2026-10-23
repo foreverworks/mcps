@@ -12,6 +12,7 @@ credentials, its accounts) are in its README, under Configuration.
 | State it writes itself: token caches, grants given through its own consent tools, stores | `<SERVER>_STATE_DIR`, else systemd's `STATE_DIRECTORY` when the unit has one, else `$XDG_STATE_HOME/mcps/<server>`, which is `~/.local/state/mcps/<server>` by default. |
 | Files it hands back | Its outbox, named in its README: usually `<SERVER>_OUTBOX_DIR`, else an `outbox` folder in its state directory. |
 | The time zone of calendar dates | Its own `..._TIME_ZONE` variable where it has one, else the process's zone (`TZ`, else the system's). Servers for Romanian institutions (ANAF, ONRC, BNR) use Romania's zone. |
+| Which products' tools it serves, for a server of several products | `<SERVER>_TOOLSETS` where it has toolsets: the toolsets to load, separated by commas. Unset, empty or `all` loads every one; the tools of the others are not registered at all. Its README lists the names. |
 
 Three rules hold everywhere:
 
@@ -25,8 +26,8 @@ Three rules hold everywhere:
   variable.
 - **A setting the server cannot read stops it.** A port that is not a port, an
   unknown access class or confirmation mode, a limit that is not a positive
-  number, or a time zone that does not exist ends the process at startup, with
-  a message naming the variable.
+  number, a time zone that does not exist, or a toolset the server does not
+  have ends the process at startup, with a message naming the variable.
 
 ## Shared variables
 
