@@ -144,8 +144,10 @@ Once only, in order:
 - [x] **`npm run check` green on a clean clone**, on Node 22 and 24.
 - [x] **CI on GitHub-hosted runners.** No job, and no pull request from a
   fork, runs on a self-hosted runner.
-- [ ] **GitHub settings**: private vulnerability reporting on (SECURITY.md
-  relies on it), branch protection on `main`, Dependabot for npm and actions.
+- [x] **GitHub settings**: private vulnerability reporting on (SECURITY.md
+  relies on it), branch protection on `main` (no force pushes, no deletion),
+  Dependabot alerts and security updates, and version updates for npm and
+  actions (`.github/dependabot.yml`).
 - [ ] **Decide per server what ships.** `devices` is useful only to someone
   who runs device hosts like the ones it manages; `bolt-food` and `glovo` use
   unofficial APIs. Each can ship with its README saying so, or stay out of
