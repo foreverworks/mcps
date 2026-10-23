@@ -237,6 +237,16 @@ export const serverJson = (m: Manifest): Readonly<Record<string, unknown>> => ({
 /** JSON as the repository writes it: two spaces, a final newline. */
 export const jsonText = (value: unknown): string => `${JSON.stringify(value, null, 2)}\n`;
 
+/**
+ * The packages in what `npm pack --json` printed: npm 11 prints an array,
+ * npm 12 an object keyed by package name. CI runs Node's own npm and the
+ * release installs npm 12, so both reach this.
+ */
+export const packedEntries = <T>(printed: string): readonly T[] => {
+  const answer = JSON.parse(printed) as readonly T[] | Readonly<Record<string, T>>;
+  return Array.isArray(answer) ? (answer as readonly T[]) : Object.values(answer);
+};
+
 /** A variable's id in an installer's prompt or a bundle's user_config: its name in lower case. */
 const keyOf = (input: Input): string => input.name.toLowerCase();
 

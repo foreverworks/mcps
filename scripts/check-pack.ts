@@ -15,6 +15,8 @@ import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync, statSync } from "node:fs";
 import { join } from "node:path";
 
+import { packedEntries } from "./packaging.js";
+
 const ROOT = process.cwd();
 const META = new Set(["package.json", "README.md", "CHANGELOG.md", "LICENSE"]);
 
@@ -36,7 +38,7 @@ const allowed = (dir: string, path: string): boolean => {
 
 const packed = (name: string): readonly string[] => {
   const out = execFileSync("npm", ["pack", "--dry-run", "-w", name, "--json"], { cwd: ROOT, encoding: "utf8", stdio: ["ignore", "pipe", "ignore"] });
-  return (JSON.parse(out) as readonly { files: readonly { path: string }[] }[])[0]?.files.map((f) => f.path) ?? [];
+  return packedEntries<{ files: readonly { path: string }[] }>(out)[0]?.files.map((f) => f.path) ?? [];
 };
 
 let failed = false;
@@ -44,7 +46,11 @@ for (const dir of workspaces) {
   const name = (JSON.parse(readFileSync(join(ROOT, dir, "package.json"), "utf8")) as { name: string }).name;
   const files = packed(name);
   const stray = files.filter((path) => !allowed(dir, path));
-  if (stray.length === 0) {
+  if (files.length === 0) {
+    // Every package holds at least its package.json: none listed means npm's answer was not read.
+    failed = true;
+    console.error(`${name}: npm pack listed no files, so nothing was checked`);
+  } else if (stray.length === 0) {
     console.log(`${name}: ${files.length} files, every one from the sources`);
   } else {
     failed = true;

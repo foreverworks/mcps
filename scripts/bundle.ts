@@ -22,7 +22,7 @@ import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { listServer } from "./listed.js";
-import { bundleFile, bundleManifest, jsonText, readManifest, type Manifest } from "./packaging.js";
+import { bundleFile, bundleManifest, jsonText, packedEntries, readManifest, type Manifest } from "./packaging.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const TOOLKIT = ["packages/mcp-kit", "packages/receipts"];
@@ -31,7 +31,7 @@ const run = (command: string, args: readonly string[], cwd: string): string => e
 
 /** A workspace packed as npm would publish it; the tarball's path. */
 const pack = (dir: string, into: string): string => {
-  const [packed] = JSON.parse(run("npm", ["pack", "--json", "--pack-destination", into, "-w", dir], ROOT)) as readonly { readonly filename: string }[];
+  const [packed] = packedEntries<{ readonly filename: string }>(run("npm", ["pack", "--json", "--pack-destination", into, "-w", dir], ROOT));
   if (packed === undefined) throw new Error(`npm pack -w ${dir} packed nothing`);
   return join(into, packed.filename);
 };
