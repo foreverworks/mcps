@@ -26,9 +26,6 @@ is real and takes the next number in its series.
 <!-- install:begin -->
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=oblio&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22oblio_config%22%2C%22description%22%3A%22Path%20of%20app.json%3A%20your%20Oblio%20login%20email%2C%20API%20secret%20and%20the%20company's%20CIF%2C%20as%20the%20README%20describes%20it.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-oblio%22%5D%2C%22env%22%3A%7B%22OBLIO_CONFIG%22%3A%22%24%7Binput%3Aoblio_config%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=oblio&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLW9ibGlvIl0sImVudiI6eyJPQkxJT19DT05GSUciOiIke2VudjpPQkxJT19DT05GSUd9In19) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-oblio.mcpb)
 
-> [!NOTE]
-> `@foreverworks/mcp-oblio` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
-
 With Claude Code:
 
 ```bash

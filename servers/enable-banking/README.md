@@ -28,9 +28,6 @@ a period once and narrow it here.
 <!-- install:begin -->
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=enable-banking&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22enable_banking_config%22%2C%22description%22%3A%22Path%20of%20app.json%3A%20your%20Enable%20Banking%20application's%20id%2C%20its%20redirect%20URL%20and%20the%20name%20of%20its%20private%20key%20file%2C%20as%20the%20README%20describes%20it.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22enable_banking_key%22%2C%22description%22%3A%22Optional.%20Path%20of%20the%20application's%20private%20key%20(PEM)%2C%20when%20app.json%20does%20not%20name%20it.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-enable-banking%22%5D%2C%22env%22%3A%7B%22ENABLE_BANKING_CONFIG%22%3A%22%24%7Binput%3Aenable_banking_config%7D%22%2C%22ENABLE_BANKING_KEY%22%3A%22%24%7Binput%3Aenable_banking_key%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=enable-banking&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWVuYWJsZS1iYW5raW5nIl0sImVudiI6eyJFTkFCTEVfQkFOS0lOR19DT05GSUciOiIke2VudjpFTkFCTEVfQkFOS0lOR19DT05GSUd9IiwiRU5BQkxFX0JBTktJTkdfS0VZIjoiJHtlbnY6RU5BQkxFX0JBTktJTkdfS0VZfSJ9fQ%3D%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-enable-banking.mcpb)
 
-> [!NOTE]
-> `@foreverworks/mcp-enable-banking` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
-
 With Claude Code:
 
 ```bash
