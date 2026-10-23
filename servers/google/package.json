@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/google",
   "mcp": {
     "title": "Google Workspace",
-    "group": "Workspace",
+    "audience": "general",
+    "maturity": "stable",
+    "tagline": "Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts.",
     "inputs": {
       "GOOGLE_OAUTH_CLIENT_FILE": {
         "title": "OAuth client file",
@@ -43,6 +45,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "google",
     "gmail",
     "calendar",

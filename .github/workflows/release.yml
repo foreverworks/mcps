@@ -43,7 +43,8 @@ jobs:
   publish:
     # Nothing is published while the repository is private: npm provenance
     # needs a public repository, and going public is the maintainer's switch.
-    # Each package also stays out until its own `"private": true` is removed.
+    # Each package also stays out until its own `"private": true` is removed,
+    # and an extras server always does (scripts/release.ts).
     if: ${{ !github.event.repository.private && !inputs.rehearse }}
     # GitHub-hosted only: npm trusted publishing does not accept self-hosted runners.
     runs-on: ubuntu-latest

@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/app-stores",
   "mcp": {
     "title": "App Store and Google Play",
-    "group": "Apps and developer tools",
+    "audience": "general",
+    "maturity": "beta",
+    "tagline": "Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs.",
     "inputs": {
       "ASC_KEY_ID": {
         "title": "App Store Connect key id",
@@ -43,6 +45,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "app-store-connect",
     "google-play",
     "testflight",

@@ -155,18 +155,40 @@ and the guard in more depth.
 4. Follow [docs/configuration.md](docs/configuration.md): secrets from `*_FILE`
    variables, state through the kit's `stateDirOf`, dates through `timeZoneOf`.
 5. Write `scripts/smoke.ts` with the kit's `connectSmoke`.
-6. Write its README from the template below. The root README's table of
+6. Write its README from the template below. The root README's list of
    servers is generated from each package.json (step 7).
-7. Give its `package.json` a `description` in two parts, what it serves, then
-   after a colon what an assistant can do with it (the registry shows the first
-   part; the root README's table, the second), and an `mcp` block: a `title` a
-   person reads, the `group` it belongs to in the root README's table (the
-   groups are listed in `scripts/check-docs.ts`), and the `inputs` someone
-   installing it sets (each variable's `type`, `file`,
-   `directory`, `text` or `secret`, whether it is `required`, and one sentence
-   for the prompt). `scripts/packaging.ts` says what each type becomes.
-   `npx tsx scripts/check-docs.ts --write` then writes its `mcpName` and its
-   registry entry, `server.json`; the check fails while either is stale.
+7. Give its `package.json` a `description` for npm (what it serves, then
+   after a colon what an assistant can do with it), the `keywords` a person
+   would search npm for, and an `mcp` block, the one place that says how the
+   server is presented:
+   - `title`: the name a person reads.
+   - `audience`: who it is for, which decides its section in the root README
+     and whether it is ever published. `romania` is for companies in Romania
+     and the people who run them; `general` is for a service people use
+     anywhere; `extras` is for a server built for one particular setup or on
+     an unofficial API, which is never published to npm, the MCP Registry or
+     as a desktop bundle. Choose `extras` when a stranger could not use it
+     without a setup like yours, or when it relies on an API its owner does
+     not offer.
+   - `maturity`: `stable` (in daily use, and its tools keep their shape),
+     `beta` (works and is in use, but is new, still growing, or reads web
+     pages its service may change) or `experimental` (rests on something
+     that can break without notice, or covers only part of the service).
+   - `tagline`: one sentence for a stranger who has never heard of this
+     repository, at most 100 characters, saying what an assistant can do with
+     it; written as the README is ([How we write](#how-we-write)). It is the
+     server's description in the MCP Registry and a desktop bundle, and its
+     line in the root README.
+   - `inputs`: what someone installing it sets (each variable's `type`,
+     `file`, `directory`, `text` or `secret`, whether it is `required`, and
+     one sentence for the prompt). `scripts/packaging.ts` says what each
+     type becomes.
+
+   `npx tsx scripts/check-docs.ts --write` then writes what follows from the
+   block: the keywords every server and its audience carry, and for a server
+   that ships its `mcpName` and its registry entry, `server.json`, or for an
+   extras server `"private": true` and neither. The check fails while any of
+   them is stale, and on an audience or maturity it does not know.
 8. Give it a `CHANGELOG.md` whose first entry says, for a person, what it
    does and which of its tools are `money`, and add `CHANGELOG.md` to its
    package.json `files`.
@@ -296,7 +318,9 @@ The install block (buttons for VS Code, Cursor and Claude Desktop, the Claude
 Code command, a JSON configuration for other clients, and how to run it from a
 clone) is generated from the package.json `mcp` block: a new README gets it
 from `npx tsx scripts/check-docs.ts --write`, and the check fails while it is
-stale. Server-specific install notes go after it.
+stale. An extras server's block has no buttons and no `npx`: it says the
+server is not published, and shows the clone. Server-specific install notes go
+after it.
 
 `scripts/check-docs.ts` holds each README to the code: its sections are the
 ones above, in order, with Money exactly when a tool is `money`; every

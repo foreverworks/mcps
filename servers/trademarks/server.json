@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/trademarks",
   "title": "Trademark search",
-  "description": "MCP server for trademark registers",
+  "description": "Check whether a name is already a registered or pending trademark in the US or the EU.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/trademarks#readme",
   "repository": {

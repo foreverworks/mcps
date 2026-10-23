@@ -37,25 +37,25 @@ no cost. The copied sign-in lasts about a year; then you copy it again.
 ## Install
 
 <!-- install:begin -->
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=bolt-food&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22bolt_food_creds%22%2C%22description%22%3A%22Path%20of%20credentials.json%3A%20the%20two%20values%20the%20README%20shows%20how%20to%20copy%20from%20the%20signed-in%20web%20app.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22bolt_food_time_zone%22%2C%22description%22%3A%22Optional.%20The%20time%20zone%20your%20bank%20books%20card%20charges%20in%2C%20e.g.%20Europe%2FBucharest.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-bolt-food%22%5D%2C%22env%22%3A%7B%22BOLT_FOOD_CREDS%22%3A%22%24%7Binput%3Abolt_food_creds%7D%22%2C%22BOLT_FOOD_TIME_ZONE%22%3A%22%24%7Binput%3Abolt_food_time_zone%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=bolt-food&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWJvbHQtZm9vZCJdLCJlbnYiOnsiQk9MVF9GT09EX0NSRURTIjoiJHtlbnY6Qk9MVF9GT09EX0NSRURTfSIsIkJPTFRfRk9PRF9USU1FX1pPTkUiOiIke2VudjpCT0xUX0ZPT0RfVElNRV9aT05FfSJ9fQ%3D%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-bolt-food.mcpb)
-
 > [!NOTE]
-> `@foreverworks/mcp-bolt-food` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
+> Bolt Food receipts is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node 22.19 or newer.
 
 With Claude Code:
 
 ```bash
-claude mcp add bolt-food -e BOLT_FOOD_CREDS="<path to Bolt Food credentials.json>" -- npx -y @foreverworks/mcp-bolt-food
+git clone https://github.com/foreverworks/mcps.git && cd mcps
+npm ci && npm run build
+claude mcp add bolt-food -e BOLT_FOOD_CREDS="<path to Bolt Food credentials.json>" -- node "$PWD/servers/bolt-food/dist/index.js"
 ```
 
-Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON:
+Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON, with the full path of `servers/bolt-food/dist/index.js` in your clone:
 
 ```json
 {
   "mcpServers": {
     "bolt-food": {
-      "command": "npx",
-      "args": ["-y", "@foreverworks/mcp-bolt-food"],
+      "command": "node",
+      "args": ["<path to the clone>/servers/bolt-food/dist/index.js"],
       "env": {
         "BOLT_FOOD_CREDS": "<path to Bolt Food credentials.json>"
       }
@@ -64,17 +64,7 @@ Claude Desktop (Settings, Developer, Edit Config) and most other clients read th
 }
 ```
 
-Each runs the published package on Node 22.19 or newer. VS Code and the Claude Desktop bundle ask for each setting as they add the server; leave an optional one empty. Cursor reads each from your environment instead (`${env:BOLT_FOOD_CREDS}` and so on), so set them before you start Cursor. The commands above set only what is required; [Configuration](#configuration) has the rest.
-
-### From a clone
-
-```bash
-git clone https://github.com/foreverworks/mcps.git && cd mcps
-npm ci && npm run build
-claude mcp add bolt-food -e BOLT_FOOD_CREDS="<path to Bolt Food credentials.json>" -- node "$PWD/servers/bolt-food/dist/index.js"
-```
-
-In a JSON configuration, the command is `node` and its one argument the full path of `servers/bolt-food/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
+The commands above set only what is required; [Configuration](#configuration) has the rest. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
 
 Also set `BOLT_FOOD_TIME_ZONE` to the zone your bank books in, so that

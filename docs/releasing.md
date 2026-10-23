@@ -10,15 +10,25 @@ package is still `"private": true`. The first release starts at
 
 | What | Where | Name |
 |---|---|---|
-| `packages/mcp-kit`, `packages/receipts` | npm | `@foreverworks/mcp-kit`, `@foreverworks/receipts` |
-| each server | npm, with provenance | `@foreverworks/mcp-<server>` |
-| each server's `server.json` | the official MCP Registry | `com.foreverworks/<server>` |
-| each server's desktop bundle | the GitHub release of the tag | `mcp-<server>.mcpb` |
+| `packages/mcp-kit` | npm | `@foreverworks/mcp-kit` |
+| each server for Romania or for everyone | npm, with provenance | `@foreverworks/mcp-<server>` |
+| each such server's `server.json` | the official MCP Registry | `com.foreverworks/<server>` |
+| each such server's desktop bundle | the GitHub release of the tag | `mcp-<server>.mcpb` |
 
-A package is published when its package.json no longer says `"private": true`
-and npm lacks its version: removing the flag is the decision to publish it.
-Versions live only in each package.json; a server announces its own at start
-(`packageVersion`), and its `server.json` is generated from it.
+**What ships follows from each server's audience**, its package.json
+`mcp.audience` ([CONTRIBUTING.md](../CONTRIBUTING.md#adding-a-server), step 7),
+and nothing else: a `romania` or `general` server ships, an `extras` server
+never does, and a toolkit package ships when a server that ships depends on
+it (so `packages/receipts`, which only the extras use, does not). An extras
+server has no `mcpName` and no `server.json`, and its package.json says
+`"private": true`, all written by `npx tsx scripts/check-docs.ts --write`;
+`scripts/bundle.ts` refuses to bundle one, and `scripts/release.ts` refuses
+to start while any of them is not private.
+
+A package that ships is published once its package.json no longer says
+`"private": true` and npm lacks its version: removing the flag is the decision
+to publish it now. Versions live only in each package.json; a server announces
+its own at start (`packageVersion`), and its `server.json` is generated from it.
 `.github/workflows/release.yml` publishes, and `scripts/release.ts` decides
 what ([What the workflow does](#what-the-workflow-does)).
 
@@ -68,10 +78,11 @@ Once only, in order:
    first entry says: `0.x` while interfaces may still change. The changesets
    pending before it are folded into those entries. To start at another
    version, change both the package.json and the entry.
-2. **Choose what ships.** Remove `"private": true` from each server that
-   ships, and from the toolkit packages they depend on: every server needs
-   `mcp-kit`, and `bolt-food` and `glovo` need `receipts`. A public package
-   that depends on a private one is refused before anything is sent. Then run
+2. **Choose what goes first.** Which servers can ever ship is their
+   audience's to say ([What a release publishes](#what-a-release-publishes)).
+   Of those, remove `"private": true` from each one this release publishes,
+   and from `mcp-kit`, which every server needs. A public package that
+   depends on a private one is refused before anything is sent. Then run
    `npx tsx scripts/check-docs.ts --write`, which drops the "not on npm yet"
    note from those servers' install blocks, and commit. Nothing is published
    while the repository is private, so this can come first.
@@ -156,10 +167,12 @@ Once only, in order:
   relies on it), branch protection on `main` (no force pushes, no deletion),
   Dependabot alerts and security updates, and version updates for npm and
   actions (`.github/dependabot.yml`).
-- [ ] **Decide per server what ships.** `devices` is useful only to someone
-  who runs device hosts like the ones it manages; `bolt-food` and `glovo` use
-  unofficial APIs. Each can ship with its README saying so, or stay out of
-  the first release.
+- [x] **Decide per server what ships.** The rule: an extras server, built
+  for one particular setup or on an unofficial API, is never published;
+  every other server is. Each server's package.json `mcp.audience` holds the
+  decision ([What a release publishes](#what-a-release-publishes)), and the
+  root README's [Extras](../README.md#extras) section lists the servers it
+  keeps out.
 
 ## What the workflow does
 
@@ -176,8 +189,9 @@ it:
    ([.changeset/README.md](../.changeset/README.md));
 3. installs `mcp-publisher` 1.8.1, checked against its SHA-256, and runs
    `mcp-publisher validate` on every `servers/*/server.json`;
-4. builds every public server's desktop bundle (`scripts/bundle.ts --public`),
-   so a broken bundle stops the release before anything is sent;
+4. builds the desktop bundle of every server that ships and is public
+   (`scripts/bundle.ts --public`), so a broken bundle stops the release
+   before anything is sent;
 5. prints the plan, then publishes each public package whose version npm
    lacks (`npm publish --access public --provenance`, the toolkit packages
    first), then each such server's `server.json` to the registry, logging in
@@ -229,8 +243,8 @@ A desktop bundle (`scripts/bundle.ts`) holds the server and the toolkit as
 npm would publish them, their dependencies installed without scripts or dev
 packages, and a manifest from package.json with the tool list, icon and
 LICENSE, checked and packed by the mcpb CLI. Its name has no version, so each
-README's link to the latest release finds it. CI builds every bundle on each
-push; to try one in Claude Desktop, run
+README's link to the latest release finds it. CI builds the bundle of every
+server that ships on each push; to try one in Claude Desktop, run
 `npm run build && npm run bundle -- --out bundles oblio`.
 
 ## Between releases

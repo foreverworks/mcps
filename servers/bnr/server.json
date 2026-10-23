@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/bnr",
   "title": "BNR exchange rates",
-  "description": "MCP server for the National Bank of Romania's exchange rates",
+  "description": "Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/bnr#readme",
   "repository": {

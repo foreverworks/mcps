@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "MCP server for Glovo order history: itemised receipts, item search, spending by store and month, and each bank card charge matched to its order; read-only",
-  "mcpName": "com.foreverworks/glovo",
   "mcp": {
     "title": "Glovo receipts",
-    "group": "Money and accounting",
+    "audience": "extras",
+    "maturity": "experimental",
+    "tagline": "Read your Glovo orders as itemised receipts matched to card charges, through an unofficial API.",
     "inputs": {
       "GLOVO_CREDS": {
         "title": "Glovo credentials.json",
@@ -25,6 +26,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "glovo",
     "receipts"
   ],

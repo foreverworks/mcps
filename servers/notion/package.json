@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/notion",
   "mcp": {
     "title": "Notion",
-    "group": "Workspace",
+    "audience": "general",
+    "maturity": "stable",
+    "tagline": "Search, read and write your Notion workspaces, with pages as Markdown and typed database queries.",
     "inputs": {
       "NOTION_TOKENS_DIR": {
         "title": "Notion tokens folder",
@@ -19,6 +21,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "notion"
   ],
   "license": "MIT",

@@ -1,73 +1,66 @@
 # mcps
 
-**MCP servers that let an AI assistant do a small company's everyday work: mail
-and documents, invoices and bank statements, Romanian tax filings, app releases
-and domains.**
+**MCP servers that let an AI assistant do a company's everyday work.** Most are
+for services people use anywhere, such as Google Workspace, Notion, Bitwarden,
+Porkbun, Expo, the app stores and European banks; a second line is for
+companies in Romania, to file with ANAF, follow the trade register, invoice
+through Oblio and read the National Bank's rates.
 
 Each server connects an MCP client, such as Claude Code, Claude Desktop, VS Code
-or Cursor, to one service. Most serve anyone who uses that service (Google
-Workspace, Notion, Bitwarden, Porkbun, Expo, the app stores); several reach
-Romanian institutions (ANAF, the trade register, the National Bank). They are
-built on one toolkit, so every tool says what it can change, and a tool that
-spends money or files a document waits for you to confirm it.
-
-## Servers
-
-Every tool is `read` (it changes nothing), `write` (it changes something in
-your account) or `money`: it moves money, makes or unmakes a legal or fiscal
-document, or commits you in a comparable way, such as a bank consent. Your
+or Cursor, to one service. They are built on one toolkit, so every tool says
+what it can change: `read` (it changes nothing), `write` (it changes something
+in your account) or `money` (it moves money, makes or unmakes a legal or fiscal
+document, or commits you in a comparable way, such as a bank consent). Your
 client asks you before each `money` call.
 
 <!-- servers:begin -->
-### Workspace
+Under each server's name: how settled it is, then how many tools it has and the most they can do. **Stable**: in daily use, and its tools keep their shape. **Beta**: works and is in use, but is new, still growing, or reads web pages its service may change. **Experimental**: rests on something that can break without notice, or covers only part of the service.
+
+## For companies in Romania
+
+The paperwork a company in Romania, and the people who run it, do online: e-invoices and declarations with ANAF, filings at the trade register, invoicing, and the National Bank's exchange rates. Each README ends with the other servers we found for that service, and what this one adds.
 
 | Server | What it does |
 |---|---|
-| [<img src="servers/bitwarden/icons/icon.svg" width="20" height="20" alt=""> Bitwarden](servers/bitwarden)<br><sub>11 tools, read and write</sub> | Find, create and update logins, store secure notes, generate and hand out passwords, compute 2FA codes, and check passwords against known breaches |
-| [<img src="servers/google/icons/icon.svg" width="20" height="20" alt=""> Google Workspace](servers/google)<br><sub>115 tools, read and write</sub> | Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, contacts and Meet transcripts |
-| [<img src="servers/notion/icons/icon.svg" width="20" height="20" alt=""> Notion](servers/notion)<br><sub>27 tools, read and write</sub> | Search, pages read and written as Markdown, typed database queries, saved views, comments and files |
-| [<img src="servers/printer/icons/icon.svg" width="20" height="20" alt=""> Printer and scanner](servers/printer)<br><sub>10 tools, read and write</sub> | Printer status, lossless printing corrected for the printer's measured response, and scanning |
+| [<img src="servers/anaf-efactura/icons/icon.svg" width="20" height="20" alt=""> ANAF e-Factura](servers/anaf-efactura)<br><sub>Stable<br>20 tools, including **money**</sub> | Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF. |
+| [<img src="servers/anaf-spv/icons/icon.svg" width="20" height="20" alt=""> ANAF SPV](servers/anaf-spv)<br><sub>Beta<br>16 tools, including **money**</sub> | Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations. |
+| [<img src="servers/bnr/icons/icon.svg" width="20" height="20" alt=""> BNR exchange rates](servers/bnr)<br><sub>Stable<br>5 tools, read-only</sub> | Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON. |
+| [<img src="servers/oblio/icons/icon.svg" width="20" height="20" alt=""> Oblio](servers/oblio)<br><sub>Stable<br>17 tools, including **money**</sub> | Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them. |
+| [<img src="servers/onrc/icons/icon.svg" width="20" height="20" alt=""> ONRC trade register](servers/onrc)<br><sub>Beta<br>9 tools, read and write</sub> | Follow your filings at Romania's trade register, with their documents, fee notes and invoices. |
 
-### Money and accounting
+## For everyone
 
-| Server | What it does |
-|---|---|
-| [<img src="servers/bnr/icons/icon.svg" width="20" height="20" alt=""> BNR exchange rates](servers/bnr)<br><sub>5 tools, read-only</sub> | The rate in force on any day, conversions to and from RON, rates over a period, and the yearly averages ANAF converts foreign income at |
-| [<img src="servers/bolt-food/icons/icon.svg" width="20" height="20" alt=""> Bolt Food receipts](servers/bolt-food)<br><sub>8 tools, read-only</sub> | Itemised receipts, item search, spending by restaurant and month, and each bank card charge matched to its order; read-only |
-| [<img src="servers/enable-banking/icons/icon.svg" width="20" height="20" alt=""> Enable Banking](servers/enable-banking)<br><sub>10 tools, including **money**</sub> | Read and search statements across accounts, export them as CSV, read balances, and manage the consents; it moves no money |
-| [<img src="servers/glovo/icons/icon.svg" width="20" height="20" alt=""> Glovo receipts](servers/glovo)<br><sub>8 tools, read-only</sub> | Itemised receipts, item search, spending by store and month, and each bank card charge matched to its order; read-only |
-| [<img src="servers/oblio/icons/icon.svg" width="20" height="20" alt=""> Oblio](servers/oblio)<br><sub>17 tools, including **money**</sub> | Issue invoices and proformas with exact totals, record payments, cancel or reverse invoices, and read clients, products and series |
-
-### Romanian authorities
+Servers for services people use anywhere. We built each one because the servers we found did less, or there were none; each README's last section names them and says what this one adds.
 
 | Server | What it does |
 |---|---|
-| [<img src="servers/anaf-efactura/icons/icon.svg" width="20" height="20" alt=""> ANAF e-Factura](servers/anaf-efactura)<br><sub>20 tools, including **money**</sub> | Read the invoices a company received and sent, check and render them, file new invoices and e-Transport declarations, and look up companies in the VAT registry |
-| [<img src="servers/anaf-spv/icons/icon.svg" width="20" height="20" alt=""> ANAF SPV](servers/anaf-spv)<br><sub>16 tools, including **money**</sub> | Download what ANAF posts to a taxpayer, request new documents, validate declarations and file a D212; it signs in by itself |
-| [<img src="servers/onrc/icons/icon.svg" width="20" height="20" alt=""> ONRC trade register](servers/onrc)<br><sub>9 tools, read and write</sub> | The filings made there and their status, the documents listed on each filing, fee notes and invoices |
+| [<img src="servers/app-stores/icons/icon.svg" width="20" height="20" alt=""> App Store and Google Play](servers/app-stores)<br><sub>Beta<br>7 tools, read and write</sub> | Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs. |
+| [<img src="servers/bitwarden/icons/icon.svg" width="20" height="20" alt=""> Bitwarden](servers/bitwarden)<br><sub>Stable<br>11 tools, read and write</sub> | Give your assistant its own Bitwarden vault to create logins, type passwords and read 2FA codes. |
+| [<img src="servers/eas/icons/icon.svg" width="20" height="20" alt=""> Expo Application Services](servers/eas)<br><sub>Beta<br>23 tools, including **money**</sub> | Find out why an Expo build, workflow run or store submission failed, and roll out updates. |
+| [<img src="servers/enable-banking/icons/icon.svg" width="20" height="20" alt=""> Enable Banking](servers/enable-banking)<br><sub>Stable<br>10 tools, including **money**</sub> | Read, search and export statements and balances from banks across Europe, without moving money. |
+| [<img src="servers/google/icons/icon.svg" width="20" height="20" alt=""> Google Workspace](servers/google)<br><sub>Stable<br>115 tools, read and write</sub> | Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts. |
+| [<img src="servers/notion/icons/icon.svg" width="20" height="20" alt=""> Notion](servers/notion)<br><sub>Stable<br>27 tools, read and write</sub> | Search, read and write your Notion workspaces, with pages as Markdown and typed database queries. |
+| [<img src="servers/porkbun/icons/icon.svg" width="20" height="20" alt=""> Porkbun](servers/porkbun)<br><sub>Beta<br>113 tools, including **money**</sub> | Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first. |
+| [<img src="servers/trademarks/icons/icon.svg" width="20" height="20" alt=""> Trademark search](servers/trademarks)<br><sub>Beta<br>6 tools, read-only</sub> | Check whether a name is already a registered or pending trademark in the US or the EU. |
+| [<img src="servers/typesafe/icons/icon.svg" width="20" height="20" alt=""> TypeSafe](servers/typesafe)<br><sub>Beta<br>3 tools, read-only</sub> | Get calibrated yes or no answers, choices and scores from TypeSafe's Jev, for one item or 1000 rows. |
 
-### Apps and developer tools
+## Extras
+
+These work, and we use them, but each is built for one particular setup or on an app's unofficial API, so they are not published to npm, the MCP Registry or as desktop bundles. Run them from a clone, and read the README first: it says what the server depends on and what can break.
 
 | Server | What it does |
 |---|---|
-| [<img src="servers/app-stores/icons/icon.svg" width="20" height="20" alt=""> App Store and Google Play](servers/app-stores)<br><sub>7 tools, read and write</sub> | Read and answer App Store and Play reviews, and read TestFlight feedback and crash logs |
-| [<img src="servers/devices/icons/icon.svg" width="20" height="20" alt=""> Device broker](servers/devices)<br><sub>10 tools, read and write</sub> | Lease one, wait in a fair queue, start spares within budgets, and check each host's health |
-| [<img src="servers/eas/icons/icon.svg" width="20" height="20" alt=""> Expo Application Services](servers/eas)<br><sub>23 tools, including **money**</sub> | Builds, workflow runs with each job's log and why it failed, store submissions with the store's error text, a credentials audit, fingerprints and updates |
-| [<img src="servers/typesafe/icons/icon.svg" width="20" height="20" alt=""> TypeSafe](servers/typesafe)<br><sub>3 tools, read-only</sub> | Typed, calibrated judgments over text or JSON (a yes or no with its probability, one of a set, a score), one at a time or in batches |
+| [<img src="servers/bolt-food/icons/icon.svg" width="20" height="20" alt=""> Bolt Food receipts](servers/bolt-food)<br><sub>Experimental<br>8 tools, read-only</sub> | Read your Bolt Food orders as itemised receipts matched to card charges, through an unofficial API. |
+| [<img src="servers/devices/icons/icon.svg" width="20" height="20" alt=""> Device broker](servers/devices)<br><sub>Experimental<br>10 tools, read and write</sub> | Share your own Android emulators, iOS simulators and desktops between AI agents, in fair turns. |
+| [<img src="servers/glovo/icons/icon.svg" width="20" height="20" alt=""> Glovo receipts](servers/glovo)<br><sub>Experimental<br>8 tools, read-only</sub> | Read your Glovo orders as itemised receipts matched to card charges, through an unofficial API. |
+| [<img src="servers/printer/icons/icon.svg" width="20" height="20" alt=""> Printer and scanner](servers/printer)<br><sub>Experimental<br>10 tools, read and write</sub> | Print, scan and check paper and toner on a network printer, with greys corrected for that printer. |
 
-### Domains and brands
-
-| Server | What it does |
-|---|---|
-| [<img src="servers/porkbun/icons/icon.svg" width="20" height="20" alt=""> Porkbun](servers/porkbun)<br><sub>113 tools, including **money**</sub> | Porkbun's official tools, served with per-client tokens, an audit line per call, purchases marked for the client to confirm, and files uploaded by path |
-| [<img src="servers/trademarks/icons/icon.svg" width="20" height="20" alt=""> Trademark search](servers/trademarks)<br><sub>6 tools, read-only</sub> | Whether a name is already a registered or pending mark, by office and Nice class (USPTO, EUIPO), and a US mark's history and documents |
-
-### Shared packages
+## Shared packages
 
 | Package | What it is |
 |---|---|
 | [mcp-kit](packages/mcp-kit) | Stdio and HTTP transports with per-client tokens, a guard that classifies, audits and can confirm every tool call, an HTTP and OAuth stack, exact decimals, and byte-exact file inputs |
-| [receipts](packages/receipts) | Itemised receipts, the join from a bank card charge to the order it paid, item search and CSV exports |
+| [receipts](packages/receipts)<br><sub>Not published: only extras use it</sub> | Itemised receipts, the join from a bank card charge to the order it paid, item search and CSV exports |
 <!-- servers:end -->
 
 ## Quick start
@@ -115,12 +108,10 @@ to set. To run one copy that several clients share over HTTP, see
 
 ## Status
 
-The servers are used every day by the people who wrote them. They are not on
-npm yet: until the first release publishes them (to npm, the MCP Registry, and
-a Claude Desktop bundle for each), build them from source as above.
-
-The Bolt Food and Glovo servers use those apps' unofficial web APIs, which can
-change without notice; check the providers' terms before you use them.
+The servers are used every day by the people who wrote them. The servers for
+Romania and for everyone are not on npm yet: until the first release publishes
+them (to npm, the MCP Registry, and a Claude Desktop bundle for each), build
+them from source as above. The [extras](#extras) are never published.
 
 ## Documentation
 

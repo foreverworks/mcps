@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/anaf-spv",
   "mcp": {
     "title": "ANAF SPV",
-    "group": "Romanian authorities",
+    "audience": "romania",
+    "maturity": "beta",
+    "tagline": "Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations.",
     "inputs": {
       "ANAF_SPV_USERNAME": {
         "title": "SPV user name",
@@ -43,9 +45,11 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
     "anaf",
     "spv",
-    "romania",
     "tax"
   ],
   "license": "MIT",

@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/notion",
   "title": "Notion",
-  "description": "MCP server for one or more Notion workspaces",
+  "description": "Search, read and write your Notion workspaces, with pages as Markdown and typed database queries.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/notion#readme",
   "repository": {

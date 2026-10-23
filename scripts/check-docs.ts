@@ -11,9 +11,12 @@
  *    or, for the variables every server shares, in docs/configuration.md.
  * 4. It gives server instructions at initialize: what it serves and where a
  *    model should start, read before any tool description.
- * 5. Its CHANGELOG.md names every `money` tool, and its package.json makes a
- *    registry entry: `mcpName` and `server.json` are written from it
- *    (scripts/packaging.ts).
+ * 5. Its CHANGELOG.md names every `money` tool, and its package.json says who
+ *    it is for (`mcp.audience`), how settled it is (`mcp.maturity`) and what
+ *    it does in one sentence (`mcp.tagline`). What follows from those is
+ *    written from them (scripts/packaging.ts): its npm keywords, and for a
+ *    server that ships its `mcpName` and registry entry `server.json`, or for
+ *    an extras server `"private": true` and neither.
  * 6. Its icons are the ones scripts/icons.ts draws, and it announces its own.
  * 7. Its README's install block (VS Code and Cursor links, the desktop bundle,
  *    the commands for Claude Code and other clients, at the top of "Install")
@@ -21,19 +24,36 @@
  *
  * A README whose tools change with a vendor's release (porkbun) generates its
  * table instead: between `<!-- tools:begin -->` and `<!-- tools:end -->`, one row
- * per tool, from `tools/list`. The root README's table of servers is generated
- * the same way, between `<!-- servers:begin -->` and `<!-- servers:end -->`, from
- * each workspace's package.json `description`, the one place a server says what
- * it is. `--write` rewrites those blocks; the check fails when one is out of date.
+ * per tool, from `tools/list`. The root README's servers are generated the
+ * same way, between `<!-- servers:begin -->` and `<!-- servers:end -->`: a
+ * section per audience, each server with its maturity and tagline, from each
+ * workspace's package.json, the one place a server says what it is and who it
+ * is for. `--write` rewrites those blocks and the files package.json implies;
+ * the check fails when one is out of date.
  *
  *   npx tsx scripts/check-docs.ts [--write] [server ...]
  */
-import { existsSync, readdirSync, readFileSync, statSync, writeFileSync } from "node:fs";
+import { existsSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { listServer } from "./listed.js";
-import { installBlock, jsonText, mcpNameOf, readManifest, serverJson, type Manifest } from "./packaging.js";
+import {
+  AUDIENCE,
+  AUDIENCES,
+  installBlock,
+  jsonText,
+  keywordsOf,
+  MATURITIES,
+  MATURITY,
+  mcpNameOf,
+  readManifest,
+  readWorkspaces,
+  serverJson,
+  shipsOf,
+  type Audience,
+  type Manifest,
+} from "./packaging.js";
 import { GLYPHS, iconsDir, iconSvg, PRODUCTS } from "./icons.js";
 import { accessOf, names, toolRows } from "./readme.js";
 
@@ -242,25 +262,61 @@ const checkIcons = (server: string, announced: number): readonly string[] => {
 };
 
 /**
- * The installer-facing files a server's package.json implies (scripts/packaging.ts):
- * its `mcpName` and its registry entry `server.json`, written under --write. Each
- * declared input must be a variable the README documents (and so one it reads:
- * some are read under a composed name, `<PREFIX>_CREDS`, that a search misses).
+ * The package.json with `key` set to `value` where it stands, or after `after`
+ * when it is new, or without `key` when `value` is undefined.
+ */
+const placed = (pkg: Readonly<Record<string, unknown>>, key: string, value: unknown, after: string): Readonly<Record<string, unknown>> => {
+  if (value === undefined) return Object.fromEntries(Object.entries(pkg).filter(([k]) => k !== key));
+  if (key in pkg) return { ...pkg, [key]: value };
+  const entries = Object.entries(pkg);
+  entries.splice(entries.findIndex(([k]) => k === after) + 1, 0, [key, value]);
+  return Object.fromEntries(entries);
+};
+
+const WRITE = "(npx tsx scripts/check-docs.ts --write)";
+
+/**
+ * The fields a server's package.json derives from its audience: its keywords,
+ * its registry name (`mcpName`, only for a server that ships; it sits after
+ * the description, where a reader looks for what the package is), and, for an
+ * extras server, `"private": true` (after the version, where npm puts it).
+ */
+const derivedPackage = (pkg: Readonly<Record<string, unknown>>, server: string, audience: Audience): { readonly pkg: Readonly<Record<string, unknown>>; readonly problems: readonly string[] } => {
+  const ships = AUDIENCE[audience].ships;
+  const current = Array.isArray(pkg["keywords"]) ? pkg["keywords"].filter((k): k is string => typeof k === "string") : [];
+  const keywords = keywordsOf(audience, current);
+  const mcpName = ships ? mcpNameOf(server) : undefined;
+  const derived = placed(placed(placed(pkg, "keywords", keywords, "mcp"), "mcpName", mcpName, "description"), "private", ships ? pkg["private"] : true, "version");
+  const problems = [
+    ...(jsonText(keywords) === jsonText(pkg["keywords"]) ? [] : [`package.json's keywords should be ${keywords.join(", ")}: the base ones, its audience's, then its own ${WRITE}`]),
+    ...(pkg["mcpName"] === mcpName
+      ? []
+      : ships
+        ? [`package.json's mcpName is ${JSON.stringify(pkg["mcpName"] ?? null)}, not "${mcpName}" ${WRITE}`]
+        : [`package.json has an mcpName, which only a published server needs, and an extras server is never published ${WRITE}`]),
+    ...(derived["private"] === pkg["private"] ? [] : [`an extras server is never published, so its package.json must say "private": true ${WRITE}`]),
+  ];
+  return { pkg: derived, problems };
+};
+
+/**
+ * The files a server's package.json implies (scripts/packaging.ts), written
+ * under --write: the fields it derives from its audience, and its registry
+ * entry `server.json` when it ships (an extras server has none). Each
+ * declared input must be a variable the README documents (and so one it
+ * reads: some are read under a composed name, `<PREFIX>_CREDS`, that a
+ * search misses).
  */
 const checkPackaging = (dir: string, server: string, documented: ReadonlySet<string>, write: boolean): { readonly problems: readonly string[]; readonly manifest?: Manifest } => {
   const pkgPath = join(dir, "package.json");
-  const pkgText = readFileSync(pkgPath, "utf8");
-  const pkg = JSON.parse(pkgText) as Record<string, unknown>;
+  const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as Record<string, unknown>;
   const problems: string[] = [];
-  const wanted = mcpNameOf(server);
-  if (pkg["mcpName"] !== wanted) {
-    if (write) {
-      // mcpName sits after the description, where a reader of the package looks for what it is.
-      const entries = Object.entries(pkg).filter(([key]) => key !== "mcpName");
-      const at = entries.findIndex(([key]) => key === "description") + 1;
-      entries.splice(at, 0, ["mcpName", wanted]);
-      writeFileSync(pkgPath, jsonText(Object.fromEntries(entries)));
-    } else problems.push(`package.json's mcpName is ${JSON.stringify(pkg["mcpName"] ?? null)}, not "${wanted}" (npx tsx scripts/check-docs.ts --write)`);
+  const mcp = pkg["mcp"];
+  const audience = typeof mcp === "object" && mcp !== null ? (mcp as Record<string, unknown>)["audience"] : undefined;
+  if (AUDIENCES.includes(audience as Audience)) {
+    const derived = derivedPackage(pkg, server, audience as Audience);
+    if (write && derived.problems.length > 0) writeFileSync(pkgPath, jsonText(derived.pkg));
+    else problems.push(...derived.problems);
   }
   const { manifest, problems: unreadable } = readManifest(ROOT, server);
   problems.push(...unreadable);
@@ -269,17 +325,18 @@ const checkPackaging = (dir: string, server: string, documented: ReadonlySet<str
     if (!documented.has(input.name)) problems.push(`package.json's mcp.inputs names \`${input.name}\`, which the README does not document`);
   }
   const entryPath = join(dir, "server.json");
-  const entry = jsonText(serverJson({ ...manifest, mcpName: wanted }));
-  const current = (() => {
-    try {
-      return readFileSync(entryPath, "utf8");
-    } catch {
-      return "";
+  if (!shipsOf(manifest)) {
+    if (existsSync(entryPath)) {
+      if (write) rmSync(entryPath);
+      else problems.push(`server.json is a registry entry, and an extras server is never published: delete it ${WRITE}`);
     }
-  })();
+    return { problems, manifest };
+  }
+  const entry = jsonText(serverJson(manifest));
+  const current = existsSync(entryPath) ? readFileSync(entryPath, "utf8") : "";
   if (current !== entry) {
     if (write) writeFileSync(entryPath, entry);
-    else problems.push("server.json is out of date with package.json (npx tsx scripts/check-docs.ts --write)");
+    else problems.push(`server.json is out of date with package.json ${WRITE}`);
   }
   return { problems, manifest };
 };
@@ -352,17 +409,11 @@ const checkServer = async (name: string, shared: ReadonlySet<string>, write: boo
 const SERVERS_BEGIN = "<!-- servers:begin -->";
 const SERVERS_END = "<!-- servers:end -->";
 
-/**
- * The groups of the root README's table of servers, in the order a reader
- * meets them. Each server names its own in its package.json `mcp.group`.
- */
-const GROUPS = ["Workspace", "Money and accounting", "Romanian authorities", "Apps and developer tools", "Domains and brands"];
-
-type Described = { readonly name: string; readonly description: string; readonly mcp?: { readonly title?: string; readonly group?: string } };
+type Described = { readonly description: string };
 
 const describedOf = (dir: string): Described => JSON.parse(readFileSync(join(ROOT, dir, "package.json"), "utf8")) as Described;
 
-/** A description's details, after its head: what the server does, since the row's link already names what it serves. */
+/** A package description's details, after its head: what it is, since the row's link already names it. */
 const detailsOf = (description: string): string => {
   const colon = description.indexOf(": ");
   const details = colon === -1 ? description : description.slice(colon + 2);
@@ -376,27 +427,38 @@ const reachOf = (dir: string): string => {
   return `${classes.length} tools, ${reach}`;
 };
 
+const capitalised = (word: string): string => `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
+
 /**
- * The root README's tables, from each workspace's package.json: the servers by
- * group, each with its icon, its title, what it does and how far its tools
- * reach (from its README's tool tables, which check-docs holds to the code),
- * then the shared packages.
+ * The root README's servers, from each workspace's package.json: what the
+ * maturities mean, then a section per audience, in AUDIENCES order, each
+ * server with its icon, its title, its maturity, how far its tools reach
+ * (from its README's tool tables, which check-docs holds to the code) and its
+ * tagline; then the shared packages, and which of them are never published.
  */
 const serversTable = (): { readonly table: string; readonly problems: readonly string[] } => {
-  const dirs = (parent: string) => readdirSync(join(ROOT, parent)).sort().map((name) => `${parent}/${name}`);
-  const servers = dirs("servers").map((dir) => ({ dir, pkg: describedOf(dir) }));
-  const problems = servers.filter(({ pkg }) => !GROUPS.includes(pkg.mcp?.group ?? "")).map(({ dir }) => `${dir}: package.json's mcp.group must be one of ${GROUPS.join(", ")}`);
-  // Two columns, so a phone keeps room for the description: the tool count sits under the name.
+  const read = readdirSync(join(ROOT, "servers"))
+    .sort()
+    .map((server) => ({ server, ...readManifest(ROOT, server) }));
+  const broken = read.filter((r) => r.manifest === undefined).map((r) => `README.md: the servers' tables wait for servers/${r.server}'s package.json (its problems are listed below)`);
+  if (broken.length > 0) return { table: "", problems: broken };
+  const servers = read.map((r) => r.manifest as Manifest);
+  // Two columns, so a phone keeps room for the tagline: the maturity and the tool count sit under
+  // the name, a line each, so neither breaks mid-phrase in the narrow column.
   // The icon sits inside the server's link: GitHub links a bare image to its own file, a link
   // with no name for a screen reader when the image is decorative.
-  const row = ({ dir, pkg }: { readonly dir: string; readonly pkg: Described }): string =>
-    `| [<img src="${dir}/icons/icon.svg" width="20" height="20" alt=""> ${pkg.mcp?.title ?? dir}](${dir})<br><sub>${reachOf(dir)}</sub> | ${detailsOf(pkg.description)} |`;
-  const groups = GROUPS.flatMap((group) => {
-    const members = servers.filter(({ pkg }) => pkg.mcp?.group === group);
-    return members.length === 0 ? [] : [`### ${group}`, "", "| Server | What it does |", "|---|---|", ...members.map(row), ""];
+  const row = (m: Manifest): string =>
+    `| [<img src="servers/${m.server}/icons/icon.svg" width="20" height="20" alt=""> ${m.title}](servers/${m.server})<br><sub>${capitalised(m.maturity)}<br>${reachOf(`servers/${m.server}`)}</sub> | ${m.tagline.replace(/\|/g, "\\|")} |`;
+  const legend = `Under each server's name: how settled it is, then how many tools it has and the most they can do. ${MATURITIES.map((k) => `**${capitalised(k)}**: ${MATURITY[k]}.`).join(" ")}`;
+  const sections = AUDIENCES.flatMap((audience) => {
+    const members = servers.filter((m) => m.audience === audience);
+    return members.length === 0 ? [] : [`## ${AUDIENCE[audience].heading}`, "", AUDIENCE[audience].intro, "", "| Server | What it does |", "|---|---|", ...members.map(row), ""];
   });
-  const packages = dirs("packages").map((dir) => `| [${dir.split("/")[1]}](${dir}) | ${detailsOf(describedOf(dir).description)} |`);
-  return { table: [...groups, "### Shared packages", "", "| Package | What it is |", "|---|---|", ...packages].join("\n"), problems };
+  const { workspaces } = readWorkspaces(ROOT);
+  const packages = workspaces
+    .filter((w) => w.dir.startsWith("packages/"))
+    .map((w) => `| [${w.dir.split("/")[1]}](${w.dir})${w.ships ? "" : "<br><sub>Not published: only extras use it</sub>"} | ${detailsOf(describedOf(w.dir).description)} |`);
+  return { table: [legend, "", ...sections, "## Shared packages", "", "| Package | What it is |", "|---|---|", ...packages].join("\n"), problems: [] };
 };
 
 /** The root README's generated block: a problem, or none (rewritten under --write). */
@@ -421,13 +483,22 @@ const main = async (): Promise<void> => {
   const configuration = readFileSync(join(ROOT, "docs/configuration.md"), "utf8");
   const shared = documentedIn(configuration);
   const problems: string[] = [];
-  for (const dir of ["packages/mcp-kit", "packages/receipts"]) {
+  const write = process.argv.includes("--write");
+  // A server without a known audience is reported with its own problems, below.
+  const { workspaces } = readWorkspaces(ROOT);
+  for (const { dir, ships } of workspaces.filter((w) => w.dir.startsWith("packages/"))) {
     if (!existsSync(join(ROOT, dir, "CHANGELOG.md"))) problems.push(`${dir}: has no CHANGELOG.md (.changeset/README.md)`);
     for (const variable of envReadIn(join(ROOT, dir, "src"))) {
       if (!shared.has(variable) && !PLATFORM.has(variable)) problems.push(`${dir}: reads \`${variable}\`, which docs/configuration.md does not document`);
     }
+    // A package nothing that ships depends on is never published: npm should refuse it too.
+    const pkgPath = join(ROOT, dir, "package.json");
+    const pkg = JSON.parse(readFileSync(pkgPath, "utf8")) as Record<string, unknown>;
+    if (!ships && pkg["private"] !== true) {
+      if (write) writeFileSync(pkgPath, jsonText(placed(pkg, "private", true, "version")));
+      else problems.push(`${dir}: only extras use it, so it is never published and its package.json must say "private": true ${WRITE}`);
+    }
   }
-  const write = process.argv.includes("--write");
   const asked = process.argv.slice(2).filter((a) => a !== "--write");
   if (asked.length === 0) problems.push(...checkRootReadme(write));
   const servers = asked.length > 0 ? asked : readdirSync(join(ROOT, "servers")).sort();

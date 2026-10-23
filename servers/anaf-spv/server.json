@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/anaf-spv",
   "title": "ANAF SPV",
-  "description": "MCP server for ANAF's Spațiul Privat Virtual (pfinternet.anaf.ro)",
+  "description": "Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/anaf-spv#readme",
   "repository": {

@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/eas",
   "mcp": {
     "title": "Expo Application Services",
-    "group": "Apps and developer tools",
+    "audience": "general",
+    "maturity": "beta",
+    "tagline": "Find out why an Expo build, workflow run or store submission failed, and roll out updates.",
     "inputs": {
       "EXPO_TOKEN_FILE": {
         "title": "Expo token file",
@@ -25,6 +27,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "expo",
     "eas",
     "react-native"

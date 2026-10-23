@@ -34,8 +34,9 @@ runs:
     # The registry's own check of every entry, before anything is published.
     - run: for entry in servers/*/server.json; do mcp-publisher validate "$entry"; done
       shell: bash
-    # Every public server's desktop bundle, built before anything is
-    # published, so a bundle that cannot be built stops the release.
+    # The desktop bundle of every public server that ships (never an extras
+    # one), built before anything is published, so a bundle that cannot be
+    # built stops the release.
     - run: npx tsx scripts/bundle.ts --public --out bundles
       shell: bash
     - run: npx tsx scripts/release.ts plan

@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/eas",
   "title": "Expo Application Services",
-  "description": "MCP server for Expo Application Services",
+  "description": "Find out why an Expo build, workflow run or store submission failed, and roll out updates.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/eas#readme",
   "repository": {

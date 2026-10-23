@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/typesafe",
   "mcp": {
     "title": "TypeSafe",
-    "group": "Apps and developer tools",
+    "audience": "general",
+    "maturity": "beta",
+    "tagline": "Get calibrated yes or no answers, choices and scores from TypeSafe's Jev, for one item or 1000 rows.",
     "inputs": {
       "TYPESAFE_API_KEY_FILE": {
         "title": "API key file",
@@ -19,6 +21,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "typesafe",
     "classification"
   ],

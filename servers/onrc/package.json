@@ -6,14 +6,18 @@
   "mcpName": "com.foreverworks/onrc",
   "mcp": {
     "title": "ONRC trade register",
-    "group": "Romanian authorities",
+    "audience": "romania",
+    "maturity": "beta",
+    "tagline": "Follow your filings at Romania's trade register, with their documents, fee notes and invoices.",
     "inputs": {}
   },
   "keywords": [
     "mcp",
     "model-context-protocol",
-    "onrc",
+    "mcp-server",
     "romania",
+    "romanian",
+    "onrc",
     "trade-register"
   ],
   "license": "MIT",

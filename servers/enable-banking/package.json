@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/enable-banking",
   "mcp": {
     "title": "Enable Banking",
-    "group": "Money and accounting",
+    "audience": "general",
+    "maturity": "stable",
+    "tagline": "Read, search and export statements and balances from banks across Europe, without moving money.",
     "inputs": {
       "ENABLE_BANKING_CONFIG": {
         "title": "Enable Banking app.json",
@@ -25,6 +27,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "enable-banking",
     "psd2",
     "open-banking",

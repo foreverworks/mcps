@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/oblio",
   "mcp": {
     "title": "Oblio",
-    "group": "Money and accounting",
+    "audience": "romania",
+    "maturity": "stable",
+    "tagline": "Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them.",
     "inputs": {
       "OBLIO_CONFIG": {
         "title": "Oblio app.json",
@@ -19,9 +21,11 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
     "oblio",
-    "invoicing",
-    "romania"
+    "invoicing"
   ],
   "license": "MIT",
   "author": "Forever Works",

@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/bitwarden",
   "mcp": {
     "title": "Bitwarden",
-    "group": "Workspace",
+    "audience": "general",
+    "maturity": "stable",
+    "tagline": "Give your assistant its own Bitwarden vault to create logins, type passwords and read 2FA codes.",
     "inputs": {
       "BITWARDEN_CLIENT_ID_FILE": {
         "title": "API key client id file",
@@ -37,6 +39,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "bitwarden",
     "passwords",
     "totp"

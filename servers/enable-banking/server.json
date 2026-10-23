@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/enable-banking",
   "title": "Enable Banking",
-  "description": "MCP server for bank accounts through Enable Banking's PSD2 API",
+  "description": "Read, search and export statements and balances from banks across Europe, without moving money.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/enable-banking#readme",
   "repository": {

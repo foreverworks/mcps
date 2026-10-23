@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "MCP server for a network printer and its flatbed scanner over IPP Everywhere and eSCL: printer status, lossless printing corrected for the printer's measured response, and scanning",
-  "mcpName": "com.foreverworks/printer",
   "mcp": {
     "title": "Printer and scanner",
-    "group": "Workspace",
+    "audience": "extras",
+    "maturity": "experimental",
+    "tagline": "Print, scan and check paper and toner on a network printer, with greys corrected for that printer.",
     "inputs": {
       "PRINTER_URI": {
         "title": "Printer address",
@@ -25,6 +26,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "printer",
     "ipp",
     "ipp-everywhere",

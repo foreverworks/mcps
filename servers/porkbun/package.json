@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/porkbun",
   "mcp": {
     "title": "Porkbun",
-    "group": "Domains and brands",
+    "audience": "general",
+    "maturity": "beta",
+    "tagline": "Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.",
     "inputs": {
       "PORKBUN_API_KEY_FILE": {
         "title": "API key file",
@@ -31,6 +33,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "porkbun",
     "dns",
     "domains"

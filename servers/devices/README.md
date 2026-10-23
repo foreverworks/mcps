@@ -28,25 +28,25 @@ no key.
 ## Install
 
 <!-- install:begin -->
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=devices&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22devices_catalog_file%22%2C%22description%22%3A%22Path%20of%20the%20catalog%3A%20the%20hosts%20and%20devices%20this%20broker%20leases%2C%20as%20the%20README%20describes%20it.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-devices%22%5D%2C%22env%22%3A%7B%22DEVICES_CATALOG_FILE%22%3A%22%24%7Binput%3Adevices_catalog_file%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=devices&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWRldmljZXMiXSwiZW52Ijp7IkRFVklDRVNfQ0FUQUxPR19GSUxFIjoiJHtlbnY6REVWSUNFU19DQVRBTE9HX0ZJTEV9In19) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-devices.mcpb)
-
 > [!NOTE]
-> `@foreverworks/mcp-devices` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
+> Device broker is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node 22.19 or newer.
 
 With Claude Code:
 
 ```bash
-claude mcp add devices -e DEVICES_CATALOG_FILE="<path to Device catalog>" -- npx -y @foreverworks/mcp-devices
+git clone https://github.com/foreverworks/mcps.git && cd mcps
+npm ci && npm run build
+claude mcp add devices -e DEVICES_CATALOG_FILE="<path to Device catalog>" -- node "$PWD/servers/devices/dist/index.js"
 ```
 
-Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON:
+Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON, with the full path of `servers/devices/dist/index.js` in your clone:
 
 ```json
 {
   "mcpServers": {
     "devices": {
-      "command": "npx",
-      "args": ["-y", "@foreverworks/mcp-devices"],
+      "command": "node",
+      "args": ["<path to the clone>/servers/devices/dist/index.js"],
       "env": {
         "DEVICES_CATALOG_FILE": "<path to Device catalog>"
       }
@@ -55,17 +55,7 @@ Claude Desktop (Settings, Developer, Edit Config) and most other clients read th
 }
 ```
 
-Each runs the published package on Node 22.19 or newer. VS Code and the Claude Desktop bundle ask for `DEVICES_CATALOG_FILE` as they add the server. Cursor reads it from your environment instead (`${env:DEVICES_CATALOG_FILE}`), so set it before you start Cursor. [Configuration](#configuration) says what it holds.
-
-### From a clone
-
-```bash
-git clone https://github.com/foreverworks/mcps.git && cd mcps
-npm ci && npm run build
-claude mcp add devices -e DEVICES_CATALOG_FILE="<path to Device catalog>" -- node "$PWD/servers/devices/dist/index.js"
-```
-
-In a JSON configuration, the command is `node` and its one argument the full path of `servers/devices/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
+[Configuration](#configuration) says what it holds. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
 
 Agents that share devices must share one broker, over HTTP (`MCP_HTTP_PORT`,

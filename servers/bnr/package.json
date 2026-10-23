@@ -6,15 +6,19 @@
   "mcpName": "com.foreverworks/bnr",
   "mcp": {
     "title": "BNR exchange rates",
-    "group": "Money and accounting",
+    "audience": "romania",
+    "maturity": "stable",
+    "tagline": "Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.",
     "inputs": {}
   },
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
     "bnr",
     "exchange-rates",
-    "romania",
     "anaf"
   ],
   "license": "MIT",

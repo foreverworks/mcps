@@ -44,9 +44,9 @@ jobs:
       - run: npx tsx scripts/access-changes.ts --check
 
   bundles:
-    # Every server's desktop bundle, built and checked by the mcpb CLI the
-    # way a release builds it, so a release cannot fail on one. Nothing is
-    # published.
+    # The desktop bundle of every server that ships (every audience but the
+    # extras), built and checked by the mcpb CLI the way a release builds it,
+    # so a release cannot fail on one. Nothing is published.
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

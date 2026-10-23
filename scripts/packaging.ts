@@ -1,19 +1,30 @@
 /**
- * What a server says about itself to installers, derived from its package.json,
- * the one place a server says what it is: its registry entry (`server.json`,
- * for the official MCP Registry), its desktop bundle's manifest (`.mcpb`) and
- * the install links in its README. check-docs writes and checks them, the
- * release builds and publishes them; nothing here is typed twice.
+ * What a server says about itself, derived from its package.json, the one
+ * place a server says what it is and who it is for: where the root README
+ * lists it, its npm keywords, its registry entry (`server.json`, for the
+ * official MCP Registry), its desktop bundle's manifest (`.mcpb`), the install
+ * block in its README, and whether it is published at all. check-docs writes
+ * and checks them, the release builds and publishes them; nothing here is
+ * typed twice.
  *
  * A server's package.json carries, beside the npm fields:
  *
- *   "mcpName": "com.foreverworks/<server>",       the registry name; npm proves it is ours
  *   "mcp": {
  *     "title": "Oblio",                            a person's name for it
+ *     "audience": "romania",                       who it is for (AUDIENCE below)
+ *     "maturity": "stable",                        how settled it is (MATURITY below)
+ *     "tagline": "Issue and track ...",            one sentence for a stranger (taglineProblems)
  *     "inputs": {                                  what a person sets to install it
  *       "OBLIO_CONFIG": { "title": "Oblio app.json", "type": "file", "required": true, "description": "Path of app.json ..." }
  *     }
  *   }
+ *
+ * and, written from those by `check-docs --write`: its `keywords` (the base
+ * and its audience's first, then its own), and for a server that ships its
+ * `mcpName` (`com.foreverworks/<server>`, the registry name npm proves is
+ * ours) and `server.json`; an extras server instead says `"private": true`
+ * and has neither. Its `description` is npm's, written by hand: what it
+ * serves, then what an assistant can do with it.
  *
  * An input's `type` is `file` or `directory` (a path: a credential lives in a
  * file, docs/configuration.md), `text` (a plain value such as a time zone) or
@@ -23,7 +34,7 @@
  * for it as a password, and a Cursor link, whose configuration is a plain
  * file, leaves it for the person to fill in.
  */
-import { readFileSync } from "node:fs";
+import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
 /** The registry's server.json schema these entries follow. */
@@ -35,8 +46,96 @@ export const NAMESPACE = "com.foreverworks";
 /** The npm scope every server is published under, as `mcp-<server>`. */
 const SCOPE = "@foreverworks/";
 
-/** The registry's limit on a description, which is the head of the package's. */
-export const SUMMARY_MAX = 100;
+/** The registry's limit on a description, which is the server's tagline. */
+export const TAGLINE_MAX = 100;
+
+/**
+ * Who a server is for. Each audience is a section of the root README, in
+ * this order, and decides whether its servers are published: an extras
+ * server never goes to npm, the MCP Registry or a desktop bundle, and its
+ * package.json says `"private": true` so that npm refuses it too.
+ */
+export const AUDIENCES = ["romania", "general", "extras"] as const;
+export type Audience = (typeof AUDIENCES)[number];
+
+export type AudienceSpec = {
+  /** The heading of its section in the root README. */
+  readonly heading: string;
+  /** What its section says before the table. */
+  readonly intro: string;
+  /** npm keywords every server of the audience carries, true of each one. */
+  readonly keywords: readonly string[];
+  /** Whether its servers are published: to npm, to the MCP Registry, as desktop bundles. */
+  readonly ships: boolean;
+};
+
+export const AUDIENCE: Readonly<Record<Audience, AudienceSpec>> = {
+  romania: {
+    heading: "For companies in Romania",
+    intro:
+      "The paperwork a company in Romania, and the people who run it, do online: e-invoices and declarations with ANAF, filings at the trade register, invoicing, and the National Bank's exchange rates. Each README ends with the other servers we found for that service, and what this one adds.",
+    keywords: ["romania", "romanian"],
+    ships: true,
+  },
+  general: {
+    heading: "For everyone",
+    intro:
+      "Servers for services people use anywhere. We built each one because the servers we found did less, or there were none; each README's last section names them and says what this one adds.",
+    keywords: [],
+    ships: true,
+  },
+  extras: {
+    heading: "Extras",
+    intro:
+      "These work, and we use them, but each is built for one particular setup or on an app's unofficial API, so they are not published to npm, the MCP Registry or as desktop bundles. Run them from a clone, and read the README first: it says what the server depends on and what can break.",
+    keywords: [],
+    ships: false,
+  },
+};
+
+/** How settled a server is, as the root README shows it under its name. */
+export const MATURITIES = ["stable", "beta", "experimental"] as const;
+export type Maturity = (typeof MATURITIES)[number];
+
+export const MATURITY: Readonly<Record<Maturity, string>> = {
+  stable: "in daily use, and its tools keep their shape",
+  beta: "works and is in use, but is new, still growing, or reads web pages its service may change",
+  experimental: "rests on something that can break without notice, or covers only part of the service",
+};
+
+/** npm keywords every server carries. */
+export const BASE_KEYWORDS = ["mcp", "model-context-protocol", "mcp-server"] as const;
+
+/**
+ * A server's npm keywords: the base ones, its audience's, then its own, which
+ * are the ones package.json has that no audience generates. Changing a
+ * server's audience changes its keywords with it.
+ */
+export const keywordsOf = (audience: Audience, current: readonly string[]): readonly string[] => {
+  const generated = new Set<string>([...BASE_KEYWORDS, ...AUDIENCES.flatMap((a) => AUDIENCE[a].keywords)]);
+  return [...new Set([...BASE_KEYWORDS, ...AUDIENCE[audience].keywords, ...current.filter((k) => !generated.has(k))])];
+};
+
+/** Words a tagline does without (CONTRIBUTING.md, "How we write"). */
+const HYPE = /\b(powerful|seamless(ly)?|simply|effortless(ly)?|blazing|robust|cutting-edge|supercharge)\b/i;
+
+/**
+ * What keeps a tagline from being one sentence a stranger reads in the
+ * registry, a desktop bundle and the root README: at most TAGLINE_MAX
+ * characters, one sentence ending in a full stop, no dash for a pause, no
+ * hype, and no "MCP server", which every reader there already knows.
+ */
+export const taglineProblems = (tagline: string): readonly string[] => [
+  ...(tagline.length > TAGLINE_MAX ? [`mcp.tagline is ${tagline.length} characters; the registry takes ${TAGLINE_MAX}`] : []),
+  ...(/^[A-Z]/.test(tagline) && tagline.endsWith(".") ? [] : ["mcp.tagline must be a sentence: a capital letter first, a full stop last"]),
+  ...(/[.!?]\s/.test(tagline) ? ["mcp.tagline must be one sentence"] : []),
+  ...(/[\u2014\u2013]|\s-\s/.test(tagline) ? ["mcp.tagline has a dash; use a comma or a colon"] : []),
+  ...(HYPE.test(tagline) ? [`mcp.tagline says "${HYPE.exec(tagline)?.[0] ?? ""}"; say what it does instead`] : []),
+  ...(/\bMCP server\b/i.test(tagline) ? ["mcp.tagline says \"MCP server\"; say what it lets an assistant do"] : []),
+];
+
+/** The keys an `mcp` block may have; anything else is a typo or a field nothing reads. */
+const MCP_KEYS = new Set(["title", "audience", "maturity", "tagline", "inputs"]);
 
 export const INPUT_TYPES = ["file", "directory", "text", "secret"] as const;
 export type InputType = (typeof INPUT_TYPES)[number];
@@ -58,10 +157,12 @@ export type Manifest = {
   readonly version: string;
   readonly mcpName: string;
   readonly title: string;
-  /** The package description: what it serves, then its details after a colon. */
+  /** npm's description: what it serves, then what an assistant can do with it. */
   readonly description: string;
-  /** The description's head, before its first colon: one line for a registry. */
-  readonly summary: string;
+  readonly audience: Audience;
+  readonly maturity: Maturity;
+  /** One sentence for a stranger: the registry's description, a bundle's, the root README's. */
+  readonly tagline: string;
   readonly homepage: string;
   /** Where to report a problem (package.json `bugs`). */
   readonly bugs: string;
@@ -72,9 +173,15 @@ export type Manifest = {
   readonly node: string;
   readonly bin: string;
   readonly inputs: readonly Input[];
-  /** package.json `private`: the release does not publish it yet, so its README says so. */
+  /**
+   * package.json `private`. For a server that ships, the release does not
+   * publish it yet, and its README says so; an extras server is always private.
+   */
   readonly private: boolean;
 };
+
+/** Whether a server is ever published: its audience decides. */
+export const shipsOf = (m: Pick<Manifest, "audience">): boolean => AUDIENCE[m.audience].ships;
 
 type PackageJson = {
   readonly name?: unknown;
@@ -98,12 +205,6 @@ const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> =>
 /** The registry name a server's package must carry. */
 export const mcpNameOf = (server: string): string => `${NAMESPACE}/${server}`;
 
-/** The head of a description: up to its first colon, or all of it. */
-export const summaryOf = (description: string): string => {
-  const colon = description.indexOf(": ");
-  return (colon === -1 ? description : description.slice(0, colon)).trim();
-};
-
 /**
  * A server's manifest, or the problems that keep its package.json from making
  * one. `mcpName` is checked by the caller, which can write it.
@@ -119,13 +220,16 @@ export const readManifest = (root: string, server: string): { readonly manifest?
   const name = text(pkg.name, "name");
   if (name !== `${SCOPE}mcp-${server}`) problems.push(`package.json name is ${name}; a server's is ${SCOPE}mcp-${server}`);
   const description = text(pkg.description, "description");
-  const summary = summaryOf(description);
-  if (summary.length > SUMMARY_MAX) {
-    problems.push(`the description's head (before its first ": ") is ${summary.length} characters; the registry takes ${SUMMARY_MAX}: say what it serves first, then the details after a colon`);
-  }
   const mcp = isRecord(pkg.mcp) ? pkg.mcp : undefined;
   if (mcp === undefined) problems.push(`package.json has no "mcp" block (scripts/packaging.ts says what goes in it)`);
+  for (const key of Object.keys(mcp ?? {})) if (!MCP_KEYS.has(key)) problems.push(`package.json has mcp.${key}, which nothing reads: the block holds ${[...MCP_KEYS].join(", ")}`);
   const title = text(mcp?.["title"], `mcp.title`);
+  const audience = mcp?.["audience"];
+  if (!AUDIENCES.includes(audience as Audience)) problems.push(`mcp.audience is ${JSON.stringify(audience ?? null)}; it must be one of ${AUDIENCES.join(", ")}`);
+  const maturity = mcp?.["maturity"];
+  if (!MATURITIES.includes(maturity as Maturity)) problems.push(`mcp.maturity is ${JSON.stringify(maturity ?? null)}; it must be one of ${MATURITIES.join(", ")}`);
+  const tagline = text(mcp?.["tagline"], "mcp.tagline");
+  if (tagline !== "") problems.push(...taglineProblems(tagline));
   const inputs: Input[] = [];
   const declared = mcp?.["inputs"];
   if (!isRecord(declared)) problems.push(`package.json has no mcp.inputs (an empty {} for a server that needs none)`);
@@ -168,7 +272,9 @@ export const readManifest = (root: string, server: string): { readonly manifest?
     mcpName: typeof pkg.mcpName === "string" ? pkg.mcpName : "",
     title,
     description,
-    summary,
+    audience: audience as Audience,
+    maturity: maturity as Maturity,
+    tagline,
     homepage: text(pkg.homepage, "homepage"),
     bugs: text(pkg.bugs, "bugs"),
     repository: { url, directory },
@@ -181,6 +287,70 @@ export const readManifest = (root: string, server: string): { readonly manifest?
     private: pkg.private === true,
   };
   return problems.length === 0 ? { manifest, problems } : { problems };
+};
+
+/**
+ * A workspace (packages/* or servers/*) as a release sees it, with whether it
+ * is ever published. A server ships when its audience does; a package ships
+ * when something that ships depends on it, so a package only the extras use
+ * is never published either. `private` is the other gate: a workspace that
+ * ships is published once it is no longer private.
+ */
+export type Workspace = {
+  readonly dir: string;
+  readonly name: string;
+  readonly version: string;
+  readonly private: boolean;
+  /** The @foreverworks packages it depends on. */
+  readonly internal: readonly string[];
+  readonly mcpName?: string;
+  /** A server's audience; a package has none. */
+  readonly audience?: Audience;
+  readonly ships: boolean;
+};
+
+type WorkspaceJson = {
+  readonly name: string;
+  readonly version: string;
+  readonly private?: boolean;
+  readonly mcpName?: string;
+  readonly mcp?: { readonly audience?: unknown };
+  readonly dependencies?: Readonly<Record<string, string>>;
+};
+
+/**
+ * Every workspace, the packages first (a server depends on them by version
+ * range), and the problems that keep one from saying whether it ships: a
+ * server without a known audience.
+ */
+export const readWorkspaces = (root: string): { readonly workspaces: readonly Workspace[]; readonly problems: readonly string[] } => {
+  const problems: string[] = [];
+  const read = ["packages", "servers"].flatMap((parent) =>
+    readdirSync(join(root, parent))
+      .sort()
+      .map((folder) => {
+        const dir = `${parent}/${folder}`;
+        const pkg = JSON.parse(readFileSync(join(root, dir, "package.json"), "utf8")) as WorkspaceJson;
+        const audience = parent === "servers" ? pkg.mcp?.audience : undefined;
+        if (parent === "servers" && !AUDIENCES.includes(audience as Audience)) problems.push(`${dir}: package.json's mcp.audience must be one of ${AUDIENCES.join(", ")}`);
+        return {
+          dir,
+          name: pkg.name,
+          version: pkg.version,
+          private: pkg.private === true,
+          internal: Object.keys(pkg.dependencies ?? {}).filter((dep) => dep.startsWith(SCOPE)),
+          ...(pkg.mcpName === undefined ? {} : { mcpName: pkg.mcpName }),
+          ...(AUDIENCES.includes(audience as Audience) ? { audience: audience as Audience } : {}),
+        };
+      }),
+  );
+  // A server ships by its audience; then a package ships while anything that ships needs it.
+  const ships = new Set(read.filter((w) => w.audience !== undefined && AUDIENCE[w.audience].ships).map((w) => w.name));
+  for (let before = -1; ships.size !== before; ) {
+    before = ships.size;
+    for (const w of read) if (ships.has(w.name)) w.internal.forEach((dep) => ships.add(dep));
+  }
+  return { workspaces: read.map((w) => ({ ...w, ships: ships.has(w.name) })), problems };
 };
 
 /** One environment variable in a registry entry. */
@@ -213,7 +383,7 @@ export const serverJson = (m: Manifest): Readonly<Record<string, unknown>> => ({
   $schema: SERVER_SCHEMA,
   name: m.mcpName,
   title: m.title,
-  description: m.summary,
+  description: m.tagline,
   version: m.version,
   websiteUrl: m.homepage,
   repository: { url: m.repository.url, source: "github", subfolder: m.repository.directory },
@@ -315,7 +485,6 @@ const jsonConfig = (m: Manifest, command: string, args: readonly string[]): stri
 /** What the README says about the settings: who asks for which, and where they are explained. */
 const settingsOf = (m: Manifest): string => {
   if (m.inputs.length === 0) return "It needs no settings.";
-  const required = requiredOf(m);
   const first = m.inputs[0]?.name ?? "";
   const one = m.inputs.length === 1;
   return [
@@ -323,12 +492,53 @@ const settingsOf = (m: Manifest): string => {
       ? `VS Code and the Claude Desktop bundle ask for \`${first}\` as they add the server.`
       : "VS Code and the Claude Desktop bundle ask for each setting as they add the server; leave an optional one empty.",
     `Cursor reads ${one ? "it" : "each"} from your environment instead (\`\${env:${first}}\`${one ? "" : " and so on"}), so set ${one ? "it" : "them"} before you start Cursor.`,
-    required.length === m.inputs.length
-      ? `[Configuration](#configuration) says what ${one ? "it holds" : "each holds"}.`
-      : required.length === 0
-        ? "Every setting is optional; [Configuration](#configuration) says which ones you need for which tools."
-        : "The commands above set only what is required; [Configuration](#configuration) has the rest.",
+    whereExplained(m),
   ].join(" ");
+};
+
+/** Where the README explains the settings: the commands set the required ones. */
+const whereExplained = (m: Manifest): string => {
+  const required = requiredOf(m);
+  if (m.inputs.length === 0) return "It needs no settings.";
+  if (required.length === m.inputs.length) return `[Configuration](#configuration) says what ${m.inputs.length === 1 ? "it holds" : "each holds"}.`;
+  if (required.length === 0) return "Every setting is optional; [Configuration](#configuration) says which ones you need for which tools.";
+  return "The commands above set only what is required; [Configuration](#configuration) has the rest.";
+};
+
+/** The built server's entry point, from the repository's root. */
+const entryOf = (m: Manifest): string => `servers/${m.server}/${m.bin.replace(/^\.\//, "")}`;
+
+/** The commands that clone the repository and build every server. */
+const cloneCommands = (m: Manifest): readonly string[] => [`git clone ${m.repository.url}.git && cd ${m.repository.url.split("/").pop() ?? ""}`, "npm ci && npm run build"];
+
+const DEPLOYING = "To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).";
+
+/**
+ * The install block of a server that is never published (an extras server):
+ * no buttons and no npx, which would point at a package that will never
+ * exist, but why not, and the clone it runs from.
+ */
+const extrasInstallBlock = (m: Manifest): string => {
+  const entry = entryOf(m);
+  return [
+    "> [!NOTE]",
+    `> ${m.title} is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node ${m.node.replace(/^>=\s*/, "")} or newer.`,
+    "",
+    "With Claude Code:",
+    "",
+    "```bash",
+    ...cloneCommands(m),
+    claudeCommand(m, `node "$PWD/${entry}"`),
+    "```",
+    "",
+    `Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON, with the full path of \`${entry}\` in your clone:`,
+    "",
+    "```json",
+    jsonConfig(m, "node", [`<path to the clone>/${entry}`]),
+    "```",
+    "",
+    `${whereExplained(m)} ${DEPLOYING}`,
+  ].join("\n");
 };
 
 /**
@@ -337,11 +547,13 @@ const settingsOf = (m: Manifest): string => {
  * Code command and the JSON other clients read, all running the published
  * package, then the same from a clone. While the package is private it is not
  * on npm, and the block says so before anyone presses a button that fails.
+ * An extras server is never published, and its block says that instead.
  */
 export const installBlock = (m: Manifest): string => {
+  if (!shipsOf(m)) return extrasInstallBlock(m);
   const node = m.node.replace(/^>=\s*/, "");
   const badge = (label: string, message: string, colour: string, logo: string): string => `https://img.shields.io/badge/${label}-${message}-${colour}?style=flat-square&logo=${logo}&logoColor=white`;
-  const entry = `servers/${m.server}/${m.bin.replace(/^\.\//, "")}`;
+  const entry = entryOf(m);
   return [
     [
       `[![Install in VS Code](${badge("VS_Code", "Install_Server", "0098FF", "visualstudiocode")})](${vscodeLink(m)})`,
@@ -373,12 +585,11 @@ export const installBlock = (m: Manifest): string => {
     "### From a clone",
     "",
     "```bash",
-    `git clone ${m.repository.url}.git && cd ${m.repository.url.split("/").pop() ?? ""}`,
-    "npm ci && npm run build",
+    ...cloneCommands(m),
     claudeCommand(m, `node "$PWD/${entry}"`),
     "```",
     "",
-    `In a JSON configuration, the command is \`node\` and its one argument the full path of \`${entry}\`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).`,
+    `In a JSON configuration, the command is \`node\` and its one argument the full path of \`${entry}\`. ${DEPLOYING}`,
   ].join("\n");
 };
 
@@ -408,7 +619,7 @@ export const bundleManifest = (m: Manifest, tools: readonly { readonly name: str
     name: `mcp-${m.server}`,
     display_name: m.title,
     version: m.version,
-    description: m.summary,
+    description: m.tagline,
     long_description: m.description,
     author: { name: m.author },
     repository: { type: "git", url: m.repository.url },

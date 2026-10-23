@@ -26,25 +26,25 @@ account and no key. Prints are A4, grey and one-sided.
 ## Install
 
 <!-- install:begin -->
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=printer&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22printer_uri%22%2C%22description%22%3A%22The%20printer's%20IPP%20address%2C%20e.g.%20ipps%3A%2F%2Fprinter.local%3A443%2Fipp%2Fprint.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22printer_tls_sha256%22%2C%22description%22%3A%22Optional.%20The%20printer%20certificate's%20SHA-256%20fingerprint%2C%20for%20a%20printer%20that%20signs%20its%20own%20certificate.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-printer%22%5D%2C%22env%22%3A%7B%22PRINTER_URI%22%3A%22%24%7Binput%3Aprinter_uri%7D%22%2C%22PRINTER_TLS_SHA256%22%3A%22%24%7Binput%3Aprinter_tls_sha256%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=printer&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLXByaW50ZXIiXSwiZW52Ijp7IlBSSU5URVJfVVJJIjoiJHtlbnY6UFJJTlRFUl9VUkl9IiwiUFJJTlRFUl9UTFNfU0hBMjU2IjoiJHtlbnY6UFJJTlRFUl9UTFNfU0hBMjU2fSJ9fQ%3D%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-printer.mcpb)
-
 > [!NOTE]
-> `@foreverworks/mcp-printer` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
+> Printer and scanner is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node 22.19 or newer.
 
 With Claude Code:
 
 ```bash
-claude mcp add printer -e PRINTER_URI="<Printer address>" -- npx -y @foreverworks/mcp-printer
+git clone https://github.com/foreverworks/mcps.git && cd mcps
+npm ci && npm run build
+claude mcp add printer -e PRINTER_URI="<Printer address>" -- node "$PWD/servers/printer/dist/index.js"
 ```
 
-Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON:
+Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON, with the full path of `servers/printer/dist/index.js` in your clone:
 
 ```json
 {
   "mcpServers": {
     "printer": {
-      "command": "npx",
-      "args": ["-y", "@foreverworks/mcp-printer"],
+      "command": "node",
+      "args": ["<path to the clone>/servers/printer/dist/index.js"],
       "env": {
         "PRINTER_URI": "<Printer address>"
       }
@@ -53,17 +53,7 @@ Claude Desktop (Settings, Developer, Edit Config) and most other clients read th
 }
 ```
 
-Each runs the published package on Node 22.19 or newer. VS Code and the Claude Desktop bundle ask for each setting as they add the server; leave an optional one empty. Cursor reads each from your environment instead (`${env:PRINTER_URI}` and so on), so set them before you start Cursor. The commands above set only what is required; [Configuration](#configuration) has the rest.
-
-### From a clone
-
-```bash
-git clone https://github.com/foreverworks/mcps.git && cd mcps
-npm ci && npm run build
-claude mcp add printer -e PRINTER_URI="<Printer address>" -- node "$PWD/servers/printer/dist/index.js"
-```
-
-In a JSON configuration, the command is `node` and its one argument the full path of `servers/printer/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
+The commands above set only what is required; [Configuration](#configuration) has the rest. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
 
 PDFs are rendered with poppler's `pdfinfo` and `pdftoppm`, found on `PATH`:

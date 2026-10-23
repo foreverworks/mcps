@@ -2,7 +2,7 @@
  * Builds a desktop bundle (`.mcpb`, modelcontextprotocol/mcpb) per server:
  * one file a person opens in Claude Desktop, which asks for the settings and
  * runs the server with its own Node. The release attaches every public
- * server's bundle; CI builds them all to prove a release could.
+ * server's bundle; CI builds every one that ships to prove a release could.
  *
  *   npx tsx scripts/bundle.ts [--public] [--out <dir>] [server ...]
  *
@@ -13,16 +13,19 @@
  * script, and none carries native code, so one bundle serves every
  * platform); the manifest from package.json (scripts/packaging.ts) with the
  * tool list a client shows; the icon; the LICENSE. Then the mcpb CLI checks
- * and packs it. `--public` skips the servers still `"private": true`.
+ * and packs it. With no server named, it bundles every server that ships
+ * (its package.json `mcp.audience` is not "extras"), and `--public` skips
+ * those still `"private": true`. An extras server is never bundled: naming
+ * one fails.
  */
 import { execFileSync } from "node:child_process";
-import { copyFileSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import { copyFileSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
 import { listServer } from "./listed.js";
-import { bundleFile, bundleManifest, jsonText, packedEntries, readManifest, type Manifest } from "./packaging.js";
+import { bundleFile, bundleManifest, jsonText, packedEntries, readManifest, readWorkspaces, type Manifest } from "./packaging.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const TOOLKIT = ["packages/mcp-kit", "packages/receipts"];
@@ -75,16 +78,21 @@ const main = async (): Promise<void> => {
   const at = args.indexOf("--out");
   const out = resolve(at === -1 ? join(ROOT, "bundles") : (args[at + 1] ?? "bundles"));
   const asked = args.filter((a, i) => !a.startsWith("--") && args[i - 1] !== "--out");
-  const servers = asked.length > 0 ? asked : readdirSync(join(ROOT, "servers")).sort();
+  const { workspaces, problems } = readWorkspaces(ROOT);
+  if (problems.length > 0) throw new Error(problems.join("; "));
+  const servers = new Map(workspaces.filter((w) => w.audience !== undefined).map((w) => [w.dir.slice("servers/".length), w]));
+  const refused = asked.filter((server) => servers.get(server)?.ships !== true);
+  if (refused.length > 0) {
+    throw new Error(refused.map((server) => (servers.has(server) ? `servers/${server} is one of the extras, which are never bundled (its package.json mcp.audience)` : `there is no servers/${server}`)).join("; "));
+  }
   mkdirSync(out, { recursive: true });
-  for (const server of servers) {
-    const isPrivate = (JSON.parse(readFileSync(join(ROOT, "servers", server, "package.json"), "utf8")) as { readonly private?: boolean }).private === true;
-    if (args.includes("--public") && isPrivate) {
+  for (const server of asked.length > 0 ? asked : [...servers].filter(([, w]) => w.ships).map(([server]) => server)) {
+    if (args.includes("--public") && servers.get(server)?.private === true) {
       console.log(`servers/${server}: private, no bundle`);
       continue;
     }
-    const { manifest, problems } = readManifest(ROOT, server);
-    if (manifest === undefined) throw new Error(`servers/${server}: ${problems.join("; ")}`);
+    const { manifest, problems: unreadable } = readManifest(ROOT, server);
+    if (manifest === undefined) throw new Error(`servers/${server}: ${unreadable.join("; ")}`);
     console.log(`${await bundle(manifest, out)}`);
   }
 };

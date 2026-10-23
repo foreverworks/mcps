@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/anaf-efactura",
   "mcp": {
     "title": "ANAF e-Factura",
-    "group": "Romanian authorities",
+    "audience": "romania",
+    "maturity": "stable",
+    "tagline": "Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF.",
     "inputs": {
       "ANAF_CONFIG": {
         "title": "ANAF app.json",
@@ -19,10 +21,12 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
     "anaf",
     "e-factura",
     "efactura",
-    "romania",
     "e-invoicing",
     "ubl"
   ],

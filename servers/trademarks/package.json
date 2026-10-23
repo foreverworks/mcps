@@ -6,7 +6,9 @@
   "mcpName": "com.foreverworks/trademarks",
   "mcp": {
     "title": "Trademark search",
-    "group": "Domains and brands",
+    "audience": "general",
+    "maturity": "beta",
+    "tagline": "Check whether a name is already a registered or pending trademark in the US or the EU.",
     "inputs": {
       "USPTO_TSDR_API_KEY_FILE": {
         "title": "USPTO TSDR API key file",
@@ -31,6 +33,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "trademarks",
     "uspto",
     "euipo"

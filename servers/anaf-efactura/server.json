@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/anaf-efactura",
   "title": "ANAF e-Factura",
-  "description": "MCP server for Romania's ANAF e-Factura and e-Transport",
+  "description": "Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF.",
   "version": "0.1.0",
   "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/anaf-efactura#readme",
   "repository": {

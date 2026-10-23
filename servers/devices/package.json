@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "MCP device broker for shared Android emulators, iOS simulators, build slots and desktops: lease one, wait in a fair queue, start spares within budgets, and check each host's health",
-  "mcpName": "com.foreverworks/devices",
   "mcp": {
     "title": "Device broker",
-    "group": "Apps and developer tools",
+    "audience": "extras",
+    "maturity": "experimental",
+    "tagline": "Share your own Android emulators, iOS simulators and desktops between AI agents, in fair turns.",
     "inputs": {
       "DEVICES_CATALOG_FILE": {
         "title": "Device catalog",
@@ -19,6 +20,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "android",
     "ios",
     "emulator",

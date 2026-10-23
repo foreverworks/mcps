@@ -3,10 +3,11 @@
   "version": "0.1.0",
   "private": true,
   "description": "MCP server for Bolt Food order history: itemised receipts, item search, spending by restaurant and month, and each bank card charge matched to its order; read-only",
-  "mcpName": "com.foreverworks/bolt-food",
   "mcp": {
     "title": "Bolt Food receipts",
-    "group": "Money and accounting",
+    "audience": "extras",
+    "maturity": "experimental",
+    "tagline": "Read your Bolt Food orders as itemised receipts matched to card charges, through an unofficial API.",
     "inputs": {
       "BOLT_FOOD_CREDS": {
         "title": "Bolt Food credentials.json",
@@ -25,6 +26,7 @@
   "keywords": [
     "mcp",
     "model-context-protocol",
+    "mcp-server",
     "bolt",
     "bolt-food",
     "receipts"
