@@ -14,16 +14,24 @@ export const decodeEntities = (text: string): string =>
     return NAMED[entity.toLowerCase()] ?? whole;
   });
 
+/** A comment, to the first `-->` or `--!>`: a browser ends it at either, and comments do not nest. */
+const COMMENT = /<!--[\s\S]*?--!?>/g;
+
+/**
+ * What a browser never shows: scripts, styles, noscript fallbacks and
+ * comments, each to the end a browser gives it (`</script >` and
+ * `</script x>` close a script too). One pattern, so whichever opens first
+ * wins, as in a browser: a comment that mentions `<script>` hides nothing
+ * after it.
+ */
+const HIDDEN = /<script\b[\s\S]*?<\/script\b[^>]*>|<style\b[\s\S]*?<\/style\b[^>]*>|<noscript\b[\s\S]*?<\/noscript\b[^>]*>|<!--[\s\S]*?--!?>/gi;
+
+/** The markup without its comments, each one a space, so removing one never joins its neighbours into new markup. */
+export const withoutComments = (html: string): string => html.replace(COMMENT, " ");
+
 /** The text a person sees: no scripts, styles or comments, tags as spaces, entities decoded, one space between words. */
 export const visibleText = (html: string): string =>
-  decodeEntities(
-    html
-      .replace(/<script[\s\S]*?<\/script>/gi, " ")
-      .replace(/<style[\s\S]*?<\/style>/gi, " ")
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, " ")
-      .replace(/<!--[\s\S]*?-->/g, " ")
-      .replace(/<[^>]+>/g, " "),
-  )
+  decodeEntities(html.replace(HIDDEN, " ").replace(/<[^>]+>/g, " "))
     .replace(/\s+/g, " ")
     .trim();
 
@@ -31,10 +39,7 @@ export const visibleText = (html: string): string =>
 export const visibleLines = (html: string): readonly string[] =>
   decodeEntities(
     html
-      .replace(/<script[\s\S]*?<\/script>/gi, "\n")
-      .replace(/<style[\s\S]*?<\/style>/gi, "\n")
-      .replace(/<noscript[\s\S]*?<\/noscript>/gi, "\n")
-      .replace(/<!--[\s\S]*?-->/g, "\n")
+      .replace(HIDDEN, "\n")
       .replace(/<\/?(?:div|p|br|tr|td|th|li|ul|h\d|table|form|span|label|option)\b[^>]*>/gi, "\n")
       .replace(/<[^>]+>/g, " "),
   )

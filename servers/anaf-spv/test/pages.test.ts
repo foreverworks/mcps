@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { decodeEntities, options, visibleText } from "../src/infra/portal/html.js";
+import { decodeEntities, options, visibleLines, visibleText } from "../src/infra/portal/html.js";
 import { addedLines, partialUpdates, requestFormIn, requestIdIn, rowCountIn, rowsIn, servedFileName, signInMessage, signInStage } from "../src/infra/portal/pages.js";
 import { contactAnswerIn, contactFormIn, identitiesIn } from "../src/infra/portal/contact.js";
 import { errorOf } from "./helpers.js";
@@ -92,6 +92,13 @@ describe("html", () => {
     ]);
     expect(visibleText("<script>x</script><p>Un  text</p><!-- c -->")).toBe("Un text");
   });
+
+  it("hides scripts and comments to the end a browser gives them, whichever opens first", () => {
+    expect(visibleText("<p>Un</p><script>x()</script ><p>text</p><!-- a > b --!><p>vizibil</p>")).toBe("Un text vizibil");
+    expect(visibleText("<!-- <script> --><p>vizibil</p><script>y()</script>")).toBe("vizibil");
+    expect(visibleText('<p>vizibil</p><script type="text/javascript">y()</script\tx>')).toBe("vizibil");
+    expect(visibleLines("<td>Un</td><style>td{}</style ><td>rand</td>")).toEqual(["Un", "rand"]);
+  });
 });
 
 describe("the contact form", () => {
@@ -139,6 +146,7 @@ describe("the contact form", () => {
     );
     const form = contactFormIn(PUBLIC, BASE);
     expect(form.categories).toEqual([{ value: "3", label: "Asistență și îndrumare de specialitate în domeniul fiscal" }]);
+    expect(contactFormIn(PUBLIC.replace("Retrasă</option> -->", "Retrasă</option> --!>"), BASE).categories).toEqual(form.categories);
     expect(form.subcategoryGroups).toEqual([
       { category: "1", choices: [{ value: "30", label: "Cereri" }] },
       { category: "5", choices: [{ value: "51", label: "Spațiul privat virtual" }] },
@@ -151,6 +159,7 @@ describe("the contact form", () => {
       "</form><script>$(document).ready(function(){ $.ajax({ async: false, url:'GetCuiuri', type:'GET', success: function(d) { var $select = $('#standard'); } }); });</script>",
     );
     expect(contactFormIn(SCRIPTED, BASE)).toMatchObject({ identitiesFrom: "/asistspv/GetCuiuri", identities: [] });
+    expect(contactFormIn(SCRIPTED.replace("</script>", "</script >"), BASE)).toMatchObject({ identitiesFrom: "/asistspv/GetCuiuri" });
     expect(identitiesIn([{ cuicnp: "12345678", denumire: "EXEMPLU S.R.L." }, { cuicnp: 2990101999999, denumire: "POPESCU ANA" }])).toEqual([
       { value: "12345678", label: "12345678 -- EXEMPLU S.R.L." },
       { value: "2990101999999", label: "2990101999999 -- POPESCU ANA" },

@@ -1,6 +1,6 @@
 import type { Choice, ContactForm, ContactRegistered } from "../../domain/contact.js";
 import { drift, fail } from "../../domain/errors.js";
-import { attribute, element, options, tags, visibleText } from "./html.js";
+import { attribute, element, options, tags, visibleText, withoutComments } from "./html.js";
 
 /**
  * SPV's contact form (`/asistspv/`, which SPV shows in an iframe behind the
@@ -40,7 +40,7 @@ const PLACEHOLDER = "0";
  * category a subcategory belongs to on ANAF's public form.
  */
 const choicesIn = (select: string): readonly (Choice & { readonly group: string | undefined })[] => {
-  const live = select.replace(/<!--[\s\S]*?-->/g, "");
+  const live = withoutComments(select);
   const tagsOf = [...live.matchAll(/<option\b[^>]*>/gi)].map((m) => m[0]);
   return options(live).map((o, i) => ({ value: o.value, label: o.label.replace(/\s+/g, " ").trim(), group: attribute(tagsOf[i] ?? "", "data-xxx") }));
 };
@@ -68,6 +68,9 @@ const groupsOf = (choices: readonly (Choice & { readonly group: string | undefin
 
 const selectNamed = (form: string, name: string): string => element(form, "select", "name", name) ?? fail(drift(`SPV's contact form has no ${name} select`));
 
+/** The bodies of the page's inline scripts, each to the end tag a browser closes it at (`</script >` too). */
+const inlineScripts = (html: string): readonly string[] => [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script\b[^>]*>/gi)].map((m) => m[1] ?? "");
+
 /**
  * What a select that read as empty looks like, for the drift that reports it:
  * its markup, the scripts the page loads, and the inline script around any
@@ -77,7 +80,7 @@ const emptySelectReport = (html: string, select: string, name: string): string =
   const id = attribute(/^<select\b[^>]*>/i.exec(select)?.[0] ?? "", "id");
   const squeeze = (text: string, max: number) => text.replace(/\s+/g, " ").slice(0, max);
   const sources = tags(html, "script").flatMap((t) => attribute(t, "src") ?? []);
-  const inline = [...html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)].map((m) => m[1] ?? "");
+  const inline = inlineScripts(html);
   const around = inline.flatMap((js) =>
     ["$.ajax", "url:", name, ...(id === undefined ? [] : [id])].flatMap((word) => {
       const at = js.indexOf(word);
@@ -93,8 +96,7 @@ const emptySelectReport = (html: string, select: string, name: string): string =
 /** The address the inline script that fills the select `#<id>` fetches its options from (jQuery's `$.ajax({ url: ... })`), on this site. */
 const fillerUrlIn = (html: string, id: string | undefined, base: URL): string | undefined => {
   if (id === undefined) return undefined;
-  for (const m of html.matchAll(/<script\b[^>]*>([\s\S]*?)<\/script>/gi)) {
-    const js = m[1] ?? "";
+  for (const js of inlineScripts(html)) {
     if (!js.includes(`#${id}`)) continue;
     const url = /\$\.ajax\(\s*\{[\s\S]*?\burl\s*:\s*['"]([^'"]+)['"]/.exec(js)?.[1];
     if (url === undefined) continue;
@@ -122,7 +124,7 @@ export const identitiesIn = (json: unknown): readonly Choice[] => {
 
 /** The form, read from the page at `base` (the address it was served from, to resolve its action). */
 export const contactFormIn = (html: string, base: URL): ContactPage => {
-  const page = html.replace(/<!--[\s\S]*?-->/g, "");
+  const page = withoutComments(html);
   // From the LAST form tag before the identity select, so an unclosed form earlier on the page cannot lend its action.
   const at = page.search(/<select\b[^>]*name\s*=\s*["']?cif_ales\b/i);
   if (at < 0) fail(drift("SPV's contact page has no cif_ales select"));
