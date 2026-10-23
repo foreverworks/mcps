@@ -89,14 +89,22 @@ const CAP_NOTE =
  *
  * A secret field reaches a result only from a `money` tool, the class a client
  * asks its user to approve (or the server asks, MCP_CONFIRM=elicit).
+ *
+ * Only the tools `policy` names are registered: with some toolsets loaded
+ * (src/mcp/toolsets.ts) it holds only theirs, and a tool outside them is
+ * absent from tools/list rather than listed and failing. What a registered
+ * tool runs is unchanged: the spend check and the wrappers call the vendor's
+ * tools through the port (get_api_settings, list_dns_records), loaded or not.
  */
 export const registerAll = (server: McpServer, deps: Deps, policy: ToolPolicy): void => {
   for (const tool of deps.porkbun.catalog) {
+    if (!Object.hasOwn(policy, tool.name)) continue;
     const revealsSecrets = policy[tool.name]?.access === "money";
     const offered = capChecked(deps, tool.name, (WRAPPED[tool.name] ?? relayed)(deps, tool, revealsSecrets));
     server.registerTool(tool.name, { description: offered.description, inputSchema: offered.inputSchema, annotations: tool.annotations }, handled(offered.run));
   }
   for (const own of OWN_TOOLS) {
+    if (!Object.hasOwn(policy, own.name)) continue;
     const offered = own.make(deps);
     server.registerTool(own.name, { description: offered.description, inputSchema: offered.inputSchema, annotations: own.annotations }, handled(offered.run));
   }

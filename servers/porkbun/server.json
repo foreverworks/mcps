@@ -57,6 +57,12 @@
           "isRequired": false,
           "isSecret": false,
           "format": "filepath"
+        },
+        {
+          "name": "PORKBUN_TOOLSETS",
+          "description": "The toolsets whose tools the server loads, separated by commas, e.g. dns,forwards. Empty loads every toolset.",
+          "isRequired": false,
+          "isSecret": false
         }
       ]
     }

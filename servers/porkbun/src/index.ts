@@ -1,10 +1,11 @@
 #!/usr/bin/env node
-import { VENDOR_INSTRUCTIONS } from "./infra/vendor.js";
 import { packageIdentity, serve } from "@foreverworks/mcp-kit";
 
 import { buildDeps } from "./composition.js";
+import { instructionsFor } from "./mcp/instructions.js";
 import { policyFor } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
+import { loadToolsets } from "./mcp/toolsets.js";
 
 /**
  * Porkbun's official MCP tools (`@porkbunllc/mcp-server`, pinned), served by
@@ -12,11 +13,14 @@ import { registerAll } from "./mcp/register.js";
  * token auth, audit line, limits, and every `money` tool marked for the
  * client to confirm with its user. Nothing is written to stdout: over stdio it
  * IS the protocol channel.
+ *
+ * PORKBUN_TOOLSETS picks the toolsets it serves (every one by default); the
+ * policy, and so the tools registered, and the instructions follow from it.
  */
 const main = async (): Promise<void> => {
   const deps = buildDeps();
-  const policy = policyFor(deps.porkbun.catalog);
-  await serve({ name: "porkbun", version: deps.porkbun.vendorVersion, ...packageIdentity(import.meta.url), instructions: VENDOR_INSTRUCTIONS, policy, register: (server) => registerAll(server, deps, policy) });
+  const { loaded, policy } = loadToolsets(policyFor(deps.porkbun.catalog));
+  await serve({ name: "porkbun", version: deps.porkbun.vendorVersion, ...packageIdentity(import.meta.url), instructions: instructionsFor(loaded), policy, register: (server) => registerAll(server, deps, policy) });
 };
 
 main().catch((error: unknown) => {

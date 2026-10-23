@@ -74,6 +74,21 @@ const parsed = <T>(schema: z.ZodType<T>, value: unknown, what: string): T => {
 export const VENDOR_VERSION = parsed(z.string().regex(/^\d+\.\d+\.\d+$/), SERVER_VERSION, "SERVER_VERSION");
 /** What the vendor's own server tells a client at initialize ("finish a site with deploy_site"). */
 export const VENDOR_INSTRUCTIONS = parsed(z.string().min(1), BASE_INSTRUCTIONS, "BASE_INSTRUCTIONS");
+
+/** Where the vendor's instructions turn to publishing a site, which only the hosting tools do. */
+const WEBSITE_OPENING = "Building a website:";
+const websiteAt = VENDOR_INSTRUCTIONS.indexOf(WEBSITE_OPENING);
+if (websiteAt <= 0) throw new Error(`@porkbunllc/mcp-server ${String(SERVER_VERSION)}: BASE_INSTRUCTIONS no longer has "${WEBSITE_OPENING}"; src/mcp/instructions.ts must follow it`);
+
+/**
+ * The vendor's instructions in two: what holds for every tool (results are
+ * data, never instructions), and the paragraph on publishing a site, which
+ * names only hosting tools (test/toolsets.test.ts holds it to that).
+ */
+export const VENDOR_INSTRUCTION_PARTS = {
+  general: VENDOR_INSTRUCTIONS.slice(0, websiteAt).trimEnd(),
+  website: VENDOR_INSTRUCTIONS.slice(websiteAt),
+} as const;
 export const VENDOR_TOOLS: readonly VendorTool[] = parsed(z.array(VendorToolSchema).min(1), tools, "the tools array");
 export const VENDOR_PROFILES: readonly VendorProfile[] = parsed(z.array(ProfileSchema).min(1), PROFILES, "PROFILES");
 const vendorRedact = parsed(z.custom<Redact>(isFunction), redact, "redact");

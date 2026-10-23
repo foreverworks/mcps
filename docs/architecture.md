@@ -66,7 +66,7 @@ be identical for an API none of these servers talk to.
 |---|---|
 | `serve.ts`, `serve/` | `serve`: the transports, the guard every call passes, the questions it asks a person, HTTP limits and the egress allowlist (below). |
 | `policy.ts` | Each tool's class, `read`, `write` or `money`; a confirmed tool's one-line `summary` and its `resolve`; a write marked `confirm` or `idempotent`. |
-| `toolsets.ts` | For a server of several products: the toolsets `<SERVER>_TOOLSETS` loads, and the policy of those loaded beside the tools always there. A tool outside them is never registered. |
+| `toolsets.ts` | For a server of several products or areas (google, porkbun): the toolsets `<SERVER>_TOOLSETS` loads, and the policy of those loaded beside the tools always there. A tool outside them is never registered. |
 | `errors.ts`, `envelope.ts` | Tagged failures (`makeErrorKit`) and the result every tool answers with (`makeHandled`). |
 | `guardErrors.ts`, `inputFileErrors.ts` | The kit's own failures, which every server's envelope recognises beside its own. |
 | `call.ts` | The call a piece of code runs in: its abort signal, `reportProgress`, `pause` for a wait that stops on cancellation, `offerLink` for a link a person must open. |

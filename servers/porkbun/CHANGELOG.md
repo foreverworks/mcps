@@ -8,4 +8,6 @@ Its `money` tools spend money or hand out a secret: `register_domain`, `renew_do
 
 Its `write` tools change DNS records, forwards, glue and DNSSEC records, hosting files, webhooks and the Cloudflare connection, and spend nothing.
 
+`PORKBUN_TOOLSETS` loads only the toolsets a client needs (`dns,forwards`, say), so it is handed those tools and not all 113; unset, it serves every one. In any toolset a purchase stays `money` and is checked against the account's monthly API caps.
+
 It speaks MCP protocol revisions 2026-07-28 and 2025-11-25, over stdio and loopback HTTP, and lists the same tools to both.

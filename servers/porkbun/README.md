@@ -32,7 +32,7 @@ mailbox password), the server also needs a directory to save into.
 ## Install
 
 <!-- install:begin -->
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=porkbun&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22porkbun_api_key_file%22%2C%22description%22%3A%22Path%20of%20a%20file%20holding%20your%20Porkbun%20API%20key%20(pk1_...).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22porkbun_secret_api_key_file%22%2C%22description%22%3A%22Path%20of%20a%20file%20holding%20your%20Porkbun%20secret%20API%20key%20(sk1_...).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22porkbun_outbox_dir%22%2C%22description%22%3A%22Optional.%20Where%20the%20tools%20that%20save%20a%20file%20(an%20SSL%20bundle%2C%20an%20invoice%20PDF%2C%20a%20DNS%20zone%20export%2C%20a%20new%20mailbox's%20password)%20write%20it.%20Without%20it%20those%20tools%20answer%20with%20a%20configuration%20error%3B%20every%20other%20tool%20works.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-porkbun%22%5D%2C%22env%22%3A%7B%22PORKBUN_API_KEY_FILE%22%3A%22%24%7Binput%3Aporkbun_api_key_file%7D%22%2C%22PORKBUN_SECRET_API_KEY_FILE%22%3A%22%24%7Binput%3Aporkbun_secret_api_key_file%7D%22%2C%22PORKBUN_OUTBOX_DIR%22%3A%22%24%7Binput%3Aporkbun_outbox_dir%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=porkbun&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLXBvcmtidW4iXSwiZW52Ijp7IlBPUktCVU5fQVBJX0tFWV9GSUxFIjoiJHtlbnY6UE9SS0JVTl9BUElfS0VZX0ZJTEV9IiwiUE9SS0JVTl9TRUNSRVRfQVBJX0tFWV9GSUxFIjoiJHtlbnY6UE9SS0JVTl9TRUNSRVRfQVBJX0tFWV9GSUxFfSIsIlBPUktCVU5fT1VUQk9YX0RJUiI6IiR7ZW52OlBPUktCVU5fT1VUQk9YX0RJUn0ifX0%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-porkbun.mcpb)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=porkbun&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22porkbun_api_key_file%22%2C%22description%22%3A%22Path%20of%20a%20file%20holding%20your%20Porkbun%20API%20key%20(pk1_...).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22porkbun_secret_api_key_file%22%2C%22description%22%3A%22Path%20of%20a%20file%20holding%20your%20Porkbun%20secret%20API%20key%20(sk1_...).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22porkbun_outbox_dir%22%2C%22description%22%3A%22Optional.%20Where%20the%20tools%20that%20save%20a%20file%20(an%20SSL%20bundle%2C%20an%20invoice%20PDF%2C%20a%20DNS%20zone%20export%2C%20a%20new%20mailbox's%20password)%20write%20it.%20Without%20it%20those%20tools%20answer%20with%20a%20configuration%20error%3B%20every%20other%20tool%20works.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22porkbun_toolsets%22%2C%22description%22%3A%22Optional.%20The%20toolsets%20whose%20tools%20the%20server%20loads%2C%20separated%20by%20commas%2C%20e.g.%20dns%2Cforwards.%20Empty%20loads%20every%20toolset.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-porkbun%22%5D%2C%22env%22%3A%7B%22PORKBUN_API_KEY_FILE%22%3A%22%24%7Binput%3Aporkbun_api_key_file%7D%22%2C%22PORKBUN_SECRET_API_KEY_FILE%22%3A%22%24%7Binput%3Aporkbun_secret_api_key_file%7D%22%2C%22PORKBUN_OUTBOX_DIR%22%3A%22%24%7Binput%3Aporkbun_outbox_dir%7D%22%2C%22PORKBUN_TOOLSETS%22%3A%22%24%7Binput%3Aporkbun_toolsets%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=porkbun&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLXBvcmtidW4iXSwiZW52Ijp7IlBPUktCVU5fQVBJX0tFWV9GSUxFIjoiJHtlbnY6UE9SS0JVTl9BUElfS0VZX0ZJTEV9IiwiUE9SS0JVTl9TRUNSRVRfQVBJX0tFWV9GSUxFIjoiJHtlbnY6UE9SS0JVTl9TRUNSRVRfQVBJX0tFWV9GSUxFfSIsIlBPUktCVU5fT1VUQk9YX0RJUiI6IiR7ZW52OlBPUktCVU5fT1VUQk9YX0RJUn0iLCJQT1JLQlVOX1RPT0xTRVRTIjoiJHtlbnY6UE9SS0JVTl9UT09MU0VUU30ifX0%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-porkbun.mcpb)
 
 > [!NOTE]
 > `@foreverworks/mcp-porkbun` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
@@ -83,6 +83,7 @@ In a JSON configuration, the command is `node` and its one argument the full pat
 | `PORKBUN_OUTBOX_DIR` | for the tools that save a file | Where files are saved, with mode 0640 (the server's user and the directory's group). No default: unset, `get_ssl_bundle`, `get_invoice_pdf`, `export_dns_zone`, and `create_mailbox` or `setup_mailbox` without a `password` answer `config`; every other tool works. |
 | `PORKBUN_BASE_URL`, `PORKBUN_DOCS_BASE` | no | Read by Porkbun's package: the API base (default `https://api.porkbun.com/api/json/v3`) and where the documentation tools fetch from (default `https://porkbun.com`). Leave them unset. |
 | `PORKBUN_X402_PRIVATE_KEY`, `PORKBUN_X402_MAX_CENTS` | no | Read by Porkbun's package to pay in USDC, which this server does not offer. Never set them. |
+| `PORKBUN_TOOLSETS` | no | The toolsets to load, separated by commas; unset, every one ([Toolsets](#toolsets)). |
 
 The keys are read on the first call that needs them, so the documentation
 tools (`read_doc`, `search_docs`, `list_doc_topics`), `get_pricing` and
@@ -111,6 +112,65 @@ variables every server shares, are in
    page, or each domain's **API Access** under Domain Management. Without it,
    every call on that domain fails.
 
+### Toolsets
+
+Every tool definition the server hands your client travels with each request
+the client makes, and Porkbun's are long. `PORKBUN_TOOLSETS` names the
+toolsets to load, separated by commas. The tools of the others are not there
+at all, and the server's instructions tell the assistant which toolsets are
+missing, so it can tell you instead of looking for a way around. Unset, empty
+or `all`, every toolset is loaded, as before.
+
+| Toolset | What it loads |
+|---|---|
+| `domains` | Availability and prices, registering and renewing, auto-renew, contacts. |
+| `dns` | DNS records, restore points, scanning, importing and exporting a zone, nameservers, `preflight_domain`, and the free TLS certificate (`get_ssl_bundle`). |
+| `dnssec` | DS records at the registry, with `preflight_domain`. |
+| `glue` | Glue records, for nameservers named under the domain they serve. |
+| `forwards` | URL forwarding and email forwarding. |
+| `hosting` | Static hosting and Cloud for WordPress: plans, `deploy_site`, files, WordPress passwords. |
+| `mailboxes` | Email hosting mailboxes: buying, setting up, renewing, passwords. |
+| `cloudflare` | Moving DNS to your own Cloudflare account, and the zone, records and proxy there. |
+| `transfers` | Transferring a domain in, with `check_domain` for its price and `scan_dns_records` and `import_dns_records` for its zone. |
+| `marketplace` | Names other people sell: Porkbun Marketplace, the aftermarket, closeouts. |
+| `webhooks` | Webhook endpoints, their secrets and their deliveries. |
+| `account` | Top-ups and auto top-up, verifying the account's email and phone, invoices. |
+| `docs` | Porkbun's API documentation, and `mock_call`'s example answers. |
+
+`ping`, `get_balance` and `get_api_settings` are always loaded: `ping` is
+where you start and where a failure is diagnosed, and every purchase, in five
+of the toolsets, is paid from the balance and counts against the monthly API
+spend cap.
+Whatever is loaded, a purchase is still `money` and still checked against the
+caps before it is sent. A name that is not a toolset stops the server at
+start, with a message listing the ones there are. `src/mcp/toolsets.ts`
+places each tool by name, and a version of Porkbun's package with a tool it
+does not place fails the tests and will not start. Measured with
+`scripts/measure-tokens.ts` on 2026-10-23 (GPT-4 tokenizer), the tool list is
+113 tools and about 44,200 tokens with every toolset, 23 tools and 8,800 with
+`dns,forwards`, and 25 tools and 12,300 with `domains,account`.
+
+To load DNS and forwarding only:
+
+```json
+{
+  "mcpServers": {
+    "porkbun": {
+      "command": "npx",
+      "args": ["-y", "@foreverworks/mcp-porkbun"],
+      "env": {
+        "PORKBUN_TOOLSETS": "dns,forwards",
+        "PORKBUN_API_KEY_FILE": "/path/to/porkbun-api-key",
+        "PORKBUN_SECRET_API_KEY_FILE": "/path/to/porkbun-secret-api-key"
+      }
+    }
+  }
+}
+```
+
+A toolset removes tools; `MCP_MAX_ACCESS=read` keeps every tool listed and
+refuses the writes.
+
 ## First run
 
 1. Ask your assistant to run Porkbun's `ping`. It checks the connection and
@@ -131,7 +191,8 @@ commits money, changes a domain's owner, or hands out a secret, and your
 client asks you before each call.
 
 113 tools: 54 read, 39 write, 20 money, generated from the running server
-because they follow Porkbun's package. Each row is the first sentence of the
+because they follow Porkbun's package, every toolset loaded
+([Toolsets](#toolsets) says which load together). Each row is the first sentence of the
 tool's description: Porkbun's, amended where this server differs, or this
 server's own for `deploy_site`, `get_ssl_bundle`, `get_invoice_pdf` and
 `export_dns_zone`.
@@ -361,6 +422,13 @@ asked, and a deployment that sets it accepts that.
 **`config`: "no Porkbun API key pair is configured for this server".** Set
 `PORKBUN_API_KEY_FILE` and `PORKBUN_SECRET_API_KEY_FILE`
 ([Getting the API key pair](#getting-the-api-key-pair)).
+
+**The server will not start: `PORKBUN_TOOLSETS names "...", which is not a
+toolset`.** Fix the name; the message lists the ones there are
+([Toolsets](#toolsets)).
+
+**The assistant says a tool is not on this server.** Its toolset is not in
+`PORKBUN_TOOLSETS`: add it, or unset the variable to load every one.
 
 **`config` naming `PORKBUN_OUTBOX_DIR`.** The tool saves a file and has
 nowhere to put it: set the variable to a directory the server may write. A

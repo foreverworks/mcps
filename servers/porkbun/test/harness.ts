@@ -8,6 +8,7 @@ import { vi } from "vitest";
 import { buildDeps } from "../src/composition.js";
 import { policyFor } from "../src/mcp/policy.js";
 import { registerAll } from "../src/mcp/register.js";
+import { loadToolsets } from "../src/mcp/toolsets.js";
 
 /** Fake keys in a temp dir: nothing here reads a real credential. */
 export const FAKE_KEY = "pk1_fake_0123456789abcdef";
@@ -46,10 +47,11 @@ export const CONFIRMING: GuardSettings = { maxAccess: "money", confirm: "elicit"
 /**
  * The server as `serve` builds it (the kit's guard around our registration), on an in-memory transport,
  * with a client that answers each confirmation with `answer` and records the lines it was shown.
+ * PORKBUN_TOOLSETS in `env` loads those toolsets, as in index.ts.
  */
 export const connect = async (env: NodeJS.ProcessEnv, settings: GuardSettings = CONFIRMING, answer: (line: string) => boolean = () => true) => {
   const deps = buildDeps(env);
-  const policy = policyFor(deps.porkbun.catalog);
+  const { policy } = loadToolsets(policyFor(deps.porkbun.catalog), env);
   const audit: string[] = [];
   const server = new McpServer({ name: "porkbun", version: "test" });
   registerAll(guard(server, { service: "porkbun", policy, settings, log: (line) => audit.push(line) }), deps, policy);
