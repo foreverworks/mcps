@@ -316,7 +316,7 @@ main { display: block; }
 @media (max-width: 63.99rem) { .toc { border-bottom: var(--rule); padding-bottom: var(--space-md); } }
 
 /* The README itself. */
-.readme { min-width: 0; max-width: var(--measure); }
+.readme { min-width: 0; max-width: var(--measure); overflow-wrap: break-word; }
 .readme > :first-child { margin-top: 0; }
 .readme h2 { font-size: var(--text-xl); margin: var(--space-xl) 0 var(--space-sm); padding-top: var(--space-md); border-top: var(--rule); }
 .readme h3 { font-size: var(--text-lg); margin: var(--space-lg) 0 var(--space-xs); }
