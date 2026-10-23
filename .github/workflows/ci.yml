@@ -22,8 +22,9 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        # The oldest Node the packages accept (engines) and the current LTS.
-        node: [22, 24]
+        # The oldest Node the packages accept (engines), the current LTS, and the
+        # next one (26 becomes LTS on 2026-10-28).
+        node: [22, 24, 26]
     steps:
       - uses: actions/checkout@v7
         with:

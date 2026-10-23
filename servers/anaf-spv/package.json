@@ -19,6 +19,24 @@
         "type": "file",
         "required": false,
         "description": "Path of a file holding your SPV password. The README also shows how to read it from a vault MCP server instead."
+      },
+      "ANAF_SPV_MAIL_MCP_URL": {
+        "title": "Mail MCP server URL",
+        "type": "text",
+        "required": false,
+        "description": "A mail MCP server over Streamable HTTP that reads the mailbox SPV sends its codes to, so a sign-in reads the code by itself. Without one (or a command below), every sign-in asks you for the code."
+      },
+      "ANAF_SPV_MAIL_MCP_TOKEN_FILE": {
+        "title": "Mail MCP token file",
+        "type": "file",
+        "required": false,
+        "description": "Path of a file holding that mail server's bearer token, if it wants one."
+      },
+      "ANAF_SPV_MAIL_MCP_COMMAND": {
+        "title": "Mail MCP command",
+        "type": "text",
+        "required": false,
+        "description": "Instead of a URL: a mail MCP server to start over stdio, as a JSON array such as [\"npx\",\"-y\",\"some-mail-mcp\"]."
       }
     }
   },

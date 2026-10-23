@@ -37,4 +37,10 @@ describe("remedies", () => {
     expect(result.isError).toBe(true);
     expect(payload(result)["error"].remedy).toContain("start_auth");
   });
+
+  it("send a spent daily allowance to tomorrow, not to a retry", async () => {
+    const result = await handled(async () => fail(apiError(429, "too many requests", { reason: "ASPSP_RATE_LIMIT_EXCEEDED" })))();
+    expect(payload(result)["error"].remedy).toContain("tomorrow");
+    expect(payload(result)["error"].remedy).not.toContain("retry");
+  });
 });

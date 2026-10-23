@@ -21,8 +21,8 @@ const tx = (over: Partial<Transaction>): Transaction => ({
 
 describe("folded", () => {
   it("ignores case and both spellings of Romanian diacritics", () => {
-    expect(folded("ȘTEFAN Ţară")).toBe("stefan tara");
-    expect(folded("Ştefan")).toBe("stefan");
+    expect(folded("ȘANTIER Ţară")).toBe("santier tara");
+    expect(folded("Şantier")).toBe("santier");
   });
 });
 

@@ -31,8 +31,8 @@ export type FilterArgs = {
 
 /**
  * Letters compared the way a person reads them: case and diacritics ignored, so
- * "stefan" finds "ȘTEFAN SRL" and "Ştefan" (the cedilla spelling banks still
- * send) alike.
+ * "santier" finds "ȘANTIER EXEMPLU SRL" and "Şantier" (the cedilla spelling
+ * banks still send) alike.
  */
 export const folded = (text: string): string =>
   text

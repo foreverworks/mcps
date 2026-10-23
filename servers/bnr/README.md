@@ -87,9 +87,10 @@ side (convert twice and state both rates). The message names which.
 **`not_found`: "BNR publishes no ... rate here; it publishes ..."**. BNR does
 not publish that currency; the message lists those it does.
 
-**`not_found`: "BNR has no rates file for ... yet"**. A year's file appears on
-its first banking day; in the first days of January, ask for a day in
-December.
+**`not_found`: "BNR has no rates file for ... yet"**. A year's file appears
+with its first fixing, so in the first days of January the new year has no
+rates of its own: `rate` and `convert` take December's last, but `rates` over
+a window in the new year and its `annual_average` wait for that first fixing.
 
 **`api`.** BNR's server did not answer, even after retries (status 0 is no
 connection). Try again in a few minutes.

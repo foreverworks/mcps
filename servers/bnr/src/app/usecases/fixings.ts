@@ -1,5 +1,5 @@
 import { dateIn, FIRST_YEAR } from "../../domain/dates.js";
-import { fail, inputError, notFound } from "../../domain/errors.js";
+import { asAppError, fail, inputError, notFound } from "../../domain/errors.js";
 import { type Fixing, inForce, type Rate } from "../../domain/rates.js";
 import type { Deps } from "../ports.js";
 
@@ -18,13 +18,25 @@ export const yearOf = (deps: Deps, year: number): Promise<readonly Fixing[]> =>
 export const currenciesIn = (fixings: readonly Fixing[]): readonly string[] => [...new Set(fixings.flatMap((f) => Object.keys(f.rates)))].sort();
 
 /**
+ * The current year's fixings so far. BNR creates a year's file with its first
+ * fixing, so in the first days of January the file does not exist yet: that
+ * year has no fixings so far, which is not a failure. A past year's missing
+ * file stays one.
+ */
+const yearSoFar = (deps: Deps, year: number): Promise<readonly Fixing[]> =>
+  yearOf(deps, year).catch((thrown: unknown) =>
+    year >= Number(today(deps).slice(0, 4)) && asAppError(thrown)?.kind === "not_found" ? [] : Promise.reject(thrown),
+  );
+
+/**
  * The rate in force on `date`: BNR's fixing of that day, or of the last
- * banking day before it; the first days of January take December's.
+ * banking day before it; the first days of January take December's, even
+ * before the new year's file exists.
  */
 export const inForceOn = async (deps: Deps, currency: string, date: string): Promise<{ readonly fixing: Fixing; readonly rate: Rate }> => {
   const year = Number(date.slice(0, 4));
   if (year < FIRST_YEAR) return fail(notFound(`BNR's XML series start in ${FIRST_YEAR}; there is no ${currency} rate on or before ${date}`));
-  let fixings = await yearOf(deps, year);
+  let fixings = await yearSoFar(deps, year);
   let found = inForce(fixings, currency, date);
   if (found === undefined && year > FIRST_YEAR) {
     fixings = await yearOf(deps, year - 1);

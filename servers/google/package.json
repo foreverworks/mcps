@@ -23,8 +23,8 @@
       "GMAIL_MODIFY_ACCOUNTS": {
         "title": "Where Gmail grants are kept",
         "type": "text",
-        "required": false,
-        "description": "For Gmail: where each mailbox's grant is kept, e.g. personal=/path/to/grants/gmail-personal.json."
+        "required": true,
+        "description": "Where each mailbox's Gmail grant is kept, e.g. personal=/path/to/grants/gmail-personal.json; consent writes it there. Without it the other products work, but no mailbox does."
       },
       "CALENDAR_TIME_ZONE": {
         "title": "Calendar time zone",
@@ -87,7 +87,7 @@
   "devDependencies": {
     "@googleapis/calendar": "^20.1.0",
     "@googleapis/docs": "^14.1.1",
-    "@googleapis/drive": "^26.0.2",
+    "@googleapis/drive": "^27.0.0",
     "@googleapis/gmail": "^22.0.2",
     "@googleapis/sheets": "^18.1.1",
     "@googleapis/slides": "^10.1.1",

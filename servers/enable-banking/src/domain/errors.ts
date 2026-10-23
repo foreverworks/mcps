@@ -87,6 +87,9 @@ export const remedyFor = (error: AppError): string => {
         return "Enable Banking may have acted without answering; a code cannot be exchanged twice, so run start_auth again rather than repeating the call";
       if (error.reason !== undefined && CONSENT_GONE.has(error.reason))
         return "the consent has lapsed or was revoked; run start_auth, have the account holder approve it in the bank app, then complete_auth";
+      // The bank's daily allowance of reads without the account holder (PSD2 allows four); retrying spends nothing back.
+      if (error.reason === "ASPSP_RATE_LIMIT_EXCEEDED")
+        return "the bank's reads of this account are spent for today; try again tomorrow, and read each period once, narrowed with get_transactions' filters or written out by export_transactions";
       if (error.reason === "EXPIRED_AUTHORIZATION_CODE" || error.reason === "WRONG_AUTHORIZATION_CODE")
         return "the code is single-use and short-lived; run start_auth again and call complete_auth straight after the bank's approval";
       if (error.status === 401 || error.status === 403)

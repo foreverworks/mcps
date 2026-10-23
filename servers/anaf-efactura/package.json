@@ -12,7 +12,7 @@
         "title": "ANAF app.json",
         "type": "file",
         "required": true,
-        "description": "Path of app.json: the OAuth app you registered with ANAF (its client id and secret, the callback URL) and the company's CIF, as the README shows."
+        "description": "Path of app.json: the OAuth app you registered with ANAF (its client id and secret, the callback URL) and the company's CIF, as the README shows. lookup_company, validate_invoice and parse_invoice work without it."
       }
     }
   },

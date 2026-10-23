@@ -52,8 +52,8 @@
         },
         {
           "name": "GMAIL_MODIFY_ACCOUNTS",
-          "description": "For Gmail: where each mailbox's grant is kept, e.g. personal=/path/to/grants/gmail-personal.json.",
-          "isRequired": false,
+          "description": "Where each mailbox's Gmail grant is kept, e.g. personal=/path/to/grants/gmail-personal.json; consent writes it there. Without it the other products work, but no mailbox does.",
+          "isRequired": true,
           "isSecret": false
         },
         {

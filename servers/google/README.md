@@ -34,7 +34,7 @@ a Google Workspace account.
 ## Install
 
 <!-- install:begin -->
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=google&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_oauth_client_file%22%2C%22description%22%3A%22Path%20of%20your%20OAuth%20client's%20JSON%20(a%20Desktop%20app%20client%20from%20the%20Google%20Cloud%20console).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_addresses%22%2C%22description%22%3A%22Each%20account's%20label%20and%20address%2C%20e.g.%20personal%3Dana%40example.com%2Cwork%3Dana%40example.org.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_modify_accounts%22%2C%22description%22%3A%22Optional.%20For%20Gmail%3A%20where%20each%20mailbox's%20grant%20is%20kept%2C%20e.g.%20personal%3D%2Fpath%2Fto%2Fgrants%2Fgmail-personal.json.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22calendar_time_zone%22%2C%22description%22%3A%22Optional.%20The%20time%20zone%20a%20time%20without%20an%20offset%20is%20read%20in%2C%20e.g.%20Europe%2FParis.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-google%22%5D%2C%22env%22%3A%7B%22GOOGLE_OAUTH_CLIENT_FILE%22%3A%22%24%7Binput%3Agoogle_oauth_client_file%7D%22%2C%22GMAIL_ADDRESSES%22%3A%22%24%7Binput%3Agmail_addresses%7D%22%2C%22GMAIL_MODIFY_ACCOUNTS%22%3A%22%24%7Binput%3Agmail_modify_accounts%7D%22%2C%22CALENDAR_TIME_ZONE%22%3A%22%24%7Binput%3Acalendar_time_zone%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=google&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWdvb2dsZSJdLCJlbnYiOnsiR09PR0xFX09BVVRIX0NMSUVOVF9GSUxFIjoiJHtlbnY6R09PR0xFX09BVVRIX0NMSUVOVF9GSUxFfSIsIkdNQUlMX0FERFJFU1NFUyI6IiR7ZW52OkdNQUlMX0FERFJFU1NFU30iLCJHTUFJTF9NT0RJRllfQUNDT1VOVFMiOiIke2VudjpHTUFJTF9NT0RJRllfQUNDT1VOVFN9IiwiQ0FMRU5EQVJfVElNRV9aT05FIjoiJHtlbnY6Q0FMRU5EQVJfVElNRV9aT05FfSJ9fQ%3D%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-google.mcpb)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=google&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_oauth_client_file%22%2C%22description%22%3A%22Path%20of%20your%20OAuth%20client's%20JSON%20(a%20Desktop%20app%20client%20from%20the%20Google%20Cloud%20console).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_addresses%22%2C%22description%22%3A%22Each%20account's%20label%20and%20address%2C%20e.g.%20personal%3Dana%40example.com%2Cwork%3Dana%40example.org.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_modify_accounts%22%2C%22description%22%3A%22Where%20each%20mailbox's%20Gmail%20grant%20is%20kept%2C%20e.g.%20personal%3D%2Fpath%2Fto%2Fgrants%2Fgmail-personal.json%3B%20consent%20writes%20it%20there.%20Without%20it%20the%20other%20products%20work%2C%20but%20no%20mailbox%20does.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22calendar_time_zone%22%2C%22description%22%3A%22Optional.%20The%20time%20zone%20a%20time%20without%20an%20offset%20is%20read%20in%2C%20e.g.%20Europe%2FParis.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-google%22%5D%2C%22env%22%3A%7B%22GOOGLE_OAUTH_CLIENT_FILE%22%3A%22%24%7Binput%3Agoogle_oauth_client_file%7D%22%2C%22GMAIL_ADDRESSES%22%3A%22%24%7Binput%3Agmail_addresses%7D%22%2C%22GMAIL_MODIFY_ACCOUNTS%22%3A%22%24%7Binput%3Agmail_modify_accounts%7D%22%2C%22CALENDAR_TIME_ZONE%22%3A%22%24%7Binput%3Acalendar_time_zone%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=google&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWdvb2dsZSJdLCJlbnYiOnsiR09PR0xFX09BVVRIX0NMSUVOVF9GSUxFIjoiJHtlbnY6R09PR0xFX09BVVRIX0NMSUVOVF9GSUxFfSIsIkdNQUlMX0FERFJFU1NFUyI6IiR7ZW52OkdNQUlMX0FERFJFU1NFU30iLCJHTUFJTF9NT0RJRllfQUNDT1VOVFMiOiIke2VudjpHTUFJTF9NT0RJRllfQUNDT1VOVFN9IiwiQ0FMRU5EQVJfVElNRV9aT05FIjoiJHtlbnY6Q0FMRU5EQVJfVElNRV9aT05FfSJ9fQ%3D%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-google.mcpb)
 
 > [!NOTE]
 > `@foreverworks/mcp-google` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
@@ -42,7 +42,7 @@ a Google Workspace account.
 With Claude Code:
 
 ```bash
-claude mcp add google -e GOOGLE_OAUTH_CLIENT_FILE="<path to OAuth client file>" -e GMAIL_ADDRESSES="<Accounts and their addresses>" -- npx -y @foreverworks/mcp-google
+claude mcp add google -e GOOGLE_OAUTH_CLIENT_FILE="<path to OAuth client file>" -e GMAIL_ADDRESSES="<Accounts and their addresses>" -e GMAIL_MODIFY_ACCOUNTS="<Where Gmail grants are kept>" -- npx -y @foreverworks/mcp-google
 ```
 
 Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON:
@@ -55,7 +55,8 @@ Claude Desktop (Settings, Developer, Edit Config) and most other clients read th
       "args": ["-y", "@foreverworks/mcp-google"],
       "env": {
         "GOOGLE_OAUTH_CLIENT_FILE": "<path to OAuth client file>",
-        "GMAIL_ADDRESSES": "<Accounts and their addresses>"
+        "GMAIL_ADDRESSES": "<Accounts and their addresses>",
+        "GMAIL_MODIFY_ACCOUNTS": "<Where Gmail grants are kept>"
       }
     }
   }
@@ -69,15 +70,14 @@ Each runs the published package on Node 22.19 or newer. VS Code and the Claude D
 ```bash
 git clone https://github.com/foreverworks/mcps.git && cd mcps
 npm ci && npm run build
-claude mcp add google -e GOOGLE_OAUTH_CLIENT_FILE="<path to OAuth client file>" -e GMAIL_ADDRESSES="<Accounts and their addresses>" -- node "$PWD/servers/google/dist/index.js"
+claude mcp add google -e GOOGLE_OAUTH_CLIENT_FILE="<path to OAuth client file>" -e GMAIL_ADDRESSES="<Accounts and their addresses>" -e GMAIL_MODIFY_ACCOUNTS="<Where Gmail grants are kept>" -- node "$PWD/servers/google/dist/index.js"
 ```
 
 In a JSON configuration, the command is `node` and its one argument the full path of `servers/google/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
 
-Gmail also needs `GMAIL_MODIFY_ACCOUNTS` ([Configuration](#configuration)):
-without it, no mailbox is configured. Over HTTP (`MCP_HTTP_PORT`), one process
-serves every session, with one token cache per grant.
+Over HTTP (`MCP_HTTP_PORT`), one process serves every session, with one token
+cache per grant.
 
 ## Configuration
 

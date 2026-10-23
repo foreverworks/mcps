@@ -279,6 +279,16 @@ describe("BNR's files", () => {
     expect(s.asked.filter((p) => p.endsWith("2026.xml"))).toHaveLength(2);
   });
 
+  it("in early January, before BNR publishes the new year's file, takes December's last fixing", async () => {
+    const s = await connected();
+    // 2027-01-02 in Bucharest: no 2027 file yet (the fake answers 404), so today's rate is 2026's last.
+    s.clock.t = Date.UTC(2027, 0, 2, 10, 0, 0);
+    expect(await s.call("rate", { currency: "USD" })).toMatchObject({ ok: true, rate: "4.3712", published_on: "2026-10-16" });
+    expect(await s.call("convert", { amount: "10", from: "EUR", to: "RON" })).toMatchObject({ ok: true });
+    // A past year's missing file is still an answer of its own.
+    expect((await s.call("annual_average", { currency: "USD", year: 2025 })).error).toMatchObject({ kind: "not_found" });
+  });
+
   it("health reads the latest fixing", async () => {
     const s = await connected();
     expect(await s.call("health")).toMatchObject({ ok: true, latest_fixing: "2026-10-16", currencies: 2, today: "2026-10-18" });
