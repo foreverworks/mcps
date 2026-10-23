@@ -1,0 +1,81 @@
+{
+  "name": "@foreverworks/mcp-bitwarden",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for a Bitwarden vault, through the official CLI: find, create and update logins, store secure notes, generate and hand out passwords, compute 2FA codes, and check passwords against known breaches",
+  "mcpName": "com.foreverworks/bitwarden",
+  "mcp": {
+    "title": "Bitwarden",
+    "group": "Workspace",
+    "inputs": {
+      "BITWARDEN_CLIENT_ID_FILE": {
+        "title": "API key client id file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding the account's API key client id."
+      },
+      "BITWARDEN_CLIENT_SECRET_FILE": {
+        "title": "API key client secret file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding the API key's client secret."
+      },
+      "BITWARDEN_MASTER_PASSWORD_FILE": {
+        "title": "Master password file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding the master password that unlocks the vault."
+      },
+      "BITWARDEN_SERVER": {
+        "title": "Bitwarden server",
+        "type": "text",
+        "required": false,
+        "description": "A self-hosted or EU server, e.g. https://vault.bitwarden.eu. Leave empty for bitwarden.com."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "bitwarden",
+    "passwords",
+    "totp"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/bitwarden#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/bitwarden"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-bitwarden": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@bitwarden/cli": "2026.10.0",
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

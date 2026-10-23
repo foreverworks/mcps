@@ -1,0 +1,11 @@
+{
+  "case": "eur-reverse-charge.identified",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "1839e2218f4354e83b78e31397da787956a3692bf390a3044b00e61ada4e2d6b",
+  "bytes": 4612,
+  "answer": {
+    "stare": "ok",
+    "trace_id": "dc169ef2-8b2c-4a04-8d96-ec90dc90ca16"
+  }
+}

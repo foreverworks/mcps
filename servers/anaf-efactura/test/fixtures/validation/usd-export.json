@@ -1,0 +1,16 @@
+{
+  "case": "usd-export",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "db39225016d9452841ad1b658e3c28d6385a1a46a674da55c3853c1e81713514",
+  "bytes": 4322,
+  "answer": {
+    "stare": "nok",
+    "trace_id": "421b70ec-5f45-4f48-a0b0-18e8d79cd5d2",
+    "Messages": [
+      {
+        "message": "tipAssert=E; codEroare=ERRIdentif; textEroare=nu a fost identificat cui cumparator"
+      }
+    ]
+  }
+}

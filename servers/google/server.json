@@ -1,0 +1,68 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/google",
+  "title": "Google Workspace",
+  "description": "MCP server for several Google accounts at once",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/google#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/google"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/google/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/google/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-google",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "GOOGLE_OAUTH_CLIENT_FILE",
+          "description": "Path of your OAuth client's JSON (a Desktop app client from the Google Cloud console).",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "GMAIL_ADDRESSES",
+          "description": "Each account's label and address, e.g. personal=ana@example.com,work=ana@example.org.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "GMAIL_MODIFY_ACCOUNTS",
+          "description": "For Gmail: where each mailbox's grant is kept, e.g. personal=/path/to/grants/gmail-personal.json.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "CALENDAR_TIME_ZONE",
+          "description": "The time zone a time without an offset is read in, e.g. Europe/Paris.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

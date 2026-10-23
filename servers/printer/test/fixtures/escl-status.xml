@@ -1,0 +1,22 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<scan:ScannerStatus xmlns:scan="http://schemas.hp.com/imaging/escl/2011/05/03" xmlns:pwg="http://www.pwg.org/schemas/2010/12/sm" >
+<pwg:Version>2.63</pwg:Version>
+<pwg:State>Idle</pwg:State>
+<scan:Jobs>
+<scan:JobInfo>
+<pwg:JobUri>/eSCL/ScanJobs/00000000-0000-4000-8000-000000000001</pwg:JobUri>
+<pwg:JobUuid>00000000-0000-4000-8000-000000000001</pwg:JobUuid>
+<scan:Age>6214</scan:Age>
+<pwg:ImagesCompleted>0</pwg:ImagesCompleted>
+<pwg:JobState>Completed</pwg:JobState>
+</scan:JobInfo>
+<scan:JobInfo>
+<pwg:JobUri>/eSCL/ScanJobs/00000000-0000-4000-8000-000000000002</pwg:JobUri>
+<pwg:JobUuid>00000000-0000-4000-8000-000000000002</pwg:JobUuid>
+<scan:Age>60</scan:Age>
+<pwg:ImagesCompleted>1</pwg:ImagesCompleted>
+<pwg:JobState>Completed</pwg:JobState>
+<pwg:JobStateReasons><pwg:JobStateReason>JobCompletedSuccessfully</pwg:JobStateReason></pwg:JobStateReasons>
+</scan:JobInfo>
+</scan:Jobs>
+</scan:ScannerStatus>

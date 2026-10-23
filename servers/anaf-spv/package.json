@@ -1,0 +1,70 @@
+{
+  "name": "@foreverworks/mcp-anaf-spv",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for ANAF's Spațiul Privat Virtual (pfinternet.anaf.ro): download what ANAF posts to a taxpayer, request new documents, validate declarations and file a D212; it signs in by itself",
+  "mcpName": "com.foreverworks/anaf-spv",
+  "mcp": {
+    "title": "ANAF SPV",
+    "group": "Romanian authorities",
+    "inputs": {
+      "ANAF_SPV_USERNAME": {
+        "title": "SPV user name",
+        "type": "text",
+        "required": false,
+        "description": "Your SPV user name, when the password comes from a file."
+      },
+      "ANAF_SPV_PASSWORD_FILE": {
+        "title": "SPV password file",
+        "type": "file",
+        "required": false,
+        "description": "Path of a file holding your SPV password. The README also shows how to read it from a vault MCP server instead."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "anaf",
+    "spv",
+    "romania",
+    "tax"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/anaf-spv#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/anaf-spv"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-anaf-spv": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "docs",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

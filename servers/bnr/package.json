@@ -1,0 +1,56 @@
+{
+  "name": "@foreverworks/mcp-bnr",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for the National Bank of Romania's exchange rates: the rate in force on any day, conversions to and from RON, rates over a period, and the yearly averages ANAF converts foreign income at",
+  "mcpName": "com.foreverworks/bnr",
+  "mcp": {
+    "title": "BNR exchange rates",
+    "group": "Money and accounting",
+    "inputs": {}
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "bnr",
+    "exchange-rates",
+    "romania",
+    "anaf"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/bnr#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/bnr"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-bnr": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

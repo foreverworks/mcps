@@ -1,0 +1,55 @@
+{
+  "name": "@foreverworks/mcp-onrc",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for Romania's trade register portal (myportal.onrc.ro): the filings made there and their status, the documents listed on each filing, fee notes and invoices",
+  "mcpName": "com.foreverworks/onrc",
+  "mcp": {
+    "title": "ONRC trade register",
+    "group": "Romanian authorities",
+    "inputs": {}
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "onrc",
+    "romania",
+    "trade-register"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/onrc#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/onrc"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-onrc": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

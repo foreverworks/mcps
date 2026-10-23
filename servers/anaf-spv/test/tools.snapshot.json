@@ -1,0 +1,673 @@
+[
+  {
+    "name": "await_reply",
+    "title": "Wait for a request's reply",
+    "description": "Wait for SPV's answer to a request_document (a RASPUNS SOLICITARE message carrying its id), checking the list every few seconds for up to wait_seconds. SPV usually answers within two minutes. With download, the answer's document is saved to the outbox as download_message saves it. answered: false means not yet; call again. A client that asks for progress hears the seconds waited; cancelling ends the wait.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "request_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The request_id request_document returned."
+        },
+        "wait_seconds": {
+          "default": 90,
+          "description": "How long to keep checking; 0 checks once.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "download": {
+          "default": true,
+          "description": "Save the answer's document to the outbox when it is there.",
+          "type": "boolean"
+        },
+        "save_dir": {
+          "default": "",
+          "description": "A folder INSIDE the downloads outbox (e.g. \"2026-10\"); empty means the outbox itself. A path outside it is refused.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "request_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "complete_login",
+    "title": "Complete sign-in",
+    "description": "Finish a sign-in that waits for its code (login answered awaiting_code, or a tool failed with needs_login): pass the digits of the newest \"Cod de siguranta\" mail. SPV honours a code for five minutes; only the newest code works.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 20,
+          "description": "The security code from the mail, e.g. 246810."
+        }
+      },
+      "required": [
+        "code"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "declaration_status",
+    "title": "A filing's status",
+    "description": "A filed declaration's state at ANAF and its receipt (recipisa), by its number, from ANAF's public status service (StareD112): no sign-in, nothing changes. The number is the index de încărcare a RECIPISA prints (the middle of its registration number INTERNT-<index>-<year>, also accepted), or the index de depunere submit_declaration answered. Answers status (processing, not_registered, validation_errors, valid) with ANAF's words, the form, the registration number and dates, and saves the signed receipt to the outbox while ANAF serves it (60 days after filing). The service lists a tax id's last 200 filings of the last three months; for an older one it says how to ask SPV for a duplicate. Any form filed electronically, whoever filed it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "reference": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The index de încărcare (digits), the registration number INTERNT-<index>-<year>, or submit_declaration's index de depunere."
+        },
+        "cif": {
+          "description": "The CNP or CUI it was filed for; default the one this server filed it for, when it did.",
+          "type": "string",
+          "minLength": 1
+        },
+        "receipt": {
+          "default": true,
+          "description": "Save the receipt's signed PDF to the outbox when ANAF still serves it.",
+          "type": "boolean"
+        },
+        "save_dir": {
+          "default": "",
+          "description": "A folder INSIDE the downloads outbox (e.g. \"2026-10\"); empty means the outbox itself. A path outside it is refused.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "reference"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "download_message",
+    "title": "Download a message",
+    "description": "Download one message's document (a signed PDF, as SPV serves it) into the downloads outbox, named <posted date>_<type>_<SPV's file name>. Answers the path, size and SHA-256. Saving the same bytes again finds them there (already_there) instead of writing a copy. A file SPV names for another message (another request's id) is refused as wrong_document and not saved.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "key": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The message's key, from list_messages."
+        },
+        "save_dir": {
+          "default": "",
+          "description": "A folder INSIDE the downloads outbox (e.g. \"2026-10\"); empty means the outbox itself. A path outside it is refused.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "key"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether this server can work: where the SPV credential comes from (a vault MCP, a file, or none), which mail driver reads the e-mailed code (google, text, auto or manual), whether a session is stored and whether a sign-in waits for its code. No network: it never signs in. Run it first, and before concluding the server is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_document_types",
+    "title": "Document types",
+    "description": "What SPV lets this account request (\"Solicitări\"), read from the live form: the identities it may request for, and for one of them every document type with the fields it requires or accepts (year, month, registration_number, pui). Among a person's: Obligatii de plata (the statement of what is owed), Nota obligatiilor de plata, Istoric declaratii PF, Duplicat declaratie unica (year), Duplicat Recipisa (registration_number), Venituri Formular Banca, Interogari Banci, certificates. For a person's CNP, the types SPV makes only for a company (Notificare, and any it has refused that way before) are left out of types and listed under cui_only.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cif": {
+          "description": "The tax id to request for, one of `identities`; default the form's first (the account holder).",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_messages",
+    "title": "List messages",
+    "description": "SPV's message list (\"Mesaje\"): every document ANAF has put in the taxpayer's virtual space and not yet archived, newest first: decisions, summonses (SOMATII), notifications, payment confirmations (PLATA), receipts, and the answers to requests (RASPUNS SOLICITARE, with the request's id). Each has a `key` for download_message, the time SPV posted it (deadlines usually run from there) and the time it will be archived, after which it can no longer be downloaded. `types` counts every type in the whole list.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Only this SPV document type, as list_messages' `types` names it: DECIZIE, SOMATII, NOTIFICARE, RASPUNS SOLICITARE, PLATA, RECIPISA, ... (case and diacritics ignored).",
+          "type": "string",
+          "minLength": 1
+        },
+        "since": {
+          "description": "Posted on or after: a calendar date in Bucharest, YYYY-MM-DD, inclusive.",
+          "type": "string"
+        },
+        "until": {
+          "description": "Posted on or before: a calendar date in Bucharest, YYYY-MM-DD, inclusive.",
+          "type": "string"
+        },
+        "cif": {
+          "description": "Only documents for this tax id (a CNP or a CUI), for an account that holds several.",
+          "type": "string",
+          "minLength": 1
+        },
+        "request_id": {
+          "description": "Only the answer to this request (request_document's request_id).",
+          "type": "string",
+          "minLength": 1
+        },
+        "text": {
+          "description": "Only messages whose details contain this phrase (case and diacritics ignored).",
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "default": 50,
+          "description": "At most this many items; `more` says how many were left out.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "login",
+    "title": "Sign in",
+    "description": "Sign in to SPV now. Rarely needed: every tool signs in by itself when the session is missing or has ended. The server reads the password from its credential source, SPV e-mails a security code, and the mail driver reads it from the mailbox; the answer says signed_in. When no mail driver can read it (manual, or the code did not come in time) the answer says awaiting_code with a deadline: read the newest \"Cod de siguranta\" mail from Autentificare.SpatiuPrivat@anaf.ro and pass its digits to complete_login. Each sign-in e-mails the user a code.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "force": {
+          "default": false,
+          "description": "Sign in again even when the stored session still works.",
+          "type": "boolean"
+        },
+        "code_by_hand": {
+          "default": false,
+          "description": "Do not read the code from the mailbox: stop at awaiting_code and wait for complete_login.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "logout",
+    "title": "Sign out",
+    "description": "Sign out at SPV and forget the session here. The next tool that needs SPV signs in again (and SPV e-mails a new code).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "posting_dates",
+    "title": "When SPV posted documents",
+    "description": "When SPV posted documents, from its alert e-mails (\"Documente noi SPV\" from Portal.ANAF@anaf.ro) in the mailbox its sign-in codes go to: per line the document (with its form, e.g. D256), the day ANAF processed it (\"prelucrata la\") and when the alert arrived, newest first. SPV drops most documents about two months after posting them, and an act posted there counts as communicated on the day it was made available, so for an archived document these alerts are the lasting record of that date. Reads mail only, never SPV. details matches list_messages' details for a document still listed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "description": "Alerts received on or after: a calendar date in Bucharest, YYYY-MM-DD, inclusive.",
+          "type": "string"
+        },
+        "until": {
+          "description": "Alerts received on or before: a calendar date in Bucharest, YYYY-MM-DD, inclusive.",
+          "type": "string"
+        },
+        "text": {
+          "description": "Only lines whose details contain this phrase (case and diacritics ignored), e.g. D256.",
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "default": 100,
+          "description": "At most this many alert e-mails read.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "request_document",
+    "title": "Request a document",
+    "description": "Ask SPV for a document, as its \"Solicitări\" form does. SPV registers the request (the answer carries its request_id) and posts the document as a RASPUNS SOLICITARE message a minute or two later: call await_reply with the id. The type must be one list_document_types offers this identity, with the fields it requires; a field the type does not take is refused before anything is sent. Free, and changes nothing at ANAF.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The document type, as list_document_types names it (case and diacritics ignored)."
+        },
+        "cif": {
+          "description": "The tax id to request for, one of `identities`; default the form's first (the account holder).",
+          "type": "string",
+          "minLength": 1
+        },
+        "year": {
+          "description": "The reporting year, for the types that take one (Duplicat declaratie unica: 2025 = the return filed in 2025).",
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2100
+        },
+        "month": {
+          "description": "The reporting month, for the types that take one.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "registration_number": {
+          "description": "A filing's registration number, for Duplicat Recipisa (e.g. INTERNT-123456789-2026).",
+          "type": "string",
+          "minLength": 1
+        },
+        "pui": {
+          "description": "The PUI, for the Fisa Rol types.",
+          "type": "string",
+          "minLength": 1
+        },
+        "month_from": {
+          "description": "The first month, for the types that take a range (Neconcordante D394).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "month_to": {
+          "description": "The last month of that range.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        }
+      },
+      "required": [
+        "type"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "session_status",
+    "title": "Session status",
+    "description": "Is a session stored, since when, and when it last worked; with probe, loads one SPV page to prove SPV still honours it. Never signs in (every other tool signs in by itself when it needs to).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "probe": {
+          "default": false,
+          "description": "Load one page to prove the session is alive.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "submit_contact_form",
+    "title": "Write to ANAF (contact form)",
+    "description": "Send a message through SPV's contact form (\"Formular de contact\"): a question or request about the taxpayer's own record, registered at ANAF under the account's name and answered later in SPV as RASPUNS SESIZARE FORMULAR UNIC DE CONTACT. By default a DRY RUN: it reads the live form, checks the message against it and answers it exactly as it would go (identity, category, text without diacritics, attachment with its SHA-256), sending nothing. With dry_run: false it sends, once: it answers the registration number, the date and the text SPV shows. The form preselects its first identity, often a company, so cif is required and read back. The same message is not sent twice unless again: true.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "cif": {
+          "type": "string",
+          "pattern": "^\\d{2,13}$",
+          "description": "The tax id to write as: one of the form's identities (the dry run lists them). Required: the form preselects the first."
+        },
+        "category": {
+          "default": 3,
+          "description": "The form's category. 3 (the default): \"Asistență și îndrumare de specialitate în domeniul fiscal\", the one answered on the merits.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 99
+        },
+        "subcategory": {
+          "description": "Only for categories 1, 2 and 5, which require one; the error lists them.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 999
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 6000,
+          "description": "The message. Sent without diacritics (stripped here) and at most 1,500 characters after that; put a longer wording in an attached PDF."
+        },
+        "attachment": {
+          "description": "A file to attach (pdf, tiff, rtf, zip, jpeg, jpg, gif, png, at most 10 MB): a file in /srv/inbox (copy it there with cp; a bare name is taken from /srv/inbox). Taken by path only, byte for byte.",
+          "type": "string",
+          "minLength": 1
+        },
+        "attachment_sha256": {
+          "description": "The attachment's hex SHA-256, as sha256sum prints it; a mismatch fails and nothing is sent.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "dry_run": {
+          "default": true,
+          "description": "true (the default): read the form and check the message, send nothing. false: send it to ANAF.",
+          "type": "boolean"
+        },
+        "again": {
+          "default": false,
+          "description": "Send even though this same message was sent, or tried, before.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "cif",
+        "text"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "submit_declaration",
+    "title": "File a declaration",
+    "description": "File a D212 with ANAF at formularespv-pf, in the account holder's name: the PDF validate_declaration made, and only that (its SHA-256, size and embedded XML are checked against what was validated). Signs in to formularespv-pf by itself (its own session; SPV e-mails a code), uploads, and answers the index de depunere; then waits for SPV's RECIPISA and downloads it with the DECLARATIE. A filed declaration is a fiscal document: it cannot be withdrawn, only rectified. Requires confirm: true; the same bytes are filed once unless refile. A D100, D300 or D112 PDF is checked and refused as unsupported before anything is sent: ANAF takes those only through e-guvernare.ro, signed with a qualified certificate. Moves money or makes a legal document: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pdf": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The filing PDF validate_declaration made: a file in /srv/inbox (copy it there with cp; a bare name is taken from /srv/inbox). Taken by path only, byte for byte."
+        },
+        "pdf_sha256": {
+          "description": "Its hex SHA-256 as validate_declaration answered it; a mismatch fails and nothing is sent.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "confirm": {
+          "default": false,
+          "description": "Must be true: a filed declaration cannot be withdrawn, only rectified.",
+          "type": "boolean"
+        },
+        "refile": {
+          "default": false,
+          "description": "Send these exact bytes again although they were filed (or sent with no answer) before.",
+          "type": "boolean"
+        },
+        "wait_seconds": {
+          "default": 60,
+          "description": "How long to wait for SPV's RECIPISA (it usually arrives within seconds).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 120
+        },
+        "save_dir": {
+          "default": "",
+          "description": "A folder INSIDE the downloads outbox (e.g. \"2026-10\"); empty means the outbox itself. A path outside it is refused.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "pdf"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "money",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "sync_messages",
+    "title": "Save every new message",
+    "description": "Download every message this server has not saved before (oldest first) and remember it, so a scheduled call keeps a complete archive: SPV drops most documents about two months after posting them. Filters narrow what is synced; `limit` caps one call and `remaining` says how many are left for the next. Answers what was saved, with paths and SHA-256. A client that asks for progress hears each document saved; cancelling stops between documents, and the next sync carries on from there.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "type": {
+          "description": "Only this SPV document type, as list_messages' `types` names it: DECIZIE, SOMATII, NOTIFICARE, RASPUNS SOLICITARE, PLATA, RECIPISA, ... (case and diacritics ignored).",
+          "type": "string",
+          "minLength": 1
+        },
+        "since": {
+          "description": "Posted on or after: a calendar date in Bucharest, YYYY-MM-DD, inclusive.",
+          "type": "string"
+        },
+        "until": {
+          "description": "Posted on or before: a calendar date in Bucharest, YYYY-MM-DD, inclusive.",
+          "type": "string"
+        },
+        "cif": {
+          "description": "Only documents for this tax id (a CNP or a CUI), for an account that holds several.",
+          "type": "string",
+          "minLength": 1
+        },
+        "save_dir": {
+          "default": "",
+          "description": "A folder INSIDE the downloads outbox (e.g. \"2026-10\"); empty means the outbox itself. A path outside it is refused.",
+          "type": "string"
+        },
+        "limit": {
+          "default": 50,
+          "description": "At most this many downloads in this call.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "validate_declaration",
+    "title": "Validate a declaration",
+    "description": "Validate a declaration's XML with ANAF's own validator for its form and period (DUKIntegrator with the \"soft J\" jars of ANAF's package for that period, kept in a cache; D212 for reporting years 2020, 2021, 2022, 2023, 2024, 2025; D100 for periods from 01.2024; D300 for periods from 05.2024; D112 for periods from 01.2025), and answer its errors verbatim, with the period, the taxpayer and what it makes payable. With pdf (the default) a valid XML also becomes the filing PDF, saved to the outbox only once its embedded XML is checked to be the validated file byte for byte. D212's period is its reporting year, an_r (2023 declares 2022's income). Files nothing: submit_declaration files a D212; ANAF takes D100, D300 and D112 only through e-guvernare.ro, signed with a qualified certificate, and the answer says so.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "form": {
+          "default": "D212",
+          "description": "The form: D212; D100, obligations to the state budget; D300, the VAT return; D112, an employer's contributions and withheld tax.",
+          "type": "string",
+          "enum": [
+            "D212",
+            "D100",
+            "D300",
+            "D112"
+          ]
+        },
+        "xml": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The declaration's XML: a file in /srv/inbox (copy it there with cp; a bare name is taken from /srv/inbox). Taken by path only, byte for byte."
+        },
+        "xml_sha256": {
+          "description": "Its hex SHA-256; a mismatch fails before anything runs.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{64}$"
+        },
+        "year": {
+          "description": "The period's year (D212: the reporting year), checked against the XML's.",
+          "type": "integer",
+          "minimum": 2000,
+          "maximum": 2100
+        },
+        "month": {
+          "description": "The period's month, checked against the XML's (D212's is 12).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 12
+        },
+        "pdf": {
+          "default": true,
+          "description": "Also make the filing PDF when the XML is valid.",
+          "type": "boolean"
+        },
+        "save_dir": {
+          "default": "",
+          "description": "A folder INSIDE the downloads outbox (e.g. \"2026-10\"); empty means the outbox itself. A path outside it is refused.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "xml"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

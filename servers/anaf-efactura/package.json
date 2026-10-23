@@ -1,0 +1,74 @@
+{
+  "name": "@foreverworks/mcp-anaf-efactura",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for Romania's ANAF e-Factura and e-Transport: read the invoices a company received and sent, check and render them, file new invoices and e-Transport declarations, and look up companies in the VAT registry",
+  "mcpName": "com.foreverworks/anaf-efactura",
+  "mcp": {
+    "title": "ANAF e-Factura",
+    "group": "Romanian authorities",
+    "inputs": {
+      "ANAF_CONFIG": {
+        "title": "ANAF app.json",
+        "type": "file",
+        "required": true,
+        "description": "Path of app.json: the OAuth app you registered with ANAF (its client id and secret, the callback URL) and the company's CIF, as the README shows."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "anaf",
+    "e-factura",
+    "efactura",
+    "romania",
+    "e-invoicing",
+    "ubl"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/anaf-efactura#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/anaf-efactura"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-anaf-efactura": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "health": "node dist/index.js --health",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "gen:types": "tsx scripts/gen-types.ts",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "fast-xml-parser": "^5.11.2",
+    "proper-lockfile": "^4.1.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/proper-lockfile": "^4.1.4",
+    "json5": "^2.2.3",
+    "openapi-typescript": "^7.13.0"
+  }
+}

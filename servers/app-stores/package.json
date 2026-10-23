@@ -1,0 +1,87 @@
+{
+  "name": "@foreverworks/mcp-app-stores",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for App Store Connect and Google Play: read and answer App Store and Play reviews, and read TestFlight feedback and crash logs",
+  "mcpName": "com.foreverworks/app-stores",
+  "mcp": {
+    "title": "App Store and Google Play",
+    "group": "Apps and developer tools",
+    "inputs": {
+      "ASC_KEY_ID": {
+        "title": "App Store Connect key id",
+        "type": "text",
+        "required": false,
+        "description": "For the App Store: the App Store Connect API key's id (10 characters)."
+      },
+      "ASC_ISSUER_ID": {
+        "title": "App Store Connect issuer id",
+        "type": "text",
+        "required": false,
+        "description": "For the App Store: the issuer id App Store Connect shows above your team keys."
+      },
+      "ASC_PRIVATE_KEY_FILE": {
+        "title": "App Store Connect key (.p8)",
+        "type": "file",
+        "required": false,
+        "description": "For the App Store: path of the .p8 key file App Store Connect let you download."
+      },
+      "PLAY_SERVICE_ACCOUNT_FILE": {
+        "title": "Google Play service account key",
+        "type": "file",
+        "required": false,
+        "description": "For Google Play: path of the service account's JSON key."
+      },
+      "PLAY_PACKAGES": {
+        "title": "Google Play package names",
+        "type": "text",
+        "required": false,
+        "description": "For Google Play: the package names to answer for, comma-separated, e.g. com.example.app."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "app-store-connect",
+    "google-play",
+    "testflight",
+    "reviews"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/app-stores#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/app-stores"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-app-stores": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,0 +1,263 @@
+[
+  {
+    "name": "begin_login",
+    "title": "Begin login",
+    "description": "Start signing in: answers with a URL the USER opens in the browser where they are already signed in to myportal.onrc.ro (Keycloak answers from that sign-in; no password or code is typed), and the redirect it ends on. Pass that address to complete_login. Open for 15 minutes; beginning again replaces it. Call this whenever a tool answers needs_login.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "complete_login",
+    "title": "Complete login",
+    "description": "Finish a begun login from the address the browser landed on (it carries code=... and state=...). Exchanges the code and stores the session in the service's own state; answers with who signed in and when the session expires. The code dies within a minute of being issued, so pass it at once.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "redirect_url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The whole address the browser landed on after the login."
+        }
+      },
+      "required": [
+        "redirect_url"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "get_request",
+    "title": "Get filing",
+    "description": "One filing: its status in the office's words, the two terms (resolutionDue: by when the registrar decides; releaseDue: when the documents are released), whether files are ready to download, and the documents in its file (the signed application, resolutions, certificates once issued).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$",
+          "description": "The filing's id (a UUID), from list_requests."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether this server is configured and holds a portal session (none, present, expired). No network. Run it before concluding the server is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_calculation_notes",
+    "title": "List calculation notes",
+    "description": "\"Notele mele de calcul\": the fee notes the office issued for the filings, with amount, status and the date to pay by. A filing with no fee has none.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "First day of the window, YYYY-MM-DD (Bucharest). Default: 365 days ago.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last day of the window, YYYY-MM-DD (Bucharest). Default: today in Bucharest.",
+          "type": "string"
+        },
+        "page": {
+          "default": 0,
+          "description": "Page, from 0, newest first.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_invoices",
+    "title": "List invoices",
+    "description": "\"Facturile mele\": the invoices the office issued for paid fees, with total, what was paid and what is outstanding.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "First day of the window, YYYY-MM-DD (Bucharest). Default: 365 days ago.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last day of the window, YYYY-MM-DD (Bucharest). Default: today in Bucharest.",
+          "type": "string"
+        },
+        "page": {
+          "default": 0,
+          "description": "Page, from 0, newest first.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_requests",
+    "title": "List filings",
+    "description": "\"Cererile mele\": the filings made from this portal account (a mențiune, an înmatriculare, a certificat constatator), newest first, with the portal number, the trade register number, the status (WORKING: still at the office), the company and whether a calculation note or an invoice exists. The id is what get_request takes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "First day of the window, YYYY-MM-DD (Bucharest). Default: 365 days ago.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last day of the window, YYYY-MM-DD (Bucharest). Default: today in Bucharest.",
+          "type": "string"
+        },
+        "page": {
+          "default": 0,
+          "description": "Page, from 0, newest first.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "logout",
+    "title": "Logout",
+    "description": "Forget the stored session and tell Keycloak it is over. The user's own browser sign-in is not touched. Reads will answer needs_login until the next login.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "session_status",
+    "title": "Session status",
+    "description": "Is a portal account signed in through this server: who, when the access and refresh tokens expire, and what to do if not. With probe, refreshes once to prove the session is still honoured by Keycloak. Never shows a token.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "probe": {
+          "default": false,
+          "description": "Refresh once to prove the session still works.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

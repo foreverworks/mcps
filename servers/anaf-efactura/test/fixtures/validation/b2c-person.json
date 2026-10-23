@@ -1,0 +1,11 @@
+{
+  "case": "b2c-person",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "04a6fc4c768bc17d601c35712b07f6d987f758a6f1aa9db50475f17cf796e024",
+  "bytes": 3850,
+  "answer": {
+    "stare": "ok",
+    "trace_id": "db984d39-0b2d-4b23-9b20-812a46016454"
+  }
+}

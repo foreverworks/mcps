@@ -1,0 +1,56 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/glovo",
+  "title": "Glovo receipts",
+  "description": "MCP server for Glovo order history",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/glovo#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/glovo"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/glovo/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/glovo/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-glovo",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "GLOVO_CREDS",
+          "description": "Path of credentials.json: the values the README shows how to copy from the signed-in web app.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "GLOVO_TIME_ZONE",
+          "description": "The time zone your bank books card charges in, e.g. Europe/Bucharest.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

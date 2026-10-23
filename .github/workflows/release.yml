@@ -1,0 +1,81 @@
+name: release
+
+# Publishes to npm with provenance, then to the official MCP Registry:
+# scripts/release.ts says what, docs/releasing.md says when and how. Started by
+# hand, or by pushing a tag `release-<date>` on main once the versions are bumped.
+on:
+  workflow_dispatch:
+  push:
+    tags: ["release-*"]
+
+# Never two releases at once, and never one cut short by the next.
+concurrency:
+  group: release
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  publish:
+    # Nothing is published while the repository is private: npm provenance
+    # needs a public repository, and going public is the maintainer's switch.
+    # Each package also stays out until its own `"private": true` is removed.
+    if: ${{ !github.event.repository.private }}
+    # GitHub-hosted only: npm trusted publishing does not accept self-hosted runners.
+    runs-on: ubuntu-latest
+    # The environment npm's trusted publisher names; give it required reviewers
+    # to make every release wait for a person.
+    environment: release
+    timeout-minutes: 30
+    permissions:
+      # The GitHub release that carries the desktop bundles.
+      contents: write
+      # npm trusted publishing (OIDC) and the provenance statement.
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          registry-url: https://registry.npmjs.org
+      # Trusted publishing needs npm 11.5.1 or newer; Node's own may be older.
+      - run: npm install -g npm@12.2.1
+      - run: npm ci
+      - run: npm run check
+      - run: npx tsx scripts/access-changes.ts --check
+      # Pinned and checked: this binary holds the registry key while it runs.
+      - name: Install mcp-publisher 1.8.1
+        run: |
+          curl -fsSL -o "$RUNNER_TEMP/mcp-publisher.tar.gz" \
+            https://github.com/modelcontextprotocol/registry/releases/download/v1.8.1/mcp-publisher_linux_amd64.tar.gz
+          echo "a06c9096dcb9727c13555b6be26c7effa707b01f06a4c561ba7a3635443cf2cc  $RUNNER_TEMP/mcp-publisher.tar.gz" | sha256sum -c -
+          mkdir -p "$RUNNER_TEMP/bin"
+          tar xzf "$RUNNER_TEMP/mcp-publisher.tar.gz" -C "$RUNNER_TEMP/bin" mcp-publisher
+          echo "$RUNNER_TEMP/bin" >> "$GITHUB_PATH"
+      # The registry's own check of every entry, before anything is published.
+      - run: for entry in servers/*/server.json; do mcp-publisher validate "$entry"; done
+      # Every public server's desktop bundle, built before anything is
+      # published, so a bundle that cannot be built stops the release.
+      - run: npx tsx scripts/bundle.ts --public --out bundles
+      - run: npx tsx scripts/release.ts plan
+      - run: npx tsx scripts/release.ts publish
+        env:
+          # Only for a package's first publish, which trusted publishing cannot
+          # make; delete the secret once each package trusts this workflow.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+      # A tag's GitHub release carries every public server's bundle, so each
+      # README's link to the newest release finds one.
+      - name: Attach the bundles to the release
+        if: startsWith(github.ref, 'refs/tags/release-')
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          shopt -s nullglob
+          bundles=(bundles/*.mcpb)
+          if [ ${#bundles[@]} -eq 0 ]; then echo "no public server, no bundle"; exit 0; fi
+          gh release create "$GITHUB_REF_NAME" "${bundles[@]}" --title "$GITHUB_REF_NAME" \
+            --notes "What changed is in each package's CHANGELOG.md. Each .mcpb is a server's desktop bundle: open it in Claude Desktop."

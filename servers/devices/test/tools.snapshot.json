@@ -1,0 +1,464 @@
+[
+  {
+    "name": "acquire",
+    "title": "Lease a device or a build slot",
+    "description": "Ask for a device (ios: a simulator on a Mac; android: an emulator; macos: a Mac's desktop session; windows: a Windows machine) or a build slot (builder:ios, builder:android). Answers granted (with the device's address and the environment a tool reads to reach it: ANDROID_SERIAL and ANDROID_ADB_SERVER_PORT for adb, IOS_SIM_MAC (the Mac's ssh target) and IOS_SIM_DEVICE (the simulator's UDID) for simctl, DEVICE_SSH with DEVICE_SSH_PORT and DEVICE_SSH_JUMP where set for a desktop), queued (a ticket: call wait), or unavailable (with the reason, e.g. its host is asleep). An Android emulator or a Windows VM slot is started for your lease and stopped after it: a granted lease says state booting until the device has booted (about a minute for an emulator), and asking again returns the same lease with its state; with until_booted, acquire waits for the boot itself and reports progress meanwhile. One device per platform and form per session (a phone and a Wear OS watch are two forms): asking again returns the one you hold and extends it, and asking for a profile it does not run is refused (release it first). A lease ends by release, after 20 min without a call from you (acquire or renew), or at its time limit (45 min, renewable to 4 h); while a person has the device, pause keeps it. sim-run, apk-run and flow-run acquire for you when you hold nothing (and renew on every use), so calling this first is only needed to wait in line or pick a profile.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "want": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android",
+            "macos",
+            "windows",
+            "builder:ios",
+            "builder:android"
+          ]
+        },
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "purpose": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "What you are doing, in a few words; shown to whoever waits behind you."
+        },
+        "profile": {
+          "description": "A profile from status (android-phone, ios-phone); default: any device of the platform.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "maestro": {
+          "description": "Only devices the catalog marks as drivable by a Maestro flow.",
+          "type": "boolean"
+        },
+        "minutes": {
+          "description": "How long you expect to need it (default 45; builders 30).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 240
+        },
+        "priority": {
+          "default": "interactive",
+          "description": "background for a loop or a timer: it waits behind interactive sessions.",
+          "type": "string",
+          "enum": [
+            "interactive",
+            "background"
+          ]
+        },
+        "until_booted": {
+          "description": "Wait up to this many seconds for a device the lease starts to finish booting, reporting progress, instead of answering state booting at once.",
+          "type": "integer",
+          "minimum": 10,
+          "maximum": 300
+        }
+      },
+      "required": [
+        "want",
+        "session",
+        "purpose"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "clear",
+    "title": "Return a quarantined device to service",
+    "description": "Lift a quarantine (from release broken or report) once the device is checked working again: say what you checked in the note, which status and the event log keep. Only after you saw it work.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "device": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "What you checked, e.g. booted it and took a screenshot of the launcher."
+        }
+      },
+      "required": [
+        "session",
+        "device",
+        "note"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether the broker works (its catalog loaded, its state reads), with each host's last probe. A host that is down (a laptop asleep, a machine off) is reported, not a fault.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "pause",
+    "title": "Hand a device to a person",
+    "description": "Pause a device lease you hold while a person takes the device over (signs in, types a code, looks at a screen): the lease holds without your calls for minutes (default 60, at most 4 h per call, never past 8 h after the grant), so you do not lose the device while you wait on them, and status shows it paused with your note. Stop driving it until you call resume. A pause that runs out ends the lease as a silent one does; pausing again moves its end. Build slots are not paused.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "lease": {
+          "type": "string",
+          "pattern": "^ls-[1-9][0-9]{0,9}$",
+          "description": "A lease id from acquire or status (ls-<number>)."
+        },
+        "want": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android",
+            "macos",
+            "windows",
+            "builder:ios",
+            "builder:android"
+          ]
+        },
+        "minutes": {
+          "description": "How long the person may need it (default 60).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 240
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300,
+          "description": "Who has it and why, e.g. \"the owner signs in to the test account\"; shown in status."
+        }
+      },
+      "required": [
+        "session",
+        "note"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "release",
+    "title": "Give a device back",
+    "description": "End a lease you hold. state: clean (leave it as it is, app data kept), dirty (reset it: the apps you installed uninstalled on iOS, app data cleared on Android), or broken (quarantine it with your note; nothing leases it until someone checks it and calls clear). iOS simulators are shut down, and Android emulators and Windows VMs the broker started are stopped, after every lease; a Mac's desktop session is left as it is.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "lease": {
+          "type": "string",
+          "pattern": "^ls-[1-9][0-9]{0,9}$",
+          "description": "A lease id from acquire or status (ls-<number>)."
+        },
+        "want": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android",
+            "macos",
+            "windows",
+            "builder:ios",
+            "builder:android"
+          ]
+        },
+        "state": {
+          "default": "clean",
+          "type": "string",
+          "enum": [
+            "clean",
+            "dirty",
+            "broken"
+          ]
+        },
+        "note": {
+          "description": "Why; required in practice for broken.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "renew",
+    "title": "Keep a lease",
+    "description": "Extend a lease you hold (by lease id, or by what it is for) to now + minutes, at most 4 h after it was granted. sim-run, apk-run and flow-run do this on every use.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "lease": {
+          "type": "string",
+          "pattern": "^ls-[1-9][0-9]{0,9}$",
+          "description": "A lease id from acquire or status (ls-<number>)."
+        },
+        "want": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android",
+            "macos",
+            "windows",
+            "builder:ios",
+            "builder:android"
+          ]
+        },
+        "minutes": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 240
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "report",
+    "title": "Report a broken device",
+    "description": "Quarantine a device that is wedged (black screen, adb offline, a simulator that will not boot) so nobody is handed it, with a note for whoever checks it. It does not end your lease: release it too.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "device": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "The device id from status."
+        },
+        "note": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 300
+        }
+      },
+      "required": [
+        "session",
+        "device",
+        "note"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "resume",
+    "title": "Take a device back",
+    "description": "End the pause on a lease you hold, once the person is done: it is an ordinary lease again, ending 20 min after your last call as before, and lasting at least that long even if the pause ran past its time limit. Resuming a lease that is not paused changes nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "lease": {
+          "type": "string",
+          "pattern": "^ls-[1-9][0-9]{0,9}$",
+          "description": "A lease id from acquire or status (ls-<number>)."
+        },
+        "want": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android",
+            "macos",
+            "windows",
+            "builder:ios",
+            "builder:android"
+          ]
+        }
+      },
+      "required": [
+        "session"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "status",
+    "title": "Devices and leases",
+    "description": "Every host your devices are on, with its health and why it is degraded or down, every device with who holds it, the build slots, the queue and the last events: those of your tenant (your token's), never another's. Pass your session to also get the leases you hold, with the address and environment of each device.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "wait",
+    "title": "Wait in the queue",
+    "description": "Long-poll a queue ticket from acquire for up to 50 s: answers granted (the lease is yours) or queued with your position. A ticket not polled for 2 minutes is dropped, and a grant not claimed within 5 minutes goes to the next in line.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "ticket": {
+          "type": "string",
+          "pattern": "^tk-[1-9][0-9]{0,9}$",
+          "description": "The ticket id from acquire (tk-<number>)."
+        },
+        "session": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Your session id: the output of `show-session-id`. A lease is your tenant's and this session's; sim-run, apk-run and flow-run find your lease by it, so use the same one."
+        },
+        "seconds": {
+          "default": 45,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "ticket",
+        "session"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  }
+]

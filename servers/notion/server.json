@@ -1,0 +1,50 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/notion",
+  "title": "Notion",
+  "description": "MCP server for one or more Notion workspaces",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/notion#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/notion"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/notion/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/notion/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-notion",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "NOTION_TOKENS_DIR",
+          "description": "A folder holding one file per workspace, notion-<label>, each with that workspace's integration token or personal access token.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

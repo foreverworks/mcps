@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<declaratie100 xmlns="mfp:anaf:dgti:d100:declaratie:v2" luna="9" an="2026" d_anulare="0" nume_declar="POPESCU" prenume_declar="ANA" functie_declar="ADMINISTRATOR" cui="99999909" den="EXEMPLU TEST SRL" adresa="STR. EXEMPLU NR. 1, BUCURESTI" telefon="0700000000" mail="test@example.com" totalPlata_A="3700">
+<obligatie cod_oblig="121" cod_bugetar="5503XXXXXX" scadenta="25.10.2026" nr_evid="10121010926251026000039" cota="1" suma_dat="1250" suma_ded="0" suma_plata="1250" suma_rest="0"/>
+<obligatie cod_oblig="150" cod_bugetar="5503XXXXXX" scadenta="25.10.2026" nr_evid="10150010926251026000041" suma_dat="600" suma_ded="0" suma_plata="600" suma_rest="0"/>
+</declaratie100>

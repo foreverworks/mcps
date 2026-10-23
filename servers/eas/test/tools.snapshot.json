@@ -1,0 +1,1808 @@
+[
+  {
+    "name": "audit_credentials",
+    "title": "Audit credentials",
+    "description": "Per bundle id (iOS) and package (Android) of a project: the distribution certificate and provisioning profile with their expiry, the App Store Connect API key for submissions, the push key, the upload keystore's fingerprints and the Google service account for submissions, and in words what is missing, expired or expiring within 30 days. Every identifier the project has credentials for or has built is covered, so one built without credentials shows up. No secret is ever read.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android"
+          ]
+        },
+        "identifier": {
+          "description": "One bundle id or package. Default: every one the project has credentials for or has built.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "cancel_build",
+    "title": "Cancel build",
+    "description": "Cancel a build that is queued or running. EAS refuses one that has already ended, and says so; nothing else changes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "build": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The build id."
+        }
+      },
+      "required": [
+        "build"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "cancel_workflow_run",
+    "title": "Cancel workflow run",
+    "description": "Cancel a workflow run that has not ended, with its running jobs (a build in progress stops spending).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The workflow run id."
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "dispatch_workflow",
+    "title": "Dispatch workflow",
+    "description": "Run an EAS workflow file at a git ref the project's GitHub repository already has. EAS reads the file and the code from GitHub; nothing local is uploaded. A build job spends EAS build credits; the summary line names the project, the file, the ref and each build job's platform and profile. Answers with the new run; follow it with get_workflow_run. Moves money or makes a legal document: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The workflow file name, e.g. \"ios-build.yml\" (the extension may be left out)."
+        },
+        "git_ref": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A ref the project's GitHub repository already has: a branch (\"main\"), \"refs/heads/<branch>\", \"refs/tags/<tag>\" or a commit hash."
+        },
+        "inputs": {
+          "description": "The workflow_dispatch inputs the file declares, by name.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "workflow",
+        "git_ref"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "money",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "get_build",
+    "title": "Get build",
+    "description": "One build: its artifacts (the .ipa/.aab URL), fingerprint, runtime version, channel, timings and error. A build that ERRORED also carries failedStep, the step that failed and the line that says why, read from its log; steps lists them all.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "build": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The build id."
+        },
+        "steps": {
+          "default": false,
+          "description": "Also list every step of the log with its result.",
+          "type": "boolean"
+        },
+        "lines": {
+          "default": 0,
+          "description": "How many of a step's last log lines to include (0: none).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        }
+      },
+      "required": [
+        "build"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_job_logs",
+    "title": "Get job logs",
+    "description": "A workflow job's log, by step: every step with its result and size, and the last lines of one step (the failed one by default). What eas workflow:logs --all-steps prints, without the noise.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "job": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The workflow job id (get_workflow_run lists them)."
+        },
+        "step": {
+          "description": "A step's name, or part of it. Default: the failed step, else the last.",
+          "type": "string",
+          "minLength": 1
+        },
+        "lines": {
+          "default": 60,
+          "description": "How many of the step's last lines.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "required": [
+        "job"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_submission",
+    "title": "Get submission",
+    "description": "One submission with Apple's or Google's error text; one that ERRORED also carries failedStep from its log (its own, or the workflow job's that made it); steps lists every step.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "submission": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The submission id."
+        },
+        "steps": {
+          "default": false,
+          "description": "Also list every step of the log with its result.",
+          "type": "boolean"
+        },
+        "lines": {
+          "default": 0,
+          "description": "How many of a step's last log lines to include (0: none).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        }
+      },
+      "required": [
+        "submission"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_workflow_run",
+    "title": "Get workflow run",
+    "description": "One workflow run with its jobs: each job's type, status and outputs (build_id, fingerprint hashes, app_build_version...) and artifacts. When it failed: reason in one line, and failures per job (the job's own error, which for an App Store upload is Apple's text, else its failed step and the line that says why); lines adds each failed step's tail.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The workflow run id."
+        },
+        "lines": {
+          "default": 0,
+          "description": "How many of a step's last log lines to include (0: none).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        }
+      },
+      "required": [
+        "run"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Check that the Expo access token is present and accepted: which actor it is (a robot user, ideally), its accounts and the projects it sees. Reads only. Run this before concluding the server is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_builds",
+    "title": "List builds",
+    "description": "A project's builds, newest first, filtered by platform, status, profile, bundle id or package, commit or fingerprint. Each says its status, profile, identifier, version and build number, commit, fingerprint, runtime, who started it and its error.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "NEW",
+            "IN_QUEUE",
+            "IN_PROGRESS",
+            "PENDING_CANCEL",
+            "ERRORED",
+            "FINISHED",
+            "CANCELED"
+          ]
+        },
+        "profile": {
+          "description": "The eas.json build profile, e.g. \"production\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "app_identifier": {
+          "description": "A bundle id or package, e.g. com.example.app.dev.",
+          "type": "string",
+          "minLength": 1
+        },
+        "commit": {
+          "description": "The full git commit hash the build was made from.",
+          "type": "string",
+          "pattern": "^[0-9a-f]{40}$"
+        },
+        "fingerprint": {
+          "description": "Builds carrying this fingerprint hash.",
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "offset": {
+          "default": 0,
+          "description": "Skip this many, newest first: nextOffset from the previous call.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "builds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "profile": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "appIdentifier": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "appVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "buildNumber": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "distribution": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gitCommitHash": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "fingerprint": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "runtimeVersion": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "platform",
+              "profile",
+              "appIdentifier",
+              "appVersion",
+              "buildNumber",
+              "distribution",
+              "gitCommitHash",
+              "fingerprint",
+              "runtimeVersion",
+              "createdAt",
+              "completedAt",
+              "by",
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextOffset": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "project",
+        "builds"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_fingerprints",
+    "title": "List fingerprints",
+    "description": "A project's fingerprints (the hash of its native side), newest first, or one by hash: how many builds and updates carry each, and the latest of them. Answers whether a build exists for a native state, the question a fingerprint-gated workflow asks.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "hash": {
+          "description": "One fingerprint hash (a build's or a fingerprint job's output).",
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "fingerprints": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "hash": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "buildCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "updateCount": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "builds": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "type": "string"
+                    },
+                    "buildProfile": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "appBuildVersion": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "platform",
+                    "buildProfile",
+                    "status",
+                    "appBuildVersion",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "updates": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "type": "string"
+                    },
+                    "branch": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "group",
+                    "platform",
+                    "branch",
+                    "createdAt"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "hash",
+              "createdAt",
+              "buildCount",
+              "updateCount",
+              "builds",
+              "updates"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "project",
+        "fingerprints"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_projects",
+    "title": "List projects",
+    "description": "The EAS projects this token can see, per account, with their full names (@account/slug) and ids: what every other tool's project argument takes. A tool may leave project out when the token sees only one.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "actor": {
+          "type": "object",
+          "properties": {
+            "kind": {
+              "type": "string"
+            },
+            "name": {
+              "type": "string"
+            }
+          },
+          "required": [
+            "kind",
+            "name"
+          ],
+          "additionalProperties": false
+        },
+        "accounts": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "projects": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "fullName": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "fullName",
+                    "name"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "name",
+              "projects"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "defaultProject": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "actor",
+        "accounts"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_submissions",
+    "title": "List submissions",
+    "description": "A project's App Store Connect and Google Play submissions, newest first: status, the build (identifier, version, build number), the ASC app or Play track, the workflow job that made it, and error: Apple's or Google's own text (for a workflow's submission it lives on the job, which this reads).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "platform": {
+          "type": "string",
+          "enum": [
+            "ios",
+            "android"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "AWAITING_BUILD",
+            "IN_QUEUE",
+            "IN_PROGRESS",
+            "FINISHED",
+            "ERRORED",
+            "CANCELED"
+          ]
+        },
+        "limit": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "offset": {
+          "default": 0,
+          "description": "Skip this many, newest first: nextOffset from the previous call.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "submissions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "completedAt": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "build": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "appIdentifier": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "appVersion": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "buildNumber": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "profile": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "appIdentifier",
+                      "appVersion",
+                      "buildNumber",
+                      "profile"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "ascAppId": {
+                "type": "string"
+              },
+              "track": {
+                "type": "string"
+              },
+              "releaseStatus": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "rollout": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "workflowRunId": {
+                "type": "string"
+              },
+              "workflowJob": {
+                "type": "string"
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "status",
+              "platform",
+              "createdAt",
+              "completedAt",
+              "build",
+              "by",
+              "error"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextOffset": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "project",
+        "submissions"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_updates",
+    "title": "List updates",
+    "description": "A project's EAS Update channels with the branches they serve (production ones marked), and per branch the latest update for each platform and runtime version: what a device on that runtime downloads next.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "channels": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "branches": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "paused": {
+                "type": "boolean",
+                "const": true
+              },
+              "protected": {
+                "type": "boolean",
+                "const": true
+              },
+              "production": {
+                "type": "boolean",
+                "const": true
+              }
+            },
+            "required": [
+              "name",
+              "branches"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "branches": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string"
+              },
+              "latest": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "group": {
+                      "type": "string"
+                    },
+                    "platform": {
+                      "type": "string"
+                    },
+                    "runtimeVersion": {
+                      "type": "string"
+                    },
+                    "createdAt": {
+                      "type": "string"
+                    },
+                    "message": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "gitCommitHash": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "rolloutPercentage": {
+                      "type": "number"
+                    },
+                    "rollBackToEmbedded": {
+                      "type": "boolean",
+                      "const": true
+                    },
+                    "by": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "group",
+                    "platform",
+                    "runtimeVersion",
+                    "createdAt",
+                    "message",
+                    "gitCommitHash",
+                    "by"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "name",
+              "latest"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "project",
+        "channels",
+        "branches"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_workflow_runs",
+    "title": "List workflow runs",
+    "description": "A project's workflow runs, newest first, optionally of one workflow file, status or ref: status, ref, commit, trigger (a GitHub push, a schedule, a dispatch) and who. A FAILURE run carries reason: the failed job, its failed step and the line that says why, read from the job's log (e.g. \"submit_ios > Prepare credentials: eas-cli failed to resolve submission config ...\").",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The workflow file name, e.g. \"ios-build.yml\" (the extension may be left out)."
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "NEW",
+            "WAITING",
+            "IN_PROGRESS",
+            "ACTION_REQUIRED",
+            "SUCCESS",
+            "FAILURE",
+            "CANCELED"
+          ]
+        },
+        "git_ref": {
+          "description": "Only runs requested at this ref, e.g. \"refs/heads/main\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "default": 10,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, to read on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "reasons": {
+          "default": true,
+          "description": "Read each FAILURE run's failed jobs' logs for its one-line reason (a request or two per failed run).",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "runs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "workflow": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string"
+              },
+              "gitRef": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gitCommitHash": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "gitCommitMessage": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "trigger": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "schedule": {
+                "type": "string"
+              },
+              "by": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "string"
+              },
+              "updatedAt": {
+                "type": "string"
+              },
+              "errors": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "id",
+              "workflow",
+              "status",
+              "gitRef",
+              "gitCommitHash",
+              "gitCommitMessage",
+              "trigger",
+              "by",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "nextCursor": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "project",
+        "runs"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_workflows",
+    "title": "List workflows",
+    "description": "A project's EAS workflow files (.eas/workflows/*.yml), by file name: what list_workflow_runs and dispatch_workflow take.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "workflows": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "fileName": {
+                "type": "string"
+              },
+              "name": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "updatedAt": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "fileName",
+              "name",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "project",
+        "workflows"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "republish_update",
+    "title": "Republish update",
+    "description": "Put an existing update group on a branch again, as eas update:republish does: roll a branch back to an earlier group, or promote a group from one branch to another. Nothing is uploaded. Refuses a group of another project, a code-signed group or one in a rollout, and with expect_commit a group published from another commit. Answers with where the group came from (its branch, commit and message) and the new group.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The update group to put on the branch again (list_updates gives groups)."
+        },
+        "branch": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The update branch to republish onto, e.g. \"production\"."
+        },
+        "platform": {
+          "description": "Only this platform's update of the group. Default: every platform in it.",
+          "type": "string",
+          "enum": [
+            "ios",
+            "android"
+          ]
+        },
+        "message": {
+          "description": "The new update's message. Default: names the group republished.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000
+        },
+        "expect_commit": {
+          "description": "The commit the group must have been published from (a hash, or a prefix of at least 7 characters). Checked before anything is published.",
+          "type": "string",
+          "pattern": "^[0-9a-fA-F]{7,40}$"
+        }
+      },
+      "required": [
+        "group",
+        "branch"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "revert_rollout",
+    "title": "Revert rollout",
+    "description": "End an update group's rollout by sending every device on its branch and runtime back to the update before it, as eas update:revert-update-rollout does: that update's group is published on the branch again, ending the rollout; nothing is deleted or uploaded. Refuses a rollout something newer already ended, and one with no update before it (the app's embedded update; revert that with eas-cli in the project). Answers with the groups republished and the production channels.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The update group in the rollout (list_updates shows each branch's latest groups with their rolloutPercentage)."
+        },
+        "platform": {
+          "description": "Only this platform's rollout. Default: every platform in it.",
+          "type": "string",
+          "enum": [
+            "ios",
+            "android"
+          ]
+        }
+      },
+      "required": [
+        "group"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "set_rollout",
+    "title": "Set rollout",
+    "description": "Raise an update group's rollout to a percentage of the devices on its branch and runtime, as eas update:edit does; 100 rolls it out to every device and ends the rollout. A rollout only grows (revert_rollout takes it back); setting what it already is changes nothing. Answers with the percentage before and after, and the production channels that serve the branch.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "group": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The update group in the rollout (list_updates shows each branch's latest groups with their rolloutPercentage)."
+        },
+        "percentage": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100,
+          "description": "The share of devices to get it, higher than now; 100 rolls it out to every device."
+        },
+        "platform": {
+          "description": "Only this platform's update of the group. Default: every platform in the rollout.",
+          "type": "string",
+          "enum": [
+            "ios",
+            "android"
+          ]
+        }
+      },
+      "required": [
+        "group",
+        "percentage"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "set_submit_key",
+    "title": "Set submit key",
+    "description": "Set (or clear) the App Store Connect API key EAS uses to submit one iOS bundle id, as eas credentials does. Without one, eas submit and a workflow's submit job fail at Prepare credentials. Answers with the key before and the bundle's audit after.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "bundle_id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The iOS bundle id whose submissions use the key, e.g. com.example.app.dev."
+        },
+        "key": {
+          "description": "The App Store Connect API key, by its 10-character Apple key id (e.g. \"ABCDE12345\") or its EAS id; the account must already hold it.",
+          "type": "string",
+          "pattern": "^(?:[A-Z0-9]{10}|[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12})$"
+        },
+        "clear": {
+          "default": false,
+          "description": "Remove the key set for submissions instead (eas submit for this bundle then fails until one is set).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "bundle_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "submit_build",
+    "title": "Submit build",
+    "description": "Submit an existing FINISHED build: iOS to App Store Connect (TestFlight), Android to a Google Play track. It uses what EAS holds for the build's own bundle id or package (the ASC key or Google service account set for submissions, as audit_credentials shows it), so it fails before scheduling anything when that is missing. Spends no build credits. Give expect_version or expect_build_number when you know what should ship: a build that differs is refused. Answers with the build as submitted (platform, profile, app version, build number, commit) and the submission; follow it with get_submission.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "build": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The id of a FINISHED build (list_builds)."
+        },
+        "asc_app_id": {
+          "description": "iOS: the App Store Connect app id. Default: the app App Store Connect has for the build's bundle id, asked through its key.",
+          "type": "string",
+          "pattern": "^\\d+$"
+        },
+        "what_to_test": {
+          "description": "iOS: TestFlight's What to Test; Android: the release notes.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 4000
+        },
+        "groups": {
+          "description": "iOS: TestFlight groups to add the build to.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "track": {
+          "description": "Android: the Google Play track. Default \"internal\".",
+          "type": "string",
+          "minLength": 1
+        },
+        "release_status": {
+          "description": "Android: the release status on the track.",
+          "type": "string",
+          "enum": [
+            "draft",
+            "in_progress",
+            "halted",
+            "completed"
+          ]
+        },
+        "rollout": {
+          "description": "Android: the staged rollout fraction, with release_status in_progress.",
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 1
+        },
+        "expect_version": {
+          "description": "The app version the build must have, e.g. \"1.4.2\". Checked before anything is submitted, so a wrongly copied build id fails instead of shipping another build.",
+          "type": "string",
+          "minLength": 1
+        },
+        "expect_build_number": {
+          "description": "The build number the build must have (iOS CFBundleVersion, Android versionCode), e.g. \"42\". Checked the same way.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "build"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "validate_workflow",
+    "title": "Validate workflow",
+    "description": "Check an EAS workflow file before it runs, the way eas workflow:validate does, without a checkout: the file as the project's repository has it at a ref (workflow and git_ref; EAS reads it from GitHub, as a dispatch would), or a file (path). Answers valid, the issues (YAML that does not parse, a needs: naming no job, and every problem EAS's own validator names, field by field), the jobs, and the build jobs a dispatch would spend credits on. Runs nothing, spends nothing. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/inbox/eas and give its path, or have a script that read the file send content_base64 with its sha256.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "description": "The project: \"@account/slug\" (e.g. \"@acme/my-app\"), its slug, or its id. Leave it out when the token sees one project (list_projects).",
+          "type": "string",
+          "minLength": 1
+        },
+        "workflow": {
+          "description": "With git_ref: the workflow file as the repository has it there, e.g. \"ios-build.yml\"; a file EAS has not run yet works too.",
+          "type": "string",
+          "minLength": 1
+        },
+        "git_ref": {
+          "description": "With workflow: a branch (\"main\"), \"refs/heads/<branch>\", \"refs/tags/<tag>\" or a commit hash the repository already has.",
+          "type": "string",
+          "minLength": 1
+        },
+        "path": {
+          "description": "Instead of workflow and git_ref, a workflow file: a file in /srv/inbox/eas (copy it there with cp; a bare name is taken from /srv/inbox/eas). Links are refused.",
+          "type": "string"
+        },
+        "content_base64": {
+          "description": "Instead of path: the file's bytes as standard base64, only as a script that read the file wrote them, never typed. Needs sha256.",
+          "type": "string"
+        },
+        "sha256": {
+          "description": "Hex SHA-256 of the source file, as sha256sum prints it. Required with content_base64, checked with path.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "project": {
+          "type": "string"
+        },
+        "source": {
+          "anyOf": [
+            {
+              "type": "object",
+              "properties": {
+                "workflow": {
+                  "type": "string"
+                },
+                "gitRef": {
+                  "type": "string"
+                },
+                "commit": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "workflow",
+                "gitRef",
+                "commit"
+              ],
+              "additionalProperties": false
+            },
+            {
+              "type": "object",
+              "properties": {
+                "file": {
+                  "type": "string"
+                },
+                "sha256": {
+                  "type": "string"
+                },
+                "size": {
+                  "type": "integer",
+                  "minimum": -9007199254740991,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "file",
+                "sha256",
+                "size"
+              ],
+              "additionalProperties": false
+            }
+          ]
+        },
+        "valid": {
+          "type": "boolean"
+        },
+        "issues": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "jobs": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "type": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "needs": {
+                "type": "array",
+                "items": {
+                  "type": "string"
+                }
+              }
+            },
+            "required": [
+              "key",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "builds": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "key": {
+                "type": "string"
+              },
+              "platform": {
+                "type": "string"
+              },
+              "profile": {
+                "type": "string"
+              },
+              "conditional": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "key",
+              "platform",
+              "profile",
+              "conditional"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "project",
+        "source",
+        "valid",
+        "issues"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "wait_for_run",
+    "title": "Wait for a run or a build",
+    "description": "Wait until a workflow run or a build ends (give run or build), looking every 15 s, and answer as get_workflow_run or get_build would then: the outcome and, when it failed, the reason. While it waits, a client that asks for progress hears where it stands (jobs done, the job running). A run that waits for someone's approval, or one still going after minutes, answers done: false with its state; cancelling the call only stops the waiting, never the run.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "run": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A workflow run id, from dispatch_workflow or list_workflow_runs."
+        },
+        "build": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A build id, from list_builds or a run's build job."
+        },
+        "minutes": {
+          "default": 10,
+          "description": "How long to wait at most (a request over HTTP is cut at 15 minutes by default); call again to keep waiting.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 14
+        },
+        "lines": {
+          "default": 0,
+          "description": "How many of a step's last log lines to include (0: none).",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 500
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

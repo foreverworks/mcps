@@ -1,0 +1,11 @@
+{
+  "case": "outside-scope",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "bbcb9748f3ac3fb96171afa817ddf3b79d338685799727e62791293fe90a2be4",
+  "bytes": 3455,
+  "answer": {
+    "stare": "ok",
+    "trace_id": "8df42276-a6e8-469e-94a1-851b16531beb"
+  }
+}

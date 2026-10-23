@@ -1,0 +1,781 @@
+[
+  {
+    "name": "ask",
+    "title": "Ask Jev",
+    "description": "Ask TypeSafe's Jev, a System One model, typed questions about one state and get calibrated answers: a `noul` is the probability that a yes/no statement holds, a `choice` picks one of your options with a probability each, a `score` places the state on your ordered levels. Jev writes no text and does no multi-step reasoning: use it for fast, narrow judgments (routing, triage, relevance, a policy check) whose probabilities you then threshold. One narrow judgment per question; a no-match option where nothing may fit. A probability near 0.5 means undecided, not medium. About 0.5 s a call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "state": {
+          "anyOf": [
+            {
+              "type": "string"
+            },
+            {
+              "type": "object",
+              "propertyNames": {
+                "type": "string"
+              },
+              "additionalProperties": {}
+            },
+            {
+              "type": "array",
+              "items": {}
+            }
+          ],
+          "description": "What is judged: text, or JSON with named fields (a record, a thread, a posting with its metadata) the questions can point at, e.g. `posting.location`."
+        },
+        "questions": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "noul"
+                  },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The judgment, stated in full (question ids never reach the model). An object may hold the question in one field and data it refers to in others, pointed at in backticks."
+                  },
+                  "criteria": {
+                    "description": "What a yes and a no mean, when the question alone leaves room.",
+                    "type": "object",
+                    "properties": {
+                      "true": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          {
+                            "type": "array",
+                            "items": {}
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "false": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          {
+                            "type": "array",
+                            "items": {}
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "instructions"
+                ],
+                "description": "Yes/no: answered with the probability that the answer is yes."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "choice"
+                  },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The judgment, stated in full (question ids never reach the model). An object may hold the question in one field and data it refers to in others, pointed at in backticks."
+                  },
+                  "criteria": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "array",
+                          "items": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "description": "Option -> what it means (null when the name says it all). Include a \"none\" option when nothing may fit."
+                  }
+                },
+                "required": [
+                  "type",
+                  "instructions",
+                  "criteria"
+                ],
+                "description": "One of a defined set: the pick, a probability per option, and a confidence."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "score"
+                  },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The judgment, stated in full (question ids never reach the model). An object may hold the question in one field and data it refers to in others, pointed at in backticks."
+                  },
+                  "criteria": {
+                    "minItems": 2,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "array",
+                          "items": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "description": "Ordered levels, lowest first, each a concrete situation that stands on its own."
+                  }
+                },
+                "required": [
+                  "type",
+                  "instructions",
+                  "criteria"
+                ],
+                "description": "A degree on your ordered levels: a probability-weighted value from 0 (can land between levels), per-level probabilities, a confidence."
+              }
+            ]
+          },
+          "description": "Your question id -> question. Every independent judgment about the same state goes in one call: they run together and cannot see each other."
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "A model from health. Default: the server's, jev-latest."
+        }
+      },
+      "required": [
+        "state",
+        "questions"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "ask_batch",
+    "title": "Ask Jev over many states",
+    "description": "The same questions over up to 1000 states, several requests at a time: triage postings, transactions, emails or passages without reading them all yourself. Replies with a summary per question (choice: counts; noul: mean and how many are >= 0.7 and <= 0.3; score: mean, min, max) and each row's compact answers (a noul's probability, a choice's pick and confidence, a score and its confidence). For a large batch pass list 'none' or 'failed' with save true: every row's full answers go to a JSONL file in the outbox and the reply names it with its sha256 and size. A row that fails is reported and the rest go on. Rows already in a file go as items_file, not typed into items: that keeps them out of your context and exactly as written. thresholds turn each answer into act, review or abstain; where lists only the rows that meet conditions, top only the k highest by a question, and counts tallies the answers (and verdicts) of the rows where keeps: over a large batch they keep the reply to the rows that matter. A client that asks for progress hears the rows done; cancelling stops the rows not yet asked.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "items": {
+          "description": "The rows, typed into the call. Give items or items_file.",
+          "minItems": 1,
+          "maxItems": 1000,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "description": "Names the row in the answer. Default: its index, allowed only up to 20 rows.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "state": {
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {}
+                  },
+                  {
+                    "type": "array",
+                    "items": {}
+                  }
+                ],
+                "description": "What is judged: text, or JSON with named fields (a record, a thread, a posting with its metadata) the questions can point at, e.g. `posting.location`."
+              }
+            },
+            "required": [
+              "state"
+            ]
+          }
+        },
+        "items_file": {
+          "description": "The rows as a UTF-8 file instead of items: JSONL, one {\"id\", \"state\"} object per line, or one JSON array of them; at most 1000, every row with an id above 20. The reply names its sha256 and size. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/typesafe-inbox and give its path, or have a script that read the file send content_base64 with its sha256.",
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "A path: a file in /srv/typesafe-inbox (copy it there with cp; a bare name is taken from /srv/typesafe-inbox). Links are refused.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The bytes as standard base64, only as a script that read the file wrote them, never typed. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file, as sha256sum prints it. Required with content_base64, checked with path.",
+              "type": "string"
+            }
+          }
+        },
+        "questions": {
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "additionalProperties": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "noul"
+                  },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The judgment, stated in full (question ids never reach the model). An object may hold the question in one field and data it refers to in others, pointed at in backticks."
+                  },
+                  "criteria": {
+                    "description": "What a yes and a no mean, when the question alone leaves room.",
+                    "type": "object",
+                    "properties": {
+                      "true": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          {
+                            "type": "array",
+                            "items": {}
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      },
+                      "false": {
+                        "anyOf": [
+                          {
+                            "type": "string"
+                          },
+                          {
+                            "type": "object",
+                            "propertyNames": {
+                              "type": "string"
+                            },
+                            "additionalProperties": {}
+                          },
+                          {
+                            "type": "array",
+                            "items": {}
+                          },
+                          {
+                            "type": "null"
+                          }
+                        ]
+                      }
+                    }
+                  }
+                },
+                "required": [
+                  "type",
+                  "instructions"
+                ],
+                "description": "Yes/no: answered with the probability that the answer is yes."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "choice"
+                  },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The judgment, stated in full (question ids never reach the model). An object may hold the question in one field and data it refers to in others, pointed at in backticks."
+                  },
+                  "criteria": {
+                    "type": "object",
+                    "propertyNames": {
+                      "type": "string"
+                    },
+                    "additionalProperties": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "array",
+                          "items": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "description": "Option -> what it means (null when the name says it all). Include a \"none\" option when nothing may fit."
+                  }
+                },
+                "required": [
+                  "type",
+                  "instructions",
+                  "criteria"
+                ],
+                "description": "One of a defined set: the pick, a probability per option, and a confidence."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "const": "score"
+                  },
+                  "instructions": {
+                    "anyOf": [
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "type": "object",
+                        "propertyNames": {
+                          "type": "string"
+                        },
+                        "additionalProperties": {}
+                      },
+                      {
+                        "type": "array",
+                        "items": {}
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ],
+                    "description": "The judgment, stated in full (question ids never reach the model). An object may hold the question in one field and data it refers to in others, pointed at in backticks."
+                  },
+                  "criteria": {
+                    "minItems": 2,
+                    "maxItems": 10,
+                    "type": "array",
+                    "items": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "object",
+                          "propertyNames": {
+                            "type": "string"
+                          },
+                          "additionalProperties": {}
+                        },
+                        {
+                          "type": "array",
+                          "items": {}
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "description": "Ordered levels, lowest first, each a concrete situation that stands on its own."
+                  }
+                },
+                "required": [
+                  "type",
+                  "instructions",
+                  "criteria"
+                ],
+                "description": "A degree on your ordered levels: a probability-weighted value from 0 (can land between levels), per-level probabilities, a confidence."
+              }
+            ]
+          },
+          "description": "Your question id -> question. Every independent judgment about the same state goes in one call: they run together and cannot see each other."
+        },
+        "model": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "A model from health. Default: the server's, jev-latest."
+        },
+        "concurrency": {
+          "default": 8,
+          "description": "Requests in flight at once.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 16
+        },
+        "probabilities": {
+          "default": false,
+          "description": "Also list each row's full distribution per choice and score.",
+          "type": "boolean"
+        },
+        "list": {
+          "default": "all",
+          "description": "Which rows the reply lists; the summary always covers every row.",
+          "type": "string",
+          "enum": [
+            "all",
+            "failed",
+            "none"
+          ]
+        },
+        "save": {
+          "default": false,
+          "description": "Also write every row's full answers to the outbox as JSONL.",
+          "type": "boolean"
+        },
+        "thresholds": {
+          "description": "Question id -> thresholds: each row's answer to that question gets a verdict, act, review or abstain, taken on its certainty (a noul's |p - 0.5| x 2, a choice's or a score's confidence, rounded down to three places). The reply echoes them and the summary counts the verdicts.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "additionalProperties": {
+            "type": "object",
+            "properties": {
+              "act_above": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Act on the answer when its certainty is above this."
+              },
+              "review_above": {
+                "type": "number",
+                "minimum": 0,
+                "maximum": 1,
+                "description": "Otherwise a person reviews it when its certainty is above this; below, abstain. At most act_above."
+              }
+            },
+            "required": [
+              "act_above",
+              "review_above"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "where": {
+          "description": "Question id -> condition; the reply lists only the answered rows meeting every one, and says how many matched. E.g. {\"urgent\": true, \"team\": [\"billing\"], \"mood\": {\"min\": 1.5}}. Checked against the questions before any request.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "additionalProperties": {
+            "anyOf": [
+              {
+                "type": "boolean",
+                "description": "A noul: true is a yes (p >= 0.7), false a no (p <= 0.3), as the summary counts them."
+              },
+              {
+                "type": "string",
+                "description": "A choice: its pick is this label."
+              },
+              {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "string"
+                },
+                "description": "A choice: its pick is one of these labels."
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "is": {
+                    "description": "As the shorthands: true/false for a noul, labels for a choice.",
+                    "anyOf": [
+                      {
+                        "type": "boolean"
+                      },
+                      {
+                        "type": "string"
+                      },
+                      {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    ]
+                  },
+                  "min": {
+                    "description": "The row's value at least this: a noul's p, a score, a choice's confidence.",
+                    "type": "number"
+                  },
+                  "max": {
+                    "description": "The row's value at most this.",
+                    "type": "number"
+                  },
+                  "verdict": {
+                    "description": "The question's verdict (it needs thresholds).",
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "act",
+                          "review",
+                          "abstain"
+                        ]
+                      },
+                      {
+                        "minItems": 1,
+                        "type": "array",
+                        "items": {
+                          "type": "string",
+                          "enum": [
+                            "act",
+                            "review",
+                            "abstain"
+                          ]
+                        }
+                      }
+                    ]
+                  }
+                },
+                "additionalProperties": false,
+                "description": "Every part given must hold."
+              }
+            ]
+          }
+        },
+        "top": {
+          "description": "Only the k rows (of those where keeps) with the highest value for one question, highest first.",
+          "type": "object",
+          "properties": {
+            "by": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100,
+              "description": "A noul or score question id: rows are ranked by its p or its score."
+            },
+            "k": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 1000,
+              "description": "How many rows to keep."
+            }
+          },
+          "required": [
+            "by",
+            "k"
+          ],
+          "additionalProperties": false
+        },
+        "counts": {
+          "default": false,
+          "description": "Also tally each question's answers (a noul's yes/no/between, a choice's picks, a score's nearest levels) and verdicts over the rows where keeps.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "questions"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Check that the TypeSafe API key is present and accepted, and list the models it can use. Run this before concluding the MCP is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

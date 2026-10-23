@@ -1,0 +1,295 @@
+[
+  {
+    "name": "get_testflight_crash_log",
+    "title": "Get a TestFlight crash log",
+    "description": "A crash feedback's crash log, saved whole to the server's outbox: the answer gives the file's path, SHA-256 and size, and its first 40 lines.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "submission": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "A crash feedback's id, from list_testflight_feedback."
+        }
+      },
+      "required": [
+        "submission"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether each store's credentials work, and what they reach: the apps the App Store Connect key sees (their bundle ids and Apple ids), and each Play package this server answers for, with one review read. A store without credentials is reported as not configured.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_app_store_reviews",
+    "title": "List App Store reviews",
+    "description": "An app's App Store reviews, newest first unless sorted otherwise: rating, title, text, the reviewer's nickname, the storefront, the date, and the developer's reply with its state (pending until Apple publishes it). Filter by star rating, storefront or whether it has a reply.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "app": {
+          "description": "The app: its bundle id (\"com.example.app\") or its Apple id (digits). Leave it out when the key sees one app (health lists them).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "rating": {
+          "description": "Only these star ratings, e.g. [1, 2].",
+          "minItems": 1,
+          "maxItems": 5,
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 5
+          }
+        },
+        "territory": {
+          "description": "Only reviews from this storefront: Apple's three-letter code, e.g. USA, ROU, GBR.",
+          "type": "string",
+          "pattern": "^[A-Z]{3}$"
+        },
+        "replied": {
+          "description": "true: only reviews with a published reply; false: only those without one.",
+          "type": "boolean"
+        },
+        "sort": {
+          "default": "newest",
+          "type": "string",
+          "enum": [
+            "newest",
+            "oldest",
+            "highest",
+            "lowest"
+          ]
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 200
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, to read on.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_play_reviews",
+    "title": "List Google Play reviews",
+    "description": "A package's Google Play reviews with text, newest first: rating, text, author, language, app version, device, the date, and the developer's reply. Google's API returns only reviews written or changed in the last 7 days; older ones are in Play Console's reports.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "package": {
+          "description": "The Play package, e.g. \"com.example.app\". Leave it out when the server answers for one (health lists them).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, to read on.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        },
+        "translate_to": {
+          "description": "Have Google translate each review into this language, e.g. \"en\".",
+          "type": "string",
+          "pattern": "^[a-z]{2,3}([_-][A-Za-z]{2,4})?$"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_testflight_feedback",
+    "title": "List TestFlight feedback",
+    "description": "What testers sent from the TestFlight app, newest first: screenshot feedback (comment and screenshots, at URLs that expire) and crash feedback (comment; get_testflight_crash_log reads the log), each with the tester's e-mail, device, OS and the build number.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "app": {
+          "description": "The app: its bundle id (\"com.example.app\") or its Apple id (digits). Leave it out when the key sees one app (health lists them).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "kind": {
+          "description": "Only crash feedback or only screenshot feedback. Default: both, merged newest first (page through one kind with its cursor).",
+          "type": "string",
+          "enum": [
+            "crash",
+            "screenshot"
+          ]
+        },
+        "limit": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call of the same kind.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "reply_app_store_review",
+    "title": "Reply to an App Store review",
+    "description": "Publish a reply under an App Store review, in the developer's name and visible to everyone once Apple publishes it: send only text the user approved for this review. A review that already has a different reply is refused unless replace is true; the same text again sends nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "review": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The review's id, from list_app_store_reviews."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5970,
+          "description": "The reply, at most 5970 characters."
+        },
+        "replace": {
+          "default": false,
+          "description": "Put this reply in place of the review's existing one. Without it, a review that already has a different reply is refused.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "review",
+        "text"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "reply_play_review",
+    "title": "Reply to a Google Play review",
+    "description": "Publish a reply under a Google Play review, in the developer's name and visible to everyone: send only text the user approved for this review. A review that already has a different reply is refused unless replace is true; the same text again sends nothing.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "package": {
+          "description": "The Play package, e.g. \"com.example.app\". Leave it out when the server answers for one (health lists them).",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "review": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The review's id, from list_play_reviews."
+        },
+        "text": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 350,
+          "description": "The reply, at most 350 characters (Google's limit)."
+        },
+        "replace": {
+          "default": false,
+          "description": "Put this reply in place of the review's existing one. Without it, a review that already has a different reply is refused.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "review",
+        "text"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  }
+]

@@ -1,0 +1,57 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/enable-banking",
+  "title": "Enable Banking",
+  "description": "MCP server for bank accounts through Enable Banking's PSD2 API",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/enable-banking#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/enable-banking"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/enable-banking/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/enable-banking/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-enable-banking",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ENABLE_BANKING_CONFIG",
+          "description": "Path of app.json: your Enable Banking application's id, its redirect URL and the name of its private key file, as the README describes it.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "ENABLE_BANKING_KEY",
+          "description": "Path of the application's private key (PEM), when app.json does not name it.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

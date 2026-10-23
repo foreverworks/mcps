@@ -1,0 +1,75 @@
+{
+  "name": "@foreverworks/mcp-porkbun",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for Porkbun domains, DNS and hosting: Porkbun's official tools, served with per-client tokens, an audit line per call, purchases marked for the client to confirm, and files uploaded by path",
+  "mcpName": "com.foreverworks/porkbun",
+  "mcp": {
+    "title": "Porkbun",
+    "group": "Domains and brands",
+    "inputs": {
+      "PORKBUN_API_KEY_FILE": {
+        "title": "API key file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding your Porkbun API key (pk1_...)."
+      },
+      "PORKBUN_SECRET_API_KEY_FILE": {
+        "title": "Secret API key file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding your Porkbun secret API key (sk1_...)."
+      },
+      "PORKBUN_OUTBOX_DIR": {
+        "title": "Folder for saved files",
+        "type": "directory",
+        "required": false,
+        "description": "Where the tools that save a file (an SSL bundle, an invoice PDF, a DNS zone export, a new mailbox's password) write it. Without it those tools answer with a configuration error; every other tool works."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "porkbun",
+    "dns",
+    "domains"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/porkbun#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/porkbun"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-porkbun": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "@porkbunllc/mcp-server": "0.52.0",
+    "zod": "^4.6.7"
+  }
+}

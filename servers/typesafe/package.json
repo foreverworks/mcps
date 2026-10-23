@@ -1,0 +1,62 @@
+{
+  "name": "@foreverworks/mcp-typesafe",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for TypeSafe's Jev: typed, calibrated judgments over text or JSON (a yes or no with its probability, one of a set, a score), one at a time or in batches",
+  "mcpName": "com.foreverworks/typesafe",
+  "mcp": {
+    "title": "TypeSafe",
+    "group": "Apps and developer tools",
+    "inputs": {
+      "TYPESAFE_API_KEY_FILE": {
+        "title": "API key file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding your TypeSafe API key."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "typesafe",
+    "classification"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/typesafe#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/typesafe"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-typesafe": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "@typesafe-ai/sdk": "0.7.0",
+    "zod": "^4.6.7"
+  }
+}

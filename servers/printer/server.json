@@ -1,0 +1,55 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/printer",
+  "title": "Printer and scanner",
+  "description": "MCP server for a network printer and its flatbed scanner over IPP Everywhere and eSCL",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/printer#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/printer"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/printer/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/printer/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-printer",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PRINTER_URI",
+          "description": "The printer's IPP address, e.g. ipps://printer.local:443/ipp/print.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "PRINTER_TLS_SHA256",
+          "description": "The printer certificate's SHA-256 fingerprint, for a printer that signs its own certificate.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

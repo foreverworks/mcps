@@ -1,0 +1,11 @@
+{
+  "case": "exempt-non-vat-buyer",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "109f90104e3855f53a9caae7cf840e15cbbd81d7b4bac0389423dd0a27704af8",
+  "bytes": 4130,
+  "answer": {
+    "stare": "ok",
+    "trace_id": "fa25ab89-7fbb-4248-bcd3-e0b4df075fd7"
+  }
+}

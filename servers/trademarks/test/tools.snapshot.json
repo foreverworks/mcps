@@ -1,0 +1,1254 @@
+[
+  {
+    "name": "download_mark_documents",
+    "title": "Save a mark's documents as a PDF",
+    "description": "Saves the documents of a US mark's file that a type code (from mark_documents) and a date window pick, as one PDF in the server's outbox, and answers its path, SHA-256 and size. Without a filter it is the whole file, which for an old mark runs to hundreds of pages. USPTO allows 4 of these a minute.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ],
+          "description": "US: case files come from USPTO's TSDR; other offices say where to read them."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "description": "The USPTO serial number (8 digits), as search_marks lists it."
+        },
+        "type": {
+          "description": "A document type code from mark_documents, e.g. \"OOA\" (an office action).",
+          "type": "string",
+          "pattern": "^[A-Za-z0-9]{2,6}$"
+        },
+        "from": {
+          "description": "Only documents dated on or after this day.",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "to": {
+          "description": "Only documents dated on or before this day.",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        }
+      },
+      "required": [
+        "office",
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "type": {
+          "type": "string"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "path": {
+          "type": "string",
+          "description": "The PDF in the server's outbox"
+        },
+        "sha256": {
+          "type": "string"
+        },
+        "size": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "source",
+        "office",
+        "id",
+        "path",
+        "sha256",
+        "size"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_mark",
+    "title": "One trade mark's details",
+    "description": "One mark by its office and number (as search_marks lists it): status, owners, every class with its goods and services (each cut at 600 characters), the dates the office publishes (filing and registration from both; the status date and expiry from EUIPO only, USPTO's search gives neither), and the office's page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ],
+          "description": "US or EM."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "description": "The office's number: a USPTO serial number (8 digits), an EUIPO application number (9, leading zeros included)."
+        }
+      },
+      "required": [
+        "office",
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "mark": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "registered",
+            "pending",
+            "dead"
+          ]
+        },
+        "statusText": {
+          "type": "string"
+        },
+        "owners": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "classes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "kind": {
+          "type": "string"
+        },
+        "filed": {
+          "type": "string"
+        },
+        "registered": {
+          "type": "string"
+        },
+        "registrationNumber": {
+          "type": "string"
+        },
+        "translation": {
+          "type": "string"
+        },
+        "link": {
+          "type": "string"
+        },
+        "goodsAndServices": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "class": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "cancelled": {
+                "type": "boolean",
+                "const": true
+              },
+              "terms": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "class",
+              "terms"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "expires": {
+          "type": "string"
+        },
+        "statusDate": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "office",
+        "id",
+        "mark",
+        "status",
+        "statusText",
+        "owners",
+        "classes",
+        "link",
+        "goodsAndServices"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Which trademark registers this server can search right now: each source's state (ok, not_configured with what it needs, pending while the register approves access, failing), whether it is an official API, what `similar` means there, and the offices it cannot search with the reason. Run this before concluding the MCP is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean"
+        },
+        "sources": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "official": {
+                    "type": "boolean"
+                  },
+                  "similar": {
+                    "type": "string"
+                  },
+                  "goods_filter": {
+                    "type": "boolean",
+                    "description": "Whether search_marks' goods filter applies here"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "ok"
+                  },
+                  "ms": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "official",
+                  "similar",
+                  "goods_filter",
+                  "state",
+                  "ms"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "official": {
+                    "type": "boolean"
+                  },
+                  "similar": {
+                    "type": "string"
+                  },
+                  "goods_filter": {
+                    "type": "boolean",
+                    "description": "Whether search_marks' goods filter applies here"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "not_configured",
+                      "pending"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "remedy": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "official",
+                  "similar",
+                  "goods_filter",
+                  "state",
+                  "reason",
+                  "remedy"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "official": {
+                    "type": "boolean"
+                  },
+                  "similar": {
+                    "type": "string"
+                  },
+                  "goods_filter": {
+                    "type": "boolean",
+                    "description": "Whether search_marks' goods filter applies here"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "failing"
+                  },
+                  "error": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "remedy": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "official",
+                  "similar",
+                  "goods_filter",
+                  "state",
+                  "error",
+                  "remedy"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        },
+        "records": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "official": {
+                    "type": "boolean"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "ok"
+                  },
+                  "ms": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "official",
+                  "state",
+                  "ms"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "official": {
+                    "type": "boolean"
+                  },
+                  "state": {
+                    "type": "string",
+                    "enum": [
+                      "not_configured",
+                      "pending"
+                    ]
+                  },
+                  "reason": {
+                    "type": "string"
+                  },
+                  "remedy": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "official",
+                  "state",
+                  "reason",
+                  "remedy"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "official": {
+                    "type": "boolean"
+                  },
+                  "state": {
+                    "type": "string",
+                    "const": "failing"
+                  },
+                  "error": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "message"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "remedy": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "official",
+                  "state",
+                  "error",
+                  "remedy"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          },
+          "description": "The sources of status histories and documents"
+        },
+        "uncovered": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "office": {
+                "type": "string",
+                "enum": [
+                  "EM",
+                  "US",
+                  "RO",
+                  "WO"
+                ]
+              },
+              "reason": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "office",
+              "reason"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "ok",
+        "sources",
+        "records",
+        "uncovered"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "mark_documents",
+    "title": "A mark's documents",
+    "description": "The documents in a US mark's file, newest first: each one's date, type code and description (an office action, a specimen, a registration certificate), whether it came in or went out, and its pages, from USPTO's TSDR. download_mark_documents saves the ones picked by type and date.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ],
+          "description": "US: case files come from USPTO's TSDR; other offices say where to read them."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "description": "The USPTO serial number (8 digits), as search_marks lists it."
+        }
+      },
+      "required": [
+        "office",
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "documents": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "description": "The office's type code; download_mark_documents filters on it"
+              },
+              "description": {
+                "type": "string"
+              },
+              "category": {
+                "type": "string",
+                "description": "incoming (filed with the office) or outgoing (sent by it)"
+              },
+              "pages": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "date",
+              "type",
+              "description",
+              "category"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "source",
+        "office",
+        "id",
+        "count",
+        "documents"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "mark_history",
+    "title": "A mark's status history",
+    "description": "Where a US mark stands and every step its file records, newest first (filed, examined, office actions, published, opposed, registered, renewed, abandoned), each with its date and USPTO's code, from USPTO's official TSDR API. Also the status in USPTO's own words with its date and code, and the filing, registration, renewal and abandonment dates.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ],
+          "description": "US: case files come from USPTO's TSDR; other offices say where to read them."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 20,
+          "description": "The USPTO serial number (8 digits), as search_marks lists it."
+        }
+      },
+      "required": [
+        "office",
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "source": {
+          "type": "string"
+        },
+        "office": {
+          "type": "string",
+          "enum": [
+            "EM",
+            "US",
+            "RO",
+            "WO"
+          ]
+        },
+        "id": {
+          "type": "string"
+        },
+        "mark": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "registered",
+            "pending",
+            "dead"
+          ]
+        },
+        "statusText": {
+          "type": "string",
+          "description": "The office's own sentence for where the mark stands"
+        },
+        "statusCode": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "statusDate": {
+          "type": "string"
+        },
+        "category": {
+          "description": "The office's summary, e.g. LIVE/REGISTRATION/Issued and Active",
+          "type": "string"
+        },
+        "filed": {
+          "type": "string"
+        },
+        "registered": {
+          "type": "string"
+        },
+        "registrationNumber": {
+          "type": "string"
+        },
+        "renewed": {
+          "type": "string"
+        },
+        "abandoned": {
+          "type": "string"
+        },
+        "events": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "date": {
+                "type": "string"
+              },
+              "code": {
+                "type": "string"
+              },
+              "description": {
+                "type": "string"
+              },
+              "number": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "date",
+              "code",
+              "description",
+              "number"
+            ],
+            "additionalProperties": false
+          },
+          "description": "Every step the file records, newest first"
+        },
+        "link": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "source",
+        "office",
+        "id",
+        "mark",
+        "status",
+        "statusText",
+        "statusCode",
+        "events",
+        "link"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "search_marks",
+    "title": "Search trademark registers for a name",
+    "description": "Is a name already a registered or pending trade mark? Searches one name in each office at once and answers per office: the marks found, closest first (identical, then containing the name, then similar, the most alike first), each with its status (registered, pending, dead), owners, Nice classes, filing date, a link to the office's page and a similarity score from 0 to 100 computed here the same way for every office (spelling and sound), plus counts per relation; goods narrows to marks whose goods and services hold given words. US is USPTO's register, EM the EU register (EUTMs and international registrations designating the EU). An office that was not searched (no source, no credentials, a failure) says so and why: never read it as clear. Not legal advice: a conflict also depends on goods and services, and no score settles similarity.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100,
+          "description": "The name as it would be written. Case, accents, spaces and punctuation do not make two marks different, but a register finds by words: search a compound spaced too (\"Blue Night\" also finds BLUENIGHT at USPTO; \"Bluenight\" misses BLUE NIGHT)."
+        },
+        "offices": {
+          "description": "EM (EUIPO), US (USPTO), RO (OSIM), WO (WIPO). Default: all of them.",
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "enum": [
+              "EM",
+              "US",
+              "RO",
+              "WO"
+            ]
+          }
+        },
+        "classes": {
+          "description": "Nice classes, e.g. [9, 42] for software and SaaS. Default: every class.",
+          "maxItems": 45,
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 45
+          }
+        },
+        "goods": {
+          "description": "Words that must appear together in a mark's goods and services, e.g. \"computer software\" or \"mobile application\". Applied where the office's source can (US); an office that cannot says goods_filter: unsupported and lists its marks unfiltered.",
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 200
+        },
+        "match": {
+          "default": "similar",
+          "description": "exact: the mark is the name. word: it contains the name. similar (default): also what sounds alike or is a letter off, where the office's source can tell.",
+          "type": "string",
+          "enum": [
+            "exact",
+            "word",
+            "similar"
+          ]
+        },
+        "status": {
+          "default": "live",
+          "description": "live (default): registered and pending marks only. all: dead ones too.",
+          "type": "string",
+          "enum": [
+            "live",
+            "all"
+          ]
+        },
+        "limit": {
+          "default": 20,
+          "description": "Marks listed per office; the counts cover every candidate examined.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string"
+        },
+        "match": {
+          "type": "string",
+          "enum": [
+            "exact",
+            "word",
+            "similar"
+          ]
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "live",
+            "all"
+          ]
+        },
+        "classes": {
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "goods": {
+          "type": "string"
+        },
+        "offices": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "searched": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "found": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "examined": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "more": {
+                    "type": "boolean",
+                    "const": true
+                  },
+                  "goods_filter": {
+                    "description": "Whether this office's marks were filtered by the goods asked for; unsupported: listed unfiltered",
+                    "type": "string",
+                    "enum": [
+                      "applied",
+                      "unsupported"
+                    ]
+                  },
+                  "counts": {
+                    "type": "object",
+                    "properties": {
+                      "identical": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "contains": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "similar": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "required": [
+                      "identical",
+                      "contains",
+                      "similar"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "marks": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "mark": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "registered",
+                            "pending",
+                            "dead"
+                          ]
+                        },
+                        "statusText": {
+                          "type": "string"
+                        },
+                        "owners": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "classes": {
+                          "type": "array",
+                          "items": {
+                            "type": "integer",
+                            "minimum": -9007199254740991,
+                            "maximum": 9007199254740991
+                          }
+                        },
+                        "kind": {
+                          "type": "string"
+                        },
+                        "filed": {
+                          "type": "string"
+                        },
+                        "registered": {
+                          "type": "string"
+                        },
+                        "registrationNumber": {
+                          "type": "string"
+                        },
+                        "translation": {
+                          "type": "string"
+                        },
+                        "link": {
+                          "type": "string"
+                        },
+                        "relation": {
+                          "type": "string",
+                          "enum": [
+                            "identical",
+                            "contains",
+                            "similar"
+                          ]
+                        },
+                        "similarity": {
+                          "description": "0 to 100, how alike the whole marks are written and sound, computed the same way for every office; absent for a mark with no words",
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 100
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "mark",
+                        "status",
+                        "statusText",
+                        "owners",
+                        "classes",
+                        "link",
+                        "relation"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "searched",
+                  "found",
+                  "examined",
+                  "counts",
+                  "marks"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "searched": {
+                    "type": "boolean",
+                    "const": false
+                  },
+                  "reason": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "office",
+                  "searched",
+                  "reason"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "office": {
+                    "type": "string",
+                    "enum": [
+                      "EM",
+                      "US",
+                      "RO",
+                      "WO"
+                    ]
+                  },
+                  "source": {
+                    "type": "string"
+                  },
+                  "searched": {
+                    "type": "boolean",
+                    "const": false
+                  },
+                  "error": {
+                    "type": "object",
+                    "properties": {
+                      "kind": {
+                        "type": "string"
+                      },
+                      "message": {
+                        "type": "string"
+                      },
+                      "remedy": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "kind",
+                      "message",
+                      "remedy"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "required": [
+                  "office",
+                  "source",
+                  "searched",
+                  "error"
+                ],
+                "additionalProperties": false
+              }
+            ]
+          }
+        }
+      },
+      "required": [
+        "name",
+        "match",
+        "status",
+        "offices"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

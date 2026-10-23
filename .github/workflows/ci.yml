@@ -1,0 +1,59 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+# A second push supersedes an in-flight run: nothing here deploys, so there is
+# no reason to finish checking a commit that is already history.
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    # GitHub-hosted. The job needs node and npm only: no docker, no secret.
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix:
+        # The oldest Node the packages accept (engines) and the current LTS.
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          # The release tags, which scripts/access-changes.ts compares against.
+          fetch-depth: 0
+      - uses: actions/setup-node@v7
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+      - run: npm ci
+      # typecheck, then tests, then build, across every workspace, then the
+      # checks that hold the docs and the packages to the code.
+      - run: npm run check
+      # Every tool whose access class changed since the last release is told
+      # in a changeset or the changelog (.changeset/README.md). Needs git, so
+      # it is not part of npm run check.
+      - run: npx tsx scripts/access-changes.ts --check
+
+  bundles:
+    # Every server's desktop bundle, built and checked by the mcpb CLI the
+    # way a release builds it, so a release cannot fail on one. Nothing is
+    # published.
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      - run: npm run build
+      - run: npx tsx scripts/bundle.ts --out bundles

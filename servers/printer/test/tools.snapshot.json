@@ -1,0 +1,388 @@
+[
+  {
+    "name": "calibration",
+    "title": "Print calibration",
+    "description": "The calibration print uses to correct this printer: how many measured patches, from which sheets, how closely the fitted model matches each sheet, and the model itself in a few numbers: the coverage printed for each 10% sent, and the left-right density offset across the page in mid tones.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "calibration_sheet",
+    "title": "Print a calibration sheet",
+    "description": "Print the calibration sheet, uncorrected: 342 grey patches from 2% to 98% across the page, black and paper references in every column, and corner marks to find it in a scan. Then the sheet goes face down on a flatbed, scan scans it, and measure_calibration turns the scan into measured patches. The sheet's layout comes from its name, so keep the name. With dry_run it writes a preview instead of printing. Only on the user's request: this puts paper through a printer. Acts outside the computer: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sheet": {
+          "description": "A name for the sheet (letters, digits, . _ -); default cal-<date>-<time>.",
+          "type": "string",
+          "maxLength": 48
+        },
+        "dry_run": {
+          "default": false,
+          "description": "Write a preview to the outbox, print nothing.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "cancel_job",
+    "title": "Cancel a print job",
+    "description": "Cancel a print job that has not finished, by its number; pages already printed stay printed. Answers the job's state afterwards.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991,
+          "description": "The printer's job number, from print or job."
+        }
+      },
+      "required": [
+        "job_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether this server works: ok unless a setting, the device's certificate or the calibration is wrong. A printer that is switched off or busy is not a failure; it is reported as reachable: false. For the printer's condition (paper, toner, errors) call status.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "job",
+    "title": "Print job",
+    "description": "One print job by its number (from print), with its state (pending, processing, completed, aborted, canceled) and reasons; without a number, the printer's current and recently completed jobs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "job_id": {
+          "description": "The printer's job number.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "limit": {
+          "default": 10,
+          "description": "How many jobs of each kind, without job_id.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "load_calibration",
+    "title": "Load a calibration",
+    "description": "Replace the calibration with a file of measured patches, {\"note\": \"...\", \"points\": [[sheet, sent %, x mm, printed %], ...]}: sent is the coverage sent (0 paper to 100 black), x the patch centre from the left paper edge, printed the coverage measured on paper. Checks it, fits the model to it and answers the same summary as calibration; the one it replaces is kept beside it.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "a file in /srv/printer/inbox (copy it there with cp; a bare name is taken from /srv/printer/inbox). Read byte for byte.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The file's bytes as standard base64, as a script that read the file wrote them. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file: required with content_base64, checked with path.",
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            }
+          },
+          "description": "The calibration JSON: { path } or { content_base64, sha256 }. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/printer/inbox and give its path, or have a script that read the file send content_base64 with its sha256."
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "measure_calibration",
+    "title": "Measure a calibration sheet",
+    "description": "Measure a scan of a printed calibration sheet: find it by its marks (askew, off the corner or upside down is fine), read every patch between its column's paper and black, and add the patches to the calibration, which print then corrects with. Answers how far the calibration as it was would have predicted this sheet and the one with it, and the new model in a few numbers. add: false measures without changing anything.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "sheet": {
+          "type": "string",
+          "maxLength": 48,
+          "description": "The name calibration_sheet printed it under."
+        },
+        "scan": {
+          "description": "The path scan answered: a scan this server saved in its outbox.",
+          "type": "string"
+        },
+        "file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "a file in /srv/printer/inbox (copy it there with cp; a bare name is taken from /srv/printer/inbox). Read byte for byte.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The file's bytes as standard base64, as a script that read the file wrote them. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file: required with content_base64, checked with path.",
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            }
+          },
+          "description": "Or a scan from elsewhere, PDF, PNG or JPEG, of the whole sheet at 150 dpi or more: { path } or { content_base64, sha256 }. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/printer/inbox and give its path, or have a script that read the file send content_base64 with its sha256."
+        },
+        "add": {
+          "default": true,
+          "description": "Add the patches to the calibration (default), or only measure.",
+          "type": "boolean"
+        },
+        "replace": {
+          "default": false,
+          "description": "Measure a sheet again whose patches are already in the calibration, replacing them.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "sheet"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "print",
+    "title": "Print a document",
+    "description": "Print a PDF, PNG or JPEG on A4 at 600 dpi in grey, exactly as rendered here: the page becomes the printer's own lossless raster (PWG), corrected for this printer's measured tone response and left-right density when a calibration is loaded, so the printer's driver changes nothing. A PDF page the size of A4 prints at its true size, pixel for pixel; a larger page is rendered to fit, a landscape one turned; an image is fitted to the page. Waits until the printer reports the job finished and answers its state. With dry_run it prints nothing and writes the raster and a preview of each page to the outbox instead: use that to check a document first. Only on the user's request: this puts paper through a printer in someone's home. Acts outside the computer: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "a file in /srv/printer/inbox (copy it there with cp; a bare name is taken from /srv/printer/inbox). Read byte for byte.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The file's bytes as standard base64, as a script that read the file wrote them. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file: required with content_base64, checked with path.",
+              "type": "string"
+            },
+            "filename": {
+              "type": "string"
+            }
+          },
+          "description": "The document: { path } or { content_base64, sha256 }. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/printer/inbox and give its path, or have a script that read the file send content_base64 with its sha256."
+        },
+        "copies": {
+          "default": 1,
+          "description": "Copies, collated (1-20); at most 100 sheets in one call.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 20
+        },
+        "pages": {
+          "description": "PDF pages to print, e.g. \"1-3,5\"; default every page.",
+          "type": "string"
+        },
+        "correction": {
+          "description": "Apply the printer's calibration (default: on when one is loaded). Off sends the greys as the document has them.",
+          "type": "boolean"
+        },
+        "dry_run": {
+          "default": false,
+          "description": "Prepare everything and write it to the outbox, print nothing.",
+          "type": "boolean"
+        },
+        "job_name": {
+          "description": "The name the printer shows for the job; default the file's name.",
+          "type": "string",
+          "maxLength": 120
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "scan",
+    "title": "Scan from the glass",
+    "description": "Scan whatever lies on the scanner's glass (someone must have placed the page) to a PDF or JPEG in the outbox, and answer its path, SHA-256 and size. The resolution, colour and size are checked against what the scanner offers before it starts; status shows them. Only on the user's request. Acts outside the computer: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "resolution": {
+          "default": 300,
+          "description": "Dots per inch; the scanner's own list is in its capabilities (often 75, 150, 300).",
+          "type": "integer",
+          "minimum": 50,
+          "maximum": 1200
+        },
+        "color": {
+          "default": "grey",
+          "type": "string",
+          "enum": [
+            "grey",
+            "colour"
+          ]
+        },
+        "format": {
+          "default": "pdf",
+          "type": "string",
+          "enum": [
+            "pdf",
+            "jpeg"
+          ]
+        },
+        "size": {
+          "default": "a4",
+          "description": "The area scanned from the top-left corner: A4, US Letter, or the whole glass.",
+          "type": "string",
+          "enum": [
+            "a4",
+            "letter",
+            "glass"
+          ]
+        },
+        "intent": {
+          "description": "The scanner's processing intent (Document, TextAndGraphic, Photo, Preview); default Document, Photo for colour.",
+          "type": "string",
+          "maxLength": 40
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "status",
+    "title": "Printer and scanner status",
+    "description": "What the printer and its scanner say now: the printer's state and reasons (out of paper, a jam, toner low, each with its meaning), whether it accepts jobs, its supplies with levels, firmware, the paper it reports loaded and the formats it takes; the scanner's state and recent jobs; and whether a calibration is loaded for the print correction. Each part answers for itself. Call it before print or scan, and to answer any question about the printer's condition.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

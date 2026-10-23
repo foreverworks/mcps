@@ -1,0 +1,63 @@
+{
+  "name": "@foreverworks/mcp-oblio",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for the Oblio invoicing platform: issue invoices and proformas with exact totals, record payments, cancel or reverse invoices, and read clients, products and series",
+  "mcpName": "com.foreverworks/oblio",
+  "mcp": {
+    "title": "Oblio",
+    "group": "Money and accounting",
+    "inputs": {
+      "OBLIO_CONFIG": {
+        "title": "Oblio app.json",
+        "type": "file",
+        "required": true,
+        "description": "Path of app.json: your Oblio login email, API secret and the company's CIF, as the README describes it."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "oblio",
+    "invoicing",
+    "romania"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/oblio#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/oblio"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-oblio": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "health": "node dist/index.js --health",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

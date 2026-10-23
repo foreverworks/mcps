@@ -1,0 +1,64 @@
+{
+  "name": "@foreverworks/mcp-devices",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP device broker for shared Android emulators, iOS simulators, build slots and desktops: lease one, wait in a fair queue, start spares within budgets, and check each host's health",
+  "mcpName": "com.foreverworks/devices",
+  "mcp": {
+    "title": "Device broker",
+    "group": "Apps and developer tools",
+    "inputs": {
+      "DEVICES_CATALOG_FILE": {
+        "title": "Device catalog",
+        "type": "file",
+        "required": true,
+        "description": "Path of the catalog: the hosts and devices this broker leases, as the README describes it."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "android",
+    "ios",
+    "emulator",
+    "simulator",
+    "devices"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/devices#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/devices"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-devices": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

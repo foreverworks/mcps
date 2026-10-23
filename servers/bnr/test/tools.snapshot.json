@@ -1,0 +1,561 @@
+[
+  {
+    "name": "annual_average",
+    "title": "BNR annual average",
+    "description": "BNR's annual average rate for a year, as ANAF converts foreign income in the D212 (\"cursul de schimb mediu anual comunicat de BNR\"): the mean of the twelve monthly averages, each the mean of the month's daily rates, to four places, with the monthly values and their day counts. Not the mean of the daily rates, which differs. A year not over yet answers the months so far with complete: false.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3,
+          "description": "ISO 4217 code: EUR, USD, GBP, CHF, ... (XAU gold, XDR SDR); case ignored."
+        },
+        "year": {
+          "type": "integer",
+          "minimum": 2005,
+          "maximum": 2100,
+          "description": "The calendar year, e.g. 2023."
+        }
+      },
+      "required": [
+        "currency",
+        "year"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "currency": {
+          "type": "string"
+        },
+        "year": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "average": {
+          "type": "string",
+          "pattern": "^-?\\d{1,15}(\\.\\d{1,8})?$",
+          "description": "BNR's exact text, RON per `multiplier` units"
+        },
+        "multiplier": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "warning": {
+          "type": "string"
+        },
+        "complete": {
+          "type": "boolean"
+        },
+        "note": {
+          "type": "string"
+        },
+        "method": {
+          "type": "string"
+        },
+        "months": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "month": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}$"
+              },
+              "average": {
+                "type": "string",
+                "pattern": "^-?\\d{1,15}(\\.\\d{1,8})?$",
+                "description": "BNR's exact text, RON per `multiplier` units"
+              },
+              "days": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "month",
+              "average",
+              "days"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "currency",
+        "year",
+        "average",
+        "multiplier",
+        "complete",
+        "method",
+        "months",
+        "source"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "convert",
+    "title": "Convert to or from RON",
+    "description": "An amount converted to or from RON at BNR's reference rate, computed exactly and rounded once: to RON is amount x rate / multiplier, from RON amount x multiplier / rate. rate_rule picks the fixing: in_force (the day's, or the last banking day's before it, as rate answers) or last_before (the last one strictly before the day, the rule for an invoice in a foreign currency). Answers the result with the rate, its multiplier and the date BNR published it, so the conversion can be stated. One side must be RON; for two other currencies, convert twice.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "amount": {
+          "type": "string",
+          "pattern": "^-?\\d{1,15}(\\.\\d{1,8})?$",
+          "description": "The amount, as a decimal string: \"1250.50\", \"-75\". Never a number."
+        },
+        "from": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3,
+          "description": "The amount's currency: RON, or the currency to convert to RON. ISO 4217; case ignored."
+        },
+        "to": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3,
+          "description": "The currency wanted: RON, or the currency to convert RON to. ISO 4217; case ignored."
+        },
+        "date": {
+          "description": "The day of the conversion, YYYY-MM-DD in Bucharest (an invoice's date, a payment's); default today.",
+          "type": "string"
+        },
+        "rate_rule": {
+          "default": "in_force",
+          "description": "in_force: the rate in force on the day; last_before: the last rate published before the day.",
+          "type": "string",
+          "enum": [
+            "in_force",
+            "last_before"
+          ]
+        },
+        "rounding": {
+          "default": "half-up",
+          "description": "How the result is rounded, once: half-up (halves away from zero, as invoices round) or half-even (banker's).",
+          "type": "string",
+          "enum": [
+            "half-up",
+            "half-even"
+          ]
+        },
+        "places": {
+          "default": 2,
+          "description": "Digits after the point in the result.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 8
+        }
+      },
+      "required": [
+        "amount",
+        "from",
+        "to"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "amount": {
+          "type": "string",
+          "pattern": "^-?\\d{1,15}(\\.\\d{1,8})?$",
+          "description": "The amount converted, as given"
+        },
+        "from": {
+          "type": "string"
+        },
+        "to": {
+          "type": "string"
+        },
+        "result": {
+          "type": "string",
+          "pattern": "^-?\\d+(\\.\\d+)?$",
+          "description": "The converted amount, computed exactly and rounded once"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "rate_rule": {
+          "type": "string",
+          "enum": [
+            "in_force",
+            "last_before"
+          ]
+        },
+        "rate": {
+          "type": "string",
+          "pattern": "^-?\\d{1,15}(\\.\\d{1,8})?$",
+          "description": "BNR's exact text, RON per `multiplier` units"
+        },
+        "multiplier": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "published_on": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "The date of the fixing the conversion used"
+        },
+        "rounding": {
+          "type": "string",
+          "enum": [
+            "half-up",
+            "half-even"
+          ]
+        },
+        "places": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "meaning": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "amount",
+        "from",
+        "to",
+        "result",
+        "date",
+        "rate_rule",
+        "rate",
+        "multiplier",
+        "published_on",
+        "rounding",
+        "places",
+        "meaning",
+        "source"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether BNR's rates can be read now: the date of its latest fixing and how many currencies it carries.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "source": {
+          "type": "string"
+        },
+        "latest_fixing": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "currencies": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "today": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "warning": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "source",
+        "currencies",
+        "today"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "rate",
+    "title": "BNR rate on a day",
+    "description": "The National Bank of Romania's reference rate in force on a day: RON per `multiplier` units of the currency (1, or 100 for HUF, JPY, KRW and a few others), as the exact text BNR published, with published_on, the date of the fixing it is. A weekend, a holiday, or today before BNR publishes (about 13:00 Bucharest) takes the last banking day's fixing. Use it for any EUR/RON or other conversion stated on a date.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "currency": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 3,
+          "description": "ISO 4217 code: EUR, USD, GBP, CHF, ... (XAU gold, XDR SDR); case ignored."
+        },
+        "date": {
+          "description": "The day, YYYY-MM-DD in Bucharest; default today.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "currency"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "currency": {
+          "type": "string"
+        },
+        "date": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "rate": {
+          "type": "string",
+          "pattern": "^-?\\d{1,15}(\\.\\d{1,8})?$",
+          "description": "BNR's exact text, RON per `multiplier` units"
+        },
+        "multiplier": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991
+        },
+        "published_on": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "The date of the fixing this rate is"
+        },
+        "meaning": {
+          "type": "string"
+        },
+        "note": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "currency",
+        "date",
+        "rate",
+        "multiplier",
+        "published_on",
+        "meaning",
+        "source"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "rates",
+    "title": "BNR rates: several currencies, or a window",
+    "description": "BNR's reference rates as series, the exact text BNR published. With date (default today): each currency's rate in force that day, from the day's fixing or the last banking day's before it. With from (and to, default today): every fixing BNR published in the window, oldest first, at most 366 days and 2000 rates a call. Without currencies, every currency BNR published. Each series carries its multiplier (RON per 1, or per 100 for HUF, JPY, KRW and a few others).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "currencies": {
+          "description": "ISO 4217 codes, e.g. [\"EUR\", \"USD\"]; default every currency BNR published.",
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 3,
+            "maxLength": 3,
+            "description": "ISO 4217 code: EUR, USD, GBP, CHF, ... (XAU gold, XDR SDR); case ignored."
+          }
+        },
+        "date": {
+          "description": "One day, YYYY-MM-DD in Bucharest: the rates in force on it. Not with from.",
+          "type": "string"
+        },
+        "from": {
+          "description": "A window's first day, YYYY-MM-DD: every fixing from it to `to`.",
+          "type": "string"
+        },
+        "to": {
+          "description": "A window's last day, included; default today. Only with from.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "ok": {
+          "type": "boolean",
+          "const": true
+        },
+        "date": {
+          "description": "The day asked for: each series holds the rate in force on it",
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "from": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "to": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "series": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "currency": {
+                "type": "string"
+              },
+              "multiplier": {
+                "type": "integer",
+                "minimum": -9007199254740991,
+                "maximum": 9007199254740991
+              },
+              "fixings": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "date": {
+                      "type": "string",
+                      "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                      "description": "The fixing's date"
+                    },
+                    "rate": {
+                      "type": "string",
+                      "pattern": "^-?\\d{1,15}(\\.\\d{1,8})?$",
+                      "description": "BNR's exact text, RON per `multiplier` units"
+                    }
+                  },
+                  "required": [
+                    "date",
+                    "rate"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "currency",
+              "multiplier",
+              "fixings"
+            ],
+            "additionalProperties": false
+          },
+          "description": "One per currency, or per currency and multiplier if BNR changed it within the window"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "How many rates the series hold"
+        },
+        "absent": {
+          "description": "Currencies asked for that BNR published no fixing of in the window",
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "note": {
+          "type": "string"
+        },
+        "source": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "ok",
+        "series",
+        "count",
+        "source"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

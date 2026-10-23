@@ -1,0 +1,64 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/porkbun",
+  "title": "Porkbun",
+  "description": "MCP server for Porkbun domains, DNS and hosting",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/porkbun#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/porkbun"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/porkbun/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/porkbun/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-porkbun",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "PORKBUN_API_KEY_FILE",
+          "description": "Path of a file holding your Porkbun API key (pk1_...).",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "PORKBUN_SECRET_API_KEY_FILE",
+          "description": "Path of a file holding your Porkbun secret API key (sk1_...).",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "PORKBUN_OUTBOX_DIR",
+          "description": "Where the tools that save a file (an SSL bundle, an invoice PDF, a DNS zone export, a new mailbox's password) write it. Without it those tools answer with a configuration error; every other tool works.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

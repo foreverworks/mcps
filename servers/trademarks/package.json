@@ -1,0 +1,74 @@
+{
+  "name": "@foreverworks/mcp-trademarks",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for trademark registers: whether a name is already a registered or pending mark, by office and Nice class (USPTO, EUIPO), and a US mark's history and documents",
+  "mcpName": "com.foreverworks/trademarks",
+  "mcp": {
+    "title": "Trademark search",
+    "group": "Domains and brands",
+    "inputs": {
+      "USPTO_TSDR_API_KEY_FILE": {
+        "title": "USPTO TSDR API key file",
+        "type": "file",
+        "required": false,
+        "description": "For US mark histories and documents: path of a file holding a USPTO TSDR API key."
+      },
+      "EUIPO_CLIENT_ID_FILE": {
+        "title": "EUIPO client id file",
+        "type": "file",
+        "required": false,
+        "description": "For EU marks: path of a file holding the EUIPO app's client id."
+      },
+      "EUIPO_CLIENT_SECRET_FILE": {
+        "title": "EUIPO client secret file",
+        "type": "file",
+        "required": false,
+        "description": "For EU marks: path of a file holding the EUIPO app's client secret."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "trademarks",
+    "uspto",
+    "euipo"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/trademarks#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/trademarks"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-trademarks": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "zod": "^4.6.7"
+  }
+}

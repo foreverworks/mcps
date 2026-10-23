@@ -1,0 +1,79 @@
+{
+  "name": "@foreverworks/mcp-printer",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for a network printer and its flatbed scanner over IPP Everywhere and eSCL: printer status, lossless printing corrected for the printer's measured response, and scanning",
+  "mcpName": "com.foreverworks/printer",
+  "mcp": {
+    "title": "Printer and scanner",
+    "group": "Workspace",
+    "inputs": {
+      "PRINTER_URI": {
+        "title": "Printer address",
+        "type": "text",
+        "required": true,
+        "description": "The printer's IPP address, e.g. ipps://printer.local:443/ipp/print."
+      },
+      "PRINTER_TLS_SHA256": {
+        "title": "Certificate fingerprint",
+        "type": "text",
+        "required": false,
+        "description": "The printer certificate's SHA-256 fingerprint, for a printer that signs its own certificate."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "printer",
+    "ipp",
+    "ipp-everywhere",
+    "airprint",
+    "pwg-raster",
+    "escl",
+    "scanner"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/printer#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/printer"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-printer": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "fast-xml-parser": "^5.11.2",
+    "jpeg-js": "^0.4.4",
+    "pngjs": "^7.0.0",
+    "undici": "^8.12.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/pngjs": "^6.0.5"
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "case": "storno",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "dedc10e6968b46ca44f61a3197acf60d1961a6d01f0da54ff6a4cc4b3942c57e",
+  "bytes": 4257,
+  "answer": {
+    "stare": "ok",
+    "trace_id": "e4fc5cc3-6236-4db2-8e39-b32a389e8a75"
+  }
+}

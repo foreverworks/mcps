@@ -1,0 +1,16 @@
+{
+  "case": "eur-reverse-charge",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "b36adebffeaf93ce9addc9cce35e13d556aa4400e9e2663476cf0cbf7e12b5b4",
+  "bytes": 4564,
+  "answer": {
+    "stare": "nok",
+    "trace_id": "c66a880f-3467-44bf-b026-bd8f7e55b643",
+    "Messages": [
+      {
+        "message": "tipAssert=E; codEroare=ERRIdentif; textEroare=nu a fost identificat cui cumparator"
+      }
+    ]
+  }
+}

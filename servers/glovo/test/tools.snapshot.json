@@ -1,0 +1,243 @@
+[
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Check that the integration is alive: mints a real access token, reads the first page of order history and the newest order's details, and reports the Glovo user id, the latest order, and how many order details are stored locally. Run this before concluding the MCP is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_orders",
+    "title": "List orders",
+    "description": "Past Glovo orders, newest first: store, the app's product summary, listedTotal and a coarse status (finished, canceled, refunded, active). Glovo's list has NO dates: a row carries state, localDate and localTime only when its details are already stored locally. For dates, use get_receipts. Reads 15 orders per call to Glovo, so a rare store filter can take a while.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "store": {
+          "description": "Case-insensitive substring of the store name.",
+          "type": "string"
+        },
+        "status": {
+          "type": "string",
+          "enum": [
+            "active",
+            "finished",
+            "canceled",
+            "refunded"
+          ]
+        },
+        "limit": {
+          "default": 30,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_receipt",
+    "title": "Get receipt",
+    "description": "One order as an itemised receipt: store, vertical (FOOD or Q_COMMERCE), state, delivery time and local date (Europe/Bucharest); every product with quantity, line price, original price and promotion; lines a picker removed or replaced (adjustment); Glovo's price lines verbatim (they sum to the total); the total; and what each payment leg was charged. charged.card is the amount on the bank statement (Apple Pay counts as card, cash does not). Amounts are decimal strings.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "order_id": {
+          "type": "integer",
+          "minimum": -9007199254740991,
+          "maximum": 9007199254740991,
+          "description": "From list_orders."
+        }
+      },
+      "required": [
+        "order_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_receipts",
+    "title": "Get receipts",
+    "description": "Receipts for every order whose delivery (or cancellation) date lies in a range of at most 93 days. Glovo's history has no dates, so this reads each order's details from the newest down until it passes the range: about 1.4 orders per second on a cold store, instant for orders stored after a week. An order Glovo will not return is reported as {partial: true} instead of failing the batch.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "First date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        },
+        "until": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Last date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        },
+        "state": {
+          "description": "Only orders in this state. Only 'delivered' orders were received; a canceled one may still show a card leg.",
+          "type": "string",
+          "enum": [
+            "delivered",
+            "canceled",
+            "in_progress"
+          ]
+        },
+        "detail": {
+          "default": "headline",
+          "description": "'headline' = store, vertical, state, date, total and the card / Glovo credits split. 'full' = the whole receipt: every product with original price, promotion and picker adjustments, Glovo's price lines, payment legs, notices.",
+          "type": "string",
+          "enum": [
+            "headline",
+            "full"
+          ]
+        }
+      },
+      "required": [
+        "since",
+        "until"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "match_card_charges",
+    "title": "Match card charges",
+    "description": "Pair bank card rows with the Glovo orders they paid for, and return each pair with its receipt. Send the rows exactly as the bank booked them, debits negative, each with its currency. A debit pairs with an order when its amount equals the order's CARD leg (the total minus any Glovo credits) and the booking date is 1 day before to 2 days after the UTC date the order was delivered (Glovo keeps no order-placed time); same-amount orders are claimed in time order. Returns matched pairs, debits nothing claimed (not Glovo, or the monthly Prime fee), credits (refunds, which pair with nothing), and card-paid orders inside the charges' date span that no charge claimed. On Romanian statements Glovo shows as 'Glovo', 'Glovoappro S.r.l.' or 'Glovo <ddmon> <code>'; 'Glovo Prime' is the subscription.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "charges": {
+          "minItems": 1,
+          "maxItems": 500,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "description": "Your id for the row, e.g. the ledger's transaction id. Echoed back."
+              },
+              "date": {
+                "type": "string",
+                "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+                "description": "Booking date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+              },
+              "amount": {
+                "type": "string",
+                "pattern": "^\\s*-?\\d{1,15}(?:[.,]\\d{1,2})?\\s*$",
+                "description": "Decimal with its sign, as booked: a debit is negative ('-42.50' or '-42,50'). A positive amount is a credit, such as a refund: it is listed under credits and pairs with no order."
+              },
+              "currency": {
+                "type": "string",
+                "pattern": "^[A-Za-z]{3}$",
+                "description": "ISO 4217 code as booked, e.g. 'EUR'."
+              }
+            },
+            "required": [
+              "id",
+              "date",
+              "amount",
+              "currency"
+            ]
+          }
+        },
+        "detail": {
+          "default": "headline",
+          "description": "'headline' = store, vertical, state, date, total and the card / Glovo credits split. 'full' = the whole receipt: every product with original price, promotion and picker adjustments, Glovo's price lines, payment legs, notices.",
+          "type": "string",
+          "enum": [
+            "headline",
+            "full"
+          ]
+        }
+      },
+      "required": [
+        "charges"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "search_items",
+    "title": "Search items",
+    "description": "Every product ever ordered, grouped by store and name, most-ordered first: times ordered, quantity, total spent, first and last date, latest line price. Delivered orders only; removed lines excluded. Needs every order's details: without `since`, the first run on a cold store reads the whole history (minutes for a long history: about 1.4 orders per second at Glovo's safe pace); later runs read the local store.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Case-insensitive substring of the product name. Omit to rank everything.",
+          "type": "string"
+        },
+        "since": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "First date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        },
+        "until": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Last date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        },
+        "top": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "export_items",
+    "title": "Export items",
+    "description": "Write one CSV row per product line (every state, with order id, date, store, vertical, prices, promotion, options, adjustment) to the server's exports directory and return its path, SHA-256 and size. Needs every order's details: without `since`, the first run on a cold store reads the whole history (minutes for a long history: about 1.4 orders per second at Glovo's safe pace); later runs read the local store.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "First date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        },
+        "until": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Last date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "order_stats",
+    "title": "Order statistics",
+    "description": "What delivered orders cost, per store and per month: orders, paid (every payment leg: card, Glovo credit, cash, other), card (what the bank statement shows) and the average per order, exact decimals, per currency. byStore lists the stores paid the most (null when Glovo gave no name); refunds are not subtracted. Without dates it covers the whole history. Needs every order's details: without `since`, the first run on a cold store reads the whole history (minutes for a long history: about 1.4 orders per second at Glovo's safe pace); later runs read the local store.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "since": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "First date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        },
+        "until": {
+          "type": "string",
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+          "description": "Last date, YYYY-MM-DD, as a calendar date in Europe/Bucharest (inclusive)."
+        },
+        "top": {
+          "default": 20,
+          "description": "How many stores byStore lists, the most paid first; `stores` counts them all.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  }
+]

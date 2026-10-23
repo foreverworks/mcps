@@ -1,0 +1,75 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/app-stores",
+  "title": "App Store and Google Play",
+  "description": "MCP server for App Store Connect and Google Play",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/app-stores#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/app-stores"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/app-stores/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/app-stores/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-app-stores",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ASC_KEY_ID",
+          "description": "For the App Store: the App Store Connect API key's id (10 characters).",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "ASC_ISSUER_ID",
+          "description": "For the App Store: the issuer id App Store Connect shows above your team keys.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "ASC_PRIVATE_KEY_FILE",
+          "description": "For the App Store: path of the .p8 key file App Store Connect let you download.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "PLAY_SERVICE_ACCOUNT_FILE",
+          "description": "For Google Play: path of the service account's JSON key.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "PLAY_PACKAGES",
+          "description": "For Google Play: the package names to answer for, comma-separated, e.g. com.example.app.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

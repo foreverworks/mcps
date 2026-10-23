@@ -1,0 +1,77 @@
+{
+  "name": "@foreverworks/mcp-enable-banking",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for bank accounts through Enable Banking's PSD2 API: read and search statements across accounts, export them as CSV, read balances, and manage the consents; it moves no money",
+  "mcpName": "com.foreverworks/enable-banking",
+  "mcp": {
+    "title": "Enable Banking",
+    "group": "Money and accounting",
+    "inputs": {
+      "ENABLE_BANKING_CONFIG": {
+        "title": "Enable Banking app.json",
+        "type": "file",
+        "required": true,
+        "description": "Path of app.json: your Enable Banking application's id, its redirect URL and the name of its private key file, as the README describes it."
+      },
+      "ENABLE_BANKING_KEY": {
+        "title": "Application private key",
+        "type": "file",
+        "required": false,
+        "description": "Path of the application's private key (PEM), when app.json does not name it."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "enable-banking",
+    "psd2",
+    "open-banking",
+    "banking"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/enable-banking#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/enable-banking"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-enable-banking": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "health": "node dist/index.js --health",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "gen:types": "tsx scripts/gen-types.ts",
+    "smoke": "tsx scripts/smoke.ts",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "proper-lockfile": "^4.1.2",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/proper-lockfile": "^4.1.4",
+    "openapi-typescript": "^7.13.0"
+  }
+}

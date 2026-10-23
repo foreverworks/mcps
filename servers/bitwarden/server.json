@@ -1,0 +1,70 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/bitwarden",
+  "title": "Bitwarden",
+  "description": "MCP server for a Bitwarden vault, through the official CLI",
+  "version": "1.0.0",
+  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/bitwarden#readme",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/bitwarden"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/bitwarden/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/bitwarden/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-bitwarden",
+      "version": "1.0.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "BITWARDEN_CLIENT_ID_FILE",
+          "description": "Path of a file holding the account's API key client id.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "BITWARDEN_CLIENT_SECRET_FILE",
+          "description": "Path of a file holding the API key's client secret.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "BITWARDEN_MASTER_PASSWORD_FILE",
+          "description": "Path of a file holding the master password that unlocks the vault.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "BITWARDEN_SERVER",
+          "description": "A self-hosted or EU server, e.g. https://vault.bitwarden.eu. Leave empty for bitwarden.com.",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

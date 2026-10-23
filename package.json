@@ -1,0 +1,56 @@
+{
+  "name": "@foreverworks/mcps",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP servers for Google Workspace, Notion, Romanian e-invoicing and company registers, open banking, invoicing, domains, Expo and more, on one shared toolkit",
+  "type": "module",
+  "workspaces": [
+    "packages/*",
+    "servers/*"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "kit": "npm run build -w @foreverworks/mcp-kit && npm run build -w @foreverworks/receipts",
+    "prebuild": "npm run kit",
+    "pretypecheck": "npm run kit",
+    "pretest": "npm run kit",
+    "build": "npm run build --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present && vitest run --config scripts/vitest.config.ts",
+    "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tsconfig.scripts.json",
+    "check": "npm run typecheck && npm run test && npm run build && npm run check:docs && npm run check:pack",
+    "postbuild": "touch .built",
+    "check:docs": "tsx scripts/check-docs.ts",
+    "check:pack": "tsx scripts/check-pack.ts",
+    "changeset": "changeset",
+    "release:version": "changeset version && npm install --package-lock-only && npm run build && tsx scripts/check-docs.ts --write",
+    "bundle": "tsx scripts/bundle.ts"
+  },
+  "devDependencies": {
+    "@anthropic-ai/mcpb": "^2.1.2",
+    "@changesets/cli": "^3.0.3",
+    "@types/node": "^22.20.5",
+    "tsx": "^4.23.15",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5"
+  },
+  "//": [
+    "overrides: each one raises a transitive dependency whose parent pins a vulnerable version, and no release of the parent allows the fixed one (checked 2026-10-23).",
+    "multer: @bitwarden/cli pins 2.3.0 (GHSA-3pph-fpjx-jg34, fixed in 2.4.0); only its `bw serve` API uses it, which the bitwarden server never runs. Remove once @bitwarden/cli depends on multer >= 2.4.0.",
+    "tmp: external-editor 3.1.0 (its last release) wants tmp ^0.0.33 (GHSA-52f5-9888-hmc6, GHSA-ph9p-34f9-6g65, fixed in 0.2.6); it reaches us through @bitwarden/cli's pinned inquirer 8.2.6 and @anthropic-ai/mcpb's @inquirer/prompts 6. It only calls tmp.tmpNameSync, unchanged in 0.2. Remove once nothing depends on external-editor."
+  ],
+  "overrides": {
+    "@bitwarden/cli": {
+      "multer": "^2.4.0"
+    },
+    "external-editor": {
+      "tmp": "^0.2.6"
+    }
+  },
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git"
+  }
+}

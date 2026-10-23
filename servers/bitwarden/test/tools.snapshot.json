@@ -1,0 +1,549 @@
+[
+  {
+    "name": "check_exposed",
+    "title": "Check a password against breaches",
+    "description": "Whether a login's password appears in Have I Been Pwned's list of passwords seen in data breaches, and how many times. Only the first five hex characters of the password's SHA-1 leave this server (k-anonymity); the password and its full hash never do, and the answer is a count. A count above 0 means the password is known to attackers: rotate it (update_login with rotate_password, then change it on the site). With previous, the password the current one replaced.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item id, from find_logins."
+        },
+        "previous": {
+          "default": false,
+          "description": "Check the password before the current one instead.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "name": {
+          "type": "string"
+        },
+        "username": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "previous": {
+          "type": "boolean",
+          "const": true
+        },
+        "exposed": {
+          "type": "boolean"
+        },
+        "count": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991,
+          "description": "How many times the password was seen in breaches; 0 when it was not"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "username",
+        "exposed",
+        "count"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "create_login",
+    "title": "Create login",
+    "description": "Save a new login. Without `password` or `password_file` a strong one is generated here and stored; nothing returns it, so call get_password when you type it into the signup form. Create the login BEFORE submitting a signup, so the password is never lost. Filed into the collection Agents unless `collection` names another.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "What the account is, e.g. 'GitHub (example-bot)'."
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "The site's URL, e.g. https://github.com/login; its host is what find_logins' url matches."
+        },
+        "username": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "The login name or email the site knows the account by."
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "A password the account already has, exactly as you were given it. Leave it out to have a strong one generated here; a secret that is already in a file goes as password_file instead, so it is never retyped."
+        },
+        "password_file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "A path: a file in /srv/bitwarden-inbox (copy it there with cp; a bare name is taken from /srv/bitwarden-inbox). Links are refused.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The bytes as standard base64, only as a script that read the file wrote them, never typed. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file, as sha256sum prints it. Required with content_base64, checked with path.",
+              "type": "string"
+            }
+          },
+          "description": "A password the account already has, from a file holding just it (one line; a final line ending is dropped): a downloaded key or a generated credential, which is safer read than retyped. Delete the file once the login is saved. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/bitwarden-inbox and give its path, or have a script that read the file send content_base64 with its sha256."
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 12,
+          "maximum": 128,
+          "description": "Length of a generated password. Default 24."
+        },
+        "symbols": {
+          "type": "boolean",
+          "description": "Whether a generated password contains symbols (!@#$%^&*-_=+). Default true; turn off for sites that refuse them."
+        },
+        "notes": {
+          "type": "string",
+          "maxLength": 10000,
+          "description": "Free text kept with the login: recovery codes, security answers, what the account is for."
+        },
+        "totp_secret": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "The site's authenticator key: the base32 secret shown under the 2FA QR code, or the otpauth://totp/ URI it encodes. Store it BEFORE confirming 2FA on the site, then confirm with the code this call returns: the site accepting it proves the key was stored exactly."
+        },
+        "collection": {
+          "description": "A collection name from health. Default: the collection Agents.",
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "create_note",
+    "title": "Create secure note",
+    "description": "Save a secret that is not a login as a new secure note: a service account's key file, an API token, a licence key. Each secret goes in a field of its own, hidden by default, typed (value) or read from a file (file), with no password length limit: up to what Bitwarden stores in a field. Nothing returns the secret: the result names each field with its length, and a file's SHA-256 and size (compare them with the source's). get_field hands a value out; get_login names the fields. Filed into the collection Agents unless `collection` names another. If a call fails without saying whether the note was saved, find_logins by its name before trying again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "What the secret is, e.g. 'Play service account key (example-app)'."
+        },
+        "fields": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "The field's name, which get_field asks for, e.g. 'service account key (JSON)'. Names in one note must differ."
+              },
+              "value": {
+                "description": "The value, typed exactly as you were given it. A secret that is already in a file goes as file instead, so it is never retyped.",
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 3695
+              },
+              "file": {
+                "description": "The value from a file, taken whole and exactly: every line, a final line ending included (a JSON key file, a PEM key, a token). UTF-8 text up to 3695 bytes. Delete the file once the note is saved. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/bitwarden-inbox and give its path, or have a script that read the file send content_base64 with its sha256.",
+                "type": "object",
+                "properties": {
+                  "path": {
+                    "description": "A path: a file in /srv/bitwarden-inbox (copy it there with cp; a bare name is taken from /srv/bitwarden-inbox). Links are refused.",
+                    "type": "string"
+                  },
+                  "content_base64": {
+                    "description": "The bytes as standard base64, only as a script that read the file wrote them, never typed. Needs sha256.",
+                    "type": "string"
+                  },
+                  "sha256": {
+                    "description": "Hex SHA-256 of the source file, as sha256sum prints it. Required with content_base64, checked with path.",
+                    "type": "string"
+                  }
+                }
+              },
+              "hidden": {
+                "default": true,
+                "description": "A hidden field is a secret: get_login names it without its value. Default true; false for a plain detail such as a project id.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "name"
+            ]
+          },
+          "description": "The secrets, one field each, and any plain details beside them."
+        },
+        "notes": {
+          "description": "Plain text anyone reading the note sees (get_login shows it): what the secret is for, where it is used. Never the secret itself.",
+          "type": "string",
+          "maxLength": 7439
+        },
+        "collection": {
+          "description": "A collection name from health. Default: the collection Agents.",
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "name",
+        "fields"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "find_logins",
+    "title": "Find logins",
+    "description": "Search the vault's logins and secure notes (`kind` says which). `search` matches name, username and URL; `url` finds the logins saved for a site (its host, as Bitwarden's autofill matches). Returns ids, names, usernames and URLs, and whether each has a password and an authenticator key, never the secrets themselves. Syncs first, so an item just added in the web vault shows up.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "search": {
+          "description": "Words in the name, username or URL.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "The site's URL, e.g. https://github.com/login; its host is what find_logins' url matches."
+        },
+        "limit": {
+          "default": 20,
+          "description": "Return at most this many; `count` says how many matched.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_field",
+    "title": "Get field",
+    "description": "One custom field's value, hidden ones included, from a login or a secure note: a secret that is not a password, such as a licence key or an API token, kept where a person put it. get_login names an item's fields. Use it only to type or pipe the value where it goes: never write it into a file, a commit, a message, a log or a reply.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item id, from find_logins."
+        },
+        "field": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The field's name as get_login lists it (case does not matter)."
+        }
+      },
+      "required": [
+        "id",
+        "field"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_login",
+    "title": "Get login",
+    "description": "One login or secure note in full except its secrets: name, username, URLs, collections, notes, custom fields (hidden ones by name only) and when the password last changed.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item id, from find_logins."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_password",
+    "title": "Get password",
+    "description": "The login's password, with its username and URLs, for typing into the site. Use it only for that: never write it into a file, a commit, a message, a log or a reply. With `previous`, the password the current one replaced, from the item's history: for when a site refused a rotation that is already stored.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item id, from find_logins."
+        },
+        "previous": {
+          "default": false,
+          "description": "Return the password before the current one instead.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Check that the vault is reachable and unlocked, and say as whom: the account, the server, when it last synced, how many logins it holds, and the organizations and collections it can file into. Run this before concluding the MCP is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "sync",
+    "title": "Sync",
+    "description": "Pull the vault from Bitwarden now. Reads already sync every 30 seconds; this is for right after someone changed something in the web vault.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "totp",
+    "title": "Current 2FA code",
+    "description": "The login's current authenticator (TOTP) code and how many seconds it stays valid, computed from the key stored on the login. If fewer than 5 seconds are left, wait and call again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item id, from find_logins."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "update_login",
+    "title": "Update login",
+    "description": "Change a login: only what is named changes. `rotate_password` generates a new password and stores it at once; change it on the site right after, with get_password, and if the site refuses, get_password with previous: true still has the old one. `url` becomes the first URL and the others stay. `append_notes` adds to the notes (recovery codes, answers) where `notes` replaces them. Set `totp_secret` when you turn on 2FA at a site, before confirming it there: the result carries the current code from the stored key. A different key already on the login is replaced only with `replace_totp`, and kept in a hidden field.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item id, from find_logins."
+        },
+        "name": {
+          "description": "A new name.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "url": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "The site's URL, e.g. https://github.com/login; its host is what find_logins' url matches."
+        },
+        "username": {
+          "type": "string",
+          "maxLength": 500,
+          "description": "The login name or email the site knows the account by."
+        },
+        "password": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 1000,
+          "description": "A password the account already has, exactly as you were given it. Leave it out to have a strong one generated here; a secret that is already in a file goes as password_file instead, so it is never retyped."
+        },
+        "password_file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "A path: a file in /srv/bitwarden-inbox (copy it there with cp; a bare name is taken from /srv/bitwarden-inbox). Links are refused.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The bytes as standard base64, only as a script that read the file wrote them, never typed. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file, as sha256sum prints it. Required with content_base64, checked with path.",
+              "type": "string"
+            }
+          },
+          "description": "A password the account already has, from a file holding just it (one line; a final line ending is dropped): a downloaded key or a generated credential, which is safer read than retyped. Delete the file once the login is saved. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/bitwarden-inbox and give its path, or have a script that read the file send content_base64 with its sha256."
+        },
+        "rotate_password": {
+          "description": "Generate a new password (with `length` and `symbols`).",
+          "type": "boolean"
+        },
+        "length": {
+          "type": "integer",
+          "minimum": 12,
+          "maximum": 128,
+          "description": "Length of a generated password. Default 24."
+        },
+        "symbols": {
+          "type": "boolean",
+          "description": "Whether a generated password contains symbols (!@#$%^&*-_=+). Default true; turn off for sites that refuse them."
+        },
+        "notes": {
+          "description": "Replaces the notes.",
+          "type": "string",
+          "maxLength": 10000
+        },
+        "append_notes": {
+          "description": "Added after the current notes on a new line; nothing is lost.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000
+        },
+        "totp_secret": {
+          "type": "string",
+          "maxLength": 2000,
+          "description": "The site's authenticator key: the base32 secret shown under the 2FA QR code, or the otpauth://totp/ URI it encodes. Store it BEFORE confirming 2FA on the site, then confirm with the code this call returns: the site accepting it proves the key was stored exactly."
+        },
+        "replace_totp": {
+          "description": "Replace a DIFFERENT authenticator key the login already has (or clear it with an empty totp_secret).",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  }
+]

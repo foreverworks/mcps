@@ -1,0 +1,11 @@
+{
+  "case": "ron-standard",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "7b903be4f9daeea7fc224e9952b073a6cbc6e324016077426936c379ccd50ad6",
+  "bytes": 6037,
+  "answer": {
+    "stare": "ok",
+    "trace_id": "5a554a9e-92c8-42c0-b348-e23556640bc0"
+  }
+}

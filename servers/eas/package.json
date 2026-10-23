@@ -1,0 +1,69 @@
+{
+  "name": "@foreverworks/mcp-eas",
+  "version": "1.0.0",
+  "private": true,
+  "description": "MCP server for Expo Application Services: builds, workflow runs with each job's log and why it failed, store submissions with the store's error text, a credentials audit, fingerprints and updates",
+  "mcpName": "com.foreverworks/eas",
+  "mcp": {
+    "title": "Expo Application Services",
+    "group": "Apps and developer tools",
+    "inputs": {
+      "EXPO_TOKEN_FILE": {
+        "title": "Expo token file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding an Expo access token."
+      },
+      "EAS_PROJECT": {
+        "title": "Default project",
+        "type": "text",
+        "required": false,
+        "description": "The project a call means when it names none, as @account/slug."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "expo",
+    "eas",
+    "react-native"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/eas#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/eas"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-eas": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^1.0.0",
+    "yaml": "2.9.1",
+    "zod": "^4.6.7"
+  }
+}

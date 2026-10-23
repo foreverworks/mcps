@@ -1,0 +1,11 @@
+{
+  "case": "usd-export.identified",
+  "recordedOn": "2026-10-23",
+  "endpoint": "https://webservicesp.anaf.ro/prod/FCTEL/rest/validare/FACT1",
+  "sha256": "b4c372517542c36b36485c77c08060902f0cb601bea34cc214cc5e6ff04d6f3a",
+  "bytes": 4320,
+  "answer": {
+    "stare": "ok",
+    "trace_id": "114ab355-dac6-481c-b903-4cf743a0045a"
+  }
+}

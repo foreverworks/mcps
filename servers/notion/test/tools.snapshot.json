@@ -1,0 +1,1416 @@
+[
+  {
+    "name": "list_accounts",
+    "title": "List accounts",
+    "description": "The Notion workspaces this server reaches, by label (one per token file), from the token files alone: no request to Notion. Every other tool finds an id's workspace by itself, so a label is needed only to narrow a search. Says nothing about whether a token works; that is health.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Ask each workspace: is its integration token accepted, which workspace and integration it is, and whether it sees any page at all (a new integration sees nothing until pages are shared with it). One broken workspace never hides the others' answers. Run this before concluding the server is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_users",
+    "title": "List users",
+    "description": "The people (and bots) of every workspace, or of the one account names: each one's id, name, and email when the token may read it. A person column's where takes a name or an email directly, so this is for checking who is who, or for the id when two people share a name.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Words in a name or an email. Leave it out to list everyone.",
+          "type": "string",
+          "minLength": 1
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "users": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "account": {
+                "type": "string"
+              },
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "person",
+                  "bot"
+                ]
+              },
+              "email": {
+                "type": "string"
+              }
+            },
+            "required": [
+              "account",
+              "id",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "failed": {
+          "description": "Workspaces that could not be read, with why",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {
+            "type": "string"
+          }
+        }
+      },
+      "required": [
+        "users"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "search",
+    "title": "Search",
+    "description": "Pages and databases by title, in every workspace at once unless account names one. Notion matches words in titles, not in page bodies. Each hit says its workspace, kind, id and parent; a database hit also carries the dataSourceId of its table. Only what is shared with the workspace's integration can be found. A workspace that fails is listed under failed, beside the others' hits.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "description": "Words in the title. Leave it out to list everything, newest edit first.",
+          "type": "string"
+        },
+        "kind": {
+          "description": "Only pages, or only databases.",
+          "type": "string",
+          "enum": [
+            "page",
+            "database"
+          ]
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        },
+        "limit": {
+          "default": 20,
+          "description": "Hits per workspace; across several workspaces, up to this many from each.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, exactly as it came back, to read on.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "read_page",
+    "title": "Read a page",
+    "description": "One page by id or URL, in whichever workspace has it: its title, parent and properties as plain values (a select is its option's name, a relation its page ids, all of them), and its body as Notion's Markdown. Empty properties are left out. A body past Notion's limit (~20,000 blocks) comes back cut, with contentTruncated and the ids of the parts left out, each readable as a page. A database's id is refused: use describe_database.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "content": {
+          "default": true,
+          "description": "Include the body as Markdown. false reads the properties alone, which is cheaper.",
+          "type": "boolean"
+        },
+        "include_transcript": {
+          "default": false,
+          "description": "For a meeting-notes page, include the transcript.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_page",
+    "title": "Create a page",
+    "description": "A new row in a database, its properties checked against the columns first (an unknown column or option is refused with the ones that exist), a child page under a page, or with no parent a private page at the top of a workspace (a title and a body, no properties). The body is Notion's Markdown. A row can start from one of its database's templates (template): Notion applies it just after the page is made, so read_page a moment later shows what it filled in. Answers the new page's workspace, id and URL. A page is not created twice: if the answer is lost it is outcome_unknown, and search or query_database says whether it exists.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "parent": {
+          "description": "Where it goes: a database (id, URL or dataSourceId) for a new row, or a page for a child page. Leave it out for a private page at the top level of the workspace account names.",
+          "type": "string",
+          "minLength": 1
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "title": {
+          "description": "The title. For a row, this fills the database's title column.",
+          "type": "string"
+        },
+        "properties": {
+          "default": {},
+          "description": "Column name -> value, checked against the database's columns (describe_database). Text and title: a string. Number: a number. Select and status: an existing option's name. Multi-select: a list of names. Date: \"YYYY-MM-DD\", an ISO date-time, or {start, end, time_zone}. Checkbox: true or false. URL, email, phone: a string. Relation: page ids or URLs. Files: external URLs. null clears a column. Computed columns (formula, rollup, created/edited time and by, unique id) cannot be written.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "markdown": {
+          "description": "The body, in Notion's Markdown. Notion takes a leading '# ' heading as the title, so start the body below it.",
+          "type": "string"
+        },
+        "icon": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 16,
+          "description": "An emoji for the page's icon."
+        },
+        "template": {
+          "description": "For a row: \"default\" for the database's default template, or a template's name or id (list_database_templates). Notion fills the row's body and properties from it just after making it; properties given here are kept. Not with markdown.",
+          "type": "string",
+          "minLength": 1
+        },
+        "allow_new_options": {
+          "default": false,
+          "description": "Let a select or multi-select value add an option the column does not have yet. A status can never be added.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "update_page",
+    "title": "Update a page",
+    "description": "Change a page's properties (a row's columns, checked against the database's schema; a page's title as properties: {title: ...}) and its icon. Only the columns named change. Answers the page as read_page does, without the body. The body is changed with append_content, edit_content and replace_content.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "properties": {
+          "default": {},
+          "description": "Column name -> value, as create_page's properties take them; only the columns named change. A page under a page: {title: ...}.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "icon": {
+          "description": "An emoji for the page's icon; null removes it.",
+          "anyOf": [
+            {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 16,
+              "description": "An emoji for the page's icon."
+            },
+            {
+              "type": "null"
+            }
+          ]
+        },
+        "allow_new_options": {
+          "default": false,
+          "description": "Let a select or multi-select value add an option the column does not have yet. A status can never be added.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "move_page",
+    "title": "Move a page",
+    "description": "Under another page, or into a database as a row. Only within the page's own workspace: Notion cannot move a page between workspaces.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "to": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The new parent: a page, or a database (the page becomes a row). Same workspace only."
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "to"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "trash_page",
+    "title": "Trash a page",
+    "description": "Into Notion's trash, with everything under it. Direct deletion of database templates is refused unless allow_template is explicit. Notion keeps trash 30 days; restore_page brings it back.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        },
+        "allow_template": {
+          "default": false,
+          "description": "Explicitly allow removing a database template after checking its role in list_database_templates.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "restore_page",
+    "title": "Restore a page",
+    "description": "Out of Notion's trash, back where it was. Notion's API cannot restore a page from the top level of a workspace (it answers a validation error); that one is restored from the Trash in Notion.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "read_blocks",
+    "title": "Read blocks",
+    "description": "The blocks directly inside a page or a block, in order, one level down: each one's id, type and plain text, and hasChildren when it holds more (read those by its id). An AI meeting-notes block answers its title, status, recording and calendar times, and the ids of the blocks that hold its summary, notes and transcript, each readable here in turn. A type the API does not support says its Notion name under unsupported. For a page's body as one text, read_page is cheaper.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "block": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page or block: its id, or a Notion URL. A URL's #fragment names a block inside the page, and that block is the one read."
+        },
+        "limit": {
+          "default": 100,
+          "description": "Blocks to return; more than 100 are read 100 at a time.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, exactly as it came back, to read on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "block"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "append_content",
+    "title": "Add to a page",
+    "description": "Markdown added to a page's body: at the end (default), at the start, or after a passage. Not resent after a lost answer: that is outcome_unknown, and read_page says whether it went through.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "markdown": {
+          "type": "string",
+          "description": "Notion's Markdown: headings, lists, to-dos (- [ ]), quotes, code, tables, callouts."
+        },
+        "at": {
+          "default": "end",
+          "description": "Where it goes.",
+          "type": "string",
+          "enum": [
+            "end",
+            "start"
+          ]
+        },
+        "after": {
+          "description": "Or after a passage, named \"first words...last words\" as it reads in the page.",
+          "type": "string"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "markdown"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "edit_content",
+    "title": "Edit a page",
+    "description": "Find and replace in a page's body, in its Markdown as read_page shows it. The smallest change that does the job: the rest of the page, its comments and its history stay as they were. Not resent after a lost answer: that is outcome_unknown, and read_page says whether it went through.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "edits": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "old": {
+                "type": "string",
+                "description": "Text to find, exactly as it reads in the page's Markdown (read_page)."
+              },
+              "new": {
+                "type": "string",
+                "description": "What replaces it; empty deletes it."
+              },
+              "all": {
+                "default": false,
+                "description": "Replace every place it appears. Off, a text found twice is refused.",
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "old",
+              "new"
+            ]
+          },
+          "description": "Find-and-replace pairs, applied in order."
+        },
+        "allow_deleting": {
+          "default": false,
+          "description": "Let the change remove child pages or databases inside the page. Off, Notion refuses such a change.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "edits"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "replace_content",
+    "title": "Replace a page's body",
+    "description": "A page's whole body, replaced by this Markdown. Properties are untouched. Child pages and databases in the body are kept unless allow_deleting. An empty body needs clear: true. Answers with the page's title and how many blocks its body held before and after; check both. Prefer edit_content for a change to part of a page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "markdown": {
+          "type": "string",
+          "description": "Notion's Markdown: headings, lists, to-dos (- [ ]), quotes, code, tables, callouts. The page's new body; empty only with clear."
+        },
+        "clear": {
+          "default": false,
+          "description": "Empty the body on purpose, with markdown \"\". Without it an empty markdown is refused, since it would erase the page.",
+          "type": "boolean"
+        },
+        "allow_deleting": {
+          "default": false,
+          "description": "Let the change remove child pages or databases inside the page. Off, Notion refuses such a change.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "markdown"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_database_templates",
+    "title": "List database templates",
+    "description": "The page templates of a database or data source, with their page ids, names and default flags. Use this catalog to distinguish templates from ordinary rows; search can return both. Inspect their pages before editing recurring content. Follow nextCursor when hasMore is true.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The database: its id, its Notion URL, or the dataSourceId search returned for it."
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, exactly as it came back, to read on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "limit": {
+          "default": 100,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "required": [
+        "database"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "describe_database",
+    "title": "Describe a database",
+    "description": "A database's columns: name, type, the options of a select, multi-select or status (with a status's groups), where a relation points, a formula's expression. Read it before writing where, sort or properties: every one of those names these columns. A database holding several tables (data sources) lists each.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The database: its id, its Notion URL, or the dataSourceId search returned for it."
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "query_database",
+    "title": "Query a database",
+    "description": "Rows of a database, filtered by where (checked against the columns first), sorted, with the columns asked for. Each row is its id, its title and its non-empty columns as plain values. A relation lists its first 25 pages here (truncated names it); read_page lists them all. nextCursor reads on; Notion stops one query at 10,000 rows (incomplete says so). Works on the Free plan, unlike the hosted connector's SQL query.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The database: its id, its Notion URL, or the dataSourceId search returned for it."
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "where": {
+          "default": [],
+          "description": "Conditions on the columns, e.g. [{\"property\": \"Status\", \"op\": \"equals\", \"value\": \"In progress\"}]. The column type comes from the schema.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "property": {
+                "description": "A column, by name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "timestamp": {
+                "description": "Or a page's own timestamp.",
+                "type": "string",
+                "enum": [
+                  "created_time",
+                  "last_edited_time"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "minLength": 1,
+                "description": "Text: equals, does_not_equal, contains, does_not_contain, starts_with, ends_with. Number: equals, does_not_equal, greater_than, less_than, greater_than_or_equal_to, less_than_or_equal_to. Checkbox: equals. Select and status: equals, does_not_equal (one option or a list: any of them). Multi-select: contains, does_not_contain. Date: equals, before, after, on_or_before, on_or_after, or with no value this_week, past_week, past_month, past_year, next_week, next_month, next_year. Relation: contains (a page id). People, created by, edited by: contains, does_not_contain (a name, an email, a user id, or \"me\"). Any column: is_empty, is_not_empty."
+              },
+              "value": {
+                "description": "What to compare with. Dates: YYYY-MM-DD, an ISO date-time, or today, tomorrow, yesterday, one_week_ago, one_week_from_now, one_month_ago, one_month_from_now.",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "match": {
+          "default": "all",
+          "description": "Whether a row must meet all the conditions in where, or any of them.",
+          "type": "string",
+          "enum": [
+            "all",
+            "any"
+          ]
+        },
+        "notion_filter": {
+          "description": "Notion's own filter object, for what where cannot say (nested and/or, rollups). ANDed with where when both are given.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "sort": {
+          "default": [],
+          "description": "The order, first key first. Default: Notion's (the database's own order).",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "property": {
+                "description": "A column, by name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "timestamp": {
+                "type": "string",
+                "enum": [
+                  "created_time",
+                  "last_edited_time"
+                ]
+              },
+              "direction": {
+                "default": "ascending",
+                "type": "string",
+                "enum": [
+                  "ascending",
+                  "descending"
+                ]
+              }
+            }
+          }
+        },
+        "properties": {
+          "description": "The columns to return, by name; the title always comes back. Default: all.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limit": {
+          "default": 100,
+          "description": "Rows to return; more than 100 are read 100 at a time.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, exactly as it came back, to read on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "in_trash": {
+          "default": false,
+          "description": "Rows in Notion's trash instead of the live ones.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "count_rows",
+    "title": "Count rows",
+    "description": "How many rows match where, and with by, how many hold each value of one column (\"how many tasks per status\"), most first; an empty value counts as \"(empty)\", and a multi-select row counts once per option. Reads the matching rows without sending them, up to Notion's 10,000 per query.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The database: its id, its Notion URL, or the dataSourceId search returned for it."
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "where": {
+          "default": [],
+          "description": "Conditions on the columns, exactly as query_database's where takes them.",
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "property": {
+                "description": "A column, by name.",
+                "type": "string",
+                "minLength": 1
+              },
+              "timestamp": {
+                "description": "Or a page's own timestamp.",
+                "type": "string",
+                "enum": [
+                  "created_time",
+                  "last_edited_time"
+                ]
+              },
+              "op": {
+                "type": "string",
+                "minLength": 1,
+                "description": "As in query_database's where."
+              },
+              "value": {
+                "description": "As in query_database's where.",
+                "anyOf": [
+                  {
+                    "type": "string"
+                  },
+                  {
+                    "type": "number"
+                  },
+                  {
+                    "type": "boolean"
+                  },
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  }
+                ]
+              }
+            },
+            "required": [
+              "op"
+            ]
+          }
+        },
+        "match": {
+          "default": "all",
+          "description": "Whether a row must meet all the conditions in where, or any of them.",
+          "type": "string",
+          "enum": [
+            "all",
+            "any"
+          ]
+        },
+        "notion_filter": {
+          "description": "Notion's own filter object, for what where cannot say (nested and/or, rollups). ANDed with where when both are given.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "by": {
+          "description": "A column to count by: rows per option, per value, per related page.",
+          "type": "string",
+          "minLength": 1
+        },
+        "in_trash": {
+          "default": false,
+          "description": "Rows in Notion's trash instead of the live ones.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_column",
+    "title": "Add a column",
+    "description": "Add a column to a database: a name it does not have yet, a type, and that type's settings (options, a number's format, a formula's expression, a relation's target). Checked against the table as it is now before anything is sent; answers the column as Notion made it. Renaming and deleting columns are left to Notion's app.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The database: its id, its Notion URL, or the dataSourceId search returned for it."
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "column": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200,
+              "description": "The column's name; one the table does not have yet (case ignored)."
+            },
+            "type": {
+              "type": "string",
+              "enum": [
+                "rich_text",
+                "number",
+                "select",
+                "multi_select",
+                "status",
+                "date",
+                "people",
+                "files",
+                "checkbox",
+                "url",
+                "email",
+                "phone_number",
+                "formula",
+                "relation",
+                "created_time",
+                "created_by",
+                "last_edited_time",
+                "last_edited_by"
+              ],
+              "description": "Its type. Rollups, unique ids and buttons are made in Notion's app."
+            },
+            "options": {
+              "description": "Select, multi-select or status: its options, in order.",
+              "maxItems": 100,
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              }
+            },
+            "format": {
+              "description": "Number: Notion's format name, e.g. number, number_with_commas, percent, euro, dollar.",
+              "type": "string",
+              "minLength": 1
+            },
+            "expression": {
+              "description": "Formula: its expression, e.g. prop(\"Hours\") * prop(\"Rate\").",
+              "type": "string",
+              "minLength": 1
+            },
+            "relation_to": {
+              "description": "Relation: the database it points at (id or URL), in the same workspace. One-way.",
+              "type": "string",
+              "minLength": 1
+            },
+            "description": {
+              "description": "What the column is for, up to 280 characters.",
+              "type": "string",
+              "maxLength": 280
+            }
+          },
+          "required": [
+            "name",
+            "type"
+          ]
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database",
+        "column"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_options",
+    "title": "Add options to a column",
+    "description": "Add options to a select, multi-select or status column (a status option in a group: To-do, In progress, Complete). The options already there are kept and sent back by id, and the column is read back after: an option that went missing fails the call. Names already there are skipped and listed under alreadyThere. For one new option while writing a row, create_page's allow_new_options is enough.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The database: its id, its Notion URL, or the dataSourceId search returned for it."
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "column": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A select, multi-select or status column, by name."
+        },
+        "options": {
+          "minItems": 1,
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "description": "The options to add; one already there is left as it is."
+        },
+        "group": {
+          "description": "Status only: the group the new options go in. Default: To-do.",
+          "type": "string",
+          "enum": [
+            "To-do",
+            "In progress",
+            "Complete"
+          ]
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database",
+        "column",
+        "options"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "create_database",
+    "title": "Create a database",
+    "description": "Create a database under a page, with a title column and the other columns given, each checked against the others before anything is made (and a relation's target found in the same workspace). Answers its id, URL and table. A database is not created twice: if the answer is lost it is outcome_unknown, and search says whether it exists.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "parent": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page it goes under: its id or Notion URL."
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "The database's title."
+        },
+        "title_column": {
+          "default": "Name",
+          "description": "The name of its title column, which every row is known by. Default: Name.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "columns": {
+          "default": [],
+          "description": "Its other columns, as add_column takes one.",
+          "maxItems": 100,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200,
+                "description": "The column's name; one the table does not have yet (case ignored)."
+              },
+              "type": {
+                "type": "string",
+                "enum": [
+                  "rich_text",
+                  "number",
+                  "select",
+                  "multi_select",
+                  "status",
+                  "date",
+                  "people",
+                  "files",
+                  "checkbox",
+                  "url",
+                  "email",
+                  "phone_number",
+                  "formula",
+                  "relation",
+                  "created_time",
+                  "created_by",
+                  "last_edited_time",
+                  "last_edited_by"
+                ],
+                "description": "Its type. Rollups, unique ids and buttons are made in Notion's app."
+              },
+              "options": {
+                "description": "Select, multi-select or status: its options, in order.",
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "format": {
+                "description": "Number: Notion's format name, e.g. number, number_with_commas, percent, euro, dollar.",
+                "type": "string",
+                "minLength": 1
+              },
+              "expression": {
+                "description": "Formula: its expression, e.g. prop(\"Hours\") * prop(\"Rate\").",
+                "type": "string",
+                "minLength": 1
+              },
+              "relation_to": {
+                "description": "Relation: the database it points at (id or URL), in the same workspace. One-way.",
+                "type": "string",
+                "minLength": 1
+              },
+              "description": {
+                "description": "What the column is for, up to 280 characters.",
+                "type": "string",
+                "maxLength": 280
+              }
+            },
+            "required": [
+              "name",
+              "type"
+            ]
+          }
+        },
+        "inline": {
+          "default": false,
+          "description": "Shown inside the page's body rather than as a page of its own.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "parent",
+        "title"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "list_views",
+    "title": "List a database's views",
+    "description": "A database's saved views (table, board, calendar, ...): each one's id, name, type, the table it shows, and the filter and sorts saved in it, in Notion's query grammar with columns by name. Use it to find the view a person means (\"my Open tasks\"), then query_view to read its rows exactly as Notion shows them.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "database": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The database: its id, its Notion URL, or the dataSourceId search returned for it."
+        },
+        "source": {
+          "description": "Which table, only when the database holds several (describe_database lists them): its name or id.",
+          "type": "string"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "database"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "account": {
+          "type": "string"
+        },
+        "database": {
+          "type": "string"
+        },
+        "source": {
+          "description": "The table the views were narrowed to",
+          "type": "string"
+        },
+        "views": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "type": {
+                "type": "string",
+                "description": "table, board, list, calendar, timeline, gallery, form, chart, map or dashboard"
+              },
+              "dataSourceId": {
+                "type": "string"
+              },
+              "url": {
+                "type": "string"
+              },
+              "filter": {
+                "description": "The saved filter, Notion's query grammar, columns by name",
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {}
+              },
+              "sorts": {
+                "type": "array",
+                "items": {}
+              }
+            },
+            "required": [
+              "id",
+              "type"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "account",
+        "database",
+        "views"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    }
+  },
+  {
+    "name": "query_view",
+    "title": "Query a saved view",
+    "description": "The rows a saved view shows, in its order, filtered and sorted exactly as Notion applies the view (quick filters and 'me' included), with total, the number of rows the view holds. Each row is its id, title and non-empty columns as query_database answers them. Notion keeps a view's result about 15 minutes: nextCursor reads on in that same result, and after that a new call without cursor starts again. A view takes no extra filter: for that, query_database with where.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "view": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The view: its id from list_views, or the view's own Notion link (it carries ?v=)."
+        },
+        "properties": {
+          "description": "The columns to keep in each row, by name; the title always comes back. Default: all.",
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "limit": {
+          "default": 25,
+          "description": "Rows to return. Each row is one more request, so read a long view in pages.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, exactly as it came back, to read on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "view"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "upload_file",
+    "title": "Upload a file to a page",
+    "description": "Upload a file to Notion and attach it to a page: to one of a row's files columns, or as a block at the end of the page's body (an image, PDF, video or sound shows as such). The file goes by path, never as text you type. Answers with its size and SHA-256 as sent: compare them with the source. A column's own Notion-hosted files are kept unless the API cannot write them back, which is refused unless replace says so; nothing is uploaded before every check passes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "A path: a file in /srv/notion-inbox (copy it there with cp; a bare name is taken from /srv/notion-inbox). Links are refused.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The bytes as standard base64, only as a script that read the file wrote them, never typed. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file, as sha256sum prints it. Required with content_base64, checked with path.",
+              "type": "string"
+            }
+          },
+          "description": "The file, up to 20 MiB (Notion's Free plan takes 5 MiB a file). Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/notion-inbox and give its path, or have a script that read the file send content_base64 with its sha256."
+        },
+        "column": {
+          "description": "A files column of the row to add it to, after the files already there. Leave it out to put it in a block at the end of the page's body.",
+          "type": "string",
+          "minLength": 1
+        },
+        "name": {
+          "description": "The name Notion shows. Default: the file's own name.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200
+        },
+        "replace": {
+          "default": false,
+          "description": "With column: drop the column's Notion-hosted files, which the API cannot write back. Its external links are always kept.",
+          "type": "boolean"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "file"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "download_files",
+    "title": "Download a page's files",
+    "description": "Save the files Notion hosts for a page to this server's outbox: its files columns and the file blocks of its body (up to 50 MiB each). Answers each file's path, size and SHA-256, and where it was on the page. External links are listed, not fetched. A file that fails is listed with why, beside the others.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "column": {
+          "description": "Only this files column; the body is then left alone.",
+          "type": "string",
+          "minLength": 1
+        },
+        "body": {
+          "default": true,
+          "description": "Also the files in the page's body: file, image, PDF, video and audio blocks, nested ones included.",
+          "type": "boolean"
+        },
+        "save_dir": {
+          "description": "A folder inside the outbox, e.g. \"2026-10/contracts\". Default: a folder named after the page's id.",
+          "type": "string",
+          "minLength": 1
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "get_comments",
+    "title": "Get comments",
+    "description": "The open comments on a page, oldest first, each with its discussion, author, time and text. Resolved ones are not listed by Notion.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "limit": {
+          "default": 50,
+          "description": "Comments per call.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        },
+        "cursor": {
+          "description": "nextCursor from the previous call, exactly as it came back, to read on.",
+          "type": "string",
+          "minLength": 1
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  },
+  {
+    "name": "add_comment",
+    "title": "Add a comment",
+    "description": "A comment on a page, or a reply in one of its discussions, shown in Notion as the workspace's integration. Not resent after a lost answer (outcome_unknown): get_comments says whether it arrived.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "page": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The page: its id, or its Notion URL (a row of a database is a page too)."
+        },
+        "markdown": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The comment, in Markdown."
+        },
+        "discussion": {
+          "description": "A discussionId from get_comments, to reply in that thread. Default: a new comment on the page.",
+          "type": "string"
+        },
+        "account": {
+          "description": "Workspace: a label list_accounts names (\"*\": every one). Rarely needed: an id or URL finds its own.",
+          "type": "string"
+        }
+      },
+      "required": [
+        "page",
+        "markdown"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema"
+    }
+  }
+]

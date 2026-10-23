@@ -1,0 +1,23 @@
+node_modules/
+dist/
+*.tsbuildinfo
+
+# Copied in by scripts/prepack.mjs for `npm pack`; the repo's one LICENSE is at the root.
+/packages/*/LICENSE
+/servers/*/LICENSE
+
+# Credentials never live in this tree: each server reads them from paths its environment names
+# (docs/configuration.md). Belt and braces:
+*credentials*.json
+*client_secret*
+*.pem
+*.key
+.env*
+# Generated test keys and certificates are fixtures, not secrets.
+!**/test/fixtures/**
+
+# Desktop bundles, built by scripts/bundle.ts for a release.
+/bundles/
+
+# Touched by a successful root build, for a deployment that watches it (docs/deploying.md).
+.built
