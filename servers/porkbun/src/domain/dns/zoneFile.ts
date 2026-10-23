@@ -214,9 +214,15 @@ const bytesOf = (raw: string): Buffer => {
   return Buffer.concat(out);
 };
 
-/** BIND's TTL: seconds, or a sum of units (1h30m, 2d, 1w). */
+/**
+ * BIND's TTL: seconds, or a sum of units (1h30m, 2d, 1w). The test reads
+ * digits, then any number of unit-and-digits, then an optional last unit:
+ * one way to read any token, so it takes time in proportion to its length.
+ * (`(\d+[smhdw]?)+` read a run of digits in every way it can be cut, and a
+ * field of 30 zeros and a letter took seconds.)
+ */
 const ttlOf = (token: Token | undefined): number | undefined => {
-  if (token === undefined || token.quoted || !/^(\d+[smhdw]?)+$/i.test(token.raw)) return undefined;
+  if (token === undefined || token.quoted || !/^\d+(?:[smhdw]\d+)*[smhdw]?$/i.test(token.raw)) return undefined;
   const unit: Readonly<Record<string, number>> = { s: 1, m: 60, h: 3600, d: 86400, w: 604800 };
   const parts = [...token.raw.toLowerCase().matchAll(/(\d+)([smhdw]?)/g)];
   return parts.reduce((total, [, n, u]) => total + Number(n) * (unit[u || "s"] as number), 0);

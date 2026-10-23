@@ -158,6 +158,12 @@ describe("parseZone", () => {
     expect(parseZone("   IN A 192.0.2.1\n", "example.com")).toEqual({ ok: false, problems: ["line 1: a record with no owner name before it"] });
     expect(parseZone("x IN A ( 192.0.2.5\n", "example.com")).toEqual({ ok: false, problems: ['line 1: a "(" that never closes'] });
   });
+
+  it("reads a field of many digits and a letter at once: the TTL test has one way to read it", () => {
+    const started = Date.now();
+    expect(parseZone(`www ${"0".repeat(30)}x IN A 192.0.2.1\n`, "example.com")).toMatchObject({ ok: false });
+    expect(Date.now() - started).toBeLessThan(500);
+  });
 });
 
 describe("export_dns_zone", () => {
