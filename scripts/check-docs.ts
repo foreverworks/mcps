@@ -14,7 +14,8 @@
  * 5. Its CHANGELOG.md names every `money` tool, and its package.json says who
  *    it is for (`mcp.audience`), how settled it is (`mcp.maturity`) and what
  *    it does in one sentence (`mcp.tagline`). What follows from those is
- *    written from them (scripts/packaging.ts): its npm keywords, and for a
+ *    written from them (scripts/packaging.ts): its npm keywords, its homepage
+ *    (its page on the site scripts/site.ts builds), and for a
  *    server that ships its `mcpName` and registry entry `server.json`, or for
  *    an extras server `"private": true` and neither.
  * 6. Its icons are the ones scripts/icons.ts draws, and it announces its own.
@@ -41,6 +42,7 @@ import { listServer } from "./listed.js";
 import {
   AUDIENCE,
   AUDIENCES,
+  homepageOf,
   installBlock,
   jsonText,
   keywordsOf,
@@ -51,11 +53,12 @@ import {
   readWorkspaces,
   serverJson,
   shipsOf,
+  SITE,
   type Audience,
   type Manifest,
 } from "./packaging.js";
 import { GLYPHS, iconsDir, iconSvg, PRODUCTS } from "./icons.js";
-import { accessOf, names, toolRows } from "./readme.js";
+import { names, reachLine, toolRows } from "./readme.js";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 const ACCESS_META = "foreverworks.com/access";
@@ -279,15 +282,23 @@ const WRITE = "(npx tsx scripts/check-docs.ts --write)";
  * The fields a server's package.json derives from its audience: its keywords,
  * its registry name (`mcpName`, only for a server that ships; it sits after
  * the description, where a reader looks for what the package is), and, for an
- * extras server, `"private": true` (after the version, where npm puts it).
+ * extras server, `"private": true` (after the version, where npm puts it);
+ * and from its folder its `homepage`, its page on the site.
  */
 const derivedPackage = (pkg: Readonly<Record<string, unknown>>, server: string, audience: Audience): { readonly pkg: Readonly<Record<string, unknown>>; readonly problems: readonly string[] } => {
   const ships = AUDIENCE[audience].ships;
   const current = Array.isArray(pkg["keywords"]) ? pkg["keywords"].filter((k): k is string => typeof k === "string") : [];
   const keywords = keywordsOf(audience, current);
   const mcpName = ships ? mcpNameOf(server) : undefined;
-  const derived = placed(placed(placed(pkg, "keywords", keywords, "mcp"), "mcpName", mcpName, "description"), "private", ships ? pkg["private"] : true, "version");
+  const homepage = homepageOf(server);
+  const derived = placed(
+    placed(placed(placed(pkg, "keywords", keywords, "mcp"), "mcpName", mcpName, "description"), "private", ships ? pkg["private"] : true, "version"),
+    "homepage",
+    homepage,
+    "author",
+  );
   const problems = [
+    ...(pkg["homepage"] === homepage ? [] : [`package.json's homepage should be its page on the site, ${homepage} ${WRITE}`]),
     ...(jsonText(keywords) === jsonText(pkg["keywords"]) ? [] : [`package.json's keywords should be ${keywords.join(", ")}: the base ones, its audience's, then its own ${WRITE}`]),
     ...(pkg["mcpName"] === mcpName
       ? []
@@ -421,17 +432,13 @@ const detailsOf = (description: string): string => {
 };
 
 /** How many tools a server's README lists, and the most a call to one can do. */
-const reachOf = (dir: string): string => {
-  const classes = [...accessOf(readFileSync(join(ROOT, dir, "README.md"), "utf8")).values()];
-  const reach = classes.includes("money") ? "including **money**" : classes.includes("write") ? "read and write" : "read-only";
-  return `${classes.length} tools, ${reach}`;
-};
+const reachOfDir = (dir: string): string => reachLine(readFileSync(join(ROOT, dir, "README.md"), "utf8"));
 
 const capitalised = (word: string): string => `${word.charAt(0).toUpperCase()}${word.slice(1)}`;
 
 /**
- * The root README's servers, from each workspace's package.json: what the
- * maturities mean, then a section per audience, in AUDIENCES order, each
+ * The root README's servers, from each workspace's package.json: where the
+ * site shows them, what the maturities mean, then a section per audience, in AUDIENCES order, each
  * server with its icon, its title, its maturity, how far its tools reach
  * (from its README's tool tables, which check-docs holds to the code) and its
  * tagline; then the shared packages, and which of them are never published.
@@ -448,7 +455,8 @@ const serversTable = (): { readonly table: string; readonly problems: readonly s
   // The icon sits inside the server's link: GitHub links a bare image to its own file, a link
   // with no name for a screen reader when the image is decorative.
   const row = (m: Manifest): string =>
-    `| [<img src="servers/${m.server}/icons/icon.svg" width="20" height="20" alt=""> ${m.title}](servers/${m.server})<br><sub>${capitalised(m.maturity)}<br>${reachOf(`servers/${m.server}`)}</sub> | ${m.tagline.replace(/\|/g, "\\|")} |`;
+    `| [<img src="servers/${m.server}/icons/icon.svg" width="20" height="20" alt=""> ${m.title}](servers/${m.server})<br><sub>${capitalised(m.maturity)}<br>${reachOfDir(`servers/${m.server}`)}</sub> | ${m.tagline.replace(/\|/g, "\\|")} |`;
+  const site = `[${SITE.replace(/^https:\/\//, "").replace(/\/$/, "")}](${SITE}) presents the servers by who they are for, each with its documentation.`;
   const legend = `Under each server's name: how settled it is, then how many tools it has and the most they can do. ${MATURITIES.map((k) => `**${capitalised(k)}**: ${MATURITY[k]}.`).join(" ")}`;
   const sections = AUDIENCES.flatMap((audience) => {
     const members = servers.filter((m) => m.audience === audience);
@@ -458,7 +466,7 @@ const serversTable = (): { readonly table: string; readonly problems: readonly s
   const packages = workspaces
     .filter((w) => w.dir.startsWith("packages/"))
     .map((w) => `| [${w.dir.split("/")[1]}](${w.dir})${w.ships ? "" : "<br><sub>Not published: only extras use it</sub>"} | ${detailsOf(describedOf(w.dir).description)} |`);
-  return { table: [legend, "", ...sections, "## Shared packages", "", "| Package | What it is |", "|---|---|", ...packages].join("\n"), problems: [] };
+  return { table: [site, "", legend, "", ...sections, "## Shared packages", "", "| Package | What it is |", "|---|---|", ...packages].join("\n"), problems: [] };
 };
 
 /** The root README's generated block: a problem, or none (rewritten under --write). */

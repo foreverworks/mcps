@@ -34,8 +34,9 @@ import { fileURLToPath, pathToFileURL } from "node:url";
 
 const ROOT = fileURLToPath(new URL("..", import.meta.url));
 
-const TILE = "#2F4F86";
-const INK = "#F4F6FA";
+/** The tile's blue and the glyph's near-white; the site takes its accent from the tile. */
+export const TILE = "#2F4F86";
+export const INK = "#F4F6FA";
 
 type Glyph = { readonly d: string; readonly fill?: string };
 
@@ -74,6 +75,12 @@ export const PRODUCTS: Readonly<Record<string, Readonly<Record<string, Glyph>>>>
     contacts: { d: "M15.5 8.5a3.5 3.5 0 1 1-7 0 3.5 3.5 0 0 1 7 0z M5 20c.8-3.8 3.6-6 7-6s6.2 2.2 7 6" },
     meet: { d: "M5 7h8.5A1.5 1.5 0 0 1 15 8.5v7a1.5 1.5 0 0 1-1.5 1.5H5a1.5 1.5 0 0 1-1.5-1.5v-7A1.5 1.5 0 0 1 5 7z M15 10.5l5.5-3v9l-5.5-3z" },
   },
+};
+
+/** The repository's own mark (the site's favicon and wordmark): two units of a rack. */
+export const SITE_GLYPH: Glyph = {
+  d: "M5.5 4h13A1.5 1.5 0 0 1 20 5.5v3A1.5 1.5 0 0 1 18.5 10h-13A1.5 1.5 0 0 1 4 8.5v-3A1.5 1.5 0 0 1 5.5 4z M5.5 14h13a1.5 1.5 0 0 1 1.5 1.5v3a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5v-3A1.5 1.5 0 0 1 5.5 14z",
+  fill: "M7 6h2.5v2H7z M7 16h2.5v2H7z",
 };
 
 /** An icon's SVG: the tile, then the glyph. */

@@ -4,7 +4,7 @@
   "title": "Porkbun",
   "description": "Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/porkbun#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/porkbun/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

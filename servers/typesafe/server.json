@@ -4,7 +4,7 @@
   "title": "TypeSafe",
   "description": "Get calibrated yes or no answers, choices and scores from TypeSafe's Jev, for one item or 1000 rows.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/typesafe#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/typesafe/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

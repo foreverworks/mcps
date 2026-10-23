@@ -16,7 +16,8 @@ servers/
                   README.md, CHANGELOG.md, package.json and the server.json
                   made from it
 scripts/          repository checks (check-docs, check-pack, access-changes),
-                  packaging and release (packaging, bundle, release)
+                  packaging and release (packaging, bundle, release), and
+                  the site built from the READMEs (site)
 docs/             this documentation
 ```
 

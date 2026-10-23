@@ -4,7 +4,7 @@
   "title": "ANAF e-Factura",
   "description": "Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/anaf-efactura#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/anaf-efactura/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

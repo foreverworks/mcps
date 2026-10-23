@@ -1,0 +1,52 @@
+name: pages
+
+# Builds the site (scripts/site.ts) from main's package.json files and READMEs
+# and publishes it to GitHub Pages. `npm run check` builds the same site and
+# checks its links, so a change that would break it fails CI before it lands.
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+# One deployment at a time; a newer push waits for the one publishing.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+permissions: {}
+
+jobs:
+  build:
+    # GitHub-hosted. Needs node and npm only: no secret.
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+          cache: npm
+      - run: npm ci
+      # Builds into _site and fails on a link that leads nowhere.
+      - run: npm run check:site
+      - uses: actions/upload-pages-artifact@v5
+        with:
+          path: _site
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Only what publishing to Pages takes: the Pages write, and the OIDC token
+    # deploy-pages proves the build with.
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v5

@@ -14,6 +14,8 @@ document, or commits you in a comparable way, such as a bank consent). Your
 client asks you before each `money` call.
 
 <!-- servers:begin -->
+[foreverworks.github.io/mcps](https://foreverworks.github.io/mcps/) presents the servers by who they are for, each with its documentation.
+
 Under each server's name: how settled it is, then how many tools it has and the most they can do. **Stable**: in daily use, and its tools keep their shape. **Beta**: works and is in use, but is new, still growing, or reads web pages its service may change. **Experimental**: rests on something that can break without notice, or covers only part of the service.
 
 ## For companies in Romania

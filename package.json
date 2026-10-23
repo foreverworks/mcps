@@ -19,10 +19,11 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && vitest run --config scripts/vitest.config.ts",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tsconfig.scripts.json",
-    "check": "npm run typecheck && npm run test && npm run build && npm run check:docs && npm run check:pack",
+    "check": "npm run typecheck && npm run test && npm run build && npm run check:docs && npm run check:pack && npm run check:site",
     "postbuild": "touch .built",
     "check:docs": "tsx scripts/check-docs.ts",
     "check:pack": "tsx scripts/check-pack.ts",
+    "check:site": "tsx scripts/site.ts",
     "changeset": "changeset",
     "release:version": "changeset version && npm install --package-lock-only && npm run build && tsx scripts/check-docs.ts --write",
     "bundle": "tsx scripts/bundle.ts"
@@ -30,7 +31,10 @@
   "devDependencies": {
     "@anthropic-ai/mcpb": "^2.1.2",
     "@changesets/cli": "^3.0.3",
+    "@fontsource-variable/inter": "^5.3.0",
+    "@fontsource-variable/space-grotesk": "^5.3.0",
     "@types/node": "^22.20.5",
+    "marked": "^18.1.1",
     "tsx": "^4.23.15",
     "typescript": "^7.0.2",
     "vitest": "^5.0.5"

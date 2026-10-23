@@ -24,15 +24,15 @@
     "mcp-server",
     "romania",
     "romanian",
-    "anaf",
     "e-factura",
+    "anaf",
     "efactura",
     "e-invoicing",
     "ubl"
   ],
   "license": "MIT",
   "author": "Forever Works",
-  "homepage": "https://github.com/foreverworks/mcps/tree/main/servers/anaf-efactura#readme",
+  "homepage": "https://foreverworks.github.io/mcps/servers/anaf-efactura/",
   "bugs": "https://github.com/foreverworks/mcps/issues",
   "repository": {
     "type": "git",

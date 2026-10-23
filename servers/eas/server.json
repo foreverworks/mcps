@@ -4,7 +4,7 @@
   "title": "Expo Application Services",
   "description": "Find out why an Expo build, workflow run or store submission failed, and roll out updates.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/eas#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/eas/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

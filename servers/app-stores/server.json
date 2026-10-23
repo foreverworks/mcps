@@ -4,7 +4,7 @@
   "title": "App Store and Google Play",
   "description": "Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/app-stores#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/app-stores/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

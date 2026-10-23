@@ -20,6 +20,23 @@ export const toolRows = (readme: string): readonly Row[] =>
 /** Each tool's access class, as the README's tables give it. */
 export const accessOf = (readme: string): ReadonlyMap<string, string> => new Map(toolRows(readme).flatMap((row) => row.tools.map((tool) => [tool, row.access] as const)));
 
+/** The most a call to one of a server's tools can do. */
+export type Reach = "money" | "write" | "read";
+
+/** How many tools a README's tables list, and the most a call to one can do. */
+export const reachOf = (readme: string): { readonly tools: number; readonly reach: Reach } => {
+  const classes = [...accessOf(readme).values()];
+  return { tools: classes.length, reach: classes.includes("money") ? "money" : classes.includes("write") ? "write" : "read" };
+};
+
+const REACH: Readonly<Record<Reach, string>> = { money: "including **money**", write: "read and write", read: "read-only" };
+
+/** That count and reach as the root README and the site say it, in Markdown: "17 tools, including **money**". */
+export const reachLine = (readme: string): string => {
+  const { tools, reach } = reachOf(readme);
+  return `${tools} tools, ${REACH[reach]}`;
+};
+
 /** Whether a text names a tool in backticks, the way a changelog does. */
 export const names = (text: string, tool: string): boolean => text.includes(`\`${tool}\``);
 

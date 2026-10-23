@@ -39,6 +39,11 @@ does not, so on a fresh clone run `npm run kit` once before
   a tracked doc, or a dist file compiled from a tracked source. Every build
   empties `dist/` first (`scripts/clean-dist.mjs`), so a stale checkout cannot
   ship what an earlier layout left behind.
+- `check:site` (`scripts/site.ts`) builds the repository's site into `_site/`
+  from each package.json `mcp` block and each README, which it renders as the
+  documentation, and fails on a link that leads nowhere. The site holds no
+  text of its own about a server, so there is nothing to keep in step with it;
+  `.github/workflows/pages.yml` publishes it from main.
 
 "The tests pass" is not "it works". Each server ships `scripts/smoke.ts`, which
 drives the built server over the real protocol with your credentials (or a
@@ -156,7 +161,7 @@ and the guard in more depth.
    variables, state through the kit's `stateDirOf`, dates through `timeZoneOf`.
 5. Write `scripts/smoke.ts` with the kit's `connectSmoke`.
 6. Write its README from the template below. The root README's list of
-   servers is generated from each package.json (step 7).
+   servers and the site are generated from each package.json (step 7).
 7. Give its `package.json` a `description` for npm (what it serves, then
    after a colon what an assistant can do with it), the `keywords` a person
    would search npm for, and an `mcp` block, the one place that says how the
@@ -185,9 +190,10 @@ and the guard in more depth.
      type becomes.
 
    `npx tsx scripts/check-docs.ts --write` then writes what follows from the
-   block: the keywords every server and its audience carry, and for a server
-   that ships its `mcpName` and its registry entry, `server.json`, or for an
-   extras server `"private": true` and neither. The check fails while any of
+   block: the keywords every server and its audience carry, its `homepage`
+   (its page on the site), and for a server that ships its `mcpName` and its
+   registry entry, `server.json`, or for an extras server `"private": true`
+   and neither. The check fails while any of
    them is stale, and on an audience or maturity it does not know.
 8. Give it a `CHANGELOG.md` whose first entry says, for a person, what it
    does and which of its tools are `money`, and add `CHANGELOG.md` to its

@@ -19,5 +19,8 @@ dist/
 # Desktop bundles, built by scripts/bundle.ts for a release.
 /bundles/
 
+# The site, built by scripts/site.ts for GitHub Pages (.github/workflows/pages.yml).
+/_site/
+
 # Touched by a successful root build, for a deployment that watches it (docs/deploying.md).
 .built

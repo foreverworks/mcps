@@ -20,10 +20,11 @@
  *   }
  *
  * and, written from those by `check-docs --write`: its `keywords` (the base
- * and its audience's first, then its own), and for a server that ships its
- * `mcpName` (`com.foreverworks/<server>`, the registry name npm proves is
- * ours) and `server.json`; an extras server instead says `"private": true`
- * and has neither. Its `description` is npm's, written by hand: what it
+ * and its audience's first, then its own), its `homepage` (its page on the
+ * site, which scripts/site.ts builds from the same fields), and for a
+ * server that ships its `mcpName` (`com.foreverworks/<server>`, the registry
+ * name npm proves is ours) and `server.json`; an extras server instead says
+ * `"private": true` and has neither. Its `description` is npm's, written by hand: what it
  * serves, then what an assistant can do with it.
  *
  * An input's `type` is `file` or `directory` (a path: a credential lives in a
@@ -42,6 +43,15 @@ export const SERVER_SCHEMA = "https://static.modelcontextprotocol.io/schemas/202
 
 /** The registry namespace, proven by a DNS record on foreverworks.com (docs/releasing.md). */
 export const NAMESPACE = "com.foreverworks";
+
+/**
+ * The repository's site (GitHub Pages, built by scripts/site.ts from the same
+ * package.json fields and READMEs): every server's home page is its page there.
+ */
+export const SITE = "https://foreverworks.github.io/mcps/";
+
+/** A server's page on the site: its package.json `homepage`, which check-docs writes. */
+export const homepageOf = (server: string): string => `${SITE}servers/${server}/`;
 
 /** The npm scope every server is published under, as `mcp-<server>`. */
 const SCOPE = "@foreverworks/";
@@ -63,6 +73,8 @@ export type AudienceSpec = {
   readonly heading: string;
   /** What its section says before the table. */
   readonly intro: string;
+  /** One word for it, where a heading has no room: the site's navigation. */
+  readonly label: string;
   /** npm keywords every server of the audience carries, true of each one. */
   readonly keywords: readonly string[];
   /** Whether its servers are published: to npm, to the MCP Registry, as desktop bundles. */
@@ -74,6 +86,7 @@ export const AUDIENCE: Readonly<Record<Audience, AudienceSpec>> = {
     heading: "For companies in Romania",
     intro:
       "The paperwork a company in Romania, and the people who run it, do online: e-invoices and declarations with ANAF, filings at the trade register, invoicing, and the National Bank's exchange rates. Each README ends with the other servers we found for that service, and what this one adds.",
+    label: "Romania",
     keywords: ["romania", "romanian"],
     ships: true,
   },
@@ -81,6 +94,7 @@ export const AUDIENCE: Readonly<Record<Audience, AudienceSpec>> = {
     heading: "For everyone",
     intro:
       "Servers for services people use anywhere. We built each one because the servers we found did less, or there were none; each README's last section names them and says what this one adds.",
+    label: "Everyone",
     keywords: [],
     ships: true,
   },
@@ -88,6 +102,7 @@ export const AUDIENCE: Readonly<Record<Audience, AudienceSpec>> = {
     heading: "Extras",
     intro:
       "These work, and we use them, but each is built for one particular setup or on an app's unofficial API, so they are not published to npm, the MCP Registry or as desktop bundles. Run them from a clone, and read the README first: it says what the server depends on and what can break.",
+    label: "Extras",
     keywords: [],
     ships: false,
   },
@@ -114,6 +129,22 @@ export const BASE_KEYWORDS = ["mcp", "model-context-protocol", "mcp-server"] as 
 export const keywordsOf = (audience: Audience, current: readonly string[]): readonly string[] => {
   const generated = new Set<string>([...BASE_KEYWORDS, ...AUDIENCES.flatMap((a) => AUDIENCE[a].keywords)]);
   return [...new Set([...BASE_KEYWORDS, ...AUDIENCE[audience].keywords, ...current.filter((k) => !generated.has(k))])];
+};
+
+/** GitHub's limit on a repository's topics. */
+export const TOPICS_MAX = 20;
+
+/**
+ * The repository's GitHub topics, which is how a stranger finds it there: the
+ * base keywords, every published audience's, then each published server's
+ * first own keyword, the one that names its service. Extras are left out, as
+ * they are from every listing.
+ */
+export const topicsOf = (manifests: readonly Pick<Manifest, "audience" | "keywords">[]): readonly string[] => {
+  const generated = new Set<string>([...BASE_KEYWORDS, ...AUDIENCES.flatMap((a) => AUDIENCE[a].keywords)]);
+  const published = AUDIENCES.filter((a) => AUDIENCE[a].ships);
+  const own = published.flatMap((a) => manifests.filter((m) => m.audience === a).flatMap((m) => m.keywords.filter((k) => !generated.has(k)).slice(0, 1)));
+  return [...new Set([...BASE_KEYWORDS, ...published.flatMap((a) => AUDIENCE[a].keywords), ...own])];
 };
 
 /** Words a tagline does without (CONTRIBUTING.md, "How we write"). */

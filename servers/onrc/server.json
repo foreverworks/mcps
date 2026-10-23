@@ -4,7 +4,7 @@
   "title": "ONRC trade register",
   "description": "Follow your filings at Romania's trade register, with their documents, fee notes and invoices.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/onrc#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/onrc/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

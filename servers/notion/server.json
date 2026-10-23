@@ -4,7 +4,7 @@
   "title": "Notion",
   "description": "Search, read and write your Notion workspaces, with pages as Markdown and typed database queries.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/notion#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/notion/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

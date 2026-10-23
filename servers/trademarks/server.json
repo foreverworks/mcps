@@ -4,7 +4,7 @@
   "title": "Trademark search",
   "description": "Check whether a name is already a registered or pending trademark in the US or the EU.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/trademarks#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/trademarks/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

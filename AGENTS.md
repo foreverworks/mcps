@@ -23,10 +23,12 @@ npm ci && npm run check
 `check` is typecheck (src, tests and scripts), every test, the build, the docs
 check (`scripts/check-docs.ts`): every server must start with an empty
 environment, list every tool it registers in its README with the right access
-class, and document every variable it reads; and the pack check
+class, and document every variable it reads; the pack check
 (`scripts/check-pack.ts`): what npm would publish for each workspace comes from
-tracked sources and nothing else. If you only ran the tests, you have
-not shown that what is on disk changed.
+tracked sources and nothing else; and the site check (`scripts/site.ts`): the
+site builds from the package.json files and READMEs, and every link in it
+leads somewhere. If you only ran the tests, you have not shown that what is on
+disk changed.
 
 "The tests pass" is not "it works". Each server's `scripts/smoke.ts` drives the
 built server over the real protocol. Where a running service holds the grants

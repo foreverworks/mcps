@@ -4,7 +4,7 @@
   "title": "BNR exchange rates",
   "description": "Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.",
   "version": "0.1.0",
-  "websiteUrl": "https://github.com/foreverworks/mcps/tree/main/servers/bnr#readme",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/bnr/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
     "source": "github",

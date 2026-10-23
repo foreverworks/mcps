@@ -107,7 +107,7 @@ variable below moves a product's part.
 | `GMAIL_DEFAULT_ACCOUNT` | The mailbox a one-mailbox read uses when none is named; default the first listed. |
 | `GMAIL_STATE_DIR` | Gmail's token caches, `<dir>/<label>/`; default `<GOOGLE_STATE_DIR>/gmail/state`. |
 | `GMAIL_ATTACHMENTS_DIR` | Where attachments are saved, `<dir>/<label>/`; default `attachments/` in each mailbox's state folder. |
-| `GMAIL_TIME_ZONE` | The zone a reply's "On <date> ... wrote:" line and a forward's Date line are written in, as Gmail writes them in its reader's zone; default `CALENDAR_TIME_ZONE`, else the process's zone. |
+| `GMAIL_TIME_ZONE` | The zone a reply's "On `<date>` ... wrote:" line and a forward's Date line are written in, as Gmail writes them in its reader's zone; default `CALENDAR_TIME_ZONE`, else the process's zone. |
 | `CALENDAR_ROOT` | Calendar grants, `<root>/<label>/credentials.json` (written by consent); default `<GOOGLE_STATE_DIR>/calendar`. |
 | `CALENDAR_DEFAULT_ACCOUNT` | The account a one-account Calendar read uses; default the first by name. |
 | `DRIVE_CREDENTIALS` | Drive's one grant (written by consent); default `<GOOGLE_STATE_DIR>/drive/credentials.json`. |
