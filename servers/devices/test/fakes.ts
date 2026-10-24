@@ -194,8 +194,8 @@ export const GEAR = (spawnMax = 1): Catalog => ({
   ],
 });
 
-/** What an emulator instance is doing: stopped, booting (adb lists it offline), or a booted device. */
-export type EmulatorState = "stopped" | "booting" | "device";
+/** What an emulator instance is doing: stopped, booting (adb lists it offline), a booted device, or failed (systemd gave up on its unit). */
+export type EmulatorState = "stopped" | "booting" | "device" | "failed";
 
 export type World = {
   android: AndroidHostProbe | "down";
@@ -204,6 +204,8 @@ export type World = {
   /** Watches paired with phones, by UDID. */
   pairs: { watch: string; phone: string }[];
   emulators: Record<string, EmulatorState>;
+  /** systemd's Result for a failed instance, printed after its state by the control command (`timeout`); none prints two columns. */
+  results: Record<string, string>;
   /** A start the control command refuses, e.g. the service behind it missing. */
   startFails: boolean;
   /** Holds every stop until it resolves: a stop takes a while (the snapshot is saved). */
@@ -219,6 +221,7 @@ export const makeWorld = (instances: readonly string[] = EMULATORS): World => ({
   simulators: [{ name: "dev-iphone", udid: "11111111-2222-4333-8444-555555555555", state: "Shutdown" }],
   pairs: [],
   emulators: Object.fromEntries(instances.map((i) => [i, "stopped"])),
+  results: {},
   startFails: false,
   stopGate: undefined,
   calls: [],
@@ -233,7 +236,7 @@ export const bootAll = (world: World): void => {
 
 /** What the control command's `status` says of each instance. */
 const unitStates = (world: World): Record<string, string> =>
-  Object.fromEntries(Object.entries(world.emulators).map(([i, st]) => [i, st === "stopped" ? "inactive" : st === "booting" ? "activating" : "active"]));
+  Object.fromEntries(Object.entries(world.emulators).map(([i, st]) => [i, st === "stopped" ? "inactive" : st === "booting" ? "activating" : st === "failed" ? "failed" : "active"]));
 
 /** The serial an instance runs on: its slot's, whichever of the slot's variants it is. */
 const serialIn = (catalog: Catalog, instance: string): string => catalog.devices.find((d) => instancesOf(d).includes(instance))?.adb?.serial ?? serialOf(instance);
@@ -241,7 +244,8 @@ const serialIn = (catalog: Catalog, instance: string): string => catalog.devices
 export const depsFor = (world: World, catalog: Catalog = CATALOG): Deps => ({
   catalog,
   hosts: {
-    probeAndroid: async () => (world.android === "down" ? fail(hostError("builder@emu-1.example.com", "exit 255: timed out")) : { ...world.android, emulators: unitStates(world) }),
+    probeAndroid: async () =>
+      world.android === "down" ? fail(hostError("builder@emu-1.example.com", "exit 255: timed out")) : { ...world.android, emulators: unitStates(world), results: { ...world.results } },
     probeMac: async () => (world.mac === "down" ? fail(hostError("runner@mac-1.example.com", "exit 255: timed out")) : { ...world.mac, simulators: [...world.simulators] }),
     // As the Mac does it: a simulator of the name is reused, a missing one created (UDIDs ...0001, ...0002 in
     // order of creation), and a watch paired with its phone unless it already is.
@@ -269,12 +273,16 @@ export const depsFor = (world: World, catalog: Catalog = CATALOG): Deps => ({
     startEmulator: async (_host, instance) => {
       if (world.startFails) return fail(hostError("emu-1", "emulator-ctl: no answer from its service"));
       world.calls.push(`start ${instance}`);
-      if (world.emulators[instance] === "stopped") world.emulators[instance] = "booting";
+      // As the host's side does: a failed unit is reset before it starts, so status no longer says failed.
+      if (world.emulators[instance] === "stopped" || world.emulators[instance] === "failed") world.emulators[instance] = "booting";
+      delete world.results[instance];
     },
     stopEmulator: async (_host, instance) => {
       world.calls.push(`stop ${instance}`);
       await world.stopGate;
+      // Stopping a failed unit clears it.
       world.emulators[instance] = "stopped";
+      delete world.results[instance];
     },
     emulatorStates: async () => (world.android === "down" ? fail(hostError("builder@emu-1.example.com", "exit 255: timed out")) : unitStates(world)),
   },
@@ -292,7 +300,7 @@ export const depsFor = (world: World, catalog: Catalog = CATALOG): Deps => ({
   adb: {
     devices: async () =>
       Object.entries(world.emulators)
-        .filter(([, st]) => st !== "stopped")
+        .filter(([, st]) => st === "booting" || st === "device")
         .map(([i, st]) => ({ serial: serialIn(catalog, i), state: st === "device" ? "device" : "offline" })),
     bootCompleted: async (_port, serial) => Object.entries(world.emulators).some(([i, st]) => serialIn(catalog, i) === serial && st === "device"),
     clearUserApps: async (_port, serial) => {

@@ -200,9 +200,9 @@ its own emulators. It must answer three calls:
 
 | Call | Must answer | Deadline |
 |---|---|---|
-| `<control> start <instance>` | Exit 0 once the start is under way; it need not wait for the boot (the broker polls for it). Starting a running instance succeeds. | 90 s |
+| `<control> start <instance>` | Exit 0 once the start is under way; it need not wait for the boot (the broker polls for it). Starting a running instance succeeds. A failed instance is reset first (`systemctl reset-failed`), so `status` never reports a failure from before the start. | 90 s |
 | `<control> stop <instance>` | Exit 0 once the emulator has stopped (saving a snapshot on the way is fine). Stopping a stopped instance succeeds. | 240 s |
-| `<control> status` | Exit 0 and one line per instance, `<instance> <state>`. `active`, `activating`, `deactivating` and `reloading` count as running (and for a `"unit"` probe, `active` must mean booted); anything else (`inactive`, `failed`) is stopped. Lines that do not parse are ignored. Run on every probe, once a minute: keep it cheap. | 20 s |
+| `<control> status` | Exit 0 and one line per instance, `<instance> <state>`, or `<instance> <state> <result>` where `<result>` is systemd's `Result` for a `failed` unit (`timeout`, `oom-kill`, `exit-code`, `signal`). `active`, `activating`, `deactivating` and `reloading` count as running (and for a `"unit"` probe, `active` must mean booted); anything else (`inactive`, `failed`) is stopped, and `failed` ends a lease still waiting for that instance to boot, with the result as its reason. Lines that do not parse are ignored; a command that prints two columns only gives no result. Run on every probe, once a minute: keep it cheap. | 20 s |
 
 A `batocera` instance is a fresh box on every start: `start` boots it from the
 stock image on a new disk (an overlay over the image, say) and `stop` throws
@@ -219,9 +219,13 @@ the reason the broker gives. With one systemd unit per emulator, for example:
 #!/bin/sh
 # /usr/local/bin/emulator-ctl: this host's emulators, one unit each (emulator@phone1, ...).
 case "$1" in
-  start)  exec systemctl --user start --no-block "emulator@$2" ;;
+  start)  systemctl --user reset-failed "emulator@$2" 2>/dev/null
+          exec systemctl --user start --no-block "emulator@$2" ;;
   stop)   exec systemctl --user stop "emulator@$2" ;;
-  status) for i in phone1 phone1api35 phone2; do echo "$i $(systemctl --user is-active "emulator@$i")"; done ;;
+  status) for i in phone1 phone1api35 phone2; do
+            s=$(systemctl --user is-active "emulator@$i")
+            if [ "$s" = failed ]; then echo "$i $s $(systemctl --user show -P Result "emulator@$i")"; else echo "$i $s"; fi
+          done ;;
   *)      echo "usage: $0 start|stop <instance> | status" >&2; exit 2 ;;
 esac
 ```
@@ -256,7 +260,7 @@ stop or reset one.
 |---|---|---|
 | `health` | read | Whether the broker works (catalog loaded, state readable), with each host's last probe; a host that is down is reported, not a fault. |
 | `status` | read | Your tenant's hosts and their health, every device and who holds it, build slots, the queue, recent events; with `session`, your own leases and their addresses. |
-| `acquire` | write | A device (`ios`, `android`, `macos`, `windows`, `batocera`) or a build slot (`builder:ios`, `builder:android`): granted, queued (a ticket) or unavailable (the reason). Takes a `profile`, `maestro`, `minutes` (default 45, 30 for a build slot, at most 240) and `priority` (`interactive`, or `background` for a loop). A started device is `booting`, then `ready`; `until_booted` waits up to that many seconds (10 to 300) for the boot, reporting progress. |
+| `acquire` | write | A device (`ios`, `android`, `macos`, `windows`, `batocera`) or a build slot (`builder:ios`, `builder:android`): granted, queued (a ticket) or unavailable (the reason). Takes a `profile`, `maestro`, `minutes` (default 45, 30 for a build slot, at most 240) and `priority` (`interactive`, or `background` for a loop). A started device is `booting`, then `ready`; `until_booted` waits up to that many seconds (10 to 300) for the boot, reporting progress. A started device whose unit fails before it boots ends its lease, and the session's next `acquire` for that platform answers `failed` with the reason, once. |
 | `wait` | write | Long-polls a ticket for up to 50 s (default 45), reporting your place in the queue; claims the grant when the queue reaches it. |
 | `renew` | write | Extends a lease you hold to now plus `minutes`, at most 4 h after it was granted. |
 | `pause` | write | Hands your device to a person without losing it: the lease holds without your calls for `minutes` (default 60, at most 4 h a call, never past 8 h from the grant), shown as paused with your note, and ends if the pause runs out. Build slots are not paused. |
@@ -308,6 +312,15 @@ ask for something else.
 **`acquire` answers `queued`.** Everything that could serve you is leased,
 resetting, or at its host's `spawn_max`: keep calling `wait` with the ticket.
 
+**`acquire` answers `failed`.** The device the broker started for your lease
+did not boot: its host's control command reported its unit `failed`, and
+`reason` says why in the unit's words
+(`batocera-1 did not start: its unit (bato1) failed (timeout)`). The lease has
+ended and the device is being stopped; acquire again to get a fresh one. It is
+said once, to your session's next `acquire` for that platform within 10
+minutes. A device that fails every time needs a look on its host: `status`'s
+events record each failure.
+
 **A device stays `booting`.** Ask again (`acquire` returns the same lease with
 its state), or pass `until_booted` to wait for the boot in one call.
 
@@ -354,6 +367,17 @@ by hand.
 - **A lease is `booting`** from its grant, which starts the slot, until the
   probe says it has booted (adb lists it as a `device` with
   `sys.boot_completed` set, or its unit is `active`).
+- **A start that fails ends its lease at once.** When a probe begun after the
+  broker started the slot finds the lease's instance `failed` (systemd gave up
+  on it: a start timeout, an out-of-memory kill, the process exiting), the
+  lease ends and the slot is stopped as after any lease, which clears the
+  failed unit. An earlier probe does not count: it can still show the last
+  run's failure. The slot is not quarantined, since a failed start may be
+  transient, and the event log keeps it. The holder's wrapper is still asking
+  `acquire` while it waits for the boot, so the session's next `acquire` for
+  that platform and form, within 10 minutes, answers `failed` with the
+  unit's reason, once, rather than quietly handing it another device;
+  `status` and `wait` leave that answer for it.
 - **After a lease**, an emulator or VM the broker started is always stopped;
   after a `dirty` one, every third-party app's data is cleared first
   (`pm clear`). A simulator is always shut down, since a booted one costs its

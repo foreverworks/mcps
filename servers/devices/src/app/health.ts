@@ -41,13 +41,16 @@ const probeAndroidHost = async (deps: Deps, catalog: Catalog, host: Host, now: n
   const units = probe.ok ? (probe.p.emulators ?? {}) : {};
   // Whichever of a slot's variants runs, it is the slot that runs: one serial, one set of ports.
   const runningInstances = Object.keys(units).filter((i) => RUNNING.has(units[i] ?? ""));
+  // A failed unit's Result, where the control command prints one: the reason a lease waiting for its boot is given.
+  const results = probe.ok ? (probe.p.results ?? {}) : {};
+  const failedInstances = Object.fromEntries(Object.keys(units).filter((i) => units[i] === "failed").map((i) => [i, results[i] ?? ""]));
   const present = [
     ...viaUnit.filter((d) => instancesOf(d).some((i) => runningInstances.includes(i))),
     ...viaServer.filter((d) => adbPorts.find((a) => a.port === d.adb?.port)?.seen?.some((s) => s.serial === d.adb?.serial && s.state === "device") === true),
   ].map((d) => d.id);
   const deadPorts = adbPorts.filter((a) => a.seen === undefined).map((a) => a.port);
   if (!probe.ok) {
-    return { state: "down", reason: `no answer over ssh (${probe.reason})`, checkedAt: now, present, runningInstances: [], booted: [], udids: {} };
+    return { state: "down", reason: `no answer over ssh (${probe.reason})`, checkedAt: now, present, runningInstances: [], failedInstances: {}, booted: [], udids: {} };
   }
   const reasons = [
     deadPorts.length > 0 ? `the adb server on 127.0.0.1:${deadPorts.join(", ")} does not answer` : undefined,
@@ -61,6 +64,7 @@ const probeAndroidHost = async (deps: Deps, catalog: Catalog, host: Host, now: n
     load: probe.p.load,
     present,
     runningInstances,
+    failedInstances,
     booted: [],
     udids: {},
   };
@@ -77,6 +81,7 @@ const probeMacHost = async (deps: Deps, catalog: Catalog, host: Host, now: numbe
       checkedAt: now,
       present: [],
       runningInstances: [],
+      failedInstances: {},
       booted: [],
       udids: {},
     };
@@ -119,6 +124,7 @@ const probeMacHost = async (deps: Deps, catalog: Catalog, host: Host, now: numbe
     load: probe.load,
     present,
     runningInstances: [],
+    failedInstances: {},
     booted,
     udids,
     ...(Object.keys(why).length === 0 ? {} : { why }),

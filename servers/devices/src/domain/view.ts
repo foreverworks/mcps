@@ -110,6 +110,22 @@ export const instancesRunning = (state: BrokerState, health: Readonly<Record<str
   return instancesOf(d).filter((i) => h.runningInstances.includes(i));
 };
 
+/**
+ * Why a lease's started slot will never boot, if its host's last probe says so: the control command reports
+ * the lease's instance `failed`, in a probe begun after the broker started it, while the lease still waits
+ * for the boot. Only such a probe counts: the host resets a failed unit before starting it, but a probe
+ * begun just before the start still shows the previous failure. In the unit's words, with systemd's
+ * Result where the command printed one: `its unit (bato1) failed (timeout)`.
+ */
+export const startFailure = (state: BrokerState, health: Readonly<Record<string, HostHealth>>, device: Device, lease: Lease): string | undefined => {
+  const mark = state.marks[device.id];
+  const h = health[device.host];
+  const instance = leaseVariant(device, lease).instance;
+  if (!isStartedSlot(device) || instance === undefined || mark?.startedAt === undefined || mark.readyAt !== undefined || h === undefined || h.checkedAt <= mark.startedAt) return undefined;
+  const result = h.failedInstances[instance];
+  return result === undefined ? undefined : `its unit (${instance}) failed${result === "" ? "" : ` (${result})`}`;
+};
+
 /** A person has the device: since when, until when the lease holds without its holder, and the note. */
 const pausedView = (p: NonNullable<Lease["paused"]>) => ({ since: iso(p.at), until: iso(p.until), note: p.note, then: "do not drive it until resume" });
 

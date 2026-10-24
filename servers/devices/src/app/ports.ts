@@ -14,6 +14,11 @@ export type AndroidHostProbe = {
    * running on the host whatever started it. Absent where the host has no control command.
    */
   readonly emulators?: Readonly<Record<string, string>>;
+  /**
+   * systemd's Result for each instance whose status line carries one, a failed unit's (`timeout`, `oom-kill`,
+   * `exit-code`, `signal`). Present with `emulators`; empty from a control command that prints two columns.
+   */
+  readonly results?: Readonly<Record<string, string>>;
 };
 
 export type SimulatorSeen = { readonly name: string; readonly udid: string; readonly state: string };

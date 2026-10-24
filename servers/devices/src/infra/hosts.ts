@@ -15,15 +15,27 @@ const sections = (text: string, count: number): readonly string[] => {
   return parts;
 };
 
-/** `<control> status`: one `<instance> <state>` line per emulator the host's control command knows. */
-export const parseEmulatorStates = (text: string): Readonly<Record<string, string>> =>
-  Object.fromEntries(
-    text
-      .split("\n")
-      .map((line) => line.trim().split(/\s+/))
-      .filter((cols): cols is [string, string] => cols.length === 2 && INSTANCE.test(cols[0] ?? "") && /^[a-z-]+$/.test(cols[1] ?? ""))
-      .map(([instance, state]) => [instance, state]),
-  );
+/** A unit's state (`active`, `failed`) or systemd's Result for a failed one (`timeout`, `oom-kill`, `exit-code`, `signal`). */
+const WORD = /^[a-z-]+$/;
+
+/**
+ * `<control> status`: one line per emulator or VM the host's control command knows, `<instance> <state>`, or
+ * `<instance> <state> <result>` where the result is systemd's for a failed unit. An older control command
+ * prints two columns; a line of any other shape is ignored.
+ */
+const statusLines = (text: string): readonly { readonly instance: string; readonly state: string; readonly result?: string }[] =>
+  text
+    .split("\n")
+    .map((line) => line.trim().split(/\s+/))
+    .filter((cols) => (cols.length === 2 || cols.length === 3) && INSTANCE.test(cols[0] ?? "") && cols.slice(1).every((c) => WORD.test(c)))
+    .map(([instance = "", state = "", result]) => ({ instance, state, ...(result === undefined ? {} : { result }) }));
+
+/** Each instance's unit state, from `<control> status`. */
+export const parseEmulatorStates = (text: string): Readonly<Record<string, string>> => Object.fromEntries(statusLines(text).map((l) => [l.instance, l.state]));
+
+/** Each instance's systemd Result, from `<control> status`, where its line carries one (a failed unit's `timeout`, say). */
+export const parseEmulatorResults = (text: string): Readonly<Record<string, string>> =>
+  Object.fromEntries(statusLines(text).flatMap((l) => (l.result === undefined ? [] : [[l.instance, l.result]])));
 
 export const parseAndroidProbe = (text: string): AndroidHostProbe => {
   const [mem, load, emulators] = sections(text, 2);
@@ -32,7 +44,7 @@ export const parseAndroidProbe = (text: string): AndroidHostProbe => {
   return {
     memAvailableMiB: Math.round(memKiB / 1024),
     load: Number.parseFloat(load ?? "0") || 0,
-    ...(emulators === undefined ? {} : { emulators: parseEmulatorStates(emulators) }),
+    ...(emulators === undefined ? {} : { emulators: parseEmulatorStates(emulators), results: parseEmulatorResults(emulators) }),
   };
 };
 

@@ -68,7 +68,8 @@ export const registerAll = (server: McpServer, broker: Broker, catalog: Catalog,
         "queued (a ticket: call wait), or unavailable (with the reason, e.g. its host is asleep). " +
         "An Android emulator, a Windows VM or a Batocera box is started for your lease and stopped after it: a granted lease says state booting until the device has " +
         "booted (about a minute for an emulator), and asking again returns the same lease with its state; with until_booted, acquire waits for the boot " +
-        "itself and reports progress meanwhile. " +
+        "itself and reports progress meanwhile. If the device fails to start instead (its host's unit for it failed: a start timeout, an out-of-memory kill), " +
+        "the lease ends at once and your next acquire for that platform answers failed, once, with the device (resource) and the unit's reason: acquire again to get a fresh device. " +
         "One device per platform and form per session (a phone and a Wear OS watch are two forms): asking again returns the one you hold and extends it, and asking for a profile it does not run is refused (release it first). A lease ends by release, after 20 min without " +
         "a call from you (acquire or renew), or at its time limit (45 min, renewable to 4 h); while a person has the device, pause keeps it." +
         wrappersAcquire(catalog),

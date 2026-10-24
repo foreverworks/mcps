@@ -5,7 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { makeAdb, parseDevices, parsePackages } from "../src/infra/adb.js";
 import { loadCatalog, parseCatalog } from "../src/infra/catalog.js";
 import { doorShell, makeDoor, message, readMessages } from "../src/infra/door.js";
-import { makeHosts, newestIosRuntime, newestRuntime, parseAndroidProbe, parseEmulatorStates, parseMacProbe, parsePairs, userApps, watchesOf } from "../src/infra/hosts.js";
+import { makeHosts, newestIosRuntime, newestRuntime, parseAndroidProbe, parseEmulatorResults, parseEmulatorStates, parseMacProbe, parsePairs, userApps, watchesOf } from "../src/infra/hosts.js";
 import type { Host } from "../src/domain/catalog.js";
 
 describe("probe parsers", () => {
@@ -17,6 +17,20 @@ describe("probe parsers", () => {
     const probe = parseAndroidProbe("43210000\n@@devices@@\n0.5\n@@devices@@\npool1 active\npool2 activating\npool3 inactive\n");
     expect(probe.emulators).toEqual({ pool1: "active", pool2: "activating", pool3: "inactive" });
     expect(parseEmulatorStates("pool1 active\nrm -rf / now\nBad active\n\npool4 failed")).toEqual({ pool1: "active", pool4: "failed" });
+  });
+
+  it("reads a failed unit's systemd Result from a third column, and an older control command's two columns as before", () => {
+    const status = "bato1 failed timeout\nwin1 failed\npool1 active\npool2 failed oom-kill\nrm -rf /\npool3 failed Bad\n";
+    expect(parseEmulatorStates(status)).toEqual({ bato1: "failed", win1: "failed", pool1: "active", pool2: "failed" });
+    expect(parseEmulatorResults(status)).toEqual({ bato1: "timeout", pool2: "oom-kill" });
+    expect(parseAndroidProbe(`43210000\n@@devices@@\n0.5\n@@devices@@\n${status}`)).toEqual({
+      memAvailableMiB: 42197,
+      load: 0.5,
+      emulators: { bato1: "failed", win1: "failed", pool1: "active", pool2: "failed" },
+      results: { bato1: "timeout", pool2: "oom-kill" },
+    });
+    // Two columns only, as every host printed before: states, and no result.
+    expect(parseAndroidProbe("43210000\n@@devices@@\n0.5\n@@devices@@\npool1 active\npool4 failed\n")).toEqual({ memAvailableMiB: 42197, load: 0.5, emulators: { pool1: "active", pool4: "failed" }, results: {} });
   });
 
   it("reads the Mac's power, load, CI and simulators", () => {

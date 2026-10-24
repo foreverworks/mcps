@@ -12,8 +12,10 @@ import {
   emptyState,
   endLease,
   expire,
+  failLease,
   grant,
   isCallers,
+  isFor,
   leaseVariant,
   pauseLease,
   positionOf,
@@ -23,6 +25,7 @@ import {
   RULES,
   sameWant,
   short,
+  takeFailure,
   touch,
   withEvent,
   nextId,
@@ -30,13 +33,14 @@ import {
   type DeviceMark,
   type EndState,
   type Ended,
+  type Failure,
   type Lease,
   type Priority,
   type Ticket,
   type Want,
   withoutStaleWork,
 } from "../domain/state.js";
-import { deviceState, instancesRunning, leaseView, nextStep, runningPerProbe, statusView, ticketView, visibleTo } from "../domain/view.js";
+import { deviceState, instancesRunning, leaseView, nextStep, runningPerProbe, startFailure, statusView, ticketView, visibleTo } from "../domain/view.js";
 import { probeHost } from "./health.js";
 import type { Deps } from "./ports.js";
 
@@ -61,6 +65,7 @@ const BOOT_POLL_MS = 3_000;
 export type Broker = ReturnType<typeof makeBroker>;
 
 type AcquireOutcome =
+  | { readonly kind: "failed"; readonly failure: Failure }
   | { readonly kind: "held"; readonly lease: Lease }
   | { readonly kind: "conflict"; readonly reason: string }
   | { readonly kind: "granted"; readonly lease: Lease; readonly warning: string | undefined }
@@ -355,11 +360,48 @@ export const makeBroker = (deps: Deps) => {
     return s;
   };
 
-  /** Expire, then serve the queue: what every state-reading call does first. */
-  const housekeep = (s0: BrokerState, now: number): { readonly state: BrokerState; readonly ended: readonly Ended[] } => {
-    const { state: s, ended } = expire(s0, now);
-    return { state: serveQueue(endMarks(s, ended, now), now), ended };
+  /**
+   * The leases whose slot the last probe saw fail before it booted (startFailure), ended at once: the
+   * slot is stopped as after any lease, not quarantined (a failed start may be transient; the event log
+   * keeps it), and the failure waits for its session's next acquire.
+   */
+  const failStarts = (s0: BrokerState, now: number): { readonly state: BrokerState; readonly ended: readonly Ended[] } => {
+    let s = s0;
+    const ended: Ended[] = [];
+    for (const lease of s0.leases) {
+      const device = lease.kind === "device" ? deviceOf(catalog, lease.resource) : undefined;
+      const what = device === undefined ? undefined : startFailure(s, health, device, lease);
+      if (what === undefined) continue;
+      const r = failLease(s, lease, what, now);
+      s = r.state;
+      ended.push(r.ended);
+    }
+    return { state: s, ended };
   };
+
+  /** Expire, end the leases whose start failed, then serve the queue: what every state-reading call does first. */
+  const housekeep = (s0: BrokerState, now: number): { readonly state: BrokerState; readonly ended: readonly Ended[] } => {
+    const expired = expire(s0, now);
+    const failed = failStarts(expired.state, now);
+    const ended = [...expired.ended, ...failed.ended];
+    return { state: serveQueue(endMarks(failed.state, ended, now), now), ended };
+  };
+
+  /** What acquire answers, once, to the session whose lease ended because its slot failed to start. */
+  const failedAnswer = (f: Failure) => ({
+    status: "failed" as const,
+    lease: f.lease.id,
+    resource: f.lease.resource,
+    reason: f.reason,
+    next: "this lease has ended and the device is being stopped: acquire again to get a fresh device",
+  });
+
+  /** The failure of this very lease, taken (told once), for a caller that was waiting for its boot. */
+  const failureOf = (lease: Lease): Promise<Failure | undefined> =>
+    transact((s) => {
+      const t = takeFailure(s, (f) => f.lease.id === lease.id);
+      return t === undefined ? { state: s, value: undefined } : { state: t.state, value: t.failure };
+    });
 
   /**
    * A spawned simulator must exist before its lease is handed over. One with a watch is ensured on every
@@ -424,7 +466,9 @@ export const makeBroker = (deps: Deps) => {
     const where = hostOf(catalog, device.host)?.label ?? device.host;
     const started = deps.now();
     for (;;) {
-      if (deviceState(await current(), device) !== "booting") return;
+      const s = await current();
+      // Booted, or the lease ended meanwhile (its start failed, say): nothing more to wait for.
+      if (deviceState(s, device) !== "booting" || !s.leases.some((l) => l.id === lease.id)) return;
       const waited = Math.round((deps.now() - started) / 1000);
       reportProgress(waited, seconds, `${device.id} is booting on ${where}: ${waited} s so far`);
       if (deps.now() - started >= seconds * 1000) return;
@@ -450,6 +494,9 @@ export const makeBroker = (deps: Deps) => {
     const minutes = input.minutes ?? (input.want.kind === "builder" ? RULES.builderMinutes : RULES.defaultMinutes);
     const out = await transact<Step<AcquireOutcome>>((s0) => {
       const { state: s, ended } = housekeep(s0, now);
+      // The slot started for this session's last lease of the kind failed before it booted: told first, and once.
+      const told = takeFailure(s, (f) => isFor(f.lease, input.tenant, input.session, input.want, answersWant(catalog, input.want)));
+      if (told !== undefined) return { state: told.state, value: { ended, result: { kind: "failed" as const, failure: told.failure } } };
       // Already waiting in the queue: the same ticket, polled. Asked for another profile, it waits for that one now, in the same place.
       // A phone and a watch wait apart: one ticket per platform and form.
       const sameForm = (a: Want, b: Want) => formOf(catalog, a.kind === "device" ? a.profile : undefined) === formOf(catalog, b.kind === "device" ? b.profile : undefined);
@@ -490,9 +537,13 @@ export const makeBroker = (deps: Deps) => {
     const booted = async (answer: Awaited<ReturnType<typeof granted>>, lease: Lease, how: "granted" | "held", warning?: string | undefined) => {
       if (input.untilBooted === undefined || answer.status === "unavailable") return answer;
       await bootWait(lease, input.untilBooted);
-      return answerFor(lease, how, warning);
+      // A start that failed while the caller waited is told now, not as a lease still booting.
+      const failure = await failureOf(lease);
+      return failure === undefined ? answerFor(lease, how, warning) : failedAnswer(failure);
     };
     switch (r.kind) {
+      case "failed":
+        return failedAnswer(r.failure);
       case "held":
         return booted(await granted(r.lease, "held"), r.lease, "held");
       case "conflict":

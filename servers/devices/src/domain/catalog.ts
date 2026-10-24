@@ -59,8 +59,8 @@ export type Host = {
   readonly builders: number;
   /**
    * The command on the host that starts and stops its emulators, run over ssh as
-   * `<control> start|stop <instance>`, and as `<control> status` (one `<instance> <state>` line each)
-   * by every probe. The README states the contract; the broker's ssh account needs no other privilege.
+   * `<control> start|stop <instance>`, and as `<control> status` (one `<instance> <state>` line each,
+   * a failed unit's followed by systemd's Result) by every probe. The README states the contract; the broker's ssh account needs no other privilege.
    */
   readonly control?: string;
   /**

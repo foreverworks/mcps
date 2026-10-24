@@ -1,7 +1,8 @@
 import { asGuardError, idempotentWrites, inCall } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
-import { emptyCatalog } from "../src/domain/catalog.js";
+import { makeBroker, type Broker } from "../src/app/broker.js";
+import { DEFAULT_TENANT, emptyCatalog } from "../src/domain/catalog.js";
 import { RULES } from "../src/domain/state.js";
 import { POLICY } from "../src/mcp/policy.js";
 import {
@@ -15,6 +16,7 @@ import {
   CATALOG,
   DESKTOP_INSTANCES,
   DESKTOPS,
+  depsFor,
   GEAR,
   GUEST,
   makeWorld,
@@ -815,6 +817,136 @@ describe("a Batocera box: a VM like the Windows one, fresh for every lease, with
     await settled();
     expect(world.calls).toEqual([`start ${BOX_EPHEMERAL}`, `stop ${BOX_EPHEMERAL}`]);
     expect(world.emulators[BOX]).toBe("stopped");
+  });
+});
+
+describe("a start that fails: the unit of a slot started for a lease fails before it boots", () => {
+  const batocera = { kind: "device", platform: "batocera" } as const;
+  const windows = { kind: "device", platform: "windows" } as const;
+  const boxes = () => {
+    const world = makeWorld(BATOCERA_INSTANCES);
+    const raw = rawBrokerFor(world, BATOCERA);
+    return { world, raw, broker: as(raw, DEFAULT_TENANT) };
+  };
+  type Shown = { mine: unknown[]; devices: { id: string; status: string }[]; recent: string[] };
+
+  it("ends the lease at once, stops the box unquarantined, and tells the session once on its next acquire, in the unit's words", async () => {
+    const { world, raw, broker } = boxes();
+    const r = (await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })) as { lease: string };
+    expect(r).toMatchObject({ status: "granted", resource: "batocera-1", state: "booting" });
+    // systemd gives up on the box's unit (a start timeout), and the next probe, a minute after the start, says so.
+    world.emulators[BOX] = "failed";
+    world.results[BOX] = "timeout";
+    world.clock += 61_000;
+    await broker.tick();
+    expect(raw.health()["emu-1"]?.failedInstances).toEqual({ [BOX]: "timeout" });
+    await settled();
+    expect((await broker.state()).leases).toEqual([]);
+    // Stopped through the control command, as after any lease (the stop clears the failed unit), and not quarantined.
+    expect(world.calls).toEqual([`start ${BOX}`, `stop ${BOX}`]);
+    const s = (await broker.status({ session: A })) as Shown;
+    expect(s.mine).toEqual([]);
+    expect(s.devices.find((d) => d.id === "batocera-1")).toEqual(expect.objectContaining({ status: "stopped" }));
+    expect(s.devices.find((d) => d.id === "batocera-1")).not.toHaveProperty("quarantine");
+    expect(s.recent.join("\n")).toMatch(/batocera-1 back from session-a-000: did not start: its unit \(bato1\) failed \(timeout\) \(clean\)/);
+    // Releasing the ended lease answers as for any lease that ended; neither it nor status takes the notice.
+    await expect(broker.release({ session: A, lease: r.lease, state: "clean" })).rejects.toMatchObject({ error: { kind: "input", message: expect.stringMatching(/no lease ls-\d+: it ended/) } });
+    // The holder's wrapper asks again, as it does every few seconds while it waits for the boot: told, once.
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toEqual({
+      status: "failed",
+      lease: r.lease,
+      resource: "batocera-1",
+      reason: "batocera-1 did not start: its unit (bato1) failed (timeout)",
+      next: expect.stringMatching(/acquire again to get a fresh device/),
+    });
+    // Then a fresh start, as for any request.
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "granted", resource: "batocera-1", state: "booting" });
+    expect(world.calls).toEqual([`start ${BOX}`, `stop ${BOX}`, `start ${BOX}`]);
+  });
+
+  it("does not count a probe begun before the start, which can still show the unit's last failure", async () => {
+    const { world, raw, broker } = boxes();
+    // The last run's failure is still on the host: the acquire's own probe sees it, and the start comes after.
+    world.emulators[BOX] = "failed";
+    world.results[BOX] = "timeout";
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "granted", resource: "batocera-1", state: "booting" });
+    expect(raw.health()["emu-1"]?.failedInstances).toEqual({ [BOX]: "timeout" });
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "held", state: "booting" });
+    await broker.tick();
+    expect((await broker.state()).leases).toHaveLength(1);
+    // The next probe reads the unit as the start left it (the host reset it first): booting, then booted.
+    world.clock += 61_000;
+    await broker.tick();
+    expect(raw.health()["emu-1"]?.failedInstances).toEqual({});
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "held", state: "booting" });
+    bootAll(world);
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "held", state: "ready" });
+    expect(world.calls).toEqual([`start ${BOX}`]);
+  });
+
+  it("tells a caller waiting for the boot as soon as the start fails, not when its wait runs out", async () => {
+    const world = makeWorld(BATOCERA_INSTANCES);
+    const deps = depsFor(world, BATOCERA);
+    // The broker's clock ticks while the caller waits, as its timer does in a running server.
+    const raw: Broker = makeBroker({
+      ...deps,
+      sleep: async (ms) => {
+        await deps.sleep(ms);
+        await raw.tick();
+      },
+    });
+    const broker = as(raw, DEFAULT_TENANT);
+    const heard: string[] = [];
+    const r = await inCall(
+      {
+        progress: (_progress, _total, message) => {
+          heard.push(message ?? "");
+          // The unit is OOM-killed after the caller's first look, a minute into the boot.
+          if (heard.length === 1) {
+            world.emulators[BOX] = "failed";
+            world.results[BOX] = "oom-kill";
+            world.clock += 61_000;
+          }
+        },
+      },
+      () => broker.acquire({ want: batocera, session: A, purpose: "a game's menu", untilBooted: 300 }),
+    );
+    expect(r).toMatchObject({ status: "failed", resource: "batocera-1", reason: "batocera-1 did not start: its unit (bato1) failed (oom-kill)" });
+    expect(heard).toHaveLength(1);
+    await settled();
+    expect(world.calls).toEqual([`start ${BOX}`, `stop ${BOX}`]);
+    // Told once: the next ask starts the box afresh.
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "granted", state: "booting" });
+  });
+
+  it("tells only the session that held it, only for its platform, and without a result from a control command that prints none", async () => {
+    const world = makeWorld(DESKTOP_INSTANCES);
+    const raw = rawBrokerFor(world, DESKTOPS);
+    const broker = as(raw, DEFAULT_TENANT);
+    await broker.acquire({ want: windows, session: A, purpose: "a windows build" });
+    // An older control command: `win1 failed`, two columns.
+    world.emulators[VM] = "failed";
+    world.clock += 61_000;
+    await broker.tick();
+    expect(raw.health()["emu-1"]?.failedInstances).toEqual({ [VM]: "" });
+    await settled();
+    expect(await broker.acquire({ want: android, session: A, purpose: "a phone" })).toMatchObject({ status: "granted", resource: "emulator-5554" });
+    expect(await broker.acquire({ want: windows, session: B, purpose: "another build" })).toMatchObject({ status: "granted", resource: "windows-1", state: "booting" });
+    expect(await broker.acquire({ want: windows, session: A, purpose: "a windows build" })).toMatchObject({ status: "failed", reason: "windows-1 did not start: its unit (win1) failed" });
+    expect(await broker.acquire({ want: windows, session: A, purpose: "a windows build" })).toMatchObject({ status: "queued" });
+  });
+
+  it("forgets a failure its session did not ask about within 10 minutes", async () => {
+    const { world, broker } = boxes();
+    await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" });
+    world.emulators[BOX] = "failed";
+    world.clock += 61_000;
+    await broker.tick();
+    await settled();
+    world.clock += RULES.failureNoticeMs;
+    await broker.tick();
+    expect((await broker.state()).failures).toEqual([]);
+    expect(await broker.acquire({ want: batocera, session: A, purpose: "a game's menu" })).toMatchObject({ status: "granted", state: "booting" });
   });
 });
 

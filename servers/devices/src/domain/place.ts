@@ -38,6 +38,11 @@ export type HostHealth = {
   readonly present: readonly string[];
   /** Android: the instances its control command reports running, whichever slot's variant each is. */
   readonly runningInstances: readonly string[];
+  /**
+   * Android: the instances its control command reports `failed` (systemd gave up on the unit: a start timeout,
+   * an OOM kill, the process exiting), each with the Result the command printed after the state, else "".
+   */
+  readonly failedInstances: Readonly<Record<string, string>>;
   /** iOS: device ids whose simulator is booted. */
   readonly booted: readonly string[];
   /** iOS: simulator name -> UDID, for every simulator on the host the catalog names. */
@@ -46,7 +51,7 @@ export type HostHealth = {
   readonly why?: Readonly<Record<string, string>>;
 };
 
-export const unknownHealth = (now: number): HostHealth => ({ state: "unknown", checkedAt: now, present: [], runningInstances: [], booted: [], udids: {} });
+export const unknownHealth = (now: number): HostHealth => ({ state: "unknown", checkedAt: now, present: [], runningInstances: [], failedInstances: {}, booted: [], udids: {} });
 
 export type Placement =
   | { readonly type: "held"; readonly lease: Lease }

@@ -80,6 +80,18 @@ export type DeviceMark = {
 /** What happened, and to whose device: status shows a tenant only its own (an event with no tenant is the default tenant's). */
 export type Event = { readonly at: number; readonly text: string; readonly tenant?: Tenant };
 
+/**
+ * A lease that ended because the slot started for it failed before it booted (its unit failed), kept so
+ * that its session is told on its next acquire, instead of being handed another device without a word.
+ */
+export type Failure = {
+  /** The lease as it ended: its tenant, session, platform and variant are what the notice is for. */
+  readonly lease: Lease;
+  /** In the unit's words: `batocera-1 did not start: its unit (bato1) failed (timeout)`. */
+  readonly reason: string;
+  readonly at: number;
+};
+
 export type BrokerState = {
   readonly seq: number;
   readonly leases: readonly Lease[];
@@ -87,9 +99,11 @@ export type BrokerState = {
   readonly marks: Readonly<Record<string, DeviceMark>>;
   /** The last few things that happened, newest last, for status. */
   readonly events: readonly Event[];
+  /** Failed starts not yet told to their session. Absent in state saved before them: none. */
+  readonly failures?: readonly Failure[];
 };
 
-export const emptyState = (): BrokerState => ({ seq: 0, leases: [], tickets: [], marks: {}, events: [] });
+export const emptyState = (): BrokerState => ({ seq: 0, leases: [], tickets: [], marks: {}, events: [], failures: [] });
 
 const MINUTE = 60_000;
 
@@ -113,6 +127,8 @@ export const RULES = {
   ticketTtlMs: 2 * MINUTE,
   /** A queued grant must be claimed this soon, or the next in line gets the device. */
   claimMs: 5 * MINUTE,
+  /** A failed start is told to its session's next acquire within this long, then forgotten. */
+  failureNoticeMs: 10 * MINUTE,
   /** A spawned simulator unused this long is deleted. */
   spawnedKeepMs: 7 * 24 * 60 * MINUTE,
   /** Events kept for status. */
@@ -143,11 +159,15 @@ export const isCallers = (x: { readonly tenant: Tenant; readonly session: string
   x.tenant === tenant && x.session === session;
 
 /**
- * The lease this caller already holds for this kind of thing, if any: one per tenant and session per
- * platform and form (`sameForm`, which knows the catalog: a phone and its watch are two).
+ * Whether a lease is this caller's for this kind of thing: one per tenant and session per platform and
+ * form (`sameForm`, which knows the catalog: a phone and its watch are two).
  */
+export const isFor = (lease: Lease, tenant: Tenant, session: string, want: Want, sameForm: (lease: Lease) => boolean = () => true): boolean =>
+  isCallers(lease, tenant, session) && lease.kind === want.kind && lease.platform === want.platform && sameForm(lease);
+
+/** The lease this caller already holds for this kind of thing, if any (`isFor`). */
 export const heldBy = (state: BrokerState, tenant: Tenant, session: string, want: Want, sameForm: (lease: Lease) => boolean = () => true): Lease | undefined =>
-  state.leases.find((l) => isCallers(l, tenant, session) && l.kind === want.kind && l.platform === want.platform && sameForm(l));
+  state.leases.find((l) => isFor(l, tenant, session, want, sameForm));
 
 /**
  * When a lease ends if nothing else happens: its hard end, or its holder going quiet, or an unclaimed
@@ -252,8 +272,27 @@ export const endLease = (state: BrokerState, lease: Lease, endState: EndState, r
 };
 
 /**
+ * The slot started for a lease failed before it booted (`what`: its unit failed, in the unit's words): the
+ * lease ends at once, as a clean one (its holder never had a device to change), and the failure waits for
+ * its session's next acquire of the same platform and form.
+ */
+export const failLease = (state: BrokerState, lease: Lease, what: string, now: number): { readonly state: BrokerState; readonly ended: Ended } => {
+  const r = endLease(state, lease, "clean", `did not start: ${what}`, now);
+  const failure: Failure = { lease, reason: `${lease.resource} did not start: ${what}`, at: now };
+  return { state: { ...r.state, failures: [...(r.state.failures ?? []), failure] }, ended: r.ended };
+};
+
+/** The failure `which` picks, taken out of the state: a failed start is told once. */
+export const takeFailure = (state: BrokerState, which: (f: Failure) => boolean): { readonly failure: Failure; readonly state: BrokerState } | undefined => {
+  const all = state.failures ?? [];
+  const failure = all.find(which);
+  return failure === undefined ? undefined : { failure, state: { ...state, failures: all.filter((f) => f !== failure) } };
+};
+
+/**
  * Everything the clock ends: leases past their end (silent holders are reset,
- * an unclaimed queue grant goes back clean), and tickets nobody polls.
+ * an unclaimed queue grant goes back clean), tickets nobody polls, and failed
+ * starts nobody asked about in time.
  */
 export const expire = (state: BrokerState, now: number): { readonly state: BrokerState; readonly ended: readonly Ended[] } => {
   let next = state;
@@ -280,6 +319,9 @@ export const expire = (state: BrokerState, now: number): { readonly state: Broke
       next = withEvent(next, now, `${dropped} queue ticket(s) dropped: not polled for ${Math.round(RULES.ticketTtlMs / MINUTE)} min`, tenant);
     }
   }
+  const failures = next.failures ?? [];
+  const kept = failures.filter((f) => now - f.at < RULES.failureNoticeMs);
+  if (kept.length < failures.length) next = { ...next, failures: kept };
   return { state: next, ended };
 };
 
