@@ -27,7 +27,7 @@ export const buildDeps = (options: BuildOptions = {}): Deps => {
   const rest = makeRest(connection, options);
   const socket = makeSocket(connection, options.openSocket ?? openNodeSocket, options.socketTimeoutMs);
   return {
-    ha: makeHomeAssistant(rest, socket),
+    ha: makeHomeAssistant(rest, socket, connection),
     instance: () => ({ url: connection.base().toString().replace(/\/$/, "") }),
     confirmDomains: () => {
       const parsed = confirmDomainsFrom(env["HOME_ASSISTANT_CONFIRM_DOMAINS"]);

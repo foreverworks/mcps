@@ -11,6 +11,7 @@ import type {
   WireLogbookEntry,
   WireServiceDomain,
   WireState,
+  WireUser,
 } from "../domain/schema.js";
 
 /**
@@ -36,6 +37,12 @@ export const stateOf = (w: WireState): EntityState => {
     lastUpdated: w.last_updated ?? lastChanged,
   };
 };
+
+/** The token's user; whether it is an administrator is what this is read for, so its absence is drift. */
+export const userOf = (w: WireUser): { readonly name: string | undefined; readonly isAdmin: boolean } => ({
+  name: text(w.name),
+  isAdmin: typeof w.is_admin === "boolean" ? w.is_admin : missing("its current user without is_admin"),
+});
 
 export const configOf = (w: WireConfig): InstanceConfig => ({
   version: w.version ?? missing("its configuration without a version"),

@@ -2,6 +2,14 @@
 
 export type Attributes = Readonly<Record<string, unknown>>;
 
+/** The user the token belongs to, as this server knows it. */
+export type TokenUser = {
+  readonly name: string | undefined;
+  readonly isAdmin: boolean;
+  /** Actions Home Assistant refused this token as admin-only, beyond those known to be (domain/admin.ts). */
+  readonly refusedActions: readonly string[];
+};
+
 export type EntityState = {
   readonly entityId: string;
   readonly state: string;

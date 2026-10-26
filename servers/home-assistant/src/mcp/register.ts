@@ -75,7 +75,8 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       title: "Health",
       description:
         "Whether this server works with its Home Assistant: the version, whether it is RUNNING, its time zone (history and logbook " +
-        "times carry an offset), whether the WebSocket API signs in too, and how many entities each domain has. ok: false comes with " +
+        "times carry an offset), whether the WebSocket API signs in too, whose token it holds and whether that user is an " +
+        "administrator (if not, the tools that need one are listed), and how many entities each domain has. ok: false comes with " +
         "the problem. Call it first, and whenever a call fails with unreachable or auth.",
       inputSchema: {},
     },
@@ -173,7 +174,8 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       description:
         "The actions (formerly services) Home Assistant offers. Without a domain, every domain with its action names; with one, each " +
         "action's description, whether it takes a target, whether it answers with data, and its fields (type, options, an example). " +
-        `Domains whose actions the user approves call by call (${DEFAULT_CONFIRM_DOMAINS.join(", ")} unless configured otherwise) are marked confirm.`,
+        `Domains whose actions the user approves call by call (${DEFAULT_CONFIRM_DOMAINS.join(", ")} unless configured otherwise) are marked confirm, ` +
+        "and actions only an administrator's token may run are marked needs_admin when this token's user is not one.",
       inputSchema: { domain: domainArg.optional().describe("Only this domain's actions, with their fields.") },
     },
     handled((a: { domain?: string | undefined }) => listActions(deps, a)),
@@ -187,7 +189,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "Render a Home Assistant template (Jinja) with its own states and helpers, for what no other tool answers in one call: " +
         "\"{{ states.light | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}\", " +
         "\"{{ area_entities('kitchen') }}\", \"{{ now() }}\". Rendering changes nothing. Home Assistant renders templates only for " +
-        "administrators.",
+        "administrators: with another user's token this answers needs_admin without asking Home Assistant (health says which it is).",
       inputSchema: {
         template: z.string().min(1).max(10_000).describe("The template text."),
         variables: z.record(z.string(), z.unknown()).optional().describe("Variables the template can use by name."),
@@ -204,7 +206,9 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "Run a Home Assistant action (formerly a service call): light.turn_on, climate.set_temperature, media_player.volume_set, " +
         "script.turn_on. Answers once it has run, with the states that changed. An action in a domain the user approves call by call " +
         `(${DEFAULT_CONFIRM_DOMAINS.join(", ")} unless configured otherwise), aimed at an entity of one, or a homeassistant action aimed ` +
-        "wider than named entities, is refused here with needs_confirmation: use call_action_confirmed. Sent once: if the answer is " +
+        "wider than named entities, is refused here with needs_confirmation: use call_action_confirmed. An action Home Assistant runs " +
+        "only for administrators (every reload, homeassistant.restart and the like) is refused with needs_admin, without being sent, " +
+        "when this token's user is not one. Sent once: if the answer is " +
         "outcome_unknown, read the entities (get_states) before running it again. Only what the user asks for: these act on a home.",
       inputSchema: actionShape,
     },

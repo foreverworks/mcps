@@ -34,7 +34,8 @@ export type SocketCommand = Readonly<Record<string, unknown>> & { readonly type:
 
 export type SocketResult = { readonly ok: true; readonly result: unknown } | { readonly ok: false; readonly code: string; readonly message: string };
 
-export type Session = { readonly version: string; readonly results: readonly SocketResult[] };
+/** `digest`: the SHA-256 of the token the session signed in with, which what it learned is kept by. */
+export type Session = { readonly version: string; readonly digest: string; readonly results: readonly SocketResult[] };
 
 export type Socket = { readonly run: (commands: readonly SocketCommand[]) => Promise<Session> };
 
@@ -52,7 +53,7 @@ const messagesOf = (data: unknown): readonly WireSocketMessage[] => {
   return (Array.isArray(parsed) ? parsed : [parsed]) as readonly WireSocketMessage[];
 };
 
-const session = (open: OpenSocket, url: URL, host: string, token: string, commands: readonly SocketCommand[], timeoutMs: number): Promise<Session> =>
+const session = (open: OpenSocket, url: URL, host: string, token: string, digest: string, commands: readonly SocketCommand[], timeoutMs: number): Promise<Session> =>
   new Promise<Session>((resolve, reject) => {
     let done = false;
     let version: string | undefined;
@@ -108,7 +109,7 @@ const session = (open: OpenSocket, url: URL, host: string, token: string, comman
           return;
         case "auth_ok":
           version = message.ha_version ?? "";
-          if (commands.length === 0) return finish({ session: { version, results: [] } });
+          if (commands.length === 0) return finish({ session: { version, digest, results: [] } });
           commands.forEach((command, i) => send({ ...command, id: i + 1 }));
           return;
         case "auth_invalid":
@@ -123,7 +124,7 @@ const session = (open: OpenSocket, url: URL, host: string, token: string, comman
               : { ok: false, code: message.error?.code ?? "unknown_error", message: message.error?.message ?? "no message" },
           );
           if (results.size === commands.length && version !== undefined) {
-            finish({ session: { version, results: commands.map((_, i) => results.get(i + 1) as SocketResult) } });
+            finish({ session: { version, digest, results: commands.map((_, i) => results.get(i + 1) as SocketResult) } });
           }
           return;
         }
@@ -155,7 +156,7 @@ const session = (open: OpenSocket, url: URL, host: string, token: string, comman
 export const makeSocket = (conn: Connection, open: OpenSocket, timeoutMs = SESSION_TIMEOUT_MS): Socket => ({
   run: async (commands) => {
     const base = conn.base();
-    return conn.withToken((token) => session(open, socketUrlOf(base), egressHostOf(base), token, commands, timeoutMs));
+    return conn.withToken((token, digest) => session(open, socketUrlOf(base), egressHostOf(base), token, digest, commands, timeoutMs));
   },
 });
 

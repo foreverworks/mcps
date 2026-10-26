@@ -8,10 +8,14 @@ locks, alarm panels, covers and valves are approved by you, call by call,
 before they run. Nothing here moves money.
 
 **You need** a Home Assistant this machine can reach (on your network or
-through its remote address) and a long-lived access token made by an
-administrator. There is no account to open and no cost. A wrong token costs a
-failed login, and Home Assistant may ban an address after a few, so the
-server never sends a refused token twice.
+through its remote address) and a long-lived access token. A token of a user
+who is not an administrator is the recommended choice: every tool works with
+it except `render_template`, and the server refuses by itself, without asking
+Home Assistant, the few actions Home Assistant keeps for administrators
+(reloads, restarts and the like). An administrator's token adds those. There
+is no account to open and no cost. A wrong token costs a failed login, and
+Home Assistant may ban an address after a few, so the server never sends a
+refused token twice.
 
 ## What you can ask
 
@@ -87,11 +91,14 @@ shares are in [docs/configuration.md](../../docs/configuration.md).
 
 ### Getting a long-lived access token
 
-1. Sign in to Home Assistant as an administrator. A user made for the
-   assistant is best: the logbook then names it as the cause of what it does.
-   It must be an administrator, because Home Assistant renders templates only
-   for administrators, and answers anyone else with a 401 that it counts as a
-   failed login.
+1. Make a person for the assistant in Settings, People, let it log in, and
+   leave **Administrator** off; then sign in as that user. The logbook then
+   names it as the cause of what it does, and it can do everything in your
+   home's entities but change Home Assistant itself. Use an administrator
+   only if you want `render_template` and the admin-only actions: Home
+   Assistant answers anyone else's request for those with a 401 that it
+   counts as a failed login, which is why this server learns whose token it
+   holds and never sends them one.
 2. Open your profile (your name at the bottom of the sidebar) and its
    **Security** tab.
 3. Under **Long-lived access tokens**, select **Create token**, give it a name
@@ -107,8 +114,9 @@ shares are in [docs/configuration.md](../../docs/configuration.md).
 ## First run
 
 1. Ask for `health`. A good answer says `ok: true`, the version,
-   `state: RUNNING`, the time zone, `websocket: ok`, and how many entities
-   each domain has.
+   `state: RUNNING`, the time zone, `websocket: ok`, the token's user and
+   whether it is an administrator (if not, `unavailable_tools` lists
+   `render_template`), and how many entities each domain has.
 2. Ask what is in an area, or which lights are on, to see `list_areas` and
    `list_entities` at work, then try an action on a light.
 3. If `health` answers `auth`, fix the token before anything else: see
@@ -128,8 +136,8 @@ bold is approved by you before every call ([below](#confirmation)).
 | `history` | read | How up to 20 entities' states changed over a window (default the last 24 hours, at most 31 days), keeping the newest changes. |
 | `logbook` | read | What happened over a window, optionally for one entity, with what caused each entry: a user, an action, an automation. |
 | `list_actions` | read | The actions on offer: every domain's action names, or one domain's actions with their fields. |
-| `render_template` | read | Renders a Home Assistant template, with its states and helpers. |
-| `call_action` | write | Runs an action on a target (entities, devices, areas, floors or labels) with its data, and answers with the states that changed; refuses one you approve call by call. |
+| `render_template` | read | Renders a Home Assistant template, with its states and helpers; with an administrator's token only. |
+| `call_action` | write | Runs an action on a target (entities, devices, areas, floors or labels) with its data, and answers with the states that changed; refuses one you approve call by call, and one only an administrator may run when the token's user is not one. |
 | `call_action_confirmed` | **write** | The same, for any action, after you approve the call. |
 
 ### Confirmation
@@ -161,7 +169,7 @@ each client asks is in
 ## Troubleshooting
 
 **`auth`, status 401.** Home Assistant refused the token: it was deleted, its
-user was removed, it was copied short, or the user is not an administrator.
+user was removed or deactivated, or it was copied short.
 Make a new one ([above](#getting-a-long-lived-access-token)) and put it in the
 token file. Until the file holds another token or the server restarts, every
 call answers `auth` with `sent: false` and sends nothing, because Home
@@ -181,8 +189,15 @@ resolve here).
 **`unavailable`.** Home Assistant answered with a server error: it is
 starting, stopping or restarting. Wait a minute and call `health`.
 
-**`permission`.** The token works, but Home Assistant answers that command
-only for administrators. Make the token as an administrator.
+**`needs_admin`.** The token's user is not an administrator, and this needs
+one: `render_template`, or an action Home Assistant runs only for
+administrators. With `sent: false` the server refused it itself and nothing
+reached Home Assistant. Every other tool works with this token; use an
+administrator's token only if you want these.
+
+**`permission`.** The token works, but Home Assistant answered a WebSocket
+command only for administrators. None of this server's commands should need
+one; report it with the version `health` gives.
 
 **`needs_confirmation`.** The action is one you approve call by call; the
 assistant should call `call_action_confirmed`, which asks you first.
@@ -226,6 +241,19 @@ may have run, so the answer is `outcome_unknown`. Home Assistant answers an
 action it does not have and one whose data does not validate with the same
 bare 400, so after a 400 the server reads the list of actions to say which.
 
+**It knows whose token it holds.** A valid token of a user who is not an
+administrator also gets a 401, counted as a failed login, when it asks for
+what only administrators may do. So before the first template or action, the
+server asks the WebSocket API who the token belongs to (`auth/current_user`),
+keeps the answer by the token's SHA-256, and refuses what needs an
+administrator itself. What needs one was read from Home Assistant's source:
+the template endpoint, every `reload` action, and the actions about 50
+integrations register for administrators only (`homeassistant.restart`,
+`recorder.purge`, every `hassio` action, and so on). An action it did not
+know to be one is learned from Home Assistant's 401 the one time, kept for
+that token, and never sent again; the token keeps working. `health` asks
+again each time, so a user made an administrator since is seen there.
+
 **Credentials stay out of answers.** A camera's `access_token` attribute is
 dropped, and the `token=` in proxy addresses such as `entity_picture` is
 replaced with `[redacted]`, before a state reaches a model.
@@ -244,6 +272,11 @@ replaced with `[redacted]`, before a state reaches a model.
   approve every cross-domain action, restarts included.
 - One instance per server, with a long-lived token. Home Assistant's OAuth
   sign-in is not used.
+- An integration that adds an admin-only action after 2026-10-26 costs one
+  failed login the first time a token that is not an administrator's asks
+  for it. A user Home Assistant lets only read, not control, gets a 401 for each
+  action on an entity it may not control: give the assistant an ordinary
+  user.
 - History and the logbook go back only as far as the recorder keeps (10 days
   unless configured otherwise).
 

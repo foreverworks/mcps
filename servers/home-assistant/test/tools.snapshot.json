@@ -2,7 +2,7 @@
   {
     "name": "call_action",
     "title": "Run an action",
-    "description": "Run a Home Assistant action (formerly a service call): light.turn_on, climate.set_temperature, media_player.volume_set, script.turn_on. Answers once it has run, with the states that changed. An action in a domain the user approves call by call (lock, alarm_control_panel, cover, valve unless configured otherwise), aimed at an entity of one, or a homeassistant action aimed wider than named entities, is refused here with needs_confirmation: use call_action_confirmed. Sent once: if the answer is outcome_unknown, read the entities (get_states) before running it again. Only what the user asks for: these act on a home.",
+    "description": "Run a Home Assistant action (formerly a service call): light.turn_on, climate.set_temperature, media_player.volume_set, script.turn_on. Answers once it has run, with the states that changed. An action in a domain the user approves call by call (lock, alarm_control_panel, cover, valve unless configured otherwise), aimed at an entity of one, or a homeassistant action aimed wider than named entities, is refused here with needs_confirmation: use call_action_confirmed. An action Home Assistant runs only for administrators (every reload, homeassistant.restart and the like) is refused with needs_admin, without being sent, when this token's user is not one. Sent once: if the answer is outcome_unknown, read the entities (get_states) before running it again. Only what the user asks for: these act on a home.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -354,7 +354,7 @@
   {
     "name": "health",
     "title": "Health",
-    "description": "Whether this server works with its Home Assistant: the version, whether it is RUNNING, its time zone (history and logbook times carry an offset), whether the WebSocket API signs in too, and how many entities each domain has. ok: false comes with the problem. Call it first, and whenever a call fails with unreachable or auth.",
+    "description": "Whether this server works with its Home Assistant: the version, whether it is RUNNING, its time zone (history and logbook times carry an offset), whether the WebSocket API signs in too, whose token it holds and whether that user is an administrator (if not, the tools that need one are listed), and how many entities each domain has. ok: false comes with the problem. Call it first, and whenever a call fails with unreachable or auth.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -437,7 +437,7 @@
   {
     "name": "list_actions",
     "title": "List actions",
-    "description": "The actions (formerly services) Home Assistant offers. Without a domain, every domain with its action names; with one, each action's description, whether it takes a target, whether it answers with data, and its fields (type, options, an example). Domains whose actions the user approves call by call (lock, alarm_control_panel, cover, valve unless configured otherwise) are marked confirm.",
+    "description": "The actions (formerly services) Home Assistant offers. Without a domain, every domain with its action names; with one, each action's description, whether it takes a target, whether it answers with data, and its fields (type, options, an example). Domains whose actions the user approves call by call (lock, alarm_control_panel, cover, valve unless configured otherwise) are marked confirm, and actions only an administrator's token may run are marked needs_admin when this token's user is not one.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -587,7 +587,7 @@
   {
     "name": "render_template",
     "title": "Render a template",
-    "description": "Render a Home Assistant template (Jinja) with its own states and helpers, for what no other tool answers in one call: \"{{ states.light | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}\", \"{{ area_entities('kitchen') }}\", \"{{ now() }}\". Rendering changes nothing. Home Assistant renders templates only for administrators.",
+    "description": "Render a Home Assistant template (Jinja) with its own states and helpers, for what no other tool answers in one call: \"{{ states.light | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}\", \"{{ area_entities('kitchen') }}\", \"{{ now() }}\". Rendering changes nothing. Home Assistant renders templates only for administrators: with another user's token this answers needs_admin without asking Home Assistant (health says which it is).",
     "inputSchema": {
       "type": "object",
       "properties": {

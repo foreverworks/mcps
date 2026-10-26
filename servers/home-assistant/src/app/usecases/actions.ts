@@ -1,10 +1,12 @@
 import { compact } from "@foreverworks/mcp-kit";
 
 import { type ActionArgs, actionCallOf, confirmReason } from "../../domain/actions.js";
+import { isAdminAction } from "../../domain/admin.js";
 import { closest } from "../../domain/closest.js";
 import { asAppError, fail } from "../../domain/errors.js";
 import type { Action, ActionCall } from "../../domain/models.js";
 import type { Deps } from "../ports.js";
+import { requireAdmin } from "./admin.js";
 
 const fieldView = (f: Action["fields"][number]) =>
   compact({
@@ -17,9 +19,10 @@ const fieldView = (f: Action["fields"][number]) =>
     example: f.example,
   });
 
-const actionView = (a: Action) =>
+const actionView = (a: Action, needsAdmin: boolean) =>
   compact({
     action: `${a.domain}.${a.service}`,
+    needs_admin: needsAdmin ? true : undefined,
     name: a.name,
     description: a.description,
     targets: a.targets ? true : undefined,
@@ -31,7 +34,8 @@ const actionView = (a: Action) =>
  * The actions Home Assistant offers. Without a domain, each domain and its
  * action names (the full list with fields runs to hundreds of kilobytes);
  * with one, each action with its fields. Domains whose actions the user
- * approves call by call say so.
+ * approves call by call say so, and so do the actions only an administrator's
+ * token may run, when this token's user is not one.
  */
 export const listActions = async (deps: Deps, a: { readonly domain?: string | undefined }) => {
   const confirm = new Set(deps.confirmDomains());
@@ -54,10 +58,13 @@ export const listActions = async (deps: Deps, a: { readonly domain?: string | un
   if (mine.length === 0) {
     fail({ kind: "not_found", what: "domain", name: wanted, message: `Home Assistant has no actions in domain "${wanted}"`, suggestions: closest(wanted, domains) });
   }
+  const user = await deps.ha.user();
   return compact({
     domain: wanted,
     confirm: confirm.has(wanted) ? "every action here goes through call_action_confirmed, which the user approves" : undefined,
-    actions: [...mine].sort((x, y) => x.service.localeCompare(y.service)).map(actionView),
+    actions: [...mine]
+      .sort((x, y) => x.service.localeCompare(y.service))
+      .map((x) => actionView(x, !user.isAdmin && (isAdminAction(x.domain, x.service) || user.refusedActions.includes(`${x.domain}.${x.service}`)))),
   });
 };
 
@@ -93,6 +100,10 @@ export const callAction = async (deps: Deps, a: ActionArgs, confirmed: boolean) 
   if (reason !== undefined && !confirmed) {
     fail({ kind: "needs_confirmation", action: name, reason, message: `${name} needs the user's approval: ${reason}; nothing was sent` });
   }
+  // Known before any action is sent, so a 401 for this token can be read as the action's refusal, not the token's.
+  const user = await deps.ha.user();
+  if (isAdminAction(call.domain, call.service)) await requireAdmin(deps, name, "Home Assistant runs it only for administrators");
+  if (!user.isAdmin && user.refusedActions.includes(name)) await requireAdmin(deps, name, "Home Assistant refused it before as reserved for administrators");
   const outcome = await deps.ha.call(call).catch((thrown: unknown) => explainRefusal(deps, call, thrown));
   return compact({
     action: name,

@@ -1,4 +1,4 @@
-import type { Action, ActionCall, ActionOutcome, EntityHistory, EntityState, InstanceConfig, LogbookEntry, Registries } from "../domain/models.js";
+import type { Action, ActionCall, ActionOutcome, EntityHistory, EntityState, InstanceConfig, LogbookEntry, Registries, TokenUser } from "../domain/models.js";
 import type { Window } from "../domain/window.js";
 
 /**
@@ -20,8 +20,12 @@ export type HomeAssistant = {
   readonly renderTemplate: (template: string, variables: Readonly<Record<string, unknown>> | undefined) => Promise<string>;
   /** The area, floor, device and entity registries, in one WebSocket session. */
   readonly registries: () => Promise<Registries>;
-  /** Open a WebSocket session and sign in: the version it reports. */
-  readonly socketCheck: () => Promise<string>;
+  /**
+   * Who the token belongs to and whether it is an administrator
+   * (auth/current_user over the WebSocket API), learned once per token and
+   * kept by its SHA-256; `fresh` asks again.
+   */
+  readonly user: (options?: { readonly fresh?: boolean }) => Promise<TokenUser>;
 };
 
 /** Where this server reaches Home Assistant, for health to say. */

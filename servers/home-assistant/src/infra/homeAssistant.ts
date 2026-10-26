@@ -1,8 +1,9 @@
 import type { HomeAssistant } from "../app/ports.js";
 import { actionBody } from "../domain/actions.js";
 import { asAppError, fail } from "../domain/errors.js";
-import type { WireArea, WireCallResult, WireConfig, WireDevice, WireEntityEntry, WireFloor, WireLogbookEntry, WireServiceDomain, WireState } from "../domain/schema.js";
-import { actionsOf, configOf, historyOf, listOf, logbookOf, outcomeOf, registriesOf, stateOf } from "./mapping.js";
+import type { WireArea, WireCallResult, WireConfig, WireDevice, WireEntityEntry, WireFloor, WireLogbookEntry, WireServiceDomain, WireState, WireUser } from "../domain/schema.js";
+import type { Connection } from "./connection.js";
+import { actionsOf, configOf, historyOf, listOf, logbookOf, outcomeOf, registriesOf, stateOf, userOf } from "./mapping.js";
 import type { Rest } from "./rest.js";
 import { type Socket, type SocketResult, socketFailure } from "./socket.js";
 
@@ -34,7 +35,7 @@ const resultOf = (command: string, r: SocketResult | undefined, orElse?: (code: 
   return fail(socketFailure(command, r));
 };
 
-export const makeHomeAssistant = (rest: Rest, socket: Socket): HomeAssistant => ({
+export const makeHomeAssistant = (rest: Rest, socket: Socket, conn: Connection): HomeAssistant => ({
   config: async () => configOf(await rest<WireConfig>("api/config")),
 
   states: async () => listOf<WireState>(await rest("api/states"), "states").map(stateOf),
@@ -56,6 +57,7 @@ export const makeHomeAssistant = (rest: Rest, socket: Socket): HomeAssistant => 
       await rest<WireCallResult>(`api/services/${call.domain}/${call.service}`, {
         method: "POST",
         json: actionBody(call),
+        action: `${call.domain}.${call.service}`,
         ...(call.returnResponse ? { query: { return_response: true } } : {}),
         timeoutMs: ACTION_TIMEOUT_MS,
       }),
@@ -107,5 +109,12 @@ export const makeHomeAssistant = (rest: Rest, socket: Socket): HomeAssistant => 
     });
   },
 
-  socketCheck: async () => (await socket.run([])).version,
+  user: async (options = {}) => {
+    const known = conn.facts(await conn.digest());
+    if (options.fresh !== true && known.admin !== undefined) return { name: known.name, isAdmin: known.admin, refusedActions: [...known.refusedActions].sort() };
+    const { results, digest } = await socket.run([{ type: "auth/current_user" }]);
+    const user = userOf(resultOf("auth/current_user", results[0]) as WireUser);
+    conn.learnUser(digest, { name: user.name, admin: user.isAdmin });
+    return { ...user, refusedActions: [...conn.facts(digest).refusedActions].sort() };
+  },
 });

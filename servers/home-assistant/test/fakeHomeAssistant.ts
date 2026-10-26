@@ -3,7 +3,9 @@
  * small flat with a kitchen, a living room and a hallway. It checks the
  * bearer token as Home Assistant does (401 "401: Unauthorized"), answers the
  * paths this server reads, and records every request and every socket, so a
- * test can assert what was sent, and that nothing was.
+ * test can assert what was sent, and that nothing was. Its token belongs to
+ * an administrator unless `admin: false`; then it answers 401 for what Home
+ * Assistant keeps for administrators, as Home Assistant does.
  */
 import type { SocketLike } from "../src/infra/socket.js";
 
@@ -45,6 +47,7 @@ export const SERVICES = [
   { domain: "cover", services: { open_cover: { name: "Open", target: {}, fields: {} }, close_cover: { name: "Close", target: {}, fields: {} } } },
   { domain: "homeassistant", services: { turn_off: { name: "Generic turn off", target: {}, fields: {} }, restart: { name: "Restart", fields: {} } } },
   { domain: "climate", services: { set_temperature: { name: "Set temperature", target: {}, fields: { temperature: { required: true, selector: { number: {} } } } } } },
+  { domain: "example_integration", services: { admin_only: { name: "Admin only", fields: {} } } },
   { domain: "weather", services: { get_forecasts: { name: "Get forecasts", target: {}, fields: { type: { required: true, selector: { select: { options: ["daily", "hourly"] } } } }, response: { optional: false } } } },
 ];
 
@@ -88,7 +91,12 @@ export type FakeOptions = {
   /** The socket cannot be opened: an error, then a close, as a browser-style WebSocket reports it. */
   readonly socketDown?: boolean;
   readonly haState?: string;
+  /** Whether the token's user is an administrator (default true). */
+  readonly admin?: boolean;
 };
+
+/** What this fake keeps for administrators: Home Assistant's template endpoint, and these actions. */
+const ADMIN_ONLY_ACTIONS = new Set(["homeassistant.restart", "example_integration.admin_only"]);
 
 const json = (status: number, body: unknown): Response => new Response(JSON.stringify(body), { status, headers: { "content-type": "application/json" } });
 const text = (status: number, body: string): Response => new Response(body, { status, headers: { "content-type": "text/plain" } });
@@ -99,8 +107,12 @@ export const fakeHomeAssistant = (options: FakeOptions = {}) => {
   const states = STATES();
   let token = TOKEN;
 
+  const admin = options.admin ?? true;
   const builtIn = (req: Recorded): Response => {
     const path = req.url.pathname;
+    if (!admin && req.method === "POST" && (path === "/api/template" || ADMIN_ONLY_ACTIONS.has(path.slice("/api/services/".length).replace("/", ".")))) {
+      return text(401, "401: Unauthorized");
+    }
     if (req.method === "GET" && path === "/api/config")
       return json(200, { version: VERSION, state: options.haState ?? "RUNNING", time_zone: "Europe/Bucharest", location_name: "Test flat", safe_mode: false, recovery_mode: false, components: ["light"] });
     if (req.method === "GET" && path === "/api/states") return json(200, states);
@@ -202,6 +214,10 @@ export const fakeHomeAssistant = (options: FakeOptions = {}) => {
         }
         if (!authed) return;
         const type = String(message["type"]);
+        if (type === "auth/current_user") {
+          reply({ id: message["id"], type: "result", success: true, result: { id: "user-1", name: admin ? "Owner" : "Assistant", is_owner: false, is_admin: admin, credentials: [], mfa_modules: [] } });
+          return;
+        }
         const override = options.socketReplies?.[type];
         const result = override ?? (type in REGISTRIES ? { result: REGISTRIES[type as keyof typeof REGISTRIES] } : { error: { code: "unknown_command", message: "Unknown command." } });
         reply("result" in result ? { id: message["id"], type: "result", success: true, result: result.result } : { id: message["id"], type: "result", success: false, error: result.error });

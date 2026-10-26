@@ -103,6 +103,9 @@ export type WireEntityEntry = {
   readonly hidden_by?: string | null;
 };
 
+/** auth/current_user: the user a token belongs to; it holds more keys than these. */
+export type WireUser = { readonly id?: string; readonly name?: string | null; readonly is_admin?: boolean; readonly is_owner?: boolean };
+
 /** A WebSocket message: the handshake's, or a command's result. */
 export type WireSocketMessage = {
   readonly type?: string;

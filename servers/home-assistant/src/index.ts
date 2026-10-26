@@ -12,7 +12,8 @@ const INSTRUCTIONS =
   "other tool does in one call. list_actions shows the actions and their fields; call_action runs one. Actions on locks, alarms, " +
   "covers and valves (or the domains this deployment names) go through call_action_confirmed, which the user approves each call. " +
   "Run only what the user asks for: these act on a home. A call that fails with auth sends nothing more until the token is fixed: " +
-  "Home Assistant counts every refused token as a failed login and may ban this address.";
+  "Home Assistant counts every refused token as a failed login and may ban this address. When the token's user is not an " +
+  "administrator, render_template and the actions Home Assistant keeps for administrators answer needs_admin without being sent.";
 
 /**
  * MCP server for Home Assistant. stdio by default, HTTP when MCP_HTTP_PORT

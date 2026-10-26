@@ -140,6 +140,8 @@ describe("health", () => {
       time_zone: "Europe/Bucharest",
       location_name: "Test flat",
       websocket: "ok",
+      token_user: "Owner",
+      admin: true,
       entities: 7,
       entities_per_domain: { camera: 1, climate: 1, cover: 1, light: 1, lock: 1, sensor: 1, sun: 1 },
     });
@@ -516,5 +518,72 @@ describe("an instance that is down or not itself", () => {
     const out = await (await setup({ fake: { routes: { "GET /api/services": () => ({ status: 200, text: "<html>Sign in</html>", contentType: "text/html" }) } } })).call("list_actions");
     expect(out.error.kind).toBe("drift");
     expect(out.error.remedy).toContain("HOME_ASSISTANT_URL");
+  });
+});
+
+describe("a token whose user is not an administrator", () => {
+  it("is healthy, and says which tools need an administrator", async () => {
+    const out = await (await setup({ fake: { admin: false } })).call("health");
+    expect(out).toMatchObject({ ok: true, websocket: "ok", token_user: "Assistant", admin: false, unavailable_tools: ["render_template"] });
+    expect(out.admin_note).toContain("homeassistant.restart");
+    expect(out.problems).toBeUndefined();
+  });
+
+  it("refuses render_template itself, without a request, and asks who the token is only once", async () => {
+    const { call, fake } = await setup({ fake: { admin: false } });
+    for (let i = 0; i < 2; i++) {
+      const out = await call("render_template", { template: "{{ now() }}" });
+      expect(out.error).toMatchObject({ kind: "needs_admin", what: "render_template", sent: false });
+      expect(out.error.message).toContain("(Assistant) is not one");
+      expect(out.error.remedy).toContain("every other tool works");
+    }
+    expect(fake.requests).toEqual([]);
+    expect(fake.sockets).toHaveLength(1);
+    expect(fake.sockets[0]?.sent.map((m) => m["type"])).toEqual(["auth", "auth/current_user"]);
+  });
+
+  it("refuses the actions Home Assistant keeps for administrators, without sending them, and runs the rest", async () => {
+    const { call, posts } = await setup({ fake: { admin: false } });
+    for (const [domain, service] of [
+      ["homeassistant", "restart"],
+      ["automation", "reload"],
+      ["hassio", "addon_start"],
+      ["recorder", "purge"],
+    ]) {
+      expect((await call("call_action", { domain, service })).error).toMatchObject({ kind: "needs_admin", what: `${domain}.${service}`, sent: false });
+    }
+    expect(posts()).toEqual([]);
+    expect((await call("call_action", { domain: "light", service: "turn_off", target: { entity_id: "light.kitchen" } })).changed).toHaveLength(1);
+    const listed = await call("list_actions", { domain: "homeassistant" });
+    expect(listed.actions.find((a: { action: string }) => a.action === "homeassistant.restart").needs_admin).toBe(true);
+    expect(listed.actions.find((a: { action: string }) => a.action === "homeassistant.turn_off").needs_admin).toBeUndefined();
+  });
+
+  it("learns an admin-only action it did not know from Home Assistant's one 401, and keeps the token", async () => {
+    const { call, posts, fake } = await setup({ fake: { admin: false } });
+    const first = await call("call_action", { domain: "example_integration", service: "admin_only" });
+    expect(first.error).toMatchObject({ kind: "needs_admin", what: "example_integration.admin_only", sent: true });
+    expect(posts()).toHaveLength(1);
+    expect((await call("call_action", { domain: "example_integration", service: "admin_only" })).error).toMatchObject({ kind: "needs_admin", sent: false });
+    expect(posts()).toHaveLength(1);
+    expect((await call("list_entities")).total).toBe(7);
+    expect((await call("health")).refused_actions).toEqual(["example_integration.admin_only"]);
+    expect(fake.requests.filter((r) => r.headers["Authorization"] !== `Bearer ${TOKEN}`)).toEqual([]);
+  });
+
+  it("still treats a 401 on a read as the token's own refusal (it was deleted), and sends nothing more", async () => {
+    const { call, fake } = await setup({ fake: { admin: false } });
+    expect((await call("list_actions")).domains).toBeDefined();
+    fake.acceptToken("another-token-0123456789");
+    expect((await call("get_states", { entity_ids: ["light.kitchen"] })).error).toMatchObject({ kind: "auth", status: 401, sent: true });
+    expect((await call("list_actions")).error).toMatchObject({ kind: "auth", sent: false });
+    expect(fake.requests).toHaveLength(2);
+  });
+
+  it("lets an administrator's token render templates and run admin-only actions", async () => {
+    const { call, posts } = await setup();
+    expect((await call("render_template", { template: "ok" })).result).toBe("ok");
+    expect((await call("call_action", { domain: "homeassistant", service: "restart" })).action).toBe("homeassistant.restart");
+    expect(posts()).toHaveLength(1);
   });
 });

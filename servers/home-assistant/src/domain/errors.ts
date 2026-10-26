@@ -15,6 +15,13 @@ export type AppError =
   | { readonly kind: "auth"; readonly status: 401 | 403; readonly sent: boolean; readonly message: string }
   /** The token works, but its user may not do this (an administrator's command over the WebSocket API). */
   | { readonly kind: "permission"; readonly message: string }
+  /**
+   * Only an administrator's token may do this, and this token's user is not
+   * one. `sent` is false when the server refused it itself, as it does for
+   * everything it knows to be admin-only, and true the one time Home
+   * Assistant refused an action the server did not know to be.
+   */
+  | { readonly kind: "needs_admin"; readonly what: string; readonly sent: boolean; readonly message: string }
   /** No such entity, action, domain or area, or an endpoint whose integration is not loaded. */
   | {
       readonly kind: "not_found";
@@ -75,10 +82,12 @@ export const remedyFor = (error: AppError): string => {
         : `set ${error.variable} in this server's environment (see its README); the next call reads it again`;
     case "auth":
       return error.status === 401
-        ? `make a new long-lived access token in an administrator's Home Assistant profile (Security tab) and put it in the file ${TOKEN_FILE_VARIABLE} names; Home Assistant counts every refused token as a failed login and may ban this address, so ${WITHHELD}`
+        ? `make a new long-lived access token in the Home Assistant profile of the user the assistant acts as (Security tab) and put it in the file ${TOKEN_FILE_VARIABLE} names; Home Assistant counts every refused token as a failed login and may ban this address, so ${WITHHELD}`
         : `Home Assistant, or a proxy in front of it, refuses this address, usually because it banned it after failed logins: remove the address from ip_bans.yaml in Home Assistant's configuration folder, restart Home Assistant and check the token; ${WITHHELD}`;
     case "permission":
       return "use a long-lived access token made by an administrator: Home Assistant answers this only for administrators";
+    case "needs_admin":
+      return "this needs a token whose Home Assistant user is an administrator, and whether to use one is the owner's choice; every other tool works with this token, and nothing more is sent for this";
     case "not_found":
       return notFoundRemedy(error.what);
     case "needs_confirmation":

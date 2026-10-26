@@ -1,6 +1,6 @@
 import { type HttpFailure, makeHttp, NOT_JSON, type RequestSpec, type Sleep } from "@foreverworks/mcp-kit";
 
-import { type AppError, drift, fail } from "../domain/errors.js";
+import { type AppError, asAppError, drift, fail } from "../domain/errors.js";
 import { apiUrl, type Connection, egressHostOf } from "./connection.js";
 
 /**
@@ -13,6 +13,10 @@ import { apiUrl, type Connection, egressHostOf } from "./connection.js";
  *   one more try for a read; an action is never sent twice (the kit's rule).
  * - Home Assistant's errors carry `{"message": ...}`, or aiohttp's plain
  *   "400: Bad Request"; either is the reason a failure shows.
+ * - An action answered 401 for a token Home Assistant accepts and whose user
+ *   is known not to be an administrator was refused as admin-only, not the
+ *   token: the action is remembered for this token and never sent again,
+ *   and the token keeps working for everything else.
  */
 
 export type RestOptions = {
@@ -25,6 +29,8 @@ export type RestSpec = RequestSpec & {
   readonly timeoutMs?: number;
   /** What a 404 means for this path; without it, an endpoint whose integration is not loaded. */
   readonly notFound?: () => AppError;
+  /** The action this request runs (domain.service), so a 401 for a non-administrator is read as that action's refusal. */
+  readonly action?: string;
 };
 
 export type Rest = <T>(path: string, spec?: RestSpec) => Promise<T>;
@@ -93,7 +99,7 @@ export const makeRest = (conn: Connection, options: RestOptions = {}): Rest => {
     const host = egressHostOf(base);
     const url = apiUrl(base, path).toString();
     const timeoutMs = spec.timeoutMs ?? READ_TIMEOUT_MS;
-    return conn.withToken((token) =>
+    return conn.withToken((token, digest) =>
       makeHttp({
         service: "Home Assistant",
         auth: { headers: async () => ({ Authorization: `Bearer ${token}` }) },
@@ -105,7 +111,18 @@ export const makeRest = (conn: Connection, options: RestOptions = {}): Rest => {
         fetch: described,
         ...(options.sleep === undefined ? {} : { sleep: options.sleep }),
         ...(options.random === undefined ? {} : { random: options.random }),
-      })<T>(url, spec),
+      })<T>(url, spec).catch((thrown: unknown) => {
+        const known = asAppError(thrown);
+        const facts = conn.facts(digest);
+        if (spec.action === undefined || known?.kind !== "auth" || known.status !== 401 || !facts.proven || facts.admin !== false) throw thrown;
+        conn.learnRefusedAction(digest, spec.action);
+        return fail({
+          kind: "needs_admin",
+          what: spec.action,
+          sent: true,
+          message: `Home Assistant refused ${spec.action} (401) because the token's user is not an administrator; it is not sent again with this token`,
+        });
+      }),
     );
   };
 };
