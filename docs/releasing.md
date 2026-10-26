@@ -194,8 +194,10 @@ it:
    before anything is sent;
 5. prints the plan, then publishes each public package whose version npm
    lacks (`npm publish --access public --provenance`, the toolkit packages
-   first), then each such server's `server.json` to the registry, logging in
-   before each entry because a registry login lasts five minutes;
+   first), then each such server's `server.json` to the registry, once npm
+   serves its package (the registry checks it, and npm can take minutes to
+   serve a version it accepted), logging in before each entry because a
+   registry login lasts five minutes;
 6. on a tag only, creates the GitHub release named after the tag, with every
    bundle. A run started by hand publishes the same but attaches no bundles.
 

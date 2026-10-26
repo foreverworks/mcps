@@ -39,6 +39,21 @@ const onNpm = (w: Workspace): boolean => {
   return found.status === 0 && found.stdout.trim() === w.version;
 };
 
+/**
+ * Waits until npm serves a version it just accepted. npm answers a publish
+ * with "may take a few minutes to become available", and the registry checks
+ * the npm package before it takes an entry: on the first release, the entry
+ * sent a second after npm accepted its package was refused with npm's 404.
+ */
+const awaitOnNpm = async (w: Workspace, minutes = 15): Promise<void> => {
+  const until = Date.now() + minutes * 60_000;
+  while (!onNpm(w)) {
+    if (Date.now() > until) throw new Error(`${w.name}@${w.version} is still not on npm after ${minutes} minutes; run the release again later`);
+    console.log(`${w.name}@${w.version}: waiting for npm to serve it`);
+    await new Promise((ok) => setTimeout(ok, 15_000));
+  }
+};
+
 const inRegistry = async (w: Workspace): Promise<boolean> => {
   const answer = await fetch(`${REGISTRY}/v0.1/servers/${encodeURIComponent(w.mcpName ?? "")}/versions/${encodeURIComponent(w.version)}`);
   if (answer.status === 404) return false;
@@ -163,6 +178,7 @@ const main = async (): Promise<void> => {
       console.log(`${w.mcpName}@${w.version}: would be published to the MCP Registry`);
       continue;
     }
+    await awaitOnNpm(w);
     loginToRegistry(key);
     run("mcp-publisher", ["publish", join(w.dir, "server.json")]);
   }
