@@ -1,0 +1,62 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/home-assistant",
+  "title": "Home Assistant",
+  "description": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
+  "version": "0.1.0",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/home-assistant/",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/home-assistant"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/home-assistant/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/home-assistant/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-home-assistant",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "HOME_ASSISTANT_URL",
+          "description": "The address you open Home Assistant at, such as http://homeassistant.local:8123.",
+          "isRequired": true,
+          "isSecret": false
+        },
+        {
+          "name": "HOME_ASSISTANT_TOKEN_FILE",
+          "description": "Path of a file holding a long-lived access token made in an administrator's Home Assistant profile.",
+          "isRequired": true,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "HOME_ASSISTANT_CONFIRM_DOMAINS",
+          "description": "Action domains you approve call by call, comma-separated (default lock,alarm_control_panel,cover,valve; none for none).",
+          "isRequired": false,
+          "isSecret": false
+        }
+      ]
+    }
+  ]
+}

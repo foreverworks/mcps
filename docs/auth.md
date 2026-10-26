@@ -66,6 +66,7 @@ systemd, grants live in a `StateDirectory=` only the service's user reads
 | `enable-banking` | an application id and an RS256 private key; a PSD2 session per bank consent | every request carries a JWT signed with the key; a consent is `start_auth` (`money`), then `complete_auth` with the redirect | a consent lasts up to 180 days, then the account holder repeats it |
 | `notion` | one token per workspace (a personal access token or an internal integration token) | made by hand in Notion, saved as `notion-<label>` | personal access tokens expire (a year at most); by hand |
 | `eas` | an Expo robot user's access token | made by hand, `EXPO_TOKEN_FILE` | does not expire; rotated by hand |
+| `home-assistant` | an administrator's long-lived access token | made by hand in the user's Home Assistant profile, `HOME_ASSISTANT_TOKEN_FILE` | ten years; by hand. A token Home Assistant refuses is never sent again, since each refusal is a failed login that can get the address banned |
 | `oblio` | the account e-mail and API secret, exchanged for an hour-long token (client credentials) | by hand, in `app.json` | automatic |
 | `porkbun` | an API key and secret key | by hand | none |
 | `bitwarden` | a personal API key and the master password, for the official CLI | by hand | none |

@@ -1,0 +1,78 @@
+{
+  "name": "@foreverworks/mcp-home-assistant",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for Home Assistant over its REST and WebSocket APIs: entities and their states, areas, history, the logbook, templates, and running actions, with locks, alarms, covers and valves confirmed",
+  "mcpName": "com.foreverworks/home-assistant",
+  "mcp": {
+    "title": "Home Assistant",
+    "audience": "general",
+    "maturity": "experimental",
+    "tagline": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
+    "inputs": {
+      "HOME_ASSISTANT_URL": {
+        "title": "Home Assistant address",
+        "type": "text",
+        "required": true,
+        "description": "The address you open Home Assistant at, such as http://homeassistant.local:8123."
+      },
+      "HOME_ASSISTANT_TOKEN_FILE": {
+        "title": "Long-lived access token file",
+        "type": "file",
+        "required": true,
+        "description": "Path of a file holding a long-lived access token made in an administrator's Home Assistant profile."
+      },
+      "HOME_ASSISTANT_CONFIRM_DOMAINS": {
+        "title": "Domains to confirm",
+        "type": "text",
+        "required": false,
+        "description": "Action domains you approve call by call, comma-separated (default lock,alarm_control_panel,cover,valve; none for none)."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "home-assistant",
+    "smart-home",
+    "home-automation",
+    "iot"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://foreverworks.github.io/mcps/servers/home-assistant/",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/home-assistant"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-home-assistant": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.1.0",
+    "zod": "^4.6.7"
+  }
+}

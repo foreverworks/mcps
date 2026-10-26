@@ -1,0 +1,624 @@
+[
+  {
+    "name": "call_action",
+    "title": "Run an action",
+    "description": "Run a Home Assistant action (formerly a service call): light.turn_on, climate.set_temperature, media_player.volume_set, script.turn_on. Answers once it has run, with the states that changed. An action in a domain the user approves call by call (lock, alarm_control_panel, cover, valve unless configured otherwise), aimed at an entity of one, or a homeassistant action aimed wider than named entities, is refused here with needs_confirmation: use call_action_confirmed. Sent once: if the answer is outcome_unknown, read the entities (get_states) before running it again. Only what the user asks for: these act on a home.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z0-9_]+$",
+          "description": "The action's domain: light, switch, climate, lock, script, homeassistant, ..."
+        },
+        "service": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z0-9_]+$",
+          "description": "The action within the domain: turn_on, set_temperature, unlock, ... (list_actions lists them)."
+        },
+        "target": {
+          "description": "What the action acts on. Several kinds may be combined; an action that takes no target (homeassistant.reload_all, a script) leaves it out.",
+          "type": "object",
+          "properties": {
+            "entity_id": {
+              "description": "One entity id (or all, for every entity of the domain) or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "device_id": {
+              "description": "One device id (list_areas) or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "area_id": {
+              "description": "One area id (list_areas) or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "floor_id": {
+              "description": "One floor id or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "label_id": {
+              "description": "One label id or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "data": {
+          "description": "The action's fields, as list_actions shows them: {\"brightness_pct\": 40}, {\"temperature\": 21.5}. Not the target.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "return_response": {
+          "default": false,
+          "description": "Ask for the data the action answers with (a weather forecast, a calendar's events); only for actions list_actions marks with response.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "domain",
+        "service"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "call_action_confirmed",
+    "title": "Run an action, with the user's approval",
+    "description": "The same as call_action, for any action, and the user approves every call before it runs: the way to lock or unlock a door, arm or disarm an alarm, open or close a cover or a valve. Only when the user asked for that action. Acts outside the computer: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z0-9_]+$",
+          "description": "The action's domain: light, switch, climate, lock, script, homeassistant, ..."
+        },
+        "service": {
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z0-9_]+$",
+          "description": "The action within the domain: turn_on, set_temperature, unlock, ... (list_actions lists them)."
+        },
+        "target": {
+          "description": "What the action acts on. Several kinds may be combined; an action that takes no target (homeassistant.reload_all, a script) leaves it out.",
+          "type": "object",
+          "properties": {
+            "entity_id": {
+              "description": "One entity id (or all, for every entity of the domain) or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "device_id": {
+              "description": "One device id (list_areas) or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "area_id": {
+              "description": "One area id (list_areas) or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "floor_id": {
+              "description": "One floor id or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            },
+            "label_id": {
+              "description": "One label id or a list of them.",
+              "anyOf": [
+                {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 255
+                },
+                {
+                  "minItems": 1,
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 255
+                  }
+                }
+              ]
+            }
+          },
+          "additionalProperties": false
+        },
+        "data": {
+          "description": "The action's fields, as list_actions shows them: {\"brightness_pct\": 40}, {\"temperature\": 21.5}. Not the target.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        },
+        "return_response": {
+          "default": false,
+          "description": "Ask for the data the action answers with (a weather forecast, a calendar's events); only for actions list_actions marks with response.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "domain",
+        "service"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "get_states",
+    "title": "Get states",
+    "description": "The current state of one or more entities, with their attributes (a light's brightness, a thermostat's target, a sensor's unit) and when the state last changed. An id Home Assistant does not know is listed under not_found; when none is known, the call fails with suggestions.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "entity_ids": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+          },
+          "description": "The entity ids, like light.kitchen (list_entities finds them)."
+        },
+        "attributes": {
+          "default": true,
+          "description": "Include each entity's attributes.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "entity_ids"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether this server works with its Home Assistant: the version, whether it is RUNNING, its time zone (history and logbook times carry an offset), whether the WebSocket API signs in too, and how many entities each domain has. ok: false comes with the problem. Call it first, and whenever a call fails with unreachable or auth.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "history",
+    "title": "State history",
+    "description": "How entities' states changed over a window, from the recorder: for each entity its changes oldest first (the first is the state when the window opened), the newest limit of them. Default the last 24 hours; at most 31 days, and only as far back as the recorder keeps (10 days unless configured otherwise).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "entity_ids": {
+          "minItems": 1,
+          "maxItems": 20,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 255,
+            "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+          },
+          "description": "The entities, like sensor.living_room_temperature."
+        },
+        "start": {
+          "description": "Where the window starts; default the last `hours` before end, with its offset: 2026-03-01T18:00:00+02:00 or 2026-03-01T16:00:00Z. health gives the instance's time zone.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "end": {
+          "description": "Where it ends; default now, with its offset: 2026-03-01T18:00:00+02:00 or 2026-03-01T16:00:00Z. health gives the instance's time zone.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "hours": {
+          "description": "Instead of start: this many hours before end (default 24).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 744
+        },
+        "attributes": {
+          "default": false,
+          "description": "Include each change's attributes too (much larger).",
+          "type": "boolean"
+        },
+        "limit": {
+          "default": 100,
+          "description": "At most this many changes per entity, the newest (1-1000).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "required": [
+        "entity_ids"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_actions",
+    "title": "List actions",
+    "description": "The actions (formerly services) Home Assistant offers. Without a domain, every domain with its action names; with one, each action's description, whether it takes a target, whether it answers with data, and its fields (type, options, an example). Domains whose actions the user approves call by call (lock, alarm_control_panel, cover, valve unless configured otherwise) are marked confirm.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "description": "Only this domain's actions, with their fields.",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z0-9_]+$"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_areas",
+    "title": "List areas",
+    "description": "Every area (or one), with its floor, its devices and the entities in it: an entity's own area, else its device's, as Home Assistant's area pages show them. Disabled devices and entities are left out. Also counts what has no area. Its ids are what call_action takes as area_id and device_id.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "area": {
+          "description": "Only this area, by its name or id.",
+          "type": "string",
+          "maxLength": 100
+        },
+        "entities": {
+          "default": true,
+          "description": "List each area's entity ids, not only how many there are.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_entities",
+    "title": "List entities",
+    "description": "Find entities: one row each with entity_id, name, state, unit and area, in entity id order. Filter by domain (light, sensor, climate, ...), by area (its name or id), and by words that must all appear in the id, the name or the area. Use it to find the entity_id other tools take; get_states reads an entity's attributes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "domain": {
+          "description": "Only entities of this domain, like light or sensor.",
+          "type": "string",
+          "maxLength": 64,
+          "pattern": "^[a-z0-9_]+$"
+        },
+        "area": {
+          "description": "Only entities in this area, by its name or id (list_areas lists them).",
+          "type": "string",
+          "maxLength": 100
+        },
+        "search": {
+          "description": "Words that must all appear in the entity id, its name or its area, ignoring case.",
+          "type": "string",
+          "maxLength": 100
+        },
+        "limit": {
+          "default": 100,
+          "description": "At most this many rows (1-1000).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "logbook",
+    "title": "Logbook",
+    "description": "What happened over a window, as Home Assistant's logbook tells it: states that changed, automations and scripts that ran, and what caused each (a user, an action, an automation) where it knows. Oldest first, the newest limit of them. Optionally for one entity.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "entity_id": {
+          "description": "Only this entity's entries.",
+          "type": "string",
+          "maxLength": 255,
+          "pattern": "^[a-z0-9_]+\\.[a-z0-9_]+$"
+        },
+        "start": {
+          "description": "Where the window starts; default the last `hours` before end, with its offset: 2026-03-01T18:00:00+02:00 or 2026-03-01T16:00:00Z. health gives the instance's time zone.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "end": {
+          "description": "Where it ends; default now, with its offset: 2026-03-01T18:00:00+02:00 or 2026-03-01T16:00:00Z. health gives the instance's time zone.",
+          "type": "string",
+          "format": "date-time",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d:[0-5]\\d(?:\\.\\d+)?(?:Z|([+-](?:[01]\\d|2[0-3]):[0-5]\\d)))$"
+        },
+        "hours": {
+          "description": "Instead of start: this many hours before end (default 24).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 744
+        },
+        "limit": {
+          "default": 100,
+          "description": "At most this many entries, the newest (1-1000).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "render_template",
+    "title": "Render a template",
+    "description": "Render a Home Assistant template (Jinja) with its own states and helpers, for what no other tool answers in one call: \"{{ states.light | selectattr('state', 'eq', 'on') | map(attribute='entity_id') | list }}\", \"{{ area_entities('kitchen') }}\", \"{{ now() }}\". Rendering changes nothing. Home Assistant renders templates only for administrators.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "template": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10000,
+          "description": "The template text."
+        },
+        "variables": {
+          "description": "Variables the template can use by name.",
+          "type": "object",
+          "propertyNames": {
+            "type": "string"
+          },
+          "additionalProperties": {}
+        }
+      },
+      "required": [
+        "template"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]
