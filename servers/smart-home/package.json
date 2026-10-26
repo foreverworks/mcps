@@ -1,0 +1,67 @@
+{
+  "name": "@foreverworks/mcp-smart-home",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for BroadLink RM infrared blasters on the local network: blaster status, pressing a device's remote buttons by name, and learning a remote's codes",
+  "mcp": {
+    "title": "Smart home",
+    "audience": "extras",
+    "maturity": "experimental",
+    "tagline": "Press the buttons of a TV, heater or fan remote by name through a BroadLink IR blaster.",
+    "inputs": {
+      "SMART_HOME_CONFIG_FILE": {
+        "title": "Catalog file",
+        "type": "file",
+        "required": true,
+        "description": "The JSON file naming the blasters, the devices they face and every button's code."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "broadlink",
+    "infrared",
+    "ir-blaster",
+    "remote-control",
+    "nec",
+    "smart-home"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://foreverworks.github.io/mcps/servers/smart-home/",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/smart-home"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-smart-home": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.1.0",
+    "zod": "^4.6.7"
+  }
+}

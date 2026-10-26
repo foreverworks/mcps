@@ -1,0 +1,239 @@
+[
+  {
+    "name": "devices",
+    "title": "Devices and buttons",
+    "description": "Every device in the catalog, the blaster facing it, and its buttons: the code each sends, whether it toggles, and whether the user approves each press (those go through press_confirmed). IR goes one way: nothing here can read whether a device is on or off or how it is set.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether this server works: ok unless the catalog is unusable, a blaster's address answers as another device, or a blaster is locked in the BroadLink app. A blaster without power is not a failure; it is reported as reachable: false. Call status for details.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "learn",
+    "title": "Learn a remote's button",
+    "description": "Listen for one press of a remote: the blaster's LED lights while it listens; someone points the remote at it from close by and presses ONE button once. Answers what it heard: for an NEC remote the address and command, which catalog buttons already send it, and the entry to add to the catalog to keep it (the catalog is the only place codes are kept); for another protocol, the measured pulses. Ask for one button per call and leave a few seconds between calls: a press while nothing listens is lost.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "description": "The device whose remote it is; its blaster listens.",
+          "type": "string",
+          "maxLength": 48
+        },
+        "blaster": {
+          "description": "A blaster's name in the catalog; needed only when there are several and no device is named.",
+          "type": "string",
+          "maxLength": 48
+        },
+        "seconds": {
+          "default": 25,
+          "description": "How long to listen (5-60).",
+          "type": "integer",
+          "minimum": 5,
+          "maximum": 60
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "press",
+    "title": "Press a button",
+    "description": "Press one of a device's buttons by name: its blaster sends the button's infrared code and this answers once the blaster confirms. A button the catalog marks for the user's approval (one that can start heating, for example) is refused here with needs_confirmation: use press_confirmed. A toggle flips the device, and its new state cannot be read back. If the blaster does not confirm (outcome_unknown), the code may still have gone out: check the device before pressing again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "type": "string",
+          "maxLength": 48,
+          "description": "The device's name in the catalog (devices lists them)."
+        },
+        "button": {
+          "type": "string",
+          "maxLength": 48,
+          "description": "The button's name on that device (devices lists them)."
+        },
+        "times": {
+          "default": 1,
+          "description": "How many presses, with a short pause between them (1-10).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "device",
+        "button"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "press_confirmed",
+    "title": "Press a button, with the user's approval",
+    "description": "The same as press, for any button, and the user approves every call before the code goes out: the way to press a button the catalog marks for approval. Only when the user asks for that press. Acts outside the computer: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "type": "string",
+          "maxLength": 48,
+          "description": "The device's name in the catalog (devices lists them)."
+        },
+        "button": {
+          "type": "string",
+          "maxLength": 48,
+          "description": "The button's name on that device (devices lists them)."
+        },
+        "times": {
+          "default": 1,
+          "description": "How many presses, with a short pause between them (1-10).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "device",
+        "button"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "send_code",
+    "title": "Send an NEC code",
+    "description": "Send an NEC infrared code the catalog does not hold, by its address and command byte, through the blaster facing a device: for finding the code of a button a remote lacks or whose key no longer works, by trying candidates while someone watches the device. The device may do anything the code means to it, so the user approves each call. A code that works goes into the catalog; for a button that works on the remote, learn is quicker. Acts outside the computer: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "device": {
+          "description": "The device the code is meant for; its blaster sends it.",
+          "type": "string",
+          "maxLength": 48
+        },
+        "blaster": {
+          "description": "A blaster's name in the catalog; needed only when there are several and no device is named.",
+          "type": "string",
+          "maxLength": 48
+        },
+        "address": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 65535,
+          "description": "The NEC address: 0-255, or 256-65535 for extended NEC. A device's address is in devices."
+        },
+        "command": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 255,
+          "description": "The command byte, 0-255."
+        },
+        "times": {
+          "default": 1,
+          "description": "How many presses, with a short pause between them (1-10).",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 10
+        }
+      },
+      "required": [
+        "address",
+        "command"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "status",
+    "title": "Blaster status",
+    "description": "What each IR blaster says about itself now: online, model, MAC, the name set in the BroadLink app, firmware, and whether Lock device is on (then nothing can be sent until someone turns it off in the app). Each blaster answers for itself; one that does not answer says what to check. Call it before pressing anything, and when a press fails.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "blaster": {
+          "description": "A blaster's name in the catalog; needed only when there are several and no device is named.",
+          "type": "string",
+          "maxLength": 48
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

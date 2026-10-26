@@ -56,6 +56,7 @@ These work, and we use them, but each is built for one particular setup or on an
 | [<img src="servers/devices/icons/icon.svg" width="20" height="20" alt=""> Device broker](servers/devices)<br><sub>Experimental<br>10 tools, read and write</sub> | Share your own Android emulators, iOS simulators and desktops between AI agents, in fair turns. |
 | [<img src="servers/glovo/icons/icon.svg" width="20" height="20" alt=""> Glovo receipts](servers/glovo)<br><sub>Experimental<br>8 tools, read-only</sub> | Read your Glovo orders as itemised receipts matched to card charges, through an unofficial API. |
 | [<img src="servers/printer/icons/icon.svg" width="20" height="20" alt=""> Printer and scanner](servers/printer)<br><sub>Experimental<br>10 tools, read and write</sub> | Print, scan and check paper and toner on a network printer, with greys corrected for that printer. |
+| [<img src="servers/smart-home/icons/icon.svg" width="20" height="20" alt=""> Smart home](servers/smart-home)<br><sub>Experimental<br>7 tools, read and write</sub> | Press the buttons of a TV, heater or fan remote by name through a BroadLink IR blaster. |
 
 ## Shared packages
 
