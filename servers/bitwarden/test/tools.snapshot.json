@@ -399,6 +399,86 @@
     }
   },
   {
+    "name": "move_item",
+    "title": "Move item",
+    "description": "Put a login or secure note in one collection: its collections become exactly the one named. Only between the collections of the item's own organization; an item in the account's own vault, or a collection of another organization, is refused with what to do instead. An item already in exactly that collection is left as it is (moved: false). After a move the vault is synced and the item read back, so the answer, its collections before and after, is what Bitwarden holds. Returns no secret. Nothing is deleted or copied.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "The item id, from find_logins."
+        },
+        "collection": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The collection to put it in: its name as health lists it (case does not matter), or its id."
+        }
+      },
+      "required": [
+        "id",
+        "collection"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "outputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string"
+        },
+        "kind": {
+          "type": "string",
+          "enum": [
+            "login",
+            "note"
+          ]
+        },
+        "name": {
+          "type": "string"
+        },
+        "collections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "The item's collections now, by name"
+        },
+        "previousCollections": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "description": "Its collections before the call, by name"
+        },
+        "moved": {
+          "type": "boolean",
+          "description": "false when the item was already in exactly that collection, and nothing was sent"
+        }
+      },
+      "required": [
+        "id",
+        "kind",
+        "name",
+        "collections",
+        "previousCollections",
+        "moved"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
     "name": "sync",
     "title": "Sync",
     "description": "Pull the vault from Bitwarden now. Reads already sync every 30 seconds; this is for right after someone changed something in the web vault.",

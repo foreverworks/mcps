@@ -7,18 +7,22 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkPolicy, connectInMemory, guard, inputFilesWith, McpServer, sha256Of } from "@foreverworks/mcp-kit";
+import { checkPolicy, connectInMemory, guard, idempotentWrites, inputFilesWith, McpServer, sha256Of } from "@foreverworks/mcp-kit";
 import { describe, expect, it, vi } from "vitest";
 
 import type { Deps, VaultPort } from "../src/app/ports.js";
 import { buildDeps } from "../src/composition.js";
-import { asAppError, fail, unavailable } from "../src/domain/errors.js";
+import { asAppError, fail, notFound, unavailable } from "../src/domain/errors.js";
 import { makePwnedRange } from "../src/infra/pwned.js";
 import type { Collection, Login } from "../src/domain/schema.js";
 import { POLICY } from "../src/mcp/policy.js";
 import { registerAll } from "../src/mcp/register.js";
 
-const COLLECTIONS: Collection[] = [{ id: "c-agents", name: "Agents", organizationId: "org-1" }];
+const COLLECTIONS: Collection[] = [
+  { id: "c-agents", name: "Agents", organizationId: "org-1" },
+  { id: "c-shared", name: "Shared", organizationId: "org-1" },
+  { id: "c-team", name: "Team", organizationId: "org-2" },
+];
 
 const login = (over: Partial<Login> = {}): Login => ({
   id: "11111111-1111-4111-8111-111111111111",
@@ -55,13 +59,14 @@ const note = (): Login =>
     fields: [{ name: "License", value: "AAAAA-BBBBB-CCCCC-DDDDD-EEEEE", hidden: true }],
   });
 
-/** A vault in memory that records what it was asked to store, and every sync it was asked for. */
+/** A vault in memory that records what it was asked to store, every move, and every sync it was asked for. */
 const fakeVault = () => {
   const items = new Map<string, Login>([
     [login().id, login()],
     [note().id, note()],
   ]);
   const syncs: (boolean | undefined)[] = [];
+  const moves: { id: string; collectionIds: readonly string[] }[] = [];
   let next = 1;
   const vault: VaultPort = {
     status: async () => ({ status: "unlocked", userEmail: "agents@example.test", serverUrl: null, lastSync: "2026-01-01T00:00:00.000Z" }),
@@ -70,11 +75,7 @@ const fakeVault = () => {
     },
     listLogins: async (filter) =>
       [...items.values()].filter((l) => !filter.search || l.name.toLowerCase().includes(filter.search.toLowerCase())),
-    getLogin: async (id) => {
-      const found = items.get(id);
-      if (!found) throw new Error("missing");
-      return found;
-    },
+    getLogin: async (id) => items.get(id) ?? fail(notFound(`no item ${id}`)),
     createLogin: async (draft) => {
       const created = { ...draft, id: `00000000-0000-4000-8000-00000000000${next++}`, kind: "login" as const, revisionDate: "now", passwordRevisionDate: null, previousPasswords: [] };
       items.set(created.id, created);
@@ -107,10 +108,20 @@ const fakeVault = () => {
       items.set(created.id, created);
       return created;
     },
+    // As the CLI does: the item's collections become the ones sent, and an item outside any organization is refused.
+    moveItem: async (id, collectionIds) => {
+      const before = items.get(id) ?? fail(notFound(`no item ${id}`));
+      if (before.organizationId === null) throw new Error("Item does not belong to an organization. Consider moving it first.");
+      moves.push({ id, collectionIds: [...collectionIds] });
+      items.set(id, { ...before, collectionIds: [...collectionIds], revisionDate: "moved" });
+    },
     collections: async () => COLLECTIONS,
-    organizations: async () => [{ id: "org-1", name: "Example Org" }],
+    organizations: async () => [
+      { id: "org-1", name: "Example Org" },
+      { id: "org-2", name: "Other Org" },
+    ],
   };
-  return { vault, items, syncs };
+  return { vault, items, syncs, moves };
 };
 
 /** The reader's one root; a fixed path, so the snapshot is the same on every machine. */
@@ -121,7 +132,7 @@ const SECRET_SHA1 = createHash("sha1").update("s3cret-Pa55!").digest("hex").toUp
 const RANGE = [`${"0".repeat(35)}:0`, `${SECRET_SHA1.slice(5)}:42`, `${"F".repeat(35)}:3`].join("\r\n");
 
 const connected = async (inbox = INBOX, change: (vault: VaultPort) => VaultPort = (v) => v, range: (prefix: string) => Promise<string> = async () => RANGE) => {
-  const { vault: plain, items, syncs } = fakeVault();
+  const { vault: plain, items, syncs, moves } = fakeVault();
   const vault = change(plain);
   const ranges: string[] = [];
   let n = 0;
@@ -146,7 +157,7 @@ const connected = async (inbox = INBOX, change: (vault: VaultPort) => VaultPort 
     const result = (await client.callTool({ name, arguments: args })) as { content: { text: string }[] };
     return JSON.parse(result.content[0]?.text ?? "{}");
   };
-  return { call, items, client, syncs, ranges };
+  return { call, items, client, syncs, ranges, moves };
 };
 
 const ID = login().id;
@@ -404,6 +415,78 @@ describe("create_note", () => {
     const { call } = await connected(INBOX, truncating);
     const result = await call("create_note", { name: "x", fields: [{ name: "token", value: "0123456789abcdef" }] });
     expect(result.error).toMatchObject({ kind: "cli", message: expect.stringMatching(/note 0000.* was created, but .*field token/) });
+  });
+});
+
+describe("move_item", () => {
+  const PERSONAL = "22222222-2222-4222-8222-222222222222";
+
+  it("puts a login or a note in exactly the collection named, by name in any case or by id, and reads it back after a sync", async () => {
+    const { call, items, moves, syncs } = await connected();
+    const moved = await call("move_item", { id: ID, collection: "shared" });
+    expect(moved).toEqual({ id: ID, kind: "login", name: "Forum login", collections: ["Shared"], previousCollections: ["Agents"], moved: true });
+    expect(items.get(ID)).toEqual({ ...login(), collectionIds: ["c-shared"], revisionDate: "moved" });
+    expect(moves).toEqual([{ id: ID, collectionIds: ["c-shared"] }]);
+    expect(syncs).toEqual([undefined, true]);
+    expect(JSON.stringify(moved)).not.toMatch(/s3cret|GEZDGNBV|1234/);
+
+    expect(await call("move_item", { id: NOTE, collection: "c-shared" })).toMatchObject({ kind: "note", collections: ["Shared"], moved: true });
+
+    // An item in two collections leaves the other one.
+    items.set(ID, login({ collectionIds: ["c-agents", "c-shared"] }));
+    expect(await call("move_item", { id: ID, collection: "Agents" })).toMatchObject({ collections: ["Agents"], previousCollections: ["Agents", "Shared"], moved: true });
+    expect(items.get(ID)?.collectionIds).toEqual(["c-agents"]);
+  });
+
+  it("answers that an item is already there, and sends nothing, however often it is asked", async () => {
+    const { call, items, moves, syncs } = await connected();
+    expect(idempotentWrites(POLICY)).toEqual(["move_item"]);
+    for (const collection of ["AGENTS", "c-agents"]) {
+      expect(await call("move_item", { id: ID, collection })).toEqual({ id: ID, kind: "login", name: "Forum login", collections: ["Agents"], previousCollections: ["Agents"], moved: false });
+    }
+    expect(moves).toEqual([]);
+    expect(syncs).toEqual([undefined, undefined]);
+    expect(items.get(ID)).toEqual(login());
+
+    expect((await call("move_item", { id: ID, collection: "Shared" })).moved).toBe(true);
+    expect((await call("move_item", { id: ID, collection: "Shared" })).moved).toBe(false);
+    expect(moves).toHaveLength(1);
+  });
+
+  it("refuses a collection of another organization, naming the item's own collections, and sends nothing", async () => {
+    const { call, items, moves } = await connected();
+    const refused = (await call("move_item", { id: ID, collection: "Team" })).error;
+    expect(refused).toMatchObject({ kind: "input", message: expect.stringContaining("Example Org, and Team to Other Org") });
+    expect(refused.message).toContain("(Agents, Shared)");
+    expect(refused.message).toContain("web vault");
+    expect(moves).toEqual([]);
+    expect(items.get(ID)).toEqual(login());
+  });
+
+  it("refuses an item in the account's own vault, saying where to move it instead", async () => {
+    const { call, items, moves } = await connected();
+    items.set(PERSONAL, login({ id: PERSONAL, name: "Personal login", organizationId: null, collectionIds: [] }));
+    const refused = (await call("move_item", { id: PERSONAL, collection: "Shared" })).error;
+    expect(refused).toMatchObject({ kind: "input", message: expect.stringContaining("Personal login is in the account's own vault") });
+    expect(refused.message).toContain("move it into Example Org in the web vault, choosing Shared there");
+    expect(moves).toEqual([]);
+  });
+
+  it("refuses a collection the account does not have exactly as create_note does, and an unknown item as not_found", async () => {
+    const { call, moves } = await connected();
+    const viaMove = (await call("move_item", { id: ID, collection: "Nope" })).error;
+    const viaNote = (await call("create_note", { name: "x", fields: [{ name: "a", value: "1" }], collection: "Nope" })).error;
+    expect(viaMove).toEqual(viaNote);
+    expect(viaMove).toMatchObject({ kind: "input", message: "no collection named Nope; health lists the collections" });
+    expect((await call("move_item", { id: "99999999-9999-4999-8999-999999999999", collection: "Shared" })).error).toMatchObject({ kind: "not_found" });
+    expect(moves).toEqual([]);
+  });
+
+  it("fails, naming the item, when the vault reads back other collections than it was sent", async () => {
+    const ignoring = (v: VaultPort): VaultPort => ({ ...v, moveItem: async () => undefined });
+    const { call } = await connected(INBOX, ignoring);
+    const result = await call("move_item", { id: ID, collection: "Shared" });
+    expect(result.error).toMatchObject({ kind: "cli", message: "Forum login was sent to Shared, but after a sync Bitwarden lists it in Agents; check it in the web vault" });
   });
 });
 

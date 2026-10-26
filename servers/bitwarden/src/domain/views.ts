@@ -1,5 +1,9 @@
 import type { Collection, Login } from "./schema.js";
 
+/** Collection ids by the names the account lists them under; an id it cannot name stays an id. */
+export const collectionNames = (ids: readonly string[], collections: readonly Collection[]): string[] =>
+  ids.map((id) => collections.find((c) => c.id === id)?.name ?? id);
+
 /**
  * What a login looks like to the caller when it did not ask for a secret: no
  * password, no authenticator key, no hidden field's value. A secret leaves this
@@ -14,7 +18,7 @@ export const summaryOf = (login: Login, collections: readonly Collection[]) => (
   urls: login.uris.map((u) => u.uri),
   hasPassword: login.password !== null && login.password !== "",
   hasTotp: login.totp !== null && login.totp !== "",
-  collections: login.collectionIds.map((id) => collections.find((c) => c.id === id)?.name ?? id),
+  collections: collectionNames(login.collectionIds, collections),
   revisionDate: login.revisionDate,
 });
 

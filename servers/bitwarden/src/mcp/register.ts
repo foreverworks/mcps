@@ -4,6 +4,7 @@ import { z } from "zod";
 import type { Deps } from "../app/ports.js";
 import { checkHealth } from "../app/usecases/health.js";
 import { checkExposed, createLogin, currentTotp, findLogins, getField, getLogin, getPassword, syncVault, updateLogin } from "../app/usecases/logins.js";
+import { moveItem } from "../app/usecases/move.js";
 import { createNote } from "../app/usecases/notes.js";
 import { MAX_FIELD_BYTES, MAX_NOTES_BYTES } from "../domain/note.js";
 import { MAX_GIVEN_LENGTH, MAX_LENGTH, MIN_LENGTH } from "../domain/password.js";
@@ -49,6 +50,16 @@ const EXPOSED_OUTPUT = z.strictObject({
   previous: z.literal(true).optional(),
   exposed: z.boolean(),
   count: z.number().int().min(0).describe("How many times the password was seen in breaches; 0 when it was not"),
+});
+
+/** move_item's answer: which item, and its collections after and before. */
+const MOVE_OUTPUT = z.strictObject({
+  id: z.string(),
+  kind: z.enum(["login", "note"]),
+  name: z.string(),
+  collections: z.array(z.string()).describe("The item's collections now, by name"),
+  previousCollections: z.array(z.string()).describe("Its collections before the call, by name"),
+  moved: z.boolean().describe("false when the item was already in exactly that collection, and nothing was sent"),
 });
 
 /** The whole tool surface. Every result leaves the secrets out except get_password's, get_field's and totp's code. */
@@ -304,6 +315,25 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         ...(a.collection === undefined ? {} : { collection: a.collection }),
       }),
     ),
+  );
+
+  server.registerTool(
+    "move_item",
+    {
+      title: "Move item",
+      description:
+        "Put a login or secure note in one collection: its collections become exactly the one named. Only between the " +
+        "collections of the item's own organization; an item in the account's own vault, or a collection of another " +
+        "organization, is refused with what to do instead. An item already in exactly that collection is left as it is " +
+        "(moved: false). After a move the vault is synced and the item read back, so the answer, its collections before and " +
+        "after, is what Bitwarden holds. Returns no secret. Nothing is deleted or copied.",
+      inputSchema: {
+        id,
+        collection: z.string().trim().min(1).max(200).describe("The collection to put it in: its name as health lists it (case does not matter), or its id."),
+      },
+      outputSchema: MOVE_OUTPUT,
+    },
+    handled((a): Promise<OutputOf<typeof MOVE_OUTPUT>> => moveItem(deps, a.id, a.collection)),
   );
 
   server.registerTool(

@@ -9,7 +9,9 @@ import type { ToolPolicy } from "@foreverworks/mcp-kit";
  * asking. A person's own passwords belong in a vault this account cannot
  * reach; what a person lends goes into a shared collection on purpose. Nothing
  * here deletes, exports, or touches the account's settings. `create_note` is a
- * plain write, not idempotent: a second call makes a second note.
+ * plain write, not idempotent: a second call makes a second note. `move_item`
+ * sets an item's collection, so it is idempotent: a second call finds the item
+ * there and sends nothing.
  */
 export const POLICY: ToolPolicy = {
   health: { access: "read" },
@@ -23,4 +25,5 @@ export const POLICY: ToolPolicy = {
   create_login: { access: "write" },
   update_login: { access: "write" },
   create_note: { access: "write" },
+  move_item: { access: "write", idempotent: true },
 };

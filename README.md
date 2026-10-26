@@ -37,7 +37,7 @@ Servers for services people use anywhere. We built each one because the servers 
 | Server | What it does |
 |---|---|
 | [<img src="servers/app-stores/icons/icon.svg" width="20" height="20" alt=""> App Store and Google Play](servers/app-stores)<br><sub>Beta<br>7 tools, read and write</sub> | Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs. |
-| [<img src="servers/bitwarden/icons/icon.svg" width="20" height="20" alt=""> Bitwarden](servers/bitwarden)<br><sub>Stable<br>11 tools, read and write</sub> | Give your assistant its own Bitwarden vault to create logins, type passwords and read 2FA codes. |
+| [<img src="servers/bitwarden/icons/icon.svg" width="20" height="20" alt=""> Bitwarden](servers/bitwarden)<br><sub>Stable<br>12 tools, read and write</sub> | Give your assistant its own Bitwarden vault to create logins, type passwords and read 2FA codes. |
 | [<img src="servers/eas/icons/icon.svg" width="20" height="20" alt=""> Expo Application Services](servers/eas)<br><sub>Beta<br>23 tools, including **money**</sub> | Find out why an Expo build, workflow run or store submission failed, and roll out updates. |
 | [<img src="servers/enable-banking/icons/icon.svg" width="20" height="20" alt=""> Enable Banking](servers/enable-banking)<br><sub>Stable<br>10 tools, including **money**</sub> | Read, search and export statements and balances from banks across Europe, without moving money. |
 | [<img src="servers/google/icons/icon.svg" width="20" height="20" alt=""> Google Workspace](servers/google)<br><sub>Stable<br>115 tools, read and write</sub> | Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts. |

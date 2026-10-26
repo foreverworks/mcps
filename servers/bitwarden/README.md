@@ -3,10 +3,10 @@
 Give your AI assistant a [Bitwarden](https://bitwarden.com) account of its own
 to sign up and sign in with. It finds, creates and updates logins, generates
 passwords and hands one out only to type it, computes 2FA codes, keeps other
-secrets (an API token, a key file) in secure notes, and checks passwords
-against Have I Been Pwned. Only `create_login`, `update_login` and
-`create_note` write; nothing deletes, exports or changes settings, and no tool
-is `money`.
+secrets (an API token, a key file) in secure notes, moves items between an
+organization's collections, and checks passwords against Have I Been Pwned.
+Only `create_login`, `update_login`, `create_note` and `move_item` write;
+nothing deletes, exports or changes settings, and no tool is `money`.
 
 **You need** a Bitwarden account set aside for the agent, not your personal
 vault (any plan: Premium is not needed), with its personal API key and master
@@ -24,6 +24,7 @@ seconds, not milliseconds.
 - "Is the password of any of our Example Cloud logins in a known breach?"
 - "Store the key in example-key.json as a secure note called 'Example Cloud
   deploy key'."
+- "Move the Example Shop login into the Shared collection."
 
 ## Install
 
@@ -136,6 +137,7 @@ Nothing deletes.
 | `create_login` | write | A new login; the password is generated here (24 characters with symbols, by default) unless given, typed or from a file. |
 | `update_login` | write | Change what is named: `rotate_password` generates a new password, `append_notes` adds to the notes, `replace_totp` allows replacing a different key. |
 | `create_note` | write | A new secure note for secrets that are not a login, each in a hidden field, typed or read whole from a file; the result gives lengths and a file's SHA-256, never a value. |
+| `move_item` | write | Put a login or secure note in exactly one collection of its own organization, by name or id; the result gives its collections before and after. |
 
 `get_password`, `get_field` and `totp` return a secret and are still `read`:
 the account holds the agent's own logins, made for it to use without asking
@@ -160,7 +162,9 @@ ids the other tools take.
 message says why. Most often: a login that already has a different
 authenticator key (pass `replace_totp: true`, and the old key is kept), a
 Steam key (not standard TOTP), a collection the account does not have
-(`health` lists them), or an edit to a secure note (notes are never edited).
+(`health` lists them), an edit to a secure note (notes are never edited), or
+a `move_item` that would take an item out of its organization or out of the
+account's own vault (the message says what to do instead).
 
 **`cli`.** The CLI ran and said no: a network failure, a refused edit, or a
 call past 90 seconds. Retry once; if it persists, run `health` and read the
@@ -219,6 +223,13 @@ replaced stays in Bitwarden's password history: `get_password` with
 adds a line to the notes (recovery codes, answers) where `notes` replaces
 them.
 
+**Moving between collections.** `move_item` replaces an item's collections
+with the one named, through `bw edit item-collections`. An item already in
+exactly that collection is answered as it is, and nothing is sent, so the call
+is safe to repeat. After a move the server syncs and reads the item back, and
+the answer is what Bitwarden holds rather than what the CLI printed. A move
+stays inside the item's own organization: see [Limitations](#limitations).
+
 **Breached passwords.** `check_exposed` uses Have I Been Pwned's keyless
 range API: the first five hex characters of the password's SHA-1 go out, and
 the answer (every hash suffix in that range with its count, padded with
@@ -234,6 +245,11 @@ them in the web vault afterwards.
 
 - **No delete, no export, no settings, no attachments, no Sends**: only what
   an agent needs to sign up and sign in, and nothing that loses data.
+- **Moves stay inside an organization.** Bitwarden encrypts an
+  organization's items with that organization's key, so moving an item out
+  of the account's own vault hands it to the organization, and Bitwarden has
+  no move from one organization to another. `move_item` refuses both and says
+  what to do in the web vault instead.
 - **Logins and secure notes only**; cards and identities are not read. A
   secure note is created and read, never edited: a changed secret is a new
   note.

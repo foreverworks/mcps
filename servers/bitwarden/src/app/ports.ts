@@ -19,6 +19,12 @@ export type VaultPort = {
   readonly editLogin: (id: string, draft: LoginDraft) => Promise<Login>;
   /** A new secure note, read back as the vault stored it. */
   readonly createNote: (draft: NoteDraft) => Promise<Login>;
+  /**
+   * Replace an organization item's collections with these, all of its own
+   * organization. Bitwarden refuses an item outside any organization. Read the
+   * item back after a forced sync to see what the server holds.
+   */
+  readonly moveItem: (id: string, collectionIds: readonly string[]) => Promise<void>;
   readonly collections: () => Promise<readonly Collection[]>;
   readonly organizations: () => Promise<readonly Organization[]>;
 };

@@ -101,7 +101,8 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
     return fail(notFound(`item ${id} is not a login or a secure note`));
   };
 
-  const encoded = (payload: Record<string, unknown>): string => Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
+  /** The base64 JSON `bw create` and `bw edit` read; it goes in on stdin, like every payload here. */
+  const encoded = (payload: unknown): string => Buffer.from(JSON.stringify(payload), "utf8").toString("base64");
 
   const collections = memoize(LISTS_TTL_MS, async (_all: "all") =>
     parsed(await withSession(["list", "collections"]), collectionWire.array()).map(collectionOf),
@@ -134,6 +135,15 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
       return loginOf(parsed(await withSession(["edit", "item", id], encoded(itemPayload(draft, base))), itemWire));
     },
     createNote: async (draft: NoteDraft) => loginOf(parsed(await withSession(["create", "item"], encoded(notePayload(draft))), itemWire)),
+    // `bw edit item-collections <id>` takes a JSON array of collection ids and no --organizationid (CLI 2026.10.0
+    // reads that option for org-collection only). It prints the item, but goes through the SDK and clears the CLI's
+    // cache on the way, so the use case reads the item back after a forced sync rather than trusting that answer.
+    moveItem: async (id, collectionIds) => {
+      checkId(id);
+      const result = await withSession(["edit", "item-collections", id], encoded(collectionIds));
+      if (result.code !== 0 && /not found/i.test(bwMessage(result))) return fail(notFound(`no item ${id}`));
+      if (result.code !== 0) failed(result);
+    },
     collections: () => collections("all"),
     organizations: () => organizations("all"),
   };
