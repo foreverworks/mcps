@@ -8,7 +8,9 @@
  *
  * health (ok, and the WebSocket signs in), list_entities, get_states of the
  * first entity, list_areas, list_actions, history and logbook of the last
- * hour, and a template. With --action <domain.service> --entity <entity_id>
+ * hour, and a template when health says the token's user is an
+ * administrator (with any other user's token render_template is skipped:
+ * the server refuses it itself). With --action <domain.service> --entity <entity_id>
  * it then runs that action once through call_action_confirmed: it acts on a
  * home, so pass it only when the people there expect it.
  *
@@ -61,8 +63,12 @@ const main = async (): Promise<void> => {
   check(Array.isArray(actions.domains) && actions.domains.length > 0, `${actions.domains?.length ?? 0} action domains`);
   const logbook = await call("logbook", { hours: 1, limit: 5 });
   check(Array.isArray(logbook.entries), "the logbook reads");
-  const template = await call("render_template", { template: "{{ states | count }}" });
-  check(typeof template.result === "string", `a template renders (${template.result ?? template.error?.kind})`);
+  if (health.admin === true) {
+    const template = await call("render_template", { template: "{{ states | count }}" });
+    check(typeof template.result === "string", `a template renders (${template.result ?? template.error?.kind})`);
+  } else {
+    console.log(`  skip render_template: the token's user is not an administrator (health: unavailable_tools ${JSON.stringify(health.unavailable_tools ?? [])})`);
+  }
 
   const action = argAfter("--action");
   const entity = argAfter("--entity");

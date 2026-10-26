@@ -7,7 +7,7 @@
   "mcp": {
     "title": "Home Assistant",
     "audience": "general",
-    "maturity": "experimental",
+    "maturity": "beta",
     "tagline": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
     "inputs": {
       "HOME_ASSISTANT_URL": {
