@@ -1,0 +1,26 @@
+name: personal-data
+
+# The personal-data check (scripts/personal-data.ts) on every push, to any
+# branch, and on every pull request: a branch is public the moment it is
+# pushed here, so the check cannot wait for main. It needs Node and nothing
+# from npm, so nothing is installed before it runs. ci.yml runs it again as
+# the first step of npm run check.
+on: [push, pull_request]
+
+concurrency:
+  group: personal-data-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version: 24
+      - run: node scripts/personal-data.ts

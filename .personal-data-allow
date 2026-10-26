@@ -1,0 +1,34 @@
+# Values that look like personal data but are public or invented, and that
+# this repository needs in files whose lines cannot carry the marker: JSON,
+# and generated, vendored or recorded files. scripts/personal-data.ts reads this list: one
+# exact value per line, with the reason in the comment above it. An entry
+# that matches nothing fails the check, so the list stays as short as what
+# uses it. CONTRIBUTING.md ("Personal data and deployments") has the rest.
+
+# ANAF's automated senders, a public body's and nobody's own: anaf-spv reads
+# the sign-in codes and alerts they send, and its tool descriptions name them.
+Autentificare.SpatiuPrivat@anaf.ro
+Portal.ANAF@anaf.ro
+
+# The example invoices inside ANAF's published OpenAPI documents, kept
+# verbatim in servers/anaf-efactura/openapi/.
+mail@seller.com
+antonio@SubscriptionsSeller.dk
+
+# The examples in Enable Banking's API reference, kept verbatim in the wire
+# types generated from it (servers/enable-banking, npm run gen:types).
+FI0455231152453547
+FI1737631867613465
+FI7727551317119265
+FI8638798819867751
+FI8821291587733472
+
+# A placeholder in Porkbun's own tool description, from its npm package,
+# kept verbatim in the porkbun server's tool snapshot.
+me@gmail.com
+
+# The invented blasters in smart-home's tests, locally administered
+# addresses. The packets its python-broadlink fixture recorded carry the
+# first, so these change to documentation MACs only when it is recorded again.
+02:00:00:00:00:01
+02:00:00:00:00:99

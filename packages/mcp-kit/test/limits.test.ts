@@ -49,7 +49,7 @@ describe("hostAllowed", () => {
     expect(hostAllowed("googleapis.com", patterns)).toBe(false);
     expect(hostAllowed("evilgoogleapis.com", patterns)).toBe(false);
     expect(hostAllowed("api.oblio.eu.evil.com", patterns)).toBe(false);
-    expect(hostAllowed("169.254.169.254", patterns)).toBe(false);
+    expect(hostAllowed("169.254.169.254", patterns)).toBe(false); // personal-data-check: allow (the cloud metadata address, which must be refused)
   });
 
   it("is off when MCP_EGRESS_ALLOW is unset", () => {

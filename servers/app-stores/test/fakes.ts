@@ -18,7 +18,7 @@ import { registerAll } from "../src/mcp/register.js";
 
 export const KEY_ID = "ABCDE12345";
 export const ISSUER = "6f1c2a9e-0b3d-4c5e-8f70-1a2b3c4d5e6f";
-export const SA_EMAIL = "reviews-reader@example-project.iam.gserviceaccount.com";
+export const SA_EMAIL = "reviews-reader@example-project.iam.gserviceaccount.com"; // personal-data-check: allow (an invented service account)
 export const PACKAGE = "com.example.habits";
 export const NOW = 1_790_000_000;
 

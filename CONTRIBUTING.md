@@ -11,7 +11,7 @@ Node 22.19 or newer, npm 10 or newer.
 
 ```bash
 npm ci          # once, at the root: workspaces share one lockfile
-npm run check   # typecheck, tests, build, then the docs check, for every workspace
+npm run check   # personal data, typecheck, tests, build, then the docs checks
 ```
 
 Every server imports `packages/mcp-kit` (and the delivery-app servers
@@ -23,6 +23,9 @@ does not, so on a fresh clone run `npm run kit` once before
 
 `npm run check` is the bar for a change:
 
+- `check:personal-data` (`scripts/personal-data.ts`) fails on anything that
+  looks like personal data in a file a commit would carry
+  (see [Personal data and deployments](#personal-data-and-deployments)).
 - `typecheck` covers `test/` and `scripts/` as well as `src/` (each workspace has
   a `tsconfig.test.json` for exactly that).
 - `test` runs every workspace's tests in isolation: `packages/mcp-kit/testing/isolate.ts`
@@ -348,6 +351,77 @@ Nothing in code, tool descriptions or remedies names a particular deployment
 server through its environment, and the text a tool shows is derived from it
 (the kit's `inputFilesFrom(env)` is the pattern: it says where to put a file
 from `MCP_FILE_ROOTS` and `MCP_FILE_SCRIPT`).
+
+### The personal-data check
+
+A value copied from a real response, a log or your own setup is public the
+moment it is pushed, and a later commit does not take it back out of the
+history. So `npm run check` starts with `check:personal-data`
+(`scripts/personal-data.ts`), and `.github/workflows/personal-data.yml` runs
+it on every push to any branch and on every pull request. It reads every text
+file a commit would carry (what git tracks, and new files it does not ignore)
+and fails on any value that looks like personal data, one line each:
+`file:line:column: kind: text`.
+
+| Kind | What it looks for |
+|---|---|
+| `ipv4-private`, `ipv4-shared`, `ipv4-link-local` | IPv4 addresses in 10.0.0.0/8, 172.16.0.0/12 and 192.168.0.0/16; in 100.64.0.0/10, which carrier-grade NAT and VPNs use; in 169.254.0.0/16 |
+| `ipv6-global`, `ipv6-unique-local`, `ipv6-link-local` | IPv6 addresses in 2000::/3, fc00::/7 and fe80::/10 |
+| `mac` | MAC addresses, with colons or hyphens |
+| `tailnet-host` | Host names under `ts.net`, Tailscale's MagicDNS domain |
+| `email` | E-mail addresses |
+| `phone` | Phone numbers in international form (`+` and the country code) and `tel:` links. A national number is not looked for: it cannot be told from the other long numbers in a codebase. |
+| `cnp` | Romanian personal numeric codes, checked by birth date, county and control digit |
+| `iban` | IBANs, compact or in groups of four, checked by the country's length and the ISO 13616 mod-97 remainder |
+
+Use the values the standards reserve for examples; the check lets them through:
+
+- **IPv4**: 192.0.2.0/24, 198.51.100.0/24 and 203.0.113.0/24 (RFC 5737),
+  loopback, `0.0.0.0`. Public addresses are not looked for.
+- **IPv6**: 2001:db8::/32 and 3fff::/20 (RFC 3849, RFC 9637), `::1`, `::`.
+- **A whole range** written in CIDR notation, such as `10.0.0.0/8` or
+  `fe80::/10`: host bits zero and no longer than a /16.
+- **MAC**: 00-00-5E-00-53-00 to 00-00-5E-00-53-FF and the multicast
+  01-00-5E-90-10-00 to 01-00-5E-90-10-FF (RFC 7042), all zeros, broadcast,
+  and `aa:bb:cc:dd:ee:ff` as a placeholder for the format.
+- **Names**: example.com, example.org and example.net, with their subdomains,
+  and anything under `.example`, `.test`, `.invalid` or `.localhost` (RFC 2606,
+  RFC 6761); a placeholder such as `<tailnet>.ts.net`.
+- **E-mail**: addresses at those names, also inside a longer name such as a
+  file's (`me@example.com.password`); `git@github.com` and GitHub's own senders
+  (`noreply@github.com`, `notifications@github.com`, `users.noreply.github.com`);
+  names shaped like an address that are not one (`icon@2x.png`,
+  `backup@home.service`).
+- **Phone**: the fictional ranges: 555-0100 to 555-0199 in any North American
+  area code (`+1 202 555 0123`), and Ofcom's drama numbers +44 7700 900000 to
+  900999, +44 20 7946 0000 to 0999 and +44 1632 960000 to 960999.
+- **IBAN**: the published examples `DE89 3704 0044 0532 0130 00`,
+  `GB82 WEST 1234 5698 7654 32` and `RO49 AAAA 1B31 0075 9384 0000`.
+
+When a value has to stay as it is, because it is the thing under test or a
+well-known service's address, put `personal-data-check: allow` on its line, in
+a comment, with the reason next to it. The marker skips the whole line, so
+keep that line to the one value:
+
+```ts
+expect(hostAllowed("169.254.169.254", patterns)).toBe(false); // personal-data-check: allow (the cloud metadata address, which must be refused)
+```
+
+In a test, rather than marking a value the check must find, build it from
+parts at run time (`["10", "1", "2", "3"].join(".")`), as
+`scripts/test/personal-data.test.ts` does.
+
+A file whose lines cannot carry a comment (JSON, a generated or a vendored
+file) names the value in `.personal-data-allow` instead: one exact value per
+line, as it appears, with the reason in a comment above it. The list is for
+values that are public, such as a public body's automated sender or a
+vendor's published example, or invented and recorded into a fixture, never
+for anyone's real data. An entry that matches nothing fails the check, so the
+list stays as short as what uses it.
+
+If the check finds real personal data that is already on GitHub, do not draw
+attention to it in an issue or a commit message: report it privately, as
+[SECURITY.md](SECURITY.md) describes.
 
 ## Commits
 

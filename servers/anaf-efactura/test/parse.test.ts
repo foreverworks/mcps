@@ -47,7 +47,7 @@ Second line kept.</cbc:Note>
     </cac:PostalAddress>
     <cac:PartyTaxScheme><cbc:CompanyID>RO92345672</cbc:CompanyID><cac:TaxScheme><cbc:ID>VAT</cbc:ID></cac:TaxScheme></cac:PartyTaxScheme>
     <cac:PartyLegalEntity><cbc:RegistrationName>Exemplu Software SRL</cbc:RegistrationName><cbc:CompanyID>J99/1234/2020</cbc:CompanyID><cbc:CompanyLegalForm>Capital social 200 RON</cbc:CompanyLegalForm></cac:PartyLegalEntity>
-    <cac:Contact><cbc:Name>Ana Popescu</cbc:Name><cbc:Telephone>+40 700 000 000</cbc:Telephone><cbc:ElectronicMail>ana@example.com</cbc:ElectronicMail></cac:Contact>
+    <cac:Contact><cbc:Name>Ana Popescu</cbc:Name><cbc:Telephone>+44 7700 900 000</cbc:Telephone><cbc:ElectronicMail>ana@example.com</cbc:ElectronicMail></cac:Contact>
   </cac:Party></cac:AccountingSupplierParty>
   <cac:AccountingCustomerParty><cac:Party>
     <cac:PostalAddress>
@@ -148,7 +148,7 @@ describe("the view of a UBL invoice", () => {
         legalId: "J99/1234/2020",
         legalForm: "Capital social 200 RON",
         address: { street: "Strada Exemplului 1", city: "SECTOR1", postalCode: "010101", countrySubentity: "RO-B", country: "RO" },
-        contact: { name: "Ana Popescu", phone: "+40 700 000 000", email: "ana@example.com" },
+        contact: { name: "Ana Popescu", phone: "+44 7700 900 000", email: "ana@example.com" },
       },
       buyer: {
         name: "Beispiel GmbH",

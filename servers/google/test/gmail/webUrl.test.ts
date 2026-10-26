@@ -25,9 +25,12 @@ describe("gmailToken", () => {
 });
 
 describe("draftUrl", () => {
+  /** A consumer mailbox: the form follows the gmail.com domain. */
+  const consumer = "user@gmail.com"; // personal-data-check: allow (the domain decides the form; the user is invented)
+
   it("opens a standalone draft in the compose window, by Gmail's own token", () => {
-    expect(draftUrl("user@gmail.com", "18c0000000000010", "18c0000000000010", "r1111111111111111111")).toBe(
-      "https://mail.google.com/mail/?authuser=user@gmail.com#all?compose=" +
+    expect(draftUrl(consumer, "18c0000000000010", "18c0000000000010", "r1111111111111111111")).toBe(
+      `https://mail.google.com/mail/?authuser=${consumer}#all?compose=` +
         "JHrtffdvJsfzqDXtnRcngHHshfzVstbvjFQmqszhfqhGKDDQqmqQBrzlmvpPxKgtkLZkDngNhnnqrvmVpNShnjklclBxHLSXBQmStlwgczvlHgXGW",
     );
   });
@@ -44,8 +47,8 @@ describe("draftUrl", () => {
 
   /** Gmail has no compose link for a reply draft; it lives inline at the foot of the conversation. */
   it("sends a reply draft to its conversation", () => {
-    expect(draftUrl("user@gmail.com", "18c0000000000001", "18c0000000000003", "r4444444444444444444")).toBe(
-      "https://mail.google.com/mail/?authuser=user@gmail.com#all/thread-f:1783425452438716417",
+    expect(draftUrl(consumer, "18c0000000000001", "18c0000000000003", "r4444444444444444444")).toBe(
+      `https://mail.google.com/mail/?authuser=${consumer}#all/thread-f:1783425452438716417`,
     );
   });
 });

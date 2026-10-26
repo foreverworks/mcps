@@ -178,8 +178,8 @@ describe("mergeAgenda", () => {
   // Every instance of a series shares one iCalUID; folding on it alone would keep only the first week.
   it("keeps every instance of a recurring series", () => {
     const series = [
-      ev("gym", "2026-09-29T19:00:00+03:00", "2026-09-29T20:00:00+03:00", { iCalUID: "gym@google.com", recurringEventId: "gym" }),
-      ev("gym_2", "2026-10-06T19:00:00+03:00", "2026-10-06T20:00:00+03:00", { iCalUID: "gym@google.com", recurringEventId: "gym" }),
+      ev("gym", "2026-09-29T19:00:00+03:00", "2026-09-29T20:00:00+03:00", { iCalUID: "gym@example.com", recurringEventId: "gym" }),
+      ev("gym_2", "2026-10-06T19:00:00+03:00", "2026-10-06T20:00:00+03:00", { iCalUID: "gym@example.com", recurringEventId: "gym" }),
     ];
     const merged = mergeAgenda([{ account: "personal", calendar: primary, events: series }], { includeDeclined: false, timeZone: TZ });
     expect(merged).toHaveLength(2);

@@ -200,7 +200,7 @@ export const credentials = (devKey: typeof KEY | null = null): RawCredentials =>
       applicationIdentifier: "com.example.habits",
       androidFcm: null,
       googleServiceAccountKeyForFcmV1: null,
-      googleServiceAccountKeyForSubmissions: { id: "sa-1", clientEmail: "eas-submit@example-project.iam.gserviceaccount.com", projectIdentifier: "example-project" },
+      googleServiceAccountKeyForSubmissions: { id: "sa-1", clientEmail: "eas-submit@example-project.iam.gserviceaccount.com", projectIdentifier: "example-project" }, // personal-data-check: allow (an invented service account)
       androidAppBuildCredentialsList: [{ name: "Build Credentials", isDefault: true, androidKeystore: { type: "JKS", keyAlias: "upload", sha1CertificateFingerprint: "AA:BB", sha256CertificateFingerprint: "CC:DD" } }],
     },
   ],

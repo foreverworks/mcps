@@ -313,7 +313,7 @@ const SERVICE_ACCOUNT_KEY = `${JSON.stringify(
     project_id: "example-project",
     private_key_id: "0123456789abcdef0123456789abcdef01234567",
     private_key: `-----BEGIN PRIVATE KEY-----\n${"MIIEvQIBADANBgkqhkiG9w0BAQEFAASC".repeat(52)}\n-----END PRIVATE KEY-----\n`,
-    client_email: "reviews@example-project.iam.gserviceaccount.com",
+    client_email: "reviews@example-project.iam.gserviceaccount.com", // personal-data-check: allow (an invented service account)
     client_id: "100000000000000000001",
     token_uri: "https://oauth2.googleapis.com/token",
   },
@@ -335,7 +335,7 @@ describe("create_note", () => {
     const created = await call("create_note", {
       name: "Play service account key (example-app)",
       notes: "Replies to Play reviews for example-app.",
-      fields: [{ name: "key.json", file: { path: "sa.json" } }, { name: "client email", value: "reviews@example-project.iam.gserviceaccount.com", hidden: false }],
+      fields: [{ name: "key.json", file: { path: "sa.json" } }, { name: "client email", value: "reviews@example-project.iam.gserviceaccount.com", hidden: false }], // personal-data-check: allow (an invented service account)
     });
     expect(created).toMatchObject({
       kind: "note",
@@ -353,7 +353,7 @@ describe("create_note", () => {
     expect(items.get(created.id)).toMatchObject({ kind: "note", organizationId: "org-1", collectionIds: ["c-agents"], notes: "Replies to Play reviews for example-app." });
 
     const detail = await call("get_login", { id: created.id });
-    expect(detail.fields).toEqual([{ name: "key.json", hidden: true }, { name: "client email", value: "reviews@example-project.iam.gserviceaccount.com" }]);
+    expect(detail.fields).toEqual([{ name: "key.json", hidden: true }, { name: "client email", value: "reviews@example-project.iam.gserviceaccount.com" }]); // personal-data-check: allow (an invented service account)
     expect(JSON.stringify(detail)).not.toContain("PRIVATE KEY");
     const out = await call("get_field", { id: created.id, field: "KEY.JSON" });
     expect(out).toMatchObject({ kind: "note", field: "key.json", hidden: true, value: SERVICE_ACCOUNT_KEY });

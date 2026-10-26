@@ -58,7 +58,7 @@ const sentByMe: RawMessage = {
       { name: "From", value: "Ana Popescu <ana.popescu@example.com>" },
       { name: "To", value: "Maria Ionescu <maria.ionescu@recruiter.example>" },
       { name: "Subject", value: "Re: Example project" },
-      { name: "Message-ID", value: "<CAmine@mail.gmail.com>" },
+      { name: "Message-ID", value: "<CAmine@mail.example.com>" },
       { name: "In-Reply-To", value: "<first@recruiter.example>" },
       { name: "References", value: "<first@recruiter.example>" },
       { name: "Date", value: "Mon, 17 Aug 2026 02:10:00 +0300" },
@@ -117,8 +117,8 @@ describe("reply", () => {
     expect(h).toContain("To: Maria Ionescu <maria.ionescu@recruiter.example>");
     expect(h).toContain("Subject: Re: Example project");
     expect(h).not.toContain("Re: Re:");
-    expect(h).toContain("In-Reply-To: <CAmine@mail.gmail.com>");
-    expect(h).toContain("References: <first@recruiter.example> <CAmine@mail.gmail.com>");
+    expect(h).toContain("In-Reply-To: <CAmine@mail.example.com>");
+    expect(h).toContain("References: <first@recruiter.example> <CAmine@mail.example.com>");
     expect(h).not.toMatch(/^From:/m);
     expect(textOf(raw)).toBe("Following up.");
     expect(out).toMatchObject({ sent: false, draftId: "r-42", threadId: "18c0000000000001" });
@@ -274,7 +274,7 @@ const outlookOriginal: RawMessage = {
       { name: "To", value: "Ana Popescu <ana.popescu@example.com>" },
       { name: "Subject", value: "RE: Example project" },
       { name: "Message-ID", value: "<reply@recruiter.example>" },
-      { name: "References", value: "<first@recruiter.example> <CAmine@mail.gmail.com>" },
+      { name: "References", value: "<first@recruiter.example> <CAmine@mail.example.com>" },
       { name: "Date", value: "Tue, 15 Jan 2030 19:41:00 +0000" },
     ],
     parts: [
@@ -358,7 +358,7 @@ describe("the images a quote shows", () => {
     const h = headersOfRaw(raw);
     expect(h).toContain("Subject: RE: Example project");
     expect(h).toContain("In-Reply-To: <reply@recruiter.example>");
-    expect(h).toContain("References: <first@recruiter.example> <CAmine@mail.gmail.com> <reply@recruiter.example>");
+    expect(h).toContain("References: <first@recruiter.example> <CAmine@mail.example.com> <reply@recruiter.example>");
     expect(textOf(raw)).toBe(
       "Tomorrow at 10, then.\n\nOn Tue, Jan 15, 2030 at 9:41\u202fPM Maria Ionescu <maria.ionescu@recruiter.example> wrote:\n\n" +
         "> Hello Ana,\n> Tomorrow at 10 works.\n>\n> ----------------------------------------\n>\n> From: Ana Popescu\n> Hi Maria\n",
@@ -511,8 +511,8 @@ describe("updateDraft", () => {
             { name: "To", value: "maria.ionescu@recruiter.example" },
             { name: "Bcc", value: "me@example.com" },
             { name: "Subject", value: "Re: Example project" },
-            { name: "In-Reply-To", value: "<CAmine@mail.gmail.com>" },
-            { name: "References", value: "<first@x> <CAmine@mail.gmail.com>" },
+            { name: "In-Reply-To", value: "<CAmine@mail.example.com>" },
+            { name: "References", value: "<first@x> <CAmine@mail.example.com>" },
           ],
           parts: [
             { mimeType: "text/plain", body: { data: b64("old body") } },
@@ -536,8 +536,8 @@ describe("updateDraft", () => {
     expect(h).toContain("Subject: Re: Example project - follow-up");
     expect(h).toContain("To: maria.ionescu@recruiter.example");
     expect(h).toContain("Bcc: me@example.com");
-    expect(h).toContain("In-Reply-To: <CAmine@mail.gmail.com>");
-    expect(h).toContain("References: <first@x> <CAmine@mail.gmail.com>");
+    expect(h).toContain("In-Reply-To: <CAmine@mail.example.com>");
+    expect(h).toContain("References: <first@x> <CAmine@mail.example.com>");
     expect(textOf(raw)).toBe("old body");
     expect(getAttachment).toHaveBeenCalledWith("d5", "a1");
     expect(raw).toContain(Buffer.from("CVBYTES").toString("base64"));

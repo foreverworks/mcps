@@ -81,7 +81,7 @@ describe("findPeople", () => {
       { account: "personal", source: "contacts", person: person("Ana", "a@example.com") },
       { account: "personal", source: "contacts", person: person("Ana Popescu", "b@example.com") },
       { account: "work", source: "directory", person: person("Ana Popescu", undefined, { emailAddresses: [{ value: "A@example.com" }, { value: "b@example.com" }] }) },
-      { account: "personal", source: "contacts", person: person("Plumber", undefined, { phoneNumbers: [{ value: "0700 000 000", canonicalForm: "+40700000000" }] }) },
+      { account: "personal", source: "contacts", person: person("Plumber", undefined, { phoneNumbers: [{ value: "07700 900000", canonicalForm: "+447700900000" }] }) },
     ]);
     expect(merged).toEqual([
       {
@@ -92,7 +92,7 @@ describe("findPeople", () => {
           { account: "work", source: "directory" },
         ],
       },
-      { name: "Plumber", emails: [], phones: ["+40700000000"], foundIn: [{ account: "personal", source: "contacts" }] },
+      { name: "Plumber", emails: [], phones: ["+447700900000"], foundIn: [{ account: "personal", source: "contacts" }] },
     ]);
   });
 
