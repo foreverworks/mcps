@@ -40,6 +40,16 @@ const CATALOG = {
         { name: "swing", command: "0x09" },
       ],
     },
+    {
+      name: "purifier",
+      title: "Air purifier",
+      address: "0x80",
+      interval_ms: 1200,
+      buttons: [
+        { name: "speed", command: "0x0b", wake: true },
+        { name: "mode", command: "0x0c" },
+      ],
+    },
   ],
 };
 
@@ -49,11 +59,13 @@ const connected = async (options: { catalog?: unknown; blaster?: Partial<FakeBla
   writeFileSync(file, JSON.stringify(options.catalog ?? CATALOG));
   const blaster = fakeBlaster(options.blaster);
   let clock = 0;
+  const sleeps: number[] = [];
   const deps = buildDeps({
     env: options.env ?? { SMART_HOME_CONFIG_FILE: file },
     exchange: fakeNetwork([blaster]),
     now: () => clock,
     sleep: async (ms) => {
+      sleeps.push(ms);
       clock += ms;
     },
     random: () => 0.5,
@@ -66,7 +78,7 @@ const connected = async (options: { catalog?: unknown; blaster?: Partial<FakeBla
     const result = (await client.callTool({ name, arguments: args })) as { content: { text: string }[] };
     return JSON.parse(result.content[0]?.text ?? "{}");
   };
-  return { call, client, blaster, file };
+  return { call, client, blaster, file, sleeps };
 };
 
 const necOf = (packet: Uint8Array | undefined) => decodeNec((decodeIrPacket(packet ?? new Uint8Array())?.durations ?? []).map(microsecondsOf));
@@ -100,7 +112,7 @@ describe("status and health", () => {
     expect((await call("status")).blasters).toEqual([
       { name: "living-room", host: "192.0.2.10", online: true, model: "RM4 mini", devtype: "0x520c", mac: "02:00:00:00:00:01", name_on_device: "Living room", locked: false, firmware: 1234 },
     ]);
-    expect(await call("health")).toEqual({ ok: true, blasters: [{ name: "living-room", reachable: true, locked: false }], devices: 2 });
+    expect(await call("health")).toEqual({ ok: true, blasters: [{ name: "living-room", reachable: true, locked: false }], devices: 3 });
   });
 
   it("says a blaster without power is offline and what to check, and stays healthy", async () => {
@@ -109,7 +121,7 @@ describe("status and health", () => {
     expect(b.online).toBe(false);
     expect(b.error.kind).toBe("offline");
     expect(b.error.remedy).toContain("USB plug");
-    expect(await call("health")).toEqual({ ok: true, blasters: [{ name: "living-room", reachable: false }], devices: 2 });
+    expect(await call("health")).toEqual({ ok: true, blasters: [{ name: "living-room", reachable: false }], devices: 3 });
   });
 
   it("says a locked blaster is locked, by its flag or by a refused auth, and is not healthy", async () => {
@@ -148,6 +160,9 @@ describe("pressing", () => {
       ],
     });
     expect(out.note).toContain("IR goes one way");
+    expect(out.devices[2]).toMatchObject({ name: "purifier", interval_ms: 1200, buttons: [{ name: "speed", code: "NEC 0x80/0x0b" }, { name: "mode", code: "NEC 0x80/0x0c" }] });
+    expect(out.devices[2].buttons[0].wake).toContain("only wakes it");
+    expect(out.devices[2].buttons[1].wake).toBeUndefined();
   });
 
   it("sends a button's NEC code as one natural press, and says a toggle's state is unknown", async () => {
@@ -159,10 +174,70 @@ describe("pressing", () => {
     expect(necOf(blaster.sent[0])).toEqual({ address: 0x04, command: 0x08, extended: false, repeats: 1 });
   });
 
-  it("presses several times, each a separate press", async () => {
-    const { call, blaster } = await connected();
-    expect((await call("press", { device: "tv", button: "volume_up", times: 3 })).times).toBe(3);
+  it("presses several times, each a separate press, 400 ms apart unless the device or the call says otherwise", async () => {
+    const { call, blaster, sleeps } = await connected();
+    expect(await call("press", { device: "tv", button: "volume_up", times: 3 })).toMatchObject({ times: 3, interval_ms: 400 });
     expect(blaster.sent.map((p) => necOf(p)?.command)).toEqual([2, 2, 2]);
+    expect(sleeps).toEqual([400, 400]);
+    sleeps.length = 0;
+    expect((await call("press", { device: "tv", button: "volume_up", times: 2, interval_ms: 1500 })).interval_ms).toBe(1500);
+    expect(sleeps).toEqual([1500]);
+    sleeps.length = 0;
+    expect((await call("press", { device: "purifier", button: "mode", times: 2 })).interval_ms).toBe(1200);
+    expect(sleeps).toEqual([1200]);
+  });
+
+  it("says nothing of spacing for a single press, and waits for none", async () => {
+    const { call, sleeps } = await connected();
+    expect((await call("press", { device: "tv", button: "volume_up", interval_ms: 3000 })).interval_ms).toBeUndefined();
+    expect(sleeps).toEqual([]);
+  });
+
+  it("sends a wake press first for a button marked wake, and none when the call says the device is awake", async () => {
+    const { call, blaster, sleeps } = await connected();
+    const out = await call("press", { device: "purifier", button: "speed", times: 2 });
+    expect(out).toMatchObject({ times: 2, wake_press: true, interval_ms: 1200, sent: true });
+    expect(out.note).toContain("A wake press went out first");
+    expect(blaster.sent.map((p) => necOf(p)?.command)).toEqual([0x0b, 0x0b, 0x0b]);
+    expect(sleeps).toEqual([1200, 1200]);
+    blaster.sent.length = 0;
+    const awake = await call("press", { device: "purifier", button: "speed", wake: false });
+    expect(awake.wake_press).toBeUndefined();
+    expect(blaster.sent).toHaveLength(1);
+    blaster.sent.length = 0;
+    expect((await call("press", { device: "tv", button: "volume_up", wake: true })).wake_press).toBe(true);
+    expect(blaster.sent).toHaveLength(2);
+  });
+
+  it("refuses presses that would wait too long in all, sending nothing", async () => {
+    const { call, blaster } = await connected();
+    const out = await call("press", { device: "purifier", button: "speed", times: 3, interval_ms: 10_000 });
+    expect(out.error.kind).toBe("input");
+    expect(out.error.message).toContain("4 presses (one of them to wake the device) 10 s apart wait 30 s in all");
+    expect(blaster.datagrams).toBe(0);
+    expect((await call("send_code", { device: "tv", address: 4, command: 2, times: 10, interval_ms: 3000 })).error.kind).toBe("input");
+    expect(blaster.datagrams).toBe(0);
+  });
+
+  it("refuses a pause shorter than the default or longer than 10 s", async () => {
+    const { client, blaster } = await connected();
+    for (const interval_ms of [100, 10_001]) {
+      const out = (await client.callTool({ name: "press", arguments: { device: "tv", button: "volume_up", times: 2, interval_ms } })) as { isError?: boolean };
+      expect(out.isError).toBe(true);
+    }
+    expect(blaster.datagrams).toBe(0);
+  });
+
+  it("tells the person approving a call how it is spaced", () => {
+    const line = (tool: "press_confirmed" | "send_code", args: Record<string, unknown>) => {
+      const rule = POLICY[tool] as { summary?: (a: Record<string, unknown>) => string };
+      return rule.summary?.(args);
+    };
+    expect(line("press_confirmed", { device: "heater", button: "power" })).toBe('press "power" on device "heater" by infrared, once');
+    expect(line("press_confirmed", { device: "heater", button: "power", times: 3, interval_ms: 1500, wake: true })).toBe(
+      'press "power" on device "heater" by infrared, 3 times, 1.5 s apart, after one press to wake it',
+    );
+    expect(line("send_code", { device: "heater", address: 0, command: 0x15, times: 2, interval_ms: 2000 })).toContain("0x00/0x15 2 times, 2 s apart through");
   });
 
   it("refuses a button marked for approval, sending nothing; press_confirmed sends it", async () => {
@@ -198,6 +273,13 @@ describe("pressing", () => {
     expect(out).toMatchObject({ blaster: "living-room", code: "NEC 0x00/0x09", sent: true, known_as: [{ device: "heater", button: "swing" }] });
     expect(necOf(blaster.sent[0])).toMatchObject({ address: 0, command: 0x09 });
     expect((await call("send_code", { address: 0xbf40, command: 1 })).error.kind).toBe("input");
+  });
+
+  it("spaces a code's presses by interval_ms, else by the named device's", async () => {
+    const { call, sleeps } = await connected();
+    expect((await call("send_code", { device: "purifier", address: 0x80, command: 0x0d, times: 2 })).interval_ms).toBe(1200);
+    expect((await call("send_code", { device: "tv", address: 4, command: 0x0d, times: 3, interval_ms: 2000 })).interval_ms).toBe(2000);
+    expect(sleeps).toEqual([1200, 2000, 2000]);
   });
 });
 
@@ -265,6 +347,12 @@ describe("the catalog", () => {
     expect(out.error.message).toContain('two blasters are named "a"');
     expect(out.error.message).toContain('names blaster "b"');
     expect(out.error.message).toContain("neither it nor its device has an NEC address");
+  });
+
+  it("refuses a device pause outside 400 ms to 10 s", async () => {
+    const catalog = { ...CATALOG, devices: [{ name: "fan", address: 0, interval_ms: 50, buttons: [{ name: "speed", command: 1 }] }] };
+    const out = await (await connected({ catalog })).call("devices");
+    expect(out.error.kind).toBe("config");
   });
 
   it("refuses a field it does not know rather than ignoring it", async () => {

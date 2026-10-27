@@ -3,15 +3,34 @@ import { z } from "zod";
 
 import { devices } from "../app/usecases/devices.js";
 import { learn } from "../app/usecases/learn.js";
-import { press, sendCode } from "../app/usecases/press.js";
+import { press, type PressArgs, sendCode, type SendCodeArgs } from "../app/usecases/press.js";
 import { health, status } from "../app/usecases/status.js";
 import type { Deps } from "../app/ports.js";
+import { MAX_PAUSE_MS, MAX_WAIT_MS, MIN_PAUSE_MS, PAUSE_MS } from "../domain/pacing.js";
 import { handled } from "./envelope.js";
 import { wire } from "./wire.js";
 
 const deviceArg = z.string().max(48).describe("The device's name in the catalog (devices lists them).");
 const buttonArg = z.string().max(48).describe("The button's name on that device (devices lists them).");
-const timesArg = z.number().int().min(1).max(10).default(1).describe("How many presses, with a short pause between them (1-10).");
+const timesArg = z.number().int().min(1).max(10).default(1).describe("How many presses, with a pause between them (1-10).");
+const intervalArg = z
+  .number()
+  .int()
+  .min(MIN_PAUSE_MS)
+  .max(MAX_PAUSE_MS)
+  .optional()
+  .describe(
+    `The pause between presses in milliseconds (${MIN_PAUSE_MS}-${MAX_PAUSE_MS}): long enough for someone to read the device's display ` +
+      `between presses, or for a device to act on each. Default: the device's interval_ms in the catalog, else ${PAUSE_MS}. One call ` +
+      `waits at most ${MAX_WAIT_MS / 1000} s in all.`,
+  );
+const wakeArg = z
+  .boolean()
+  .optional()
+  .describe(
+    "Send one press first only to wake the device (some devices light their display on the first press and act on the next): " +
+      "default what the catalog says of the button (devices). false when the device is already awake, pressed a moment ago.",
+  );
 const blasterArg = z.string().max(48).optional().describe("A blaster's name in the catalog; needed only when there are several and no device is named.");
 
 /** The whole tool surface. */
@@ -61,11 +80,12 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       description:
         "Press one of a device's buttons by name: its blaster sends the button's infrared code and this answers once the blaster " +
         "confirms. A button the catalog marks for the user's approval (one that can start heating, for example) is refused here with " +
-        "needs_confirmation: use press_confirmed. A toggle flips the device, and its new state cannot be read back. If the blaster does " +
-        "not confirm (outcome_unknown), the code may still have gone out: check the device before pressing again.",
-      inputSchema: { device: deviceArg, button: buttonArg, times: timesArg },
+        "needs_confirmation: use press_confirmed. A toggle flips the device, and its new state cannot be read back. Several presses " +
+        "(times) are spaced by interval_ms; a button the catalog marks wake gets one press more, first, to wake the device. If the " +
+        "blaster does not confirm (outcome_unknown), the code may still have gone out: check the device before pressing again.",
+      inputSchema: { device: deviceArg, button: buttonArg, times: timesArg, interval_ms: intervalArg, wake: wakeArg },
     },
-    handled((a: { device: string; button: string; times: number }) => press(deps, a, false).then(wire)),
+    handled((a: PressArgs) => press(deps, a, false).then(wire)),
   );
 
   server.registerTool(
@@ -75,9 +95,9 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       description:
         "The same as press, for any button, and the user approves every call before the code goes out: the way to press a button the " +
         "catalog marks for approval. Only when the user asks for that press.",
-      inputSchema: { device: deviceArg, button: buttonArg, times: timesArg },
+      inputSchema: { device: deviceArg, button: buttonArg, times: timesArg, interval_ms: intervalArg, wake: wakeArg },
     },
-    handled((a: { device: string; button: string; times: number }) => press(deps, a, true).then(wire)),
+    handled((a: PressArgs) => press(deps, a, true).then(wire)),
   );
 
   server.registerTool(
@@ -95,9 +115,10 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         address: z.number().int().min(0).max(0xffff).describe("The NEC address: 0-255, or 256-65535 for extended NEC. A device's address is in devices."),
         command: z.number().int().min(0).max(0xff).describe("The command byte, 0-255."),
         times: timesArg,
+        interval_ms: intervalArg,
       },
     },
-    handled((a: { device?: string | undefined; blaster?: string | undefined; address: number; command: number; times: number }) => sendCode(deps, a).then(wire)),
+    handled((a: SendCodeArgs) => sendCode(deps, a).then(wire)),
   );
 
   server.registerTool(

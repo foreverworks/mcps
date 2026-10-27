@@ -3,6 +3,7 @@ import { z } from "zod";
 
 import { type Catalog, catalogProblems, type Code } from "../domain/catalog.js";
 import { fail } from "../domain/errors.js";
+import { MAX_PAUSE_MS, MIN_PAUSE_MS } from "../domain/pacing.js";
 
 /**
  * The catalog file (SMART_HOME_CONFIG_FILE), checked and turned into the
@@ -27,6 +28,7 @@ const button = z
     pulses: z.array(z.number().int().min(1).max(2_000_000)).min(4).max(1024).optional(),
     toggle: z.boolean().default(false),
     confirm: z.boolean().default(false),
+    wake: z.boolean().default(false),
     note: z.string().max(300).optional(),
   })
   .refine((b) => (b.command === undefined) !== (b.pulses === undefined), "a button has either command (NEC) or pulses (raw), not both");
@@ -37,6 +39,7 @@ const device = z.strictObject({
   blaster: name.optional(),
   address: byteOrHex(0xffff).optional(),
   note: z.string().max(500).optional(),
+  interval_ms: z.number().int().min(MIN_PAUSE_MS).max(MAX_PAUSE_MS).optional(),
   buttons: z.array(button).max(200),
 });
 
@@ -74,13 +77,14 @@ export const catalogFrom = (parsed: File): Catalog => {
       title: d.title,
       blaster: blasterName ?? "",
       note: d.note,
+      intervalMs: d.interval_ms,
       buttons: d.buttons.flatMap((b) => {
         const code = codeOf(d, b);
         if (typeof code === "string") {
           problems.push(code);
           return [];
         }
-        return [{ name: b.name, code, toggle: b.toggle, confirm: b.confirm, note: b.note }];
+        return [{ name: b.name, code, toggle: b.toggle, confirm: b.confirm, wake: b.wake, note: b.note }];
       }),
     };
   });

@@ -9,7 +9,8 @@ const INSTRUCTIONS =
   "Infrared remote control through BroadLink RM blasters on the local network: devices lists every device and its buttons, press " +
   "sends one by name, status says whether each blaster answers and whether it is locked in the BroadLink app. A button marked for " +
   "approval (one that can start heating, say) goes through press_confirmed, and an untested code through send_code; the user approves " +
-  "each of those calls. learn hears one press of a remote and answers its code. IR goes one way: nothing here can read whether a device " +
+  "each of those calls. When someone watches the device between presses, space them with interval_ms. learn hears one press of a " +
+  "remote and answers its code. IR goes one way: nothing here can read whether a device " +
   "is on or off, and a toggle pressed twice undoes itself. Press only what the user asks for: these act on devices in someone's home.";
 
 /**

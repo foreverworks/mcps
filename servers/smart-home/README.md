@@ -20,6 +20,7 @@ bytes per button; others as the timings the blaster measured.
 
 - "Is the IR blaster online?"
 - "Turn the TV volume up three times."
+- "Step the heater's level twice, a second and a half apart, so I can read its display."
 - "Which buttons does the heater have?"
 - "I'm pointing the fan remote at the blaster: learn the button I press."
 - "Try NEC command 0x15 on the heater while I watch it."
@@ -91,9 +92,11 @@ server shares are in [docs/configuration.md](../../docs/configuration.md).
       "title": "Fan heater",
       "address": "0x00",
       "note": "On the floor by the window.",
+      "interval_ms": 1500,
       "buttons": [
         { "name": "power", "command": "0x46", "toggle": true, "confirm": true, "note": "starts heating" },
-        { "name": "swing", "command": "0x09" }
+        { "name": "swing", "command": "0x09" },
+        { "name": "level", "command": "0x0b", "wake": true, "note": "steps the heating level" }
       ]
     }
   ]
@@ -107,6 +110,10 @@ server shares are in [docs/configuration.md](../../docs/configuration.md).
 - **A device** has a `name`, an optional `title` and `note`, the `blaster`
   facing it (needed only when there are several), and the NEC `address` its
   remote uses. Names are lowercase letters, digits, `-` and `_`.
+- **`interval_ms`** on a device is the pause between its presses when a call
+  presses more than once and names none: 400 to 10000 milliseconds, 400 when
+  unset. Raise it for a device whose display someone reads between presses,
+  or one that misses presses that come quickly.
 - **A button** has a `name` and either `command`, the NEC command byte, or
   `pulses`, the microseconds `learn` measured for a remote of another protocol.
   A button may carry its own `address`. Bytes are numbers or hex strings
@@ -117,6 +124,12 @@ server shares are in [docs/configuration.md](../../docs/configuration.md).
 - **`confirm: true`** puts the button behind `press_confirmed`: `press` refuses
   it, and your client asks you before every press. Use it for anything that
   must not happen unattended: heating, a door, a pump.
+- **`wake: true`** says the device spends the button's first press waking up
+  (its display lights and shows the current setting) and acts only on a
+  press that follows while it is awake, as many heaters and fans do. `press`
+  then sends one press more, first, and the device's pause after it. If the
+  device was already awake, that first press acts too: a call can say
+  `wake: false` when the button was pressed a moment ago.
 
 `learn` answers each new button as the entry to add here, so the catalog stays
 the one place codes are kept.
@@ -153,10 +166,10 @@ learning mode; **write** in bold is confirmed with you before every call
 | `health` | read | Whether the server works: ok unless the catalog is unusable, a blaster's address answers as another device, or a blaster is locked. A blaster without power is reported (`reachable: false`), not a failure. |
 | `status` | read | Each blaster as it answers now: online, model, MAC, the name set in the app, firmware, and whether it is locked. |
 | `devices` | read | The catalog: every device, the blaster facing it, its buttons with their codes, which toggle and which need your approval. |
-| `press` | write | Presses a device's button by name, 1 to 10 times; refuses a button marked `confirm`. |
+| `press` | write | Presses a device's button by name, 1 to 10 times, `interval_ms` apart, with a wake press first for a button marked `wake`; refuses a button marked `confirm`. |
 | `learn` | write | Listens for one press of a remote (5 to 60 s, default 25) and answers its code, the catalog buttons that already send it, and the entry to add. |
 | `press_confirmed` | **write** | The same as `press`, for any button, after you approve the call. |
-| `send_code` | **write** | Sends an NEC code that is not in the catalog, by address and command byte: for finding the code of a button the remote lacks. |
+| `send_code` | **write** | Sends an NEC code that is not in the catalog, by address and command byte, 1 to 10 times, `interval_ms` apart: for finding the code of a button the remote lacks. |
 
 ### Confirmation
 
@@ -167,6 +180,7 @@ from the arguments, for example:
 
 ```
 smart-home: press "power" on device "heater" by infrared, once
+smart-home: press "level" on device "heater" by infrared, 2 times, 1.5 s apart
 smart-home: send the untested NEC code 0x00/0x15 once through the blaster facing "heater": the device may do whatever that code means to it
 ```
 
@@ -219,6 +233,16 @@ within a unit or two of what the blaster records from the remote itself. A
 code is sent once: if the blaster does not confirm it, the answer says the
 outcome is unknown instead of trying again, because a second press of a
 toggle undoes the first.
+
+**Spacing presses.** Several presses in one call are separate presses, never
+one held button: 400 ms apart by default, longer than an NEC remote's frame
+period and the repeat code each press carries. A call's `interval_ms`, else
+its device's in the catalog, sets a longer pause, up to 10 s, so someone can
+read the device's display between presses or a device that is slow to take
+the next one gets it. One call waits at most 20 s between its presses in
+all; a longer run is refused before anything is sent, and goes as several
+calls. A button marked `wake` gets one press more, first, and the answer
+says so (`wake_press`).
 
 **Learning.** The blaster listens in windows of about 25 seconds; the server
 opens a new one before the last closes, and asks every second for a captured

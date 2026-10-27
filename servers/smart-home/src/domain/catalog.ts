@@ -27,6 +27,8 @@ export type Button = {
   readonly toggle: boolean;
   /** A person approves every press (it can start heating, open something, spend something). */
   readonly confirm: boolean;
+  /** The device ignores its first press but for waking up (its display lights): press sends one press more, first. */
+  readonly wake: boolean;
   readonly note?: string | undefined;
 };
 
@@ -35,6 +37,8 @@ export type Device = {
   readonly title?: string | undefined;
   readonly blaster: string;
   readonly note?: string | undefined;
+  /** The pause between this device's presses, unless a call names its own (domain/pacing.ts). */
+  readonly intervalMs?: number | undefined;
   readonly buttons: readonly Button[];
 };
 
