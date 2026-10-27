@@ -129,7 +129,8 @@ server shares are in [docs/configuration.md](../../docs/configuration.md).
   press that follows while it is awake, as many heaters and fans do. `press`
   then sends one press more, first, and the device's pause after it. If the
   device was already awake, that first press acts too: a call can say
-  `wake: false` when the button was pressed a moment ago.
+  `wake: false` while the device is still awake from a press a moment ago,
+  of this button or of any other, when its display wakes as a whole.
 
 `learn` answers each new button as the entry to add here, so the catalog stays
 the one place codes are kept.

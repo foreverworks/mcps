@@ -105,7 +105,7 @@
           "maximum": 10000
         },
         "wake": {
-          "description": "Send one press first only to wake the device (some devices light their display on the first press and act on the next): default what the catalog says of the button (devices). false when the device is already awake, pressed a moment ago.",
+          "description": "Send one press first only to wake the device (some devices light their display on the first press and act on the next): default what the catalog says of the button (devices). false while the device is still awake from a press a moment ago (of any of its buttons, when its display wakes as a whole).",
           "type": "boolean"
         }
       },
@@ -156,7 +156,7 @@
           "maximum": 10000
         },
         "wake": {
-          "description": "Send one press first only to wake the device (some devices light their display on the first press and act on the next): default what the catalog says of the button (devices). false when the device is already awake, pressed a moment ago.",
+          "description": "Send one press first only to wake the device (some devices light their display on the first press and act on the next): default what the catalog says of the button (devices). false while the device is still awake from a press a moment ago (of any of its buttons, when its display wakes as a whole).",
           "type": "boolean"
         }
       },

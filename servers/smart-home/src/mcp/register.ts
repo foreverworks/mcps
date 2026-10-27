@@ -29,7 +29,8 @@ const wakeArg = z
   .optional()
   .describe(
     "Send one press first only to wake the device (some devices light their display on the first press and act on the next): " +
-      "default what the catalog says of the button (devices). false when the device is already awake, pressed a moment ago.",
+      "default what the catalog says of the button (devices). false while the device is still awake from a press a moment ago " +
+      "(of any of its buttons, when its display wakes as a whole).",
   );
 const blasterArg = z.string().max(48).optional().describe("A blaster's name in the catalog; needed only when there are several and no device is named.");
 

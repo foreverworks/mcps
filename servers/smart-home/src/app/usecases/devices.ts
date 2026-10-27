@@ -11,7 +11,8 @@ export const ONE_WAY =
 /** Said of a button marked wake, in devices and after a press. */
 export const WAKE =
   "the device's first press only wakes it (its display lights): press sends one press first to wake it, then the presses asked for; " +
-  "if it was already awake, that first press acts too, so pass wake: false when it was pressed a moment ago";
+  "if it was already awake, that first press acts too, so pass wake: false while it is still awake from a press a moment ago " +
+  "(of any of its buttons, when its display wakes as a whole)";
 
 export const devices = async (deps: Deps) => {
   const catalog = await deps.catalog();
