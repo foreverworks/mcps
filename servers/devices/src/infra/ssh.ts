@@ -1,7 +1,7 @@
+import { run } from "@foreverworks/mcp-kit";
 import { mkdir } from "node:fs/promises";
 
 import { fail, hostError } from "../domain/errors.js";
-import { run } from "./run.js";
 
 /**
  * One command on a host over ssh, as the broker's own user: its ssh configuration (a key, or an

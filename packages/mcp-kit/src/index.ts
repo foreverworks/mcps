@@ -47,6 +47,7 @@ export {
 export { AMOUNT_SCALE, asAmount, computable, documentTotal, lineAmount, reversalTotal, type DocumentTotal, type RateTotal, type TaxedLine } from "./invoiceTotals.js";
 export { readJsonFile, withFileLock, writeJsonFile, type JsonFileOptions, type LockOptions } from "./jsonFile.js";
 export { writeFileAtomic } from "./files.js";
+export { run, type RunOptions, type RunResult } from "./run.js";
 export { csvOf } from "./csv.js";
 export { envPath, stateDirOf, timeZoneOf, unsetPath } from "./env.js";
 export { readConfigFile } from "./configFile.js";
