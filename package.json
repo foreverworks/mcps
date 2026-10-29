@@ -51,6 +51,9 @@
     },
     "external-editor": {
       "tmp": "^0.2.6"
+    },
+    "@anthropic-ai/mcpb": {
+      "zod": "^4.6.7"
     }
   },
   "license": "MIT",
