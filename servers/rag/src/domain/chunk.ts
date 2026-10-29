@@ -17,7 +17,7 @@ export type Chunk = {
 };
 
 export type ChunkLimits = {
-  /** A chunk is at most this many characters, unless one word is longer. */
+  /** A chunk is at most this many characters; a longer word is cut. */
   readonly maxChars: number;
   /** A last piece shorter than this joins the previous chunk of its section when both fit. */
   readonly minChars: number;
@@ -33,11 +33,22 @@ export const DEFAULT_LIMITS: ChunkLimits = { maxChars: 1200, minChars: 200 };
 /** Sentence ends: a full stop, question or exclamation mark, or an ellipsis, then white space. */
 const SENTENCE_END = /(?<=[.!?…])\s+/u;
 
-/** Splits text longer than max at white space; a single word longer than max stays whole. */
+/** A word longer than max, cut into pieces of max characters (code points, so no surrogate pair is split). */
+const cutWord = (word: string, max: number): string[] => {
+  if (word.length <= max) return [word];
+  const points = Array.from(word);
+  return Array.from({ length: Math.ceil(points.length / max) }, (_, i) => points.slice(i * max, (i + 1) * max).join(""));
+};
+
+/**
+ * Splits text longer than max at white space, and a word longer than max into
+ * pieces: one minified line or base64 blob would otherwise be one chunk of any
+ * size, past what an embedding request takes.
+ */
 const hardSplit = (text: string, max: number): string[] => {
   const out: string[] = [];
   let current = "";
-  for (const word of text.split(/\s+/u).filter((w) => w.length > 0)) {
+  for (const word of text.split(/\s+/u).flatMap((w) => (w.length > 0 ? cutWord(w, max) : []))) {
     if (current.length > 0 && current.length + 1 + word.length > max) {
       out.push(current);
       current = word;

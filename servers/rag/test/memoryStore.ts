@@ -3,7 +3,7 @@
  * infra/store.ts (which scripts/integration.ts drives against Postgres), with
  * cosine by brute force and "any word" full-text matching by set overlap.
  */
-import type { ChunkToStore, CollectionRow, DocumentRow, Store, StoredChunk } from "../src/app/ports.js";
+import type { ChunkToStore, CollectionRow, DocumentRow, SaveResult, Store, StoredChunk } from "../src/app/ports.js";
 
 type Doc = Omit<DocumentRow, "chunks">;
 type Row = StoredChunk & { readonly embedding: readonly number[] };
@@ -41,6 +41,11 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
     scope.collections.includes(r.collection) && (scope.sourcePrefix === undefined || r.source.startsWith(scope.sourcePrefix));
   const docRow = (d: Doc & { collection: string }): DocumentRow => ({ ...d, chunks: chunks.filter((r) => r.collection === d.collection && r.source === d.source).length });
   const under = (source: string, path: string) => source === path || source.startsWith(`${path}/`);
+  const forget = (collection: string, gone: readonly Doc[]): number => {
+    gone.forEach((d) => documents.delete(docKey(collection, d.source)));
+    chunks = chunks.filter((r) => !(r.collection === collection && gone.some((d) => d.source === r.source)));
+    return gone.length;
+  };
 
   return {
     rows: () => chunks,
@@ -52,6 +57,7 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
       [...collections.values()]
         .sort((a, b) => a.name.localeCompare(b.name))
         .map((c) => ({ ...c, documents: [...documents.values()].filter((d) => d.collection === c.name).length, chunks: chunks.filter((r) => r.collection === c.name).length })),
+    collectionInfos: async () => [...collections.values()].sort((a, b) => a.name.localeCompare(b.name)),
     createCollection: async (row) => {
       if (collections.has(row.name)) return false;
       collections.set(row.name, { ...row, created: "2026-01-01T00:00:00.000Z" });
@@ -71,7 +77,11 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
       return d === undefined ? undefined : docRow(d);
     },
     chunkIds: async (c, s) => new Set(chunks.filter((r) => r.collection === c && r.source === s).map((r) => r.id)),
-    saveDocument: async (collection, document, list: readonly ChunkToStore[]) => {
+    saveDocument: async (collection, document, list: readonly ChunkToStore[]): Promise<SaveResult> => {
+      const keep = list.filter((c) => c.embedding === undefined).map((c) => c.id);
+      const there = new Set(chunks.filter((r) => r.collection === collection && r.source === document.source).map((r) => r.id));
+      const missing = keep.filter((id) => !there.has(id));
+      if (missing.length > 0) return { saved: false, missing };
       documents.set(docKey(collection, document.source), { ...document, collection, indexed: "2026-01-01T00:00:00.000Z" });
       const ids = new Set(list.map((c) => c.id));
       const before = chunks.length;
@@ -86,14 +96,17 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
           added += 1;
         }
       }
-      return { added, kept: list.filter((c) => c.embedding === undefined).length, removed };
+      return { saved: true, added, kept: keep.length, removed };
     },
-    removeSources: async (collection, path, except = new Set()) => {
-      const gone = [...documents.values()].filter((d) => d.collection === collection && under(d.source, path) && !except.has(d.source));
-      gone.forEach((d) => documents.delete(docKey(collection, d.source)));
-      chunks = chunks.filter((r) => !(r.collection === collection && gone.some((d) => d.source === r.source)));
-      return gone.length;
-    },
+    removeSources: async (collection, path) => forget(collection, [...documents.values()].filter((d) => d.collection === collection && under(d.source, path))),
+    prune: async (collection, folder, { present, recursive }) =>
+      forget(
+        collection,
+        [...documents.values()].filter((d) => {
+          const below = d.source.slice(folder.length);
+          return d.collection === collection && below.startsWith("/") && !present.has(d.source) && !below.includes("/.") && (recursive || !below.slice(1).includes("/"));
+        }),
+      ),
     documents: async (collection, { prefix, limit, offset }) => {
       const all = [...documents.values()].filter((d) => d.collection === collection && (prefix === undefined || d.source.startsWith(prefix))).sort((a, b) => a.source.localeCompare(b.source));
       return { total: all.length, rows: all.slice(offset, offset + limit).map(docRow) };

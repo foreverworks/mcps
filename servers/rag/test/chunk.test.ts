@@ -25,6 +25,13 @@ describe("chunkDocument", () => {
     expect(chunks.map((c) => c.body).join(" ").replace(/\s+/g, " ")).toBe((long + " " + para("w", 200)).replace(/\s+/g, " "));
   });
 
+  it("cuts a word longer than a chunk into pieces, without splitting a character", () => {
+    const blob = "ș".repeat(250) + "x".repeat(400);
+    const chunks = chunkDocument("/s", [{ location: "", text: `Before. ${blob}` }], { maxChars: 300, minChars: 10 });
+    expect(chunks.every((c) => c.body.length <= 300)).toBe(true);
+    expect(chunks.map((c) => c.body).join("").replace(/\s+/g, "")).toBe(`Before.${blob}`);
+  });
+
   it("joins a short tail to the chunk before it when both fit", () => {
     const chunks = chunkDocument("/s", [{ location: "", text: `${para("a", 40)}\n\nShort tail.` }], { maxChars: 1200, minChars: 200 });
     expect(chunks).toHaveLength(1);

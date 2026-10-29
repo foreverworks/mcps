@@ -38,7 +38,11 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
     reranker: makeReranker(env),
     extractor: makeExtractor(),
     sources: makeSources(roots, { maxBytes: positive(env["RAG_MAX_FILE_BYTES"], DEFAULT_MAX_FILE_BYTES), script: env["MCP_FILE_SCRIPT"]?.trim() || undefined }),
-    settings: { language: env["RAG_OCR_LANGUAGE"]?.trim() || "eng", embedBatch: positive(env["RAG_EMBED_BATCH"], 32) },
+    settings: {
+      language: env["RAG_OCR_LANGUAGE"]?.trim() || "eng",
+      embedBatch: positive(env["RAG_EMBED_BATCH"], 32),
+      rerankBatch: positive(env["RAG_RERANK_BATCH"], 32),
+    },
     now: () => new Date(),
   };
 };

@@ -130,7 +130,7 @@
   {
     "name": "index_path",
     "title": "Index a file or folder",
-    "description": "Index one file or every file of a folder (under /srv/rag/inbox) into a collection. Reads pdf, png, jpg, jpeg, tif, tiff, bmp, webp, docx, odt, rtf, epub, html, htm, md, markdown, txt, text, csv; PDF pages without a text layer and images are OCRed in the given language. Text is cut into chunks of about 1200 characters that never cross a page or a heading, each with a stable id and its location; only chunks not stored already are embedded, and a file whose sha256 is unchanged is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the rest go on. Slow: embedding runs about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
+    "description": "Index one file or every file of a folder (under /srv/rag/inbox) into a collection. Reads pdf, png, jpg, jpeg, tif, tiff, bmp, webp, docx, odt, rtf, epub, html, htm, md, markdown, txt, text, csv; PDF pages without a text layer and images are OCRed in the given language. Text is cut into chunks of about 1200 characters that never cross a page or a heading, each with a stable id and its location; only chunks not stored already are embedded, and a file whose sha256 is unchanged (and was read the same way) is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the rest go on. Slow: embedding runs about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -166,12 +166,12 @@
         },
         "prune": {
           "default": false,
-          "description": "For a folder: also remove from the index the sources under it that are no longer there.",
+          "description": "For a folder: also remove from the index the sources under it that are no longer there (only its own files when recursive is false).",
           "type": "boolean"
         },
         "max_files": {
           "default": 200,
-          "description": "Files read in this call; call again for the rest.",
+          "description": "Files read in this call; unchanged files are passed over without counting, so calling again goes on with the rest.",
           "type": "integer",
           "minimum": 1,
           "maximum": 5000
@@ -321,7 +321,7 @@
         "path": {
           "type": "string",
           "minLength": 1,
-          "description": "The absolute path as list_sources shows it, or a folder above several."
+          "description": "The absolute path as list_sources shows it, or a folder above several. Not / itself: drop_collection removes everything."
         }
       },
       "required": [

@@ -14,8 +14,20 @@ const ROMANIAN_COMMA_BELOW: Readonly<Record<string, string>> = { "ş": "ș", "Ş
  */
 export const includesRomanian = (language: string): boolean => language.split("+").some((code) => code.trim() === "ron");
 
+/**
+ * Control characters other than tab and newline: a form feed or vertical tab
+ * becomes a line break, the rest go. Postgres refuses NUL in text outright,
+ * and one NUL in a file failed the database write for the whole call.
+ */
+const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu;
+
 export const normaliseText = (text: string, language: string): string => {
-  let out = text.normalize("NFC").replace(/\r\n?/g, "\n").replace(/ /g, " ").replace(/[­​﻿]/g, "");
+  let out = text
+    .normalize("NFC")
+    .replace(/\r\n?/g, "\n")
+    .replace(CONTROL, (c) => (c === "\u000B" || c === "\u000C" ? "\n" : ""))
+    .replace(/\u00A0/g, " ")
+    .replace(/[\u00AD\u200B\uFEFF]/g, "");
   if (includesRomanian(language)) out = out.replace(/[şŞţŢ]/g, (c) => ROMANIAN_COMMA_BELOW[c] ?? c);
   return out
     .split("\n")

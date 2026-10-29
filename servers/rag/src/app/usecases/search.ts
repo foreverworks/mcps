@@ -18,6 +18,20 @@ const RETRIEVE = 50;
 
 const keyOf = (h: { readonly collection: string; readonly id: string }): string => `${h.collection}\u0000${h.id}`;
 
+/**
+ * Scores every text against the query, in requests of at most the batch the
+ * endpoint takes; a cross-encoder scores each pair on its own, so the batches'
+ * scores compare. Best first, each naming its index in `texts`.
+ */
+const rerankAll = async (deps: Deps, query: string, texts: readonly string[]): Promise<readonly { readonly index: number; readonly score: number }[]> => {
+  const out: { index: number; score: number }[] = [];
+  for (let i = 0; i < texts.length; i += deps.settings.rerankBatch) {
+    const scores = await deps.reranker.rerank(query, texts.slice(i, i + deps.settings.rerankBatch));
+    out.push(...scores.map((s) => ({ index: s.index + i, score: s.score })));
+  }
+  return out.sort((a, b) => b.score - a.score);
+};
+
 const clip = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max).replace(/\s+\S*$/u, "")} …`);
 
 /**
@@ -50,7 +64,7 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   let rerankNote: string | undefined;
   if (args.rerank && candidates.length > 1) {
     try {
-      const scores = await deps.reranker.rerank(query, candidates.map((c) => c.chunk.body));
+      const scores = await rerankAll(deps, query, candidates.map((c) => c.chunk.body));
       order = scores.flatMap((s) => { const c = candidates[s.index]; return c === undefined ? [] : [{ ...c, rerank: s.score, i: s.index }]; });
     } catch (thrown) {
       rerankNote = `the reranker failed (${describeFailure(thrown)}); results are in fused order`;

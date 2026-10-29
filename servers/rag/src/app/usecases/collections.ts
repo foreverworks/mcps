@@ -1,5 +1,5 @@
 import { fail, inputError, notFound } from "../../domain/errors.js";
-import type { CollectionRow, Deps } from "../ports.js";
+import type { CollectionInfo, Deps } from "../ports.js";
 
 /** A collection name is also what a search filter names: short, lowercase, no spaces. */
 export const COLLECTION_NAME = /^[a-z0-9][a-z0-9_-]{0,62}$/u;
@@ -12,11 +12,12 @@ export const embeddingModel = async (deps: Deps): Promise<{ readonly model: stri
   return { model: info.revision === undefined ? info.model : `${info.model}@${info.revision}`, dimension };
 };
 
-export const findCollection = async (deps: Deps, name: string): Promise<CollectionRow> =>
-  (await deps.store.collections()).find((c) => c.name === name) ?? fail(notFound(`no collection named "${name}"; create_collection makes one`));
+/** A collection as recorded; counting what it holds is list_collections' work, not every call's. */
+export const findCollection = async (deps: Deps, name: string): Promise<CollectionInfo> =>
+  (await deps.store.collectionInfos()).find((c) => c.name === name) ?? fail(notFound(`no collection named "${name}"; create_collection makes one`));
 
 /** A collection can only be searched and grown with the model that embedded it. */
-export const assertSameModel = (collection: CollectionRow, current: { readonly model: string; readonly dimension: number }): void => {
+export const assertSameModel = (collection: CollectionInfo, current: { readonly model: string; readonly dimension: number }): void => {
   if (collection.model !== current.model || collection.dimension !== current.dimension)
     fail({
       kind: "mismatch",
@@ -34,7 +35,7 @@ export const createCollection = async (deps: Deps, args: { readonly name: string
   const model = await embeddingModel(deps);
   await deps.store.ensureSchema(model.dimension);
   const created = await deps.store.createCollection({ name: args.name, description: args.description ?? "", model: model.model, dimension: model.dimension });
-  const row = await findCollection(deps, args.name);
+  const row = (await deps.store.collections()).find((c) => c.name === args.name) ?? fail(notFound(`no collection named "${args.name}"`));
   if (!created && row.description !== (args.description ?? row.description))
     return fail(inputError(`collection "${args.name}" exists with another description ("${row.description}"); drop it first or keep its description`));
   return { created, collection: row };

@@ -6,10 +6,10 @@ import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { checkPolicy, connectInMemory, guard, McpServer } from "@foreverworks/mcp-kit";
+import { checkPolicy, connectInMemory, guard, idempotentWrites, McpServer } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
-import type { Deps, Reranker } from "../src/app/ports.js";
+import type { Deps, Reranker, Store } from "../src/app/ports.js";
 import { buildDeps } from "../src/composition.js";
 import { makeExtractor } from "../src/infra/extract.js";
 import { makeSources } from "../src/infra/sources.js";
@@ -24,7 +24,7 @@ const DOCS: Readonly<Record<string, string>> = {
   "garden/notes.md": "# Greenhouse\n\nThe greenhouse is watered early in the morning. Mosquitoes do not survive the winter there.",
 };
 
-const connected = async (over: { readonly reranker?: Reranker } = {}) => {
+const connected = async (over: { readonly reranker?: Reranker; readonly wrapStore?: (store: Store) => Store } = {}) => {
   const inbox = await mkdtemp(join(tmpdir(), "rag-inbox-"));
   for (const [path, text] of Object.entries(DOCS)) {
     await mkdir(join(inbox, path, ".."), { recursive: true });
@@ -33,7 +33,7 @@ const connected = async (over: { readonly reranker?: Reranker } = {}) => {
   const store = memoryStore();
   const embedded: string[] = [];
   const deps: Deps = {
-    store,
+    store: over.wrapStore === undefined ? store : over.wrapStore(store),
     embedder: {
       info: async () => ({ model: "test/embed", revision: "r1" }),
       embed: async (texts) => {
@@ -44,11 +44,15 @@ const connected = async (over: { readonly reranker?: Reranker } = {}) => {
     },
     reranker: over.reranker ?? {
       info: async () => ({ model: "test/rerank" }),
-      rerank: async (query, texts) => texts.map((t, index) => ({ index, score: fakeRerankScore(query, t) })).sort((a, b) => b.score - a.score),
+      rerank: async (query, texts) => {
+        // As text-embeddings-inference does past its --max-client-batch-size: the search must send batches.
+        if (texts.length > 2) throw new Error(`batch size ${texts.length} > maximum allowed batch size 2`);
+        return texts.map((t, index) => ({ index, score: fakeRerankScore(query, t) })).sort((a, b) => b.score - a.score);
+      },
     },
     extractor: makeExtractor(),
     sources: makeSources([inbox], { maxBytes: 1024 * 1024 }),
-    settings: { language: "eng", embedBatch: 2 },
+    settings: { language: "eng", embedBatch: 2, rerankBatch: 2 },
     now: () => new Date("2026-01-01T00:00:00Z"),
   };
   const server = new McpServer({ name: "rag", version: "test" });
@@ -127,9 +131,114 @@ describe("index, search, read", () => {
     expect(s.embedded.slice(first)).toEqual(["The tenant returns both keys at the end."]);
     expect(changed.chunks_kept).toBe(2);
 
+    // The emptied file keeps its place with no chunks: nothing of it is found, and it is not read again.
     const listed = await s.call("list_sources", { collection: "docs" });
-    expect(listed.sources.map((x: { source: string }) => x.source)).toEqual([join(s.inbox, "garden/notes.md"), join(s.inbox, "lease/contract.md")]);
+    expect(listed.sources.map((x: { source: string; chunks: number }) => [x.source, x.chunks])).toEqual([
+      [join(s.inbox, "garden/notes.md"), 0],
+      [join(s.inbox, "lease/contract.md"), 3],
+    ]);
+    expect(s.store.rows().some((r) => r.source.endsWith("garden/notes.md"))).toBe(false);
+    expect(await s.call("index_path", { collection: "docs", path: s.inbox })).toMatchObject({ unchanged: 2, skipped: 0 });
     expect((await s.call("remove_source", { collection: "docs", path: join(s.inbox, "lease") })).documents_removed).toBe(1);
+  });
+
+  it("prunes only the folder's own files when not recursive, and never a dot-named path", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    await writeFile(join(s.inbox, "top.md"), "# Top\n\nA file at the top of the folder, about the boiler service.");
+    await mkdir(join(s.inbox, ".drafts"));
+    await writeFile(join(s.inbox, ".drafts/plan.md"), "# Plan\n\nA draft indexed by its own path, about the move.");
+    await s.call("index_path", { collection: "docs", path: s.inbox });
+    await s.call("index_path", { collection: "docs", path: join(s.inbox, ".drafts/plan.md") });
+    expect((await s.call("list_sources", { collection: "docs" })).total).toBe(5);
+    const { rm } = await import("node:fs/promises");
+    await rm(join(s.inbox, "top.md"));
+    const pruned = await s.call("index_path", { collection: "docs", path: s.inbox, recursive: false, prune: true });
+    expect(pruned).toMatchObject({ files: 0, sources_pruned: 1 });
+    expect((await s.call("list_sources", { collection: "docs" })).total).toBe(4);
+    expect(await s.call("index_path", { collection: "docs", path: s.inbox, prune: true })).toMatchObject({ unchanged: 3, sources_pruned: 0 });
+  });
+
+  it("goes on past max_files when called again, and counts files it does not read without stopping on them", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    await writeFile(join(s.inbox, "garden/photo.heic"), "not read");
+    const calls = [];
+    for (let i = 0; i < 3; i += 1) calls.push(await s.call("index_path", { collection: "docs", path: s.inbox, max_files: 1 }));
+    expect(calls.map((c) => [c.indexed, c.unchanged, c.more === true])).toEqual([
+      [1, 0, true],
+      [1, 1, true],
+      [1, 2, false],
+    ]);
+    expect(calls[0]).toMatchObject({ files: 3, not_readable: 1 });
+  });
+
+  it("embeds again the chunks another call removed between reading and saving, so none is lost", async () => {
+    let race = false;
+    const s = await connected({
+      wrapStore: (store) => ({
+        ...store,
+        chunkIds: async (collection, source) => {
+          const ids = await store.chunkIds(collection, source);
+          if (race) {
+            race = false;
+            await store.removeSources(collection, source);
+          }
+          return ids;
+        },
+      }),
+    });
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: s.inbox });
+    const contract = join(s.inbox, "lease/contract.md");
+    await writeFile(contract, `${DOCS["lease/contract.md"]}\n\n## Keys\n\nThe tenant returns both keys at the end.`);
+    race = true;
+    const out = await s.call("index_path", { collection: "docs", path: contract });
+    expect(out).toMatchObject({ indexed: 1, failed: 0 });
+    expect(s.store.rows().filter((r) => r.source === contract)).toHaveLength(3);
+    expect((await s.call("read_document", { collection: "docs", source: contract })).chunks).toHaveLength(3);
+  });
+
+  it("reads unchanged files again when the language changes, keeping every embedding", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: s.inbox, language: "eng" });
+    expect(await s.call("index_path", { collection: "docs", path: s.inbox, language: "ron" })).toMatchObject({ indexed: 3, chunks_embedded: 0, chunks_removed: 0 });
+    expect(await s.call("index_path", { collection: "docs", path: s.inbox, language: "ron" })).toMatchObject({ unchanged: 3 });
+  });
+
+  it("indexes a UTF-16 text file and drops NUL characters instead of failing the call", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    await writeFile(join(s.inbox, "export.txt"), Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from("Invoice total for the boiler repair.", "utf16le")]));
+    await writeFile(join(s.inbox, "nul.txt"), "Meter reading\u0000 taken in January.");
+    const out = await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect(out).toMatchObject({ indexed: 5, failed: 0 });
+    expect(s.store.rows().some((r) => r.body.includes("\u0000"))).toBe(false);
+    expect((await s.call("search", { query: "boiler repair invoice", rerank: false })).results[0].source).toBe(join(s.inbox, "export.txt"));
+  });
+
+  it("removes a folder given with extra slashes, and refuses to empty the collection that way", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect((await s.call("remove_source", { collection: "docs", path: `${s.inbox}//lease/./` })).documents_removed).toBe(2);
+    const all = await s.call("remove_source", { collection: "docs", path: "/" });
+    expect(all.error.message).toContain("drop_collection");
+  });
+
+  it("leaves the index as it was when a write is repeated", async () => {
+    const s = await connected();
+    expect(idempotentWrites(POLICY)).toEqual(["create_collection", "index_path", "remove_source"]);
+    for (let i = 0; i < 2; i += 1) {
+      await s.call("create_collection", { name: "docs", description: "same" });
+      await s.call("index_path", { collection: "docs", path: s.inbox });
+    }
+    const rows = s.store.rows().length;
+    expect((await s.call("list_sources", { collection: "docs" })).total).toBe(3);
+    expect((await s.call("remove_source", { collection: "docs", path: join(s.inbox, "garden") })).documents_removed).toBe(1);
+    expect((await s.call("remove_source", { collection: "docs", path: join(s.inbox, "garden") })).documents_removed).toBe(0);
+    expect(s.store.rows().length).toBeLessThan(rows);
   });
 
   it("refuses a path outside its roots and passes over links", async () => {

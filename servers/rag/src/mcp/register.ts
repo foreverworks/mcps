@@ -71,7 +71,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         `Index one file or every file of a folder (${where}) into a collection. Reads ${SUPPORTED_EXTENSIONS.join(", ")}; ` +
         "PDF pages without a text layer and images are OCRed in the given language. Text is cut into chunks of about 1200 characters that never cross " +
         "a page or a heading, each with a stable id and its location; only chunks not stored already are embedded, and a file whose sha256 is " +
-        "unchanged is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the " +
+        "unchanged (and was read the same way) is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the " +
         "rest go on. Slow: embedding runs about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
       inputSchema: {
         collection,
@@ -86,8 +86,14 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
           ),
         ocr: z.boolean().default(true).describe("OCR PDF pages that have no text layer, and images."),
         force: z.boolean().default(false).describe("Read and chunk files again even when their sha256 is unchanged (embeddings of unchanged chunks are still kept)."),
-        prune: z.boolean().default(false).describe("For a folder: also remove from the index the sources under it that are no longer there."),
-        max_files: z.number().int().min(1).max(5000).default(200).describe("Files read in this call; call again for the rest."),
+        prune: z.boolean().default(false).describe("For a folder: also remove from the index the sources under it that are no longer there (only its own files when recursive is false)."),
+        max_files: z
+          .number()
+          .int()
+          .min(1)
+          .max(5000)
+          .default(200)
+          .describe("Files read in this call; unchanged files are passed over without counting, so calling again goes on with the rest."),
       },
     },
     handled((a) => indexPath(deps, { collection: a.collection, path: a.path, recursive: a.recursive, language: a.language, ocr: a.ocr, force: a.force, prune: a.prune, maxFiles: a.max_files })),
@@ -98,7 +104,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
     {
       title: "Remove a source",
       description: "Remove one indexed file, or every indexed file under a folder, from a collection's index. The files themselves are not touched.",
-      inputSchema: { collection, path: z.string().trim().min(1).describe("The absolute path as list_sources shows it, or a folder above several.") },
+      inputSchema: { collection, path: z.string().trim().min(1).describe("The absolute path as list_sources shows it, or a folder above several. Not / itself: drop_collection removes everything.") },
     },
     handled((a) => removeSource(deps, a)),
   );

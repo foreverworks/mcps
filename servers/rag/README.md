@@ -70,6 +70,7 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_OCR_LANGUAGE` | no | Tesseract language code(s) for OCR when a call names none. Default `eng`. |
 | `RAG_MAX_FILE_BYTES` | no | Largest file it reads. Default 200 MiB. |
 | `RAG_EMBED_BATCH` | no | Texts per embed request. Default 32, text-embeddings-inference's default limit. |
+| `RAG_RERANK_BATCH` | no | Passages per rerank request; a search with more candidates sends several. Default 32, text-embeddings-inference's default `--max-client-batch-size`. |
 
 Without them the server still starts and lists its tools, and each call that
 needs one answers a `config` error naming it. Files are read from
@@ -120,7 +121,7 @@ each call (see Confirmation in [docs/security.md](../../docs/security.md)).
 | `list_collections` | read | Every collection with its description, embedding model, documents and chunks. |
 | `create_collection` | write | A named collection, recording the embedding model and dimension; the first one creates the tables. |
 | `drop_collection` | write | Deletes a collection and everything indexed in it. The files are not touched. |
-| `index_path` | write | Indexes a file or a folder: text extracted (OCR for scanned pages and images), cut into chunks with stable ids and their page or heading, and only new chunks embedded; unchanged files are passed over. `prune` removes sources no longer in the folder. |
+| `index_path` | write | Indexes a file or a folder: text extracted (OCR for scanned pages and images), cut into chunks with stable ids and their page or heading, and only new chunks embedded; unchanged files are passed over and do not count toward `max_files`, so a second call goes on from the first. `prune` removes sources no longer in the folder. |
 | `remove_source` | write | Removes one indexed file, or every one under a folder. |
 | `list_sources` | read | The indexed files of a collection, with sha256, size, pages and chunks. |
 | `search` | read | Hybrid search (vectors and full text, fused by reciprocal rank) reranked; passages with source, location and scores. |
@@ -136,21 +137,34 @@ it".
 
 ## How it works
 
-- **Extraction.** PDFs through `pdftotext`, page by page; a page with fewer
-  than 20 visible characters goes through `ocrmypdf --skip-text`, which leaves
-  every page with text alone, and its text is tesseract's own (`--sidecar`):
-  pdftotext reading the OCRed layer lost the space before Romanian words that
-  start with î. Images through `tesseract`. docx, odt, rtf, html
-  and epub through `pandoc` to Markdown, whose headings become locations.
-  Each file's bytes are copied to a private temporary folder first, so a tool
-  never opens the caller's path. Text is normalised (NFC, line endings, white
-  space); for a language that includes `ron`, the cedilla letters `ş` and `ţ`
-  that OCR and older documents produce become `ș` and `ț`, which is what a
-  question has.
+- **Extraction.** PDFs through `pdftotext`, page by page; the pages with fewer
+  than 20 visible characters, and only those, are OCRed by `ocrmypdf
+  --force-ocr --pages` (a scanned page that carries a stamped page number has a
+  few characters of text, and `--skip-text` would pass it over), and their text
+  is tesseract's own (`--sidecar`): pdftotext reading the OCRed layer lost the
+  space before Romanian words that start with î. Images through `tesseract`.
+  docx, odt, rtf, html and epub through `pandoc` to Markdown, whose headings
+  become locations; pandoc runs with `--sandbox` and a 1 GiB heap, since a
+  document is a ZIP or XML from anywhere. Each file's bytes are copied to a
+  private temporary folder first, so a tool never opens the caller's path. A
+  tool that runs past its deadline is killed with every process it started. Text
+  is normalised (NFC, line endings, white space, no control characters; UTF-16
+  text files with a byte order mark are read as such); for a language that
+  includes `ron`, the cedilla letters `ş` and `ţ` that OCR and older documents
+  produce become `ș` and `ț`, which is what a question has.
 - **Chunks** are about 1200 characters, cut at paragraphs, then sentences, then
   words, never across a page or a heading. A chunk's id hashes its source, its
   location and its text, so the same text keeps its id and its embedding when a
-  file is indexed again; a file whose sha256 is unchanged is not read further.
+  file is indexed again. A file is passed over when its sha256 and the way it
+  was read (the language, whether OCR ran, this server's extraction version)
+  are unchanged; a file whose OCR failed is read again on the next run. A file
+  with no text is recorded with no chunks, so it is not read again either.
+- **Indexing a folder** lists the files of the formats above, in name order,
+  without following links or entering dot-named folders. `max_files` counts the
+  files read in a call, not those passed over as unchanged, so calling again
+  goes on where the last call stopped. `prune` removes the sources no longer in
+  the folder (only its own files when `recursive` is false), once the whole
+  folder has been listed.
 - **Search** takes the 50 nearest chunks by cosine (HNSW, with pgvector's
   iterative scan so filters still fill the list) and the 50 best full-text
   matches of any of the question's words of three letters or more (accents

@@ -2,12 +2,12 @@ import { inputFilesWith, type InputFiles } from "@foreverworks/mcp-kit";
 import { lstat, readdir, realpath } from "node:fs/promises";
 import { isAbsolute, join, relative, resolve, sep } from "node:path";
 
-import type { Listing, Sources } from "../app/ports.js";
+import type { Sources } from "../app/ports.js";
 import { fail, inputError } from "../domain/errors.js";
 
 const inside = (root: string, path: string): boolean => {
   const rel = relative(root, path);
-  return rel === "" || (!rel.startsWith("..") && !isAbsolute(rel));
+  return rel === "" || (rel !== ".." && !rel.startsWith(`..${sep}`) && !isAbsolute(rel));
 };
 
 /**
@@ -15,6 +15,8 @@ const inside = (root: string, path: string): boolean => {
  * files only, the real path re-checked inside a root). A folder is walked
  * here, in name order, without following a link anywhere: a link is counted
  * and passed over, so an agent cannot plant one that points out of a root.
+ * Only files of a format the server reads are listed; the walk stops at
+ * `limit` of them and says so.
  */
 export const makeSources = (roots: readonly string[], options: { readonly maxBytes: number; readonly script?: string | undefined }): Sources => {
   const read: InputFiles = inputFilesWith(roots, { maxBytes: options.maxBytes, script: options.script });
@@ -35,12 +37,13 @@ export const makeSources = (roots: readonly string[], options: { readonly maxByt
     return real;
   };
 
-  const list = async (path: string, { recursive, limit }: { readonly recursive: boolean; readonly limit: number }): Promise<Listing> => {
+  const list: Sources["list"] = async (path, { recursive, limit, readable }) => {
     const start = await resolveInRoot(path);
     const top = await lstat(start);
-    if (top.isFile()) return { files: [start], links: 0, truncated: false, folder: false, path: start };
+    if (top.isFile()) return { files: readable(start) ? [start] : [], unreadable: readable(start) ? 0 : 1, links: 0, truncated: false, folder: false, path: start };
     if (!top.isDirectory()) return fail(inputError(`${start} is neither a file nor a folder`));
     const files: string[] = [];
+    let unreadable = 0;
     let links = 0;
     let truncated = false;
     const walk = async (dir: string): Promise<void> => {
@@ -51,13 +54,14 @@ export const makeSources = (roots: readonly string[], options: { readonly maxByt
         const full = join(dir, entry.name);
         if (entry.isSymbolicLink()) links += 1;
         else if (entry.isFile()) {
-          if (files.length >= limit) truncated = true;
+          if (!readable(entry.name)) unreadable += 1;
+          else if (files.length >= limit) truncated = true;
           else files.push(full);
         } else if (entry.isDirectory() && recursive) await walk(full);
       }
     };
     await walk(start);
-    return { files, links, truncated, folder: true, path: start.endsWith(sep) ? start.slice(0, -1) : start };
+    return { files, unreadable, links, truncated, folder: true, path: start.endsWith(sep) && start !== sep ? start.slice(0, -1) : start };
   };
 
   return { read, list, roots };

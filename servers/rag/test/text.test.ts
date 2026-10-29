@@ -16,6 +16,10 @@ describe("normaliseText", () => {
     expect(normaliseText("é", "eng")).toBe("é");
   });
 
+  it("drops control characters Postgres would refuse, and turns a form feed into a line break", () => {
+    expect(normaliseText("a\u0000b\u0007c\fd\te", "eng")).toBe("abc\nd\te");
+  });
+
   it("counts visible characters only", () => {
     expect(visibleLength(" \n a b \f")).toBe(2);
   });

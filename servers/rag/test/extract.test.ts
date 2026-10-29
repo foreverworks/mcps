@@ -10,7 +10,7 @@ import { describe, expect, it } from "vitest";
 
 import { kindOf } from "../src/domain/kinds.js";
 import { normaliseText } from "../src/domain/text.js";
-import { makeExtractor } from "../src/infra/extract.js";
+import { decode, makeExtractor } from "../src/infra/extract.js";
 import { sidecarPages } from "../src/infra/extract/sidecar.js";
 
 const has = (tool: string, flag = "--version"): boolean => {
@@ -45,6 +45,12 @@ describe("extract", () => {
     expect(text).toContain("Țânțarii nu supraviețuiesc iarna în seră");
   }, 120_000);
 
+  it.skipIf(!has("pdftotext", "-v") || !has("ocrmypdf") || !has("tesseract"))("OCRs a scanned page that carries a few characters of text, such as a page number", async () => {
+    const out = await extractor.extract(await fixture("stamped.pdf"), { language: "ron", ocr: true });
+    expect(out).toMatchObject({ ocrPages: 1, complete: true });
+    expect(normaliseText(out.sections.map((s) => s.text).join("\n"), "ron")).toContain("Țânțarii nu supraviețuiesc iarna în seră");
+  }, 120_000);
+
   it.skipIf(!has("pdftotext", "-v"))("says so when OCR is off and a page has no text", async () => {
     const out = await extractor.extract(await fixture("scan.pdf"), { language: "ron", ocr: false });
     expect(out.sections).toEqual([]);
@@ -68,6 +74,13 @@ describe("extract", () => {
 });
 
 describe("sidecarPages", () => {
+  it("reads UTF-16 with a byte order mark, either way round, and counts NUL characters", () => {
+    const text = "Țânțarii și iarna";
+    expect(decode(Buffer.concat([Buffer.from([0xff, 0xfe]), Buffer.from(text, "utf16le")])).text).toBe(text);
+    expect(decode(Buffer.concat([Buffer.from([0xfe, 0xff]), Buffer.from(text, "utf16le").swap16()])).text).toBe(text);
+    expect(decode(Buffer.from("a\u0000b")).warnings[0]).toContain("1 NUL character");
+  });
+
   it("maps tesseract's text to its pages across runs of skipped pages", () => {
     const pages = sidecarPages("[OCR skipped on page(s) 1-2]\fthird page\f[OCR skipped on page(s) 4]\ffifth page\f");
     expect([...pages.entries()]).toEqual([

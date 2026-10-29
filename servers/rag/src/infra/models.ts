@@ -1,3 +1,5 @@
+import { callSignal } from "@foreverworks/mcp-kit";
+
 import { fail, configError } from "../domain/errors.js";
 import type { Embedder, ModelInfo, Reranker } from "../app/ports.js";
 
@@ -29,7 +31,8 @@ const call = async (env: NodeJS.ProcessEnv, endpoint: Endpoint, path: string, bo
       method: body === undefined ? "GET" : "POST",
       headers: body === undefined ? {} : { "Content-Type": "application/json" },
       ...(body === undefined ? {} : { body: JSON.stringify(body) }),
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      // The deadline, or the client cancelling the call: a cancelled search does not wait out a slow rerank.
+      signal: AbortSignal.any([AbortSignal.timeout(TIMEOUT_MS), ...[callSignal()].filter((x): x is AbortSignal => x !== undefined)]),
     });
   } catch (thrown) {
     return fail({ kind: "model", endpoint, message: `${url} did not answer: ${thrown instanceof Error ? thrown.message : String(thrown)}` });

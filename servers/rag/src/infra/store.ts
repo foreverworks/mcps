@@ -1,6 +1,6 @@
 import type pg from "pg";
 
-import type { ChunkToStore, CollectionRow, DocumentRow, Hit, SearchScope, Store, StoredChunk } from "../app/ports.js";
+import type { ChunkToStore, CollectionInfo, CollectionRow, DocumentRow, Hit, SaveResult, SearchScope, Store, StoredChunk } from "../app/ports.js";
 import { fail } from "../domain/errors.js";
 import type { Pool } from "./database.js";
 
@@ -67,7 +67,9 @@ const schemaSql = (dimension: number): readonly string[] => [
   `CREATE TABLE IF NOT EXISTS rag_document (
      collection text NOT NULL REFERENCES rag_collection (name) ON DELETE CASCADE,
      source text NOT NULL, sha256 text NOT NULL, size bigint NOT NULL, kind text NOT NULL, pages integer,
-     indexed timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (collection, source))`,
+     extraction text NOT NULL DEFAULT '', indexed timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (collection, source))`,
+  // Tables made before the column existed: their documents read as extracted some other way, so each is read once more.
+  "ALTER TABLE rag_document ADD COLUMN IF NOT EXISTS extraction text NOT NULL DEFAULT ''",
   `CREATE TABLE IF NOT EXISTS rag_chunk (
      collection text NOT NULL, source text NOT NULL, id text NOT NULL, ordinal integer NOT NULL,
      location text NOT NULL, body text NOT NULL, embedding vector(${dimension}) NOT NULL, fts tsvector NOT NULL,
@@ -81,7 +83,7 @@ const schemaSql = (dimension: number): readonly string[] => [
 /** `left(source, length(prefix)) = prefix`, not LIKE: a path may hold % and _. */
 const PREFIX = "($PREFIX::text IS NULL OR left(source, length($PREFIX::text)) = $PREFIX::text)";
 
-type DocumentSql = { source: string; sha256: string; size: string; kind: string; pages: number | null; indexed: Date; chunks: string };
+type DocumentSql = { source: string; sha256: string; size: string; kind: string; pages: number | null; extraction: string; indexed: Date; chunks: string };
 
 const documentOf = (r: DocumentSql): DocumentRow => ({
   source: r.source,
@@ -89,14 +91,18 @@ const documentOf = (r: DocumentSql): DocumentRow => ({
   size: Number(r.size),
   kind: r.kind,
   pages: r.pages ?? undefined,
+  extraction: r.extraction,
   chunks: Number(r.chunks),
   indexed: r.indexed.toISOString(),
 });
 
-const DOCUMENT_COLUMNS = `d.source, d.sha256, d.size, d.kind, d.pages, d.indexed,
+const DOCUMENT_COLUMNS = `d.source, d.sha256, d.size, d.kind, d.pages, d.extraction, d.indexed,
   (SELECT count(*) FROM rag_chunk k WHERE k.collection = d.collection AND k.source = d.source) AS chunks`;
 
 type ChunkSql = { collection: string; source: string; id: string; ordinal: number; location: string; body: string };
+
+/** New chunks per INSERT: one statement for a whole long document would carry hundreds of MB of vectors as one parameter. */
+const INSERT_BATCH = 256;
 
 export const makeStore = (pool: () => Promise<Pool>): Store => {
   let ensured: number | undefined;
@@ -142,6 +148,16 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
       return rows.rows.map((r): CollectionRow => ({ ...r, created: r.created.toISOString(), documents: Number(r.documents), chunks: Number(r.chunks) }));
     },
 
+    collectionInfos: async () => {
+      const db = await pool();
+      if (!(await tablesExist(db))) return [];
+      const rows = await query<{ name: string; description: string; model: string; dimension: number; created: Date }>(
+        db,
+        "SELECT name, description, model, dimension, created FROM rag_collection ORDER BY name",
+      );
+      return rows.rows.map((r): CollectionInfo => ({ ...r, created: r.created.toISOString() }));
+    },
+
     createCollection: async (row) => {
       const out = await query(await pool(), "INSERT INTO rag_collection (name, description, model, dimension) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING", [
         row.name,
@@ -176,13 +192,24 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
     },
 
     saveDocument: async (collection, document, chunks) =>
-      inTransaction(await pool(), async (client) => {
+      inTransaction(await pool(), async (client): Promise<SaveResult> => {
         await query(client, "SELECT pg_advisory_xact_lock(hashtext($1), hashtext($2))", [collection, document.source]);
+        // The chunks to keep were read before this lock; another call may have removed them since.
+        const keep = chunks.filter((c) => c.embedding === undefined).map((c) => c.id);
+        const present = await query<{ id: string }>(client, "SELECT id FROM rag_chunk WHERE collection = $1 AND source = $2 AND id = ANY($3::text[])", [
+          collection,
+          document.source,
+          keep,
+        ]);
+        if (present.rows.length < new Set(keep).size) {
+          const there = new Set(present.rows.map((r) => r.id));
+          return { saved: false, missing: keep.filter((id) => !there.has(id)) };
+        }
         await query(
           client,
-          `INSERT INTO rag_document (collection, source, sha256, size, kind, pages, indexed) VALUES ($1, $2, $3, $4, $5, $6, now())
-           ON CONFLICT (collection, source) DO UPDATE SET sha256 = $3, size = $4, kind = $5, pages = $6, indexed = now()`,
-          [collection, document.source, document.sha256, document.size, document.kind, document.pages ?? null],
+          `INSERT INTO rag_document (collection, source, sha256, size, kind, pages, extraction, indexed) VALUES ($1, $2, $3, $4, $5, $6, $7, now())
+           ON CONFLICT (collection, source) DO UPDATE SET sha256 = $3, size = $4, kind = $5, pages = $6, extraction = $7, indexed = now()`,
+          [collection, document.source, document.sha256, document.size, document.kind, document.pages ?? null, document.extraction],
         );
         const ids = chunks.map((c) => c.id);
         const removed = await query(client, "DELETE FROM rag_chunk WHERE collection = $1 AND source = $2 AND NOT (id = ANY($3::text[]))", [collection, document.source, ids]);
@@ -193,23 +220,36 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
           [collection, ids, chunks.map((c) => c.ordinal)],
         );
         const fresh = chunks.filter((c): c is ChunkToStore & { embedding: readonly number[] } => c.embedding !== undefined);
-        const added = await query(
-          client,
-          `INSERT INTO rag_chunk (collection, source, id, ordinal, location, body, embedding, fts)
-           SELECT $1, $2, u.id, u.ordinal, u.location, u.body, u.embedding::vector, to_tsvector('simple', unaccent(u.body))
-           FROM unnest($3::text[], $4::int[], $5::text[], $6::text[], $7::text[]) AS u(id, ordinal, location, body, embedding)
-           ON CONFLICT (collection, id) DO NOTHING`,
-          [collection, document.source, fresh.map((c) => c.id), fresh.map((c) => c.ordinal), fresh.map((c) => c.location), fresh.map((c) => c.body), fresh.map((c) => vectorText(c.embedding))],
-        );
-        const addedCount = added.rowCount ?? 0;
-        return { added: addedCount, kept: chunks.length - fresh.length, removed: removed.rowCount ?? 0 };
+        let added = 0;
+        for (let i = 0; i < fresh.length; i += INSERT_BATCH) {
+          const batch = fresh.slice(i, i + INSERT_BATCH);
+          const inserted = await query(
+            client,
+            `INSERT INTO rag_chunk (collection, source, id, ordinal, location, body, embedding, fts)
+             SELECT $1, $2, u.id, u.ordinal, u.location, u.body, u.embedding::vector, to_tsvector('simple', unaccent(u.body))
+             FROM unnest($3::text[], $4::int[], $5::text[], $6::text[], $7::text[]) AS u(id, ordinal, location, body, embedding)
+             ON CONFLICT (collection, id) DO NOTHING`,
+            [collection, document.source, batch.map((c) => c.id), batch.map((c) => c.ordinal), batch.map((c) => c.location), batch.map((c) => c.body), batch.map((c) => vectorText(c.embedding))],
+          );
+          added += inserted.rowCount ?? 0;
+        }
+        return { saved: true, added, kept: keep.length, removed: removed.rowCount ?? 0 };
       }),
 
-    removeSources: async (collection, path, except = new Set()) => {
+    removeSources: async (collection, path) => {
+      const r = await query(await pool(), "DELETE FROM rag_document WHERE collection = $1 AND (source = $2 OR left(source, length($2) + 1) = $2 || '/')", [collection, path]);
+      return r.rowCount ?? 0;
+    },
+
+    prune: async (collection, folder, { present, recursive }) => {
+      // The part of the path below the folder, from its leading slash: '/.' in it means a dot-named part.
       const r = await query(
         await pool(),
-        `DELETE FROM rag_document WHERE collection = $1 AND (source = $2 OR left(source, length($2) + 1) = $2 || '/') AND NOT (source = ANY($3::text[]))`,
-        [collection, path, [...except]],
+        `DELETE FROM rag_document WHERE collection = $1 AND left(source, length($2) + 1) = $2 || '/'
+           AND NOT (source = ANY($3::text[]))
+           AND position('/.' in substr(source, length($2) + 1)) = 0
+           AND ($4 OR position('/' in substr(source, length($2) + 2)) = 0)`,
+        [collection, folder, [...present], recursive],
       );
       return r.rowCount ?? 0;
     },
