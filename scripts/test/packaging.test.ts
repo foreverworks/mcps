@@ -226,10 +226,10 @@ describe("installing a server", () => {
     expect(installBlock(manifestOf({}))).not.toContain("not on npm yet");
   });
 
-  it("for an extras server offers only the clone, and says why there is no package", () => {
+  it("for an extras server offers only the clone, and says there is no package", () => {
     const block = installBlock(manifestOf({ private: true, mcp: { ...MCP, audience: "extras", inputs } }));
     expect(block).toContain("Example is one of this repository's [extras](../../README.md#extras)");
-    expect(block).toContain("which are not published to npm, the MCP Registry or as desktop bundles");
+    expect(block).toContain("which run from a clone and are not published to npm, the MCP Registry or as desktop bundles");
     expect(block).toContain('claude mcp add example -e EXAMPLE_CONFIG="<path to Example app.json>" -- node "$PWD/servers/example/dist/index.js"');
     expect(block).toContain('"args": ["<path to the clone>/servers/example/dist/index.js"]');
     expect(block).not.toMatch(/npx|vscode\.dev|cursor\.com|\.mcpb/);

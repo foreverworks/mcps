@@ -37,7 +37,7 @@ you copy it again.
 
 <!-- install:begin -->
 > [!NOTE]
-> Glovo receipts is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node 22.19 or newer.
+> Glovo receipts is one of this repository's [extras](../../README.md#extras), which run from a clone and are not published to npm, the MCP Registry or as desktop bundles. Run it on Node 22.19 or newer.
 
 With Claude Code:
 
@@ -165,9 +165,9 @@ session ended, or Glovo stopped accepting the token. Copy the credentials again
 throttled batch stops. Wait a minute and ask again.
 
 **`api` with another status: "the Glovo web app may have changed its API".**
-Retry once. If it keeps failing, the unofficial API has probably changed:
-please [open an issue](https://github.com/foreverworks/mcps/issues) with the
-error's `message`.
+Retry once. If it keeps failing, Glovo's web API has changed:
+[open an issue](https://github.com/foreverworks/mcps/issues) with the error's
+`message`.
 
 **`not_found`: "there is no such order in this account".** Take order ids from
 `list_orders`.

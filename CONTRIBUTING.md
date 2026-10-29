@@ -173,15 +173,17 @@ and the guard in more depth.
    - `audience`: who it is for, which decides its section in the root README
      and whether it is ever published. `romania` is for companies in Romania
      and the people who run them; `general` is for a service people use
-     anywhere; `extras` is for a server built for one particular setup or on
-     an unofficial API, which is never published to npm, the MCP Registry or
-     as a desktop bundle. Choose `extras` when a stranger could not use it
-     without a setup like yours, or when it relies on an API its owner does
-     not offer.
+     anywhere; `extras` is for a server that runs from a clone and is not
+     published to npm, the MCP Registry or as a desktop bundle. Choose
+     `extras` for a server that needs hardware or a service its user sets up
+     first (a printer, a device host, model servers), for one that relies on
+     an API its owner does not document for third parties, or when the
+     repository's GitHub topics (at most 20, `TOPICS_MAX` in
+     `scripts/packaging.ts`) have no room for another published server.
    - `maturity`: `stable` (in daily use, and its tools keep their shape),
-     `beta` (works and is in use, but is new, still growing, or reads web
-     pages its service may change) or `experimental` (rests on something
-     that can break without notice, or covers only part of the service).
+     `beta` (in use, and new or still growing, or reading web pages its
+     service may change) or `experimental` (rests on an interface its owner
+     may change without notice, or covers part of the service).
    - `tagline`: one sentence for a stranger who has never heard of this
      repository, at most 100 characters, saying what an assistant can do with
      it; written as the README is ([How we write](#how-we-write)). It is the

@@ -38,7 +38,7 @@ no cost. The copied sign-in lasts about a year; then you copy it again.
 
 <!-- install:begin -->
 > [!NOTE]
-> Bolt Food receipts is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node 22.19 or newer.
+> Bolt Food receipts is one of this repository's [extras](../../README.md#extras), which run from a clone and are not published to npm, the MCP Registry or as desktop bundles. Run it on Node 22.19 or newer.
 
 With Claude Code:
 
@@ -170,7 +170,7 @@ expired, or its session ended. Copy the credentials again
 minute and ask again.
 
 **`api` with another code: "the Bolt web app may have changed its API".** Retry
-once. If it keeps failing, the unofficial API has probably changed: please
+once. If it keeps failing, Bolt's web API has changed:
 [open an issue](https://github.com/foreverworks/mcps/issues) with the error's
 `message`.
 

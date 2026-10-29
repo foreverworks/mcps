@@ -167,9 +167,8 @@ Once only, in order:
   relies on it), branch protection on `main` (no force pushes, no deletion),
   Dependabot alerts and security updates, and version updates for npm and
   actions (`.github/dependabot.yml`).
-- [x] **Decide per server what ships.** The rule: an extras server, built
-  for one particular setup or on an unofficial API, is never published;
-  every other server is. Each server's package.json `mcp.audience` holds the
+- [x] **Decide per server what ships.** The rule: an extras server is never
+  published; every other server is. Each server's package.json `mcp.audience` holds the
   decision ([What a release publishes](#what-a-release-publishes)), and the
   root README's [Extras](../README.md#extras) section lists the servers it
   keeps out.

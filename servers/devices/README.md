@@ -30,7 +30,7 @@ no key.
 
 <!-- install:begin -->
 > [!NOTE]
-> Device broker is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node 22.19 or newer.
+> Device broker is one of this repository's [extras](../../README.md#extras), which run from a clone and are not published to npm, the MCP Registry or as desktop bundles. Run it on Node 22.19 or newer.
 
 With Claude Code:
 

@@ -16,7 +16,7 @@ client asks you before each `money` call.
 <!-- servers:begin -->
 [foreverworks.github.io/mcps](https://foreverworks.github.io/mcps/) presents the servers by who they are for, each with its documentation.
 
-Under each server's name: how settled it is, then how many tools it has and the most they can do. **Stable**: in daily use, and its tools keep their shape. **Beta**: works and is in use, but is new, still growing, or reads web pages its service may change. **Experimental**: rests on something that can break without notice, or covers only part of the service.
+Under each server's name: how settled it is, then how many tools it has and the most they can do. **Stable**: in daily use, and its tools keep their shape. **Beta**: in use, and new or still growing, or reading web pages its service may change. **Experimental**: rests on an interface its owner may change without notice, or covers part of the service.
 
 ## For companies in Romania
 
@@ -49,7 +49,7 @@ Servers for services people use anywhere. We built each one because the servers 
 
 ## Extras
 
-These work, and we use them, but each is built for one particular setup or on an app's unofficial API, so they are not published to npm, the MCP Registry or as desktop bundles. Run them from a clone, and read the README first: it says what the server depends on and what can break.
+These run from a clone of this repository and are not published to npm, the MCP Registry or as desktop bundles. Each README has the install steps and what the server needs.
 
 | Server | What it does |
 |---|---|

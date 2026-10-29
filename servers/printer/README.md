@@ -27,7 +27,7 @@ account and no key. Prints are A4, grey and one-sided.
 
 <!-- install:begin -->
 > [!NOTE]
-> Printer and scanner is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node 22.19 or newer.
+> Printer and scanner is one of this repository's [extras](../../README.md#extras), which run from a clone and are not published to npm, the MCP Registry or as desktop bundles. Run it on Node 22.19 or newer.
 
 With Claude Code:
 

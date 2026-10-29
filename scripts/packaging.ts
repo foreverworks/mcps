@@ -101,7 +101,7 @@ export const AUDIENCE: Readonly<Record<Audience, AudienceSpec>> = {
   extras: {
     heading: "Extras",
     intro:
-      "These work, and we use them, but each is built for one particular setup or on an app's unofficial API, so they are not published to npm, the MCP Registry or as desktop bundles. Run them from a clone, and read the README first: it says what the server depends on and what can break.",
+      "These run from a clone of this repository and are not published to npm, the MCP Registry or as desktop bundles. Each README has the install steps and what the server needs.",
     label: "Extras",
     keywords: [],
     ships: false,
@@ -114,8 +114,8 @@ export type Maturity = (typeof MATURITIES)[number];
 
 export const MATURITY: Readonly<Record<Maturity, string>> = {
   stable: "in daily use, and its tools keep their shape",
-  beta: "works and is in use, but is new, still growing, or reads web pages its service may change",
-  experimental: "rests on something that can break without notice, or covers only part of the service",
+  beta: "in use, and new or still growing, or reading web pages its service may change",
+  experimental: "rests on an interface its owner may change without notice, or covers part of the service",
 };
 
 /** npm keywords every server carries. */
@@ -547,13 +547,13 @@ const DEPLOYING = "To share one running copy between several clients over HTTP, 
 /**
  * The install block of a server that is never published (an extras server):
  * no buttons and no npx, which would point at a package that will never
- * exist, but why not, and the clone it runs from.
+ * exist, but the clone it runs from.
  */
 const extrasInstallBlock = (m: Manifest): string => {
   const entry = entryOf(m);
   return [
     "> [!NOTE]",
-    `> ${m.title} is one of this repository's [extras](../../README.md#extras), which are not published to npm, the MCP Registry or as desktop bundles: each is built for one particular setup or on an app's unofficial API. Run it from a clone, on Node ${m.node.replace(/^>=\s*/, "")} or newer.`,
+    `> ${m.title} is one of this repository's [extras](../../README.md#extras), which run from a clone and are not published to npm, the MCP Registry or as desktop bundles. Run it on Node ${m.node.replace(/^>=\s*/, "")} or newer.`,
     "",
     "With Claude Code:",
     "",
