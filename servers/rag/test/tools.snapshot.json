@@ -1,0 +1,413 @@
+[
+  {
+    "name": "create_collection",
+    "title": "Create a collection",
+    "description": "Make a named collection to index documents into; it records the embedding model and dimension the server uses now, and only that model can search or grow it later. Creating one that exists with the same description is a no-op. The first collection also creates the tables.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "description": "Lowercase letters, digits, - and _, at most 63 characters."
+        },
+        "description": {
+          "description": "What the collection holds, for whoever lists it later.",
+          "type": "string",
+          "maxLength": 500
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "drop_collection",
+    "title": "Drop a collection",
+    "description": "Delete a collection and everything indexed in it (documents, chunks, embeddings). The source files are not touched; indexing them again rebuilds it. Acts outside the computer: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "A collection's name, as list_collections shows it."
+        }
+      },
+      "required": [
+        "name"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "expand",
+    "title": "Read around a hit",
+    "description": "The chunks just before and after a search result in its document, in order, the hit marked: the context a passage needs.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "A collection's name, as list_collections shows it."
+        },
+        "id": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The chunk id from search."
+        },
+        "before": {
+          "default": 1,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        },
+        "after": {
+          "default": 1,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 20
+        }
+      },
+      "required": [
+        "collection",
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether search and indexing can work: the database (its vector and unaccent extensions, the tables and their vector dimension, how many collections), the embed endpoint (model, revision, dimension), the rerank endpoint (model), and the text extractors found on PATH (pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from. Run this before concluding the server is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "index_path",
+    "title": "Index a file or folder",
+    "description": "Index one file or every file of a folder (under /srv/rag/inbox) into a collection. Reads pdf, png, jpg, jpeg, tif, tiff, bmp, webp, docx, odt, rtf, epub, html, htm, md, markdown, txt, text, csv; PDF pages without a text layer and images are OCRed in the given language. Text is cut into chunks of about 1200 characters that never cross a page or a heading, each with a stable id and its location; only chunks not stored already are embedded, and a file whose sha256 is unchanged is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the rest go on. Slow: embedding runs about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "A collection's name, as list_collections shows it."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "A file or folder under /srv/rag/inbox; a relative path is taken from the first. Links are refused."
+        },
+        "recursive": {
+          "default": true,
+          "description": "Also index the folders inside a folder.",
+          "type": "boolean"
+        },
+        "language": {
+          "description": "OCR language as tesseract's codes, e.g. eng, ron, deu. Default: the server's. Give the document's one language: a pair such as ron+eng lets the second strip the first's accents. ron also rewrites the old cedilla ş and ţ as ș and ț.",
+          "type": "string"
+        },
+        "ocr": {
+          "default": true,
+          "description": "OCR PDF pages that have no text layer, and images.",
+          "type": "boolean"
+        },
+        "force": {
+          "default": false,
+          "description": "Read and chunk files again even when their sha256 is unchanged (embeddings of unchanged chunks are still kept).",
+          "type": "boolean"
+        },
+        "prune": {
+          "default": false,
+          "description": "For a folder: also remove from the index the sources under it that are no longer there.",
+          "type": "boolean"
+        },
+        "max_files": {
+          "default": 200,
+          "description": "Files read in this call; call again for the rest.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 5000
+        }
+      },
+      "required": [
+        "collection",
+        "path"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "list_collections",
+    "title": "List collections",
+    "description": "Every collection with its description, the embedding model it was built with, and how many documents and chunks it holds.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_sources",
+    "title": "List indexed sources",
+    "description": "The files indexed in a collection: path, sha256, size, kind, pages, chunks and when, in path order, a page at a time.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "A collection's name, as list_collections shows it."
+        },
+        "prefix": {
+          "description": "Only sources whose path starts with this; end a folder with /.",
+          "type": "string"
+        },
+        "limit": {
+          "default": 100,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 500
+        },
+        "offset": {
+          "default": 0,
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "required": [
+        "collection"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "read_document",
+    "title": "Read an indexed document",
+    "description": "A document's text as indexed, chunk by chunk with each one's location, up to max_chars per call; next_from continues.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "A collection's name, as list_collections shows it."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The source path, as search or list_sources shows it."
+        },
+        "from": {
+          "default": 0,
+          "description": "The first chunk's ordinal.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "max_chars": {
+          "default": 20000,
+          "type": "integer",
+          "minimum": 500,
+          "maximum": 100000
+        }
+      },
+      "required": [
+        "collection",
+        "source"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "remove_source",
+    "title": "Remove a source",
+    "description": "Remove one indexed file, or every indexed file under a folder, from a collection's index. The files themselves are not touched.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "A collection's name, as list_collections shows it."
+        },
+        "path": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The absolute path as list_sources shows it, or a folder above several."
+        }
+      },
+      "required": [
+        "collection",
+        "path"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "search",
+    "title": "Search",
+    "description": "Find the passages that answer a question, in any language the model reads (a Romanian question finds a Romanian passage worded differently). Hybrid: the nearest chunks by embedding and the full-text matches of any of its words (accents ignored), fused by reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Each result has its collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole document. Reranking is the slow part: about 0.5 s per candidate on a CPU.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "query": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 2000,
+          "description": "The question, in full sentences: the reranker reads it as written."
+        },
+        "collections": {
+          "description": "Where to search. Default: every collection.",
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 63,
+            "description": "A collection's name, as list_collections shows it."
+          }
+        },
+        "source_prefix": {
+          "description": "Only sources whose path starts with this; end a folder with /.",
+          "type": "string"
+        },
+        "limit": {
+          "default": 5,
+          "description": "Results returned.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "candidates": {
+          "default": 20,
+          "description": "Fused candidates the reranker reads; more finds more and costs time.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "rerank": {
+          "default": true,
+          "description": "false returns the fused order, without the reranker: fast, less precise.",
+          "type": "boolean"
+        },
+        "max_chars": {
+          "default": 1200,
+          "description": "Each result's text is cut to about this many characters.",
+          "type": "integer",
+          "minimum": 100,
+          "maximum": 5000
+        }
+      },
+      "required": [
+        "query"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

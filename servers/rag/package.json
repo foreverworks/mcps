@@ -1,0 +1,98 @@
+{
+  "name": "@foreverworks/mcp-rag",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for retrieval over your own documents: index PDFs (with OCR), images, docx and Markdown into Postgres with pgvector, then search them with hybrid retrieval and a reranker, all on your machine",
+  "mcp": {
+    "title": "Local RAG",
+    "audience": "extras",
+    "maturity": "beta",
+    "tagline": "Index your PDFs, scans and documents locally, and search them with hybrid retrieval and a reranker.",
+    "inputs": {
+      "RAG_DATABASE_URL": {
+        "title": "Database URL",
+        "type": "text",
+        "required": true,
+        "description": "postgresql:// URL of a database with the vector extension; the password may be left out of it."
+      },
+      "RAG_DATABASE_PASSWORD_FILE": {
+        "title": "Database password file",
+        "type": "file",
+        "required": false,
+        "description": "Path of a file holding the database password, when the URL does not carry it."
+      },
+      "RAG_EMBED_URL": {
+        "title": "Embedding server",
+        "type": "text",
+        "required": true,
+        "description": "Base URL of a text-embeddings-inference server running an embedding model."
+      },
+      "RAG_RERANK_URL": {
+        "title": "Rerank server",
+        "type": "text",
+        "required": true,
+        "description": "Base URL of a text-embeddings-inference server running a reranker model."
+      },
+      "RAG_SOURCE_ROOTS": {
+        "title": "Folders to index",
+        "type": "text",
+        "required": false,
+        "description": "Folders the server may read documents from, separated by colons."
+      },
+      "RAG_OCR_LANGUAGE": {
+        "title": "OCR language",
+        "type": "text",
+        "required": false,
+        "description": "Tesseract language code for scanned pages, such as eng or ron (default eng)."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "rag",
+    "pgvector",
+    "ocr"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://foreverworks.github.io/mcps/servers/rag/",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/rag"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-rag": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.1.0",
+    "pg": "8.23.1",
+    "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@types/pg": "8.23.1"
+  }
+}
