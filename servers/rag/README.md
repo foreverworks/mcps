@@ -138,7 +138,9 @@ it".
 
 - **Extraction.** PDFs through `pdftotext`, page by page; a page with fewer
   than 20 visible characters goes through `ocrmypdf --skip-text`, which leaves
-  every page with text alone. Images through `tesseract`. docx, odt, rtf, html
+  every page with text alone, and its text is tesseract's own (`--sidecar`):
+  pdftotext reading the OCRed layer lost the space before Romanian words that
+  start with î. Images through `tesseract`. docx, odt, rtf, html
   and epub through `pandoc` to Markdown, whose headings become locations.
   Each file's bytes are copied to a private temporary folder first, so a tool
   never opens the caller's path. Text is normalised (NFC, line endings, white

@@ -11,6 +11,7 @@ import { describe, expect, it } from "vitest";
 import { kindOf } from "../src/domain/kinds.js";
 import { normaliseText } from "../src/domain/text.js";
 import { makeExtractor } from "../src/infra/extract.js";
+import { sidecarPages } from "../src/infra/extract/sidecar.js";
 
 const has = (tool: string, flag = "--version"): boolean => {
   try {
@@ -41,7 +42,7 @@ describe("extract", () => {
     expect(out.ocrPages).toBe(1);
     const text = normaliseText(out.sections.map((s) => s.text).join("\n"), "ron");
     expect(text).toContain("dimineața devreme");
-    expect(text).toContain("Țânțarii nu supraviețuiesc");
+    expect(text).toContain("Țânțarii nu supraviețuiesc iarna în seră");
   }, 120_000);
 
   it.skipIf(!has("pdftotext", "-v"))("says so when OCR is off and a page has no text", async () => {
@@ -63,5 +64,16 @@ describe("extract", () => {
     expect(md.sections).toEqual([{ location: "T", text: "Body." }]);
     const latin = await extractor.extract({ name: "a.txt", bytes: Buffer.from([0x63, 0x61, 0x66, 0xe9]), kind: { kind: "text" } }, { language: "eng", ocr: true });
     expect(latin.warnings[0]).toContain("not UTF-8");
+  });
+});
+
+describe("sidecarPages", () => {
+  it("maps tesseract's text to its pages across runs of skipped pages", () => {
+    const pages = sidecarPages("[OCR skipped on page(s) 1-2]\fthird page\f[OCR skipped on page(s) 4]\ffifth page\f");
+    expect([...pages.entries()]).toEqual([
+      [3, "third page"],
+      [5, "fifth page"],
+    ]);
+    expect([...sidecarPages("only\fsecond").keys()]).toEqual([1, 2]);
   });
 });
