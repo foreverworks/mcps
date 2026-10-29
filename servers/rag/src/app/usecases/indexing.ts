@@ -171,7 +171,10 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
   let read = 0;
   let more = false;
   let stopped = false;
-  for (const [i, source] of listing.files.entries()) {
+  // A remote provider answers each request in a fraction of a second and takes many at once, so its
+  // files are read, embedded and saved several at a time; the local endpoint takes them one by one.
+  const parallel = collection.provider === "local" ? 1 : deps.settings.remoteConcurrency;
+  for (let i = 0; i < listing.files.length; ) {
     if (cancelled()) {
       stopped = true;
       break;
@@ -180,16 +183,24 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
       more = true;
       break;
     }
-    reportProgress(i, listing.files.length, basename(source));
-    try {
-      const outcome = await indexOne(deps, collection, source, args, language);
-      outcomes.push(outcome);
-      if (outcome.status !== "unchanged") read += 1;
-    } catch (thrown) {
-      if (stopsTheCall(thrown)) throw thrown;
-      outcomes.push({ status: "failed", source, error: describeFailure(thrown) });
-      read += 1;
-    }
+    // Never more files at once than max_files still allows, so a call reads at most max_files.
+    const batch = listing.files.slice(i, i + Math.min(parallel, args.maxFiles - read));
+    reportProgress(i, listing.files.length, basename(batch[0] ?? ""));
+    const settled = await Promise.allSettled(batch.map((source) => indexOne(deps, collection, source, args, language)));
+    let stop: unknown;
+    settled.forEach((r, k) => {
+      if (r.status === "fulfilled") {
+        outcomes.push(r.value);
+        if (r.value.status !== "unchanged") read += 1;
+      } else if (stopsTheCall(r.reason)) {
+        stop ??= r.reason;
+      } else {
+        outcomes.push({ status: "failed", source: batch[k] ?? "", error: describeFailure(r.reason) });
+        read += 1;
+      }
+    });
+    if (stop !== undefined) throw stop;
+    i += batch.length;
   }
   // A prune needs the whole listing, not the whole of it indexed: what is on disk is what it keeps.
   const pruneSkipped = !args.prune

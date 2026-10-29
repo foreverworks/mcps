@@ -44,6 +44,7 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
       language: env["RAG_OCR_LANGUAGE"]?.trim() || "eng",
       embedBatch: positive(env["RAG_EMBED_BATCH"], 32),
       rerankBatch: positive(env["RAG_RERANK_BATCH"], 32),
+      remoteConcurrency: positive(env["RAG_REMOTE_CONCURRENCY"], 8),
     },
     now: () => new Date(),
   };

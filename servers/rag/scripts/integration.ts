@@ -45,7 +45,7 @@ const main = async (): Promise<void> => {
     reranker: { info: async () => ({ model: "fake/overlap" }), rerank: async (q, texts) => texts.map((t, index) => ({ index, score: fakeRerankScore(q, t) })).sort((a, b) => b.score - a.score) },
     extractor: makeExtractor(),
     sources: makeSources([folder], { maxBytes: 50 * 1024 * 1024 }),
-    settings: { language: "ron", embedBatch: 8, rerankBatch: 4 },
+    settings: { language: "ron", embedBatch: 8, rerankBatch: 4, remoteConcurrency: 3 },
     now: () => new Date(),
   };
   const name = `it-${Date.now()}`;

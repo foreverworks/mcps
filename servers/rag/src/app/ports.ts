@@ -185,6 +185,8 @@ export type Settings = {
   readonly embedBatch: number;
   /** Passages per rerank request: text-embeddings-inference refuses more than its --max-client-batch-size (32 by default). */
   readonly rerankBatch: number;
+  /** Files indexed at once for a collection embedded at a remote provider (the local endpoint takes one at a time). */
+  readonly remoteConcurrency: number;
 };
 
 export type Deps = {

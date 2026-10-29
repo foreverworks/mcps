@@ -80,6 +80,7 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_CLOUDFLARE_API_TOKEN_FILE` | no | File holding a Cloudflare API token that may run Workers AI on that account: the account permission Workers AI Read is enough. For a local run, `RAG_CLOUDFLARE_API_TOKEN` may hold it instead. |
 | `RAG_CLOUDFLARE_MODEL` | no | The Workers AI model that matches the local embedding model. Default `@cf/baai/bge-m3`, which is `BAAI/bge-m3`. |
 | `RAG_CLOUDFLARE_BATCH` | no | Texts per Workers AI request. Default 64. |
+| `RAG_REMOTE_CONCURRENCY` | no | Files indexed at once for a collection embedded at a remote provider. Default 8; the local endpoint always takes one at a time. |
 
 Without them the server still starts and lists its tools, and each call that
 needs one answers a `config` error naming it. Files are read from

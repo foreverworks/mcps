@@ -69,7 +69,7 @@ const connected = async (over: { readonly reranker?: Reranker; readonly wrapStor
     },
     extractor: makeExtractor(),
     sources: makeSources([inbox], { maxBytes: 1024 * 1024 }),
-    settings: { language: "eng", embedBatch: 2, rerankBatch: 2 },
+    settings: { language: "eng", embedBatch: 2, rerankBatch: 2, remoteConcurrency: 2 },
     now: () => new Date("2026-01-01T00:00:00Z"),
   };
   const server = new McpServer({ name: "rag", version: "test" });
@@ -359,5 +359,28 @@ describe("index, search, read", () => {
     expect(stopped.error).toMatchObject({ kind: "provider", reason: "quota" });
     const listed = (await s.call("list_collections")).collections[0];
     expect(listed).toMatchObject({ documents: 1, spent_tokens: 10, spent_neurons: 0.01 });
+  });
+
+  it("indexes several files at once at a remote provider, never more than max_files in a call", async () => {
+    let inFlight = 0;
+    let most = 0;
+    const s = await connected({
+      remote: fakeRemote({
+        embed: async (texts) => {
+          inFlight += 1;
+          most = Math.max(most, inFlight);
+          await new Promise((r) => setTimeout(r, 20));
+          inFlight -= 1;
+          return { vectors: texts.map((t) => fakeEmbed(t)), usage: { requests: 1, texts: texts.length, tokens: 1, neurons: 0 } };
+        },
+      }),
+    });
+    await s.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
+    const first = await s.call("index_path", { collection: "docs", path: s.inbox, max_files: 2 });
+    expect(first).toMatchObject({ indexed: 2, more: true });
+    expect(most).toBe(2);
+    const rest = await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect(rest).toMatchObject({ indexed: 1, unchanged: 2, failed: 0 });
+    expect(rest.more).toBeUndefined();
   });
 });
