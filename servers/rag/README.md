@@ -6,7 +6,10 @@ database with pgvector, finds the passages that answer a question (in any
 language the models read, worded differently from the text), and hands them
 back with the file and page or heading they came from. Embeddings and
 reranking run on servers you host, so documents and questions stay on your
-machine.
+machine. For a corpus too large to embed on a CPU, a collection can be
+indexed at Cloudflare Workers AI instead, which runs the same model; its
+documents' text then goes to Cloudflare, and questions are still embedded on
+your machine.
 
 **You need** Postgres with the [pgvector](https://github.com/pgvector/pgvector)
 extension, two [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference)
@@ -23,6 +26,8 @@ languages you need, and `pandoc`.
   me the paragraphs around the first one."
 - "Index notes/ again; only the files I changed this week should be read."
 - "Remove the drafts folder from the index."
+- "Make a collection for the court archive indexed at Cloudflare, index it,
+  and tell me what it cost."
 
 ## Install
 
@@ -71,6 +76,10 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_MAX_FILE_BYTES` | no | Largest file it reads. Default 200 MiB. |
 | `RAG_EMBED_BATCH` | no | Texts per embed request. Default 32, text-embeddings-inference's default limit. |
 | `RAG_RERANK_BATCH` | no | Passages per rerank request; a search with more candidates sends several. Default 32, text-embeddings-inference's default `--max-client-batch-size`. |
+| `RAG_CLOUDFLARE_ACCOUNT_ID` | no | The Cloudflare account that runs Workers AI, for collections indexed there. |
+| `RAG_CLOUDFLARE_API_TOKEN_FILE` | no | File holding a Cloudflare API token that may run Workers AI on that account: the account permission Workers AI Read is enough. For a local run, `RAG_CLOUDFLARE_API_TOKEN` may hold it instead. |
+| `RAG_CLOUDFLARE_MODEL` | no | The Workers AI model that matches the local embedding model. Default `@cf/baai/bge-m3`, which is `BAAI/bge-m3`. |
+| `RAG_CLOUDFLARE_BATCH` | no | Texts per Workers AI request. Default 64. |
 
 Without them the server still starts and lists its tools, and each call that
 needs one answers a `config` error naming it. Files are read from
@@ -91,6 +100,35 @@ CREATE EXTENSION vector;
 
 Give the server a database of its own. One database holds vectors of one
 dimension, so a second embedding model needs a second database.
+
+### Embedding providers
+
+Each collection records where its chunks are embedded when it is indexed:
+
+- **`local`**, the default: the embed endpoint above.
+- **`cloudflare`**: [Workers AI](https://developers.cloudflare.com/workers-ai/models/bge-m3/),
+  which serves `BAAI/bge-m3` as `@cf/baai/bge-m3`, and takes the embedding off
+  your CPU: 100 MB of English text is about 27 million bge-m3 tokens, many
+  hours of work for a CPU (see the measurements under How it works).
+
+Questions are always embedded by the local endpoint, so a collection indexed at
+Cloudflare is searched exactly like one indexed locally. That holds only while
+both give the same vectors, so `create_collection` sends three probe texts to
+both and refuses the provider unless every pair has a cosine similarity of at
+least 0.999. `BAAI/bge-m3` served by text-embeddings-inference and
+`@cf/baai/bge-m3` agree to 0.99999. Naming a provider for an existing
+collection moves it there (with the same probe); what it already holds stays,
+and only new chunks go to the new provider.
+
+What it costs: Workers AI bills in neurons, and bge-m3 takes about 1,075 per
+million input tokens. Every account gets 10,000 neurons a day free, about 9
+million tokens; past that, an account on the Workers Free plan is refused until
+00:00 UTC, and the Workers Paid plan bills $0.011 per 1,000 neurons (about
+$0.012 per million tokens). `index_path` reports the requests, texts, tokens
+and neurons Workers AI billed for the call, and `list_collections` the total
+per collection. A spent daily allocation stops the call with a `provider`
+error whose reason is `quota`; the files indexed until then stay indexed, and
+the collection can go on locally meanwhile.
 
 ### The models
 
@@ -117,9 +155,9 @@ each call (see Confirmation in [docs/security.md](../../docs/security.md)).
 
 | Tool | Access | What it does |
 |---|---|---|
-| `health` | read | The database (extensions, tables, dimension, collections), the embed and rerank endpoints (model, revision, dimension), and the extractors on PATH with tesseract's languages. |
-| `list_collections` | read | Every collection with its description, embedding model, documents and chunks. |
-| `create_collection` | write | A named collection, recording the embedding model and dimension; the first one creates the tables. |
+| `health` | read | The database (extensions, tables, dimension, collections), the embed and rerank endpoints (model, revision, dimension), the extractors on PATH with tesseract's languages, and which remote providers are configured. |
+| `list_collections` | read | Every collection with its description, embedding model, provider, what a remote provider has cost it, documents and chunks. |
+| `create_collection` | write | A named collection, recording the embedding model and dimension and where its chunks are embedded (a remote provider only after the probe); for an existing one, moves it to the provider named. The first one creates the tables. |
 | `drop_collection` | write | Deletes a collection and everything indexed in it. The files are not touched. |
 | `index_path` | write | Indexes a file or a folder: text extracted (OCR for scanned pages and images), cut into chunks with stable ids and their page or heading, and only new chunks embedded; unchanged files are passed over and do not count toward `max_files`, so a second call goes on from the first. `prune` removes sources no longer in the folder. |
 | `remove_source` | write | Removes one indexed file, or every one under a folder. |
@@ -187,7 +225,9 @@ in 3.5 s.
 - **One embedding dimension per database**, and a collection only with the model
   that built it.
 - **Slow on a CPU**, as measured above: index large folders in several calls
-  (`max_files`), and keep `candidates` near 20.
+  (`max_files`) or at a remote provider, and keep `candidates` near 20.
+- **One remote provider**, Cloudflare Workers AI, and only for indexing: the
+  reranker and every question run on the local endpoints.
 - **No scheduling.** Nothing watches the folders; call `index_path` again.
 
 ## Other servers for local RAG

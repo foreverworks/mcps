@@ -2,7 +2,7 @@
   {
     "name": "create_collection",
     "title": "Create a collection",
-    "description": "Make a named collection to index documents into; it records the embedding model and dimension the server uses now, and only that model can search or grow it later. Creating one that exists with the same description is a no-op. The first collection also creates the tables.",
+    "description": "Make a named collection to index documents into; it records the embedding model and dimension the server uses now, and only that model can search or grow it later. Creating one that exists with the same description is a no-op. The first collection also creates the tables. embedding_provider says where its chunks are embedded when indexed: local (the server's own embed endpoint, the default) or a remote service running the same model, which is faster for a large corpus and sends the documents' text there. A remote provider is accepted only after it embeds probe texts as the local endpoint does (cosine at least 0.999), since every question is embedded locally. Naming another provider for an existing collection moves it there, with the same probe; chunks already embedded stay, as both providers' vectors are alike.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -14,6 +14,14 @@
           "description": "What the collection holds, for whoever lists it later.",
           "type": "string",
           "maxLength": 500
+        },
+        "embedding_provider": {
+          "description": "Where indexing embeds this collection's chunks. Default: local for a new collection, unchanged for an existing one.",
+          "type": "string",
+          "enum": [
+            "local",
+            "cloudflare"
+          ]
         }
       },
       "required": [
@@ -111,7 +119,7 @@
   {
     "name": "health",
     "title": "Health",
-    "description": "Whether search and indexing can work: the database (its vector and unaccent extensions, the tables and their vector dimension, how many collections), the embed endpoint (model, revision, dimension), the rerank endpoint (model), and the text extractors found on PATH (pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from. Run this before concluding the server is broken.",
+    "description": "Whether search and indexing can work: the database (its vector and unaccent extensions, the tables and their vector dimension, how many collections), the embed endpoint (model, revision, dimension), the rerank endpoint (model), and the text extractors found on PATH (pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from, and whether each remote embedding provider is configured (read from the settings, without calling it). Run this before concluding the server is broken.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -130,7 +138,7 @@
   {
     "name": "index_path",
     "title": "Index a file or folder",
-    "description": "Index one file or every file of a folder (under /srv/rag/inbox) into a collection. Reads pdf, png, jpg, jpeg, tif, tiff, bmp, webp, docx, odt, rtf, epub, html, htm, md, markdown, txt, text, csv; PDF pages without a text layer and images are OCRed in the given language. Text is cut into chunks of about 1200 characters that never cross a page or a heading, each with a stable id and its location; only chunks not stored already are embedded, and a file whose sha256 is unchanged (and was read the same way) is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the rest go on. Slow: embedding runs about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
+    "description": "Index one file or every file of a folder (under /srv/rag/inbox) into a collection. Reads pdf, png, jpg, jpeg, tif, tiff, bmp, webp, docx, odt, rtf, epub, html, htm, md, markdown, txt, text, csv; PDF pages without a text layer and images are OCRed in the given language. Text is cut into chunks of about 1200 characters that never cross a page or a heading, each with a stable id and its location; only chunks not stored already are embedded, and a file whose sha256 is unchanged (and was read the same way) is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the rest go on. Chunks are embedded where the collection says (create_collection's embedding_provider); the reply says how many requests and texts, and for a remote provider the tokens and neurons it reported. Slow when local: about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -196,7 +204,7 @@
   {
     "name": "list_collections",
     "title": "List collections",
-    "description": "Every collection with its description, the embedding model it was built with, and how many documents and chunks it holds.",
+    "description": "Every collection with its description, the embedding model it was built with, where its chunks are embedded (provider and that provider's model), what a remote provider has cost it (tokens, neurons), and how many documents and chunks it holds.",
     "inputSchema": {
       "type": "object",
       "properties": {},

@@ -6,6 +6,7 @@ import type { InputFiles } from "@foreverworks/mcp-kit";
 
 import type { Chunk, Section } from "../domain/chunk.js";
 import type { Kind } from "../domain/kinds.js";
+import type { Provider, ProbeResult, RemoteProvider, Usage } from "../domain/provider.js";
 
 /** What a model endpoint says it serves. */
 export type ModelInfo = { readonly model: string; readonly revision?: string | undefined };
@@ -14,6 +15,22 @@ export type Embedder = {
   readonly info: () => Promise<ModelInfo>;
   /** One vector per text, in order; the endpoint's batch limit is the port's to respect. */
   readonly embed: (texts: readonly string[]) => Promise<readonly (readonly number[])[]>;
+};
+
+/**
+ * An embedding service elsewhere serving the model the local endpoint serves,
+ * used to index a collection set to it. Questions are always embedded locally.
+ */
+export type RemoteEmbedder = {
+  readonly provider: RemoteProvider;
+  /** The model as the provider names it. */
+  readonly model: string;
+  /** Texts per request. */
+  readonly batch: number;
+  /** The settings it lacks (an empty token file counts as missing), without calling it: health reports them and spends nothing. */
+  readonly missing: () => Promise<readonly string[]>;
+  /** One vector per text, in order, and what the provider says the request cost. */
+  readonly embed: (texts: readonly string[]) => Promise<{ readonly vectors: readonly (readonly number[])[]; readonly usage: Usage }>;
 };
 
 export type Reranker = {
@@ -67,10 +84,22 @@ export type Sources = {
 export type CollectionInfo = {
   readonly name: string;
   readonly description: string;
+  /** The local embed endpoint's model and dimension: every question is embedded with it. */
   readonly model: string;
   readonly dimension: number;
   readonly created: string;
+  /** Where its chunks are embedded, and that provider's name for the model (the local one's, for local). */
+  readonly provider: Provider;
+  readonly provider_model: string;
+  /** The probe that let it use a remote provider. */
+  readonly provider_probe?: ProbeResult | undefined;
+  /** What indexing it has cost at remote providers, as they reported it. */
+  readonly spent_tokens: number;
+  readonly spent_neurons: number;
 };
+
+/** Where a collection's chunks are embedded, as create_collection records it. */
+export type ProviderSetting = { readonly provider: Provider; readonly provider_model: string; readonly provider_probe?: ProbeResult | undefined };
 
 export type CollectionRow = CollectionInfo & { readonly documents: number; readonly chunks: number };
 
@@ -121,7 +150,11 @@ export type Store = {
   readonly collections: () => Promise<readonly CollectionRow[]>;
   /** The collections as recorded, without the counts: what a call checks before it works on one. */
   readonly collectionInfos: () => Promise<readonly CollectionInfo[]>;
-  readonly createCollection: (row: { readonly name: string; readonly description: string; readonly model: string; readonly dimension: number }) => Promise<boolean>;
+  readonly createCollection: (row: { readonly name: string; readonly description: string; readonly model: string; readonly dimension: number } & ProviderSetting) => Promise<boolean>;
+  /** Sets where an existing collection's chunks are embedded; false when there is no such collection. */
+  readonly setProvider: (name: string, setting: ProviderSetting) => Promise<boolean>;
+  /** Adds what a remote provider reported for indexing into the collection. */
+  readonly addSpent: (name: string, usage: Usage) => Promise<void>;
   /** Removes the collection and everything indexed in it; how many documents and chunks went. */
   readonly dropCollection: (name: string) => Promise<{ readonly documents: number; readonly chunks: number } | undefined>;
   readonly document: (collection: string, source: string) => Promise<DocumentRow | undefined>;
@@ -157,6 +190,7 @@ export type Settings = {
 export type Deps = {
   readonly store: Store;
   readonly embedder: Embedder;
+  readonly remote: Readonly<Record<RemoteProvider, RemoteEmbedder>>;
   readonly reranker: Reranker;
   readonly extractor: Extractor;
   readonly sources: Sources;

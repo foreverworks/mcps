@@ -18,11 +18,12 @@ const part = async <T extends object>(read: () => Promise<T>): Promise<({ readon
  * extractor is listed under problems, since only the files that need it fail.
  */
 export const checkHealth = async (deps: Deps) => {
-  const [database, embed, rerank, tools] = await Promise.all([
+  const [database, embed, rerank, tools, providers] = await Promise.all([
     part(() => deps.store.status()),
     part(() => embeddingModel(deps)),
     part(() => deps.reranker.info()),
     deps.extractor.tools(),
+    Promise.all(Object.values(deps.remote).map(async (r) => ({ remote: r, missing: await r.missing() }))),
   ]);
   const problems = [
     ...(database.ok ? [] : [`database: ${database.error}`]),
@@ -44,6 +45,8 @@ export const checkHealth = async (deps: Deps) => {
     embed,
     rerank,
     extractors: tools,
+    // What each remote provider would need, read from the settings: health never spends a provider's units.
+    providers: Object.fromEntries(providers.map(({ remote, missing }) => [remote.provider, { model: remote.model, configured: missing.length === 0, ...(missing.length === 0 ? {} : { missing }) }])),
     roots: deps.sources.roots,
     language: deps.settings.language,
   };

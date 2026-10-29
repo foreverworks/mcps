@@ -7,6 +7,7 @@ import { checkHealth } from "../app/usecases/health.js";
 import { indexPath, listSources, removeSource } from "../app/usecases/indexing.js";
 import { expand, readDocument, search } from "../app/usecases/search.js";
 import { SUPPORTED_EXTENSIONS } from "../domain/kinds.js";
+import { MIN_PROBE_COSINE, PROVIDERS } from "../domain/provider.js";
 import { handled } from "./envelope.js";
 
 const collection = z.string().trim().min(1).max(63).describe("A collection's name, as list_collections shows it.");
@@ -22,7 +23,8 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       description:
         "Whether search and indexing can work: the database (its vector and unaccent extensions, the tables and their vector dimension, how many " +
         "collections), the embed endpoint (model, revision, dimension), the rerank endpoint (model), and the text extractors found on PATH " +
-        "(pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from. Run this before concluding the server is broken.",
+        "(pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from, and whether each remote embedding " +
+        "provider is configured (read from the settings, without calling it). Run this before concluding the server is broken.",
       inputSchema: {},
     },
     handled(() => checkHealth(deps)),
@@ -32,7 +34,9 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
     "list_collections",
     {
       title: "List collections",
-      description: "Every collection with its description, the embedding model it was built with, and how many documents and chunks it holds.",
+      description:
+        "Every collection with its description, the embedding model it was built with, where its chunks are embedded (provider and that provider's " +
+        "model), what a remote provider has cost it (tokens, neurons), and how many documents and chunks it holds.",
       inputSchema: {},
     },
     handled(() => listCollections(deps)),
@@ -44,13 +48,21 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       title: "Create a collection",
       description:
         "Make a named collection to index documents into; it records the embedding model and dimension the server uses now, and only that model " +
-        "can search or grow it later. Creating one that exists with the same description is a no-op. The first collection also creates the tables.",
+        "can search or grow it later. Creating one that exists with the same description is a no-op. The first collection also creates the tables. " +
+        "embedding_provider says where its chunks are embedded when indexed: local (the server's own embed endpoint, the default) or a remote " +
+        `service running the same model, which is faster for a large corpus and sends the documents' text there. A remote provider is accepted only after it ` +
+        `embeds probe texts as the local endpoint does (cosine at least ${MIN_PROBE_COSINE}), since every question is embedded locally. Naming another ` +
+        "provider for an existing collection moves it there, with the same probe; chunks already embedded stay, as both providers' vectors are alike.",
       inputSchema: {
         name: z.string().trim().describe("Lowercase letters, digits, - and _, at most 63 characters."),
         description: z.string().max(500).optional().describe("What the collection holds, for whoever lists it later."),
+        embedding_provider: z
+          .enum(PROVIDERS)
+          .optional()
+          .describe("Where indexing embeds this collection's chunks. Default: local for a new collection, unchanged for an existing one."),
       },
     },
-    handled((a) => createCollection(deps, a)),
+    handled((a) => createCollection(deps, { name: a.name, description: a.description, provider: a.embedding_provider })),
   );
 
   server.registerTool(
@@ -72,7 +84,8 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "PDF pages without a text layer and images are OCRed in the given language. Text is cut into chunks of about 1200 characters that never cross " +
         "a page or a heading, each with a stable id and its location; only chunks not stored already are embedded, and a file whose sha256 is " +
         "unchanged (and was read the same way) is passed over, so running it again only redoes what changed. Links are never followed. One file's failure is reported and the " +
-        "rest go on. Slow: embedding runs about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
+        "rest go on. Chunks are embedded where the collection says (create_collection's embedding_provider); the reply says how many requests and texts, " +
+        "and for a remote provider the tokens and neurons it reported. Slow when local: about 1-2 chunks of that size per second on a CPU, and OCR a few seconds per page.",
       inputSchema: {
         collection,
         path: z.string().trim().min(1).describe(`A file or folder ${where}; a relative path is taken from the first. Links are refused.`),

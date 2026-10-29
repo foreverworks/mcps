@@ -2,6 +2,7 @@ import type pg from "pg";
 
 import type { ChunkToStore, CollectionInfo, CollectionRow, DocumentRow, Hit, SaveResult, SearchScope, Store, StoredChunk } from "../app/ports.js";
 import { fail } from "../domain/errors.js";
+import type { ProbeResult } from "../domain/provider.js";
 import type { Pool } from "./database.js";
 
 /**
@@ -56,6 +57,19 @@ const inTransaction = async <T>(pool: Pool, work: (client: pg.PoolClient) => Pro
   }
 };
 
+/**
+ * Columns added after the first release, for tables made before them: where a
+ * collection's chunks are embedded (local, which is what embedded them then)
+ * and what a remote provider has cost it.
+ */
+const UPGRADES: readonly string[] = [
+  "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'local'",
+  "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS provider_model text NOT NULL DEFAULT ''",
+  "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS provider_probe jsonb",
+  "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS spent_tokens bigint NOT NULL DEFAULT 0",
+  "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS spent_neurons double precision NOT NULL DEFAULT 0",
+];
+
 const schemaSql = (dimension: number): readonly string[] => [
   "CREATE EXTENSION IF NOT EXISTS vector",
   "CREATE EXTENSION IF NOT EXISTS unaccent",
@@ -75,6 +89,7 @@ const schemaSql = (dimension: number): readonly string[] => [
      location text NOT NULL, body text NOT NULL, embedding vector(${dimension}) NOT NULL, fts tsvector NOT NULL,
      PRIMARY KEY (collection, id),
      FOREIGN KEY (collection, source) REFERENCES rag_document (collection, source) ON DELETE CASCADE)`,
+  ...UPGRADES,
   "CREATE INDEX IF NOT EXISTS rag_chunk_embedding ON rag_chunk USING hnsw (embedding vector_cosine_ops)",
   "CREATE INDEX IF NOT EXISTS rag_chunk_fts ON rag_chunk USING gin (fts)",
   "CREATE INDEX IF NOT EXISTS rag_chunk_document ON rag_chunk (collection, source, ordinal)",
@@ -96,6 +111,35 @@ const documentOf = (r: DocumentSql): DocumentRow => ({
   indexed: r.indexed.toISOString(),
 });
 
+const COLLECTION_COLUMNS = "c.name, c.description, c.model, c.dimension, c.created, c.provider, c.provider_model, c.provider_probe, c.spent_tokens, c.spent_neurons";
+
+type CollectionSql = {
+  name: string;
+  description: string;
+  model: string;
+  dimension: number;
+  created: Date;
+  provider: string;
+  provider_model: string;
+  provider_probe: ProbeResult | null;
+  spent_tokens: string;
+  spent_neurons: number;
+};
+
+const collectionOf = (r: CollectionSql): CollectionInfo => ({
+  name: r.name,
+  description: r.description,
+  model: r.model,
+  dimension: r.dimension,
+  created: r.created.toISOString(),
+  provider: r.provider === "cloudflare" ? "cloudflare" : "local",
+  // Collections made before providers were recorded: the local model is what embedded them.
+  provider_model: r.provider_model === "" ? r.model : r.provider_model,
+  ...(r.provider_probe === null ? {} : { provider_probe: r.provider_probe }),
+  spent_tokens: Number(r.spent_tokens),
+  spent_neurons: Number(r.spent_neurons),
+});
+
 const DOCUMENT_COLUMNS = `d.source, d.sha256, d.size, d.kind, d.pages, d.extraction, d.indexed,
   (SELECT count(*) FROM rag_chunk k WHERE k.collection = d.collection AND k.source = d.source) AS chunks`;
 
@@ -106,7 +150,19 @@ const INSERT_BATCH = 256;
 
 export const makeStore = (pool: () => Promise<Pool>): Store => {
   let ensured: number | undefined;
+  let upgraded = false;
   const tablesExist = async (db: Pool): Promise<boolean> => (await query<{ t: string | null }>(db, "SELECT to_regclass('rag_collection')::text AS t")).rows[0]?.t != null;
+  /** Whether the tables exist, bringing their columns up to this version first (once per process). */
+  const ready = async (db: Pool): Promise<boolean> => {
+    if (!(await tablesExist(db))) return false;
+    if (upgraded) return true;
+    await inTransaction(db, async (client) => {
+      await query(client, "SELECT pg_advisory_xact_lock(hashtext('rag_schema'))");
+      for (const statement of UPGRADES) await query(client, statement);
+    });
+    upgraded = true;
+    return true;
+  };
 
   return {
     status: async () => {
@@ -137,35 +193,47 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
 
     collections: async () => {
       const db = await pool();
-      if (!(await tablesExist(db))) return [];
-      const rows = await query<{ name: string; description: string; model: string; dimension: number; created: Date; documents: string; chunks: string }>(
+      if (!(await ready(db))) return [];
+      const rows = await query<CollectionSql & { documents: string; chunks: string }>(
         db,
-        `SELECT c.name, c.description, c.model, c.dimension, c.created,
+        `SELECT ${COLLECTION_COLUMNS},
            (SELECT count(*) FROM rag_document d WHERE d.collection = c.name) AS documents,
            (SELECT count(*) FROM rag_chunk k WHERE k.collection = c.name) AS chunks
          FROM rag_collection c ORDER BY c.name`,
       );
-      return rows.rows.map((r): CollectionRow => ({ ...r, created: r.created.toISOString(), documents: Number(r.documents), chunks: Number(r.chunks) }));
+      return rows.rows.map((r): CollectionRow => ({ ...collectionOf(r), documents: Number(r.documents), chunks: Number(r.chunks) }));
     },
 
     collectionInfos: async () => {
       const db = await pool();
-      if (!(await tablesExist(db))) return [];
-      const rows = await query<{ name: string; description: string; model: string; dimension: number; created: Date }>(
-        db,
-        "SELECT name, description, model, dimension, created FROM rag_collection ORDER BY name",
-      );
-      return rows.rows.map((r): CollectionInfo => ({ ...r, created: r.created.toISOString() }));
+      if (!(await ready(db))) return [];
+      const rows = await query<CollectionSql>(db, `SELECT ${COLLECTION_COLUMNS} FROM rag_collection c ORDER BY c.name`);
+      return rows.rows.map(collectionOf);
     },
 
     createCollection: async (row) => {
-      const out = await query(await pool(), "INSERT INTO rag_collection (name, description, model, dimension) VALUES ($1, $2, $3, $4) ON CONFLICT (name) DO NOTHING", [
-        row.name,
-        row.description,
-        row.model,
-        row.dimension,
+      const out = await query(
+        await pool(),
+        `INSERT INTO rag_collection (name, description, model, dimension, provider, provider_model, provider_probe)
+         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) ON CONFLICT (name) DO NOTHING`,
+        [row.name, row.description, row.model, row.dimension, row.provider, row.provider_model, row.provider_probe === undefined ? null : JSON.stringify(row.provider_probe)],
+      );
+      return (out.rowCount ?? 0) > 0;
+    },
+
+    setProvider: async (name, setting) => {
+      const out = await query(await pool(), "UPDATE rag_collection SET provider = $2, provider_model = $3, provider_probe = $4::jsonb WHERE name = $1", [
+        name,
+        setting.provider,
+        setting.provider_model,
+        setting.provider_probe === undefined ? null : JSON.stringify(setting.provider_probe),
       ]);
       return (out.rowCount ?? 0) > 0;
+    },
+
+    addSpent: async (name, usage) => {
+      if (usage.tokens === 0 && usage.neurons === 0) return;
+      await query(await pool(), "UPDATE rag_collection SET spent_tokens = spent_tokens + $2, spent_neurons = spent_neurons + $3 WHERE name = $1", [name, usage.tokens, usage.neurons]);
     },
 
     dropCollection: async (name) =>

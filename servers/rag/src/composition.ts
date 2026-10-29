@@ -4,6 +4,7 @@ import { delimiter, resolve } from "node:path";
 import type { Deps } from "./app/ports.js";
 import { makePool } from "./infra/database.js";
 import { makeExtractor } from "./infra/extract.js";
+import { makeCloudflareEmbedder } from "./infra/cloudflare.js";
 import { makeEmbedder, makeReranker } from "./infra/models.js";
 import { makeSources } from "./infra/sources.js";
 import { makeStore } from "./infra/store.js";
@@ -35,6 +36,7 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
   return {
     store: makeStore(makePool(env)),
     embedder: makeEmbedder(env),
+    remote: { cloudflare: makeCloudflareEmbedder(env) },
     reranker: makeReranker(env),
     extractor: makeExtractor(),
     sources: makeSources(roots, { maxBytes: positive(env["RAG_MAX_FILE_BYTES"], DEFAULT_MAX_FILE_BYTES), script: env["MCP_FILE_SCRIPT"]?.trim() || undefined }),

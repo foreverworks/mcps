@@ -60,8 +60,19 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
     collectionInfos: async () => [...collections.values()].sort((a, b) => a.name.localeCompare(b.name)),
     createCollection: async (row) => {
       if (collections.has(row.name)) return false;
-      collections.set(row.name, { ...row, created: "2026-01-01T00:00:00.000Z" });
+      collections.set(row.name, { ...row, created: "2026-01-01T00:00:00.000Z", spent_tokens: 0, spent_neurons: 0 });
       return true;
+    },
+    setProvider: async (name, setting) => {
+      const row = collections.get(name);
+      if (row === undefined) return false;
+      const { provider_probe: _old, ...rest } = row;
+      collections.set(name, { ...rest, ...setting });
+      return true;
+    },
+    addSpent: async (name, usage) => {
+      const row = collections.get(name);
+      if (row !== undefined) collections.set(name, { ...row, spent_tokens: row.spent_tokens + usage.tokens, spent_neurons: Math.round((row.spent_neurons + usage.neurons) * 1e6) / 1e6 });
     },
     dropCollection: async (name) => {
       if (!collections.has(name)) return undefined;

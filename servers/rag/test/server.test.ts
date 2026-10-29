@@ -9,7 +9,9 @@ import { join } from "node:path";
 import { checkPolicy, connectInMemory, guard, idempotentWrites, McpServer } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
-import type { Deps, Reranker, Store } from "../src/app/ports.js";
+import type { Deps, RemoteEmbedder, Reranker, Store } from "../src/app/ports.js";
+import { fail } from "../src/domain/errors.js";
+import { PROBE_TEXTS } from "../src/domain/provider.js";
 import { buildDeps } from "../src/composition.js";
 import { makeExtractor } from "../src/infra/extract.js";
 import { makeSources } from "../src/infra/sources.js";
@@ -24,7 +26,21 @@ const DOCS: Readonly<Record<string, string>> = {
   "garden/notes.md": "# Greenhouse\n\nThe greenhouse is watered early in the morning. Mosquitoes do not survive the winter there.",
 };
 
-const connected = async (over: { readonly reranker?: Reranker; readonly wrapStore?: (store: Store) => Store } = {}) => {
+/** A remote provider that embeds as the local fake does (or not), billing a token per word and a neuron per thousand tokens. */
+const fakeRemote = (over: Partial<RemoteEmbedder> & { readonly sent?: string[] } = {}): RemoteEmbedder => ({
+  provider: "cloudflare",
+  model: "@cf/test/embed",
+  batch: 3,
+  missing: async () => [],
+  embed: async (texts) => {
+    over.sent?.push(...texts);
+    const tokens = texts.reduce((n, t) => n + t.split(/\s+/u).length, 0);
+    return { vectors: texts.map((t) => fakeEmbed(t)), usage: { requests: 1, texts: texts.length, tokens, neurons: tokens / 1000 } };
+  },
+  ...over,
+});
+
+const connected = async (over: { readonly reranker?: Reranker; readonly wrapStore?: (store: Store) => Store; readonly remote?: RemoteEmbedder } = {}) => {
   const inbox = await mkdtemp(join(tmpdir(), "rag-inbox-"));
   for (const [path, text] of Object.entries(DOCS)) {
     await mkdir(join(inbox, path, ".."), { recursive: true });
@@ -37,11 +53,12 @@ const connected = async (over: { readonly reranker?: Reranker; readonly wrapStor
     embedder: {
       info: async () => ({ model: "test/embed", revision: "r1" }),
       embed: async (texts) => {
-        // The one-word probe that learns the dimension is not an indexed text.
-        if (!(texts.length === 1 && texts[0] === "dimension")) embedded.push(...texts);
+        // The one-word probe that learns the dimension, and a provider's probe texts, are not indexed texts.
+        if (!(texts.length === 1 && texts[0] === "dimension") && texts !== PROBE_TEXTS) embedded.push(...texts);
         return texts.map((t) => fakeEmbed(t));
       },
     },
+    remote: { cloudflare: over.remote ?? fakeRemote() },
     reranker: over.reranker ?? {
       info: async () => ({ model: "test/rerank" }),
       rerank: async (query, texts) => {
@@ -272,5 +289,75 @@ describe("index, search, read", () => {
     expect(dropped).toMatchObject({ dropped: "docs", documents: 3 });
     expect((await s.call("list_collections")).count).toBe(0);
     expect(s.store.rows()).toHaveLength(0);
+  });
+
+  it("indexes a collection set to a remote provider there, reports what it cost, and still embeds questions locally", async () => {
+    const sent: string[] = [];
+    const s = await connected({ remote: fakeRemote({ sent }) });
+    const made = await s.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
+    expect(made.collection).toMatchObject({ provider: "cloudflare", provider_model: "@cf/test/embed", model: "test/embed@r1", provider_probe: { agrees: true, min_cosine: 1, texts: PROBE_TEXTS.length } });
+    const indexed = await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect(indexed.indexed).toBe(3);
+    // Every chunk went to the provider, none to the local endpoint; batches of its size (3).
+    expect(s.embedded).toEqual([]);
+    expect(sent.filter((t) => !PROBE_TEXTS.includes(t))).toHaveLength(indexed.chunks_embedded);
+    expect(indexed.embedding).toMatchObject({ provider: "cloudflare", model: "@cf/test/embed", texts: indexed.chunks_embedded });
+    expect(indexed.embedding.tokens).toBeGreaterThan(0);
+    expect(indexed.embedding.neurons).toBeCloseTo(indexed.embedding.tokens / 1000, 6);
+    const listed = (await s.call("list_collections")).collections[0];
+    expect(listed).toMatchObject({ spent_tokens: indexed.embedding.tokens, chunks: indexed.chunks_embedded });
+    const found = await s.call("search", { query: "Who pays for major repairs to the structure?", limit: 1 });
+    expect(found.results[0]?.source).toMatch(/contract\.md$/u);
+    expect(s.embedded).toEqual(["Who pays for major repairs to the structure?"]);
+  });
+
+  it("refuses a remote provider that does not embed as the local endpoint, and one that is not configured", async () => {
+    const odd = await connected({ remote: fakeRemote({ embed: async (texts) => ({ vectors: texts.map((t) => fakeEmbed(`${t} skew skew skew`)), usage: { requests: 1, texts: texts.length, tokens: 1, neurons: 0 } }) }) });
+    const refused = await odd.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
+    expect(refused.error).toMatchObject({ kind: "mismatch" });
+    expect(refused.error.message).toMatch(/probe cosine 0\.\d+/u);
+    expect((await odd.call("list_collections")).count).toBe(0);
+    const bare = await connected({ remote: fakeRemote({ missing: async () => ["RAG_CLOUDFLARE_ACCOUNT_ID", "RAG_CLOUDFLARE_API_TOKEN_FILE"] }) });
+    const unset = await bare.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
+    expect(unset.error).toMatchObject({ kind: "config", variable: "RAG_CLOUDFLARE_ACCOUNT_ID" });
+    expect((await bare.call("health")).providers).toEqual({ cloudflare: { model: "@cf/test/embed", configured: false, missing: ["RAG_CLOUDFLARE_ACCOUNT_ID", "RAG_CLOUDFLARE_API_TOKEN_FILE"] } });
+  });
+
+  it("moves a collection between providers without embedding again what it holds", async () => {
+    const sent: string[] = [];
+    const s = await connected({ remote: fakeRemote({ sent }) });
+    await s.call("create_collection", { name: "docs", description: "kept" });
+    const first = await s.call("index_path", { collection: "docs", path: s.inbox, max_files: 1 });
+    expect(first.embedding).toEqual({ provider: "local", model: "test/embed@r1", requests: expect.any(Number), texts: first.chunks_embedded });
+    const moved = await s.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
+    expect(moved).toMatchObject({ created: false, switched: { from: "local", to: "cloudflare" }, collection: { description: "kept", provider: "cloudflare" } });
+    const rest = await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect(rest).toMatchObject({ indexed: 2, unchanged: 1 });
+    expect(sent.filter((t) => !PROBE_TEXTS.includes(t))).toHaveLength(rest.chunks_embedded);
+    // Unnamed, the provider stays; named again, it goes back with no probe.
+    expect((await s.call("create_collection", { name: "docs" })).collection.provider).toBe("cloudflare");
+    const back = await s.call("create_collection", { name: "docs", embedding_provider: "local" });
+    expect(back.collection).toMatchObject({ provider: "local", provider_model: "test/embed@r1" });
+    expect(back.collection.provider_probe).toBeUndefined();
+  });
+
+  it("stops at a spent quota, keeping what was saved and what it cost", async () => {
+    let calls = 0;
+    const s = await connected({
+      remote: fakeRemote({
+        embed: async (texts) => {
+          calls += 1;
+          // The probe and the first file pass; then the daily allocation is gone.
+          if (calls > 2) return fail({ kind: "provider", provider: "cloudflare", reason: "quota", status: 429, message: "daily free allocation spent" });
+          return { vectors: texts.map((t) => fakeEmbed(t)), usage: { requests: 1, texts: texts.length, tokens: 10, neurons: 0.01 } };
+        },
+        batch: 50,
+      }),
+    });
+    await s.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
+    const stopped = await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect(stopped.error).toMatchObject({ kind: "provider", reason: "quota" });
+    const listed = (await s.call("list_collections")).collections[0];
+    expect(listed).toMatchObject({ documents: 1, spent_tokens: 10, spent_neurons: 0.01 });
   });
 });

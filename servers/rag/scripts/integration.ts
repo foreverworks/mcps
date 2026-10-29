@@ -32,6 +32,16 @@ const main = async (): Promise<void> => {
   const deps: Deps = {
     store: makeStore(pool),
     embedder: { info: async () => ({ model: "fake/bow", revision: "1" }), embed: async (texts) => texts.map((t) => fakeEmbed(t, 128)) },
+    // A remote provider that embeds as the local one does, and bills a token per word.
+    remote: {
+      cloudflare: {
+        provider: "cloudflare",
+        model: "fake/bow-remote",
+        batch: 5,
+        missing: async () => [],
+        embed: async (texts) => ({ vectors: texts.map((t) => fakeEmbed(t, 128)), usage: { requests: 1, texts: texts.length, tokens: texts.join(" ").split(/\s+/u).length, neurons: 0.001 } }),
+      },
+    },
     reranker: { info: async () => ({ model: "fake/overlap" }), rerank: async (q, texts) => texts.map((t, index) => ({ index, score: fakeRerankScore(q, t) })).sort((a, b) => b.score - a.score) },
     extractor: makeExtractor(),
     sources: makeSources([folder], { maxBytes: 50 * 1024 * 1024 }),
@@ -42,6 +52,9 @@ const main = async (): Promise<void> => {
   try {
     console.log("health:", JSON.stringify(await checkHealth(deps)).slice(0, 400));
     assert.equal((await createCollection(deps, { name, description: "integration" })).created, true);
+    // The provider columns: moved to the remote provider (probe passes) and back, recorded both ways.
+    assert.equal((await createCollection(deps, { name, provider: "cloudflare" })).collection.provider, "cloudflare");
+    assert.equal((await createCollection(deps, { name, provider: "local" })).collection.provider_model, "fake/bow@1");
     const first = await indexPath(deps, { collection: name, path: folder, recursive: true, ocr: true, force: false, prune: false, maxFiles: 50, language: undefined });
     console.log("index:", JSON.stringify(first));
     assert.equal(first.failed, 0);

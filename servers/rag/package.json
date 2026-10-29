@@ -2,7 +2,7 @@
   "name": "@foreverworks/mcp-rag",
   "version": "0.1.0",
   "private": true,
-  "description": "MCP server for retrieval over your own documents: index PDFs (with OCR), images, docx and Markdown into Postgres with pgvector, then search them with hybrid retrieval and a reranker, all on your machine",
+  "description": "MCP server for retrieval over your own documents: index PDFs (with OCR), images, docx and Markdown into Postgres with pgvector, then search them with hybrid retrieval and a reranker, on your machine or with indexing at Cloudflare Workers AI",
   "mcp": {
     "title": "Local RAG",
     "audience": "extras",
@@ -44,6 +44,18 @@
         "type": "text",
         "required": false,
         "description": "Tesseract language code for scanned pages, such as eng or ron (default eng)."
+      },
+      "RAG_CLOUDFLARE_ACCOUNT_ID": {
+        "title": "Cloudflare account",
+        "type": "text",
+        "required": false,
+        "description": "The Cloudflare account that runs Workers AI, for collections indexed there."
+      },
+      "RAG_CLOUDFLARE_API_TOKEN_FILE": {
+        "title": "Cloudflare API token file",
+        "type": "file",
+        "required": false,
+        "description": "Path of a file holding a Cloudflare API token allowed to run Workers AI on that account."
       }
     }
   },
