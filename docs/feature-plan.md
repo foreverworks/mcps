@@ -178,7 +178,9 @@ Taken by the maintainers; none blocks an item any more.
 - **New dependencies are approved**: SDK v2 (K6); Porkbun 0.52.0, which brings
   `@x402/core`, `@x402/evm` and `viem` though their tools are left out (PB1);
   changesets (P3); the `.mcpb` CLI (P2); `pg` (node-postgres) for `rag`, the first
-  server with a database, which has no SDK of its own to bring one (2026-10-29).
+  server with a database, which has no SDK of its own to bring one (2026-10-29),
+  and its own URL parser `pg-connection-string`, already in the tree through `pg`,
+  named directly since `rag` calls it.
 - **New grants and egress are approved**: Google Tasks, People and Meet scopes
   (G1, G3, G5); an App Store Connect key and a Play service account (E-EAS4); a
   USPTO API key (M3); `api.pwnedpasswords.com` (W2).
