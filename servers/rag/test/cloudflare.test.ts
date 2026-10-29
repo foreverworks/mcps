@@ -84,6 +84,9 @@ describe("the Workers AI client", () => {
     expect(error).toMatchObject({ kind: "provider", provider: "cloudflare", reason: "quota", status: 429 });
     expect(error?.message).toContain("00:00 UTC");
     expect(sent).toHaveLength(1);
+    const after = client([() => refusal(429, 4006, "you have used up your daily free allocation")]);
+    expect(await failureOf(after.embedder.embed(["one"]))).toMatchObject({ reason: "quota", status: 429 });
+    expect(after.sent).toHaveLength(1);
   });
 
   it("names a refused token as auth, and a server that keeps failing as unreachable", async () => {

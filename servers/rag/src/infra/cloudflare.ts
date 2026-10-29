@@ -26,8 +26,13 @@ export const DEFAULT_BATCH = 64;
 const API = "https://api.cloudflare.com/client/v4";
 const TOKEN = { file: "RAG_CLOUDFLARE_API_TOKEN_FILE", value: "RAG_CLOUDFLARE_API_TOKEN" } as const;
 
-/** Workers AI's error codes that matter here (developers.cloudflare.com/workers-ai/platform/errors). */
-const DAILY_ALLOCATION_SPENT = "3036";
+/**
+ * Workers AI's error codes that matter here. 3036 is the documented "daily free allocation used up"
+ * (developers.cloudflare.com/workers-ai/platform/errors); 4006 is what a Workers Free account was
+ * actually answered, HTTP 429, once it had spent its allocation (2026-10-29: every request from
+ * 25,666 neurons on, until the reset). Neither passes before 00:00 UTC, so neither is retried.
+ */
+const DAILY_ALLOCATION_SPENT: ReadonlySet<string> = new Set(["3036", "4006"]);
 const OUT_OF_CAPACITY = "3040";
 
 type RunResult = {
@@ -55,7 +60,7 @@ const failureOf = (failure: HttpFailure): never => {
   const reason = "reason" in failure ? failure.reason : undefined;
   const message = messageOf(failure);
   const base = { kind: "provider" as const, provider: "cloudflare", message, ...(status === undefined || status === 0 ? {} : { status }) };
-  if (reason === DAILY_ALLOCATION_SPENT) return fail({ ...base, reason: "quota", message: `Workers AI's daily free allocation is spent until 00:00 UTC (${message})` });
+  if (reason !== undefined && DAILY_ALLOCATION_SPENT.has(reason)) return fail({ ...base, reason: "quota", message: `Workers AI's daily free allocation is spent until 00:00 UTC (${message})` });
   if (status === 401 || status === 403) return fail({ ...base, reason: "auth" });
   if (failure.kind === "rate_limited") return fail({ ...base, reason: "rate_limited" });
   if (failure.kind === "transport" || (status !== undefined && status >= 500)) return fail({ ...base, reason: "unreachable" });
@@ -91,7 +96,7 @@ export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, options: HttpOpti
     auth: { headers: async () => ({ Authorization: `Bearer ${await token()}` }) },
     // Out of capacity and server errors pass; a spent daily allocation does not until midnight UTC.
     isRetryable: (status, reason) => status >= 500 || status === 408 || reason === OUT_OF_CAPACITY,
-    isRateLimited: (status, reason) => status === 429 && reason !== DAILY_ALLOCATION_SPENT,
+    isRateLimited: (status, reason) => status === 429 && !(reason !== undefined && DAILY_ALLOCATION_SPENT.has(reason)),
     reasonOf,
     fail: failureOf,
     attempts: 6,
