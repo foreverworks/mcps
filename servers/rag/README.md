@@ -129,7 +129,10 @@ $0.012 per million tokens). `index_path` reports the requests, texts, tokens
 and neurons Workers AI billed for the call, and `list_collections` the total
 per collection. A spent daily allocation stops the call with a `provider`
 error whose reason is `quota`; the files indexed until then stay indexed, and
-the collection can go on locally meanwhile.
+the collection can go on locally meanwhile. Workers AI enforces the allocation
+late: one account's requests went through to 25,666 neurons before it answered
+code 4006 to every one, and that refusal still held hours after the 00:00 UTC
+reset.
 
 ### The models
 
@@ -215,6 +218,11 @@ Measured on one 16-vCPU AMD EPYC server with no GPU, 8 cores per model,
 second, 42 ms to embed a question, 9 s to rerank 20 passages of 300 tokens and
 23 s for 50. `Alibaba-NLP/gte-multilingual-reranker-base` as ONNX did the same 20
 in 3.5 s.
+
+Indexing 24,959 English documents (100 MB of text, 105,882 chunks, about 27
+million tokens) on the same server: 1.74 chunks per second on the local
+endpoint, 28.4 at Workers AI with 8 files at a time. A search over those
+105,882 chunks takes 3.5 s before the reranker and about 16 s with it.
 
 ## Limitations
 
