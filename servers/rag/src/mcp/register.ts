@@ -22,9 +22,10 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       title: "Health",
       description:
         "Whether search and indexing can work: the database (its vector and unaccent extensions, the tables and their vector dimension, how many " +
-        "collections), the embed endpoint (model, revision, dimension), the rerank endpoint (model), and the text extractors found on PATH " +
-        "(pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from, and whether each remote embedding " +
-        "provider is configured (read from the settings, without calling it). Run this before concluding the server is broken.",
+        "collections, and any without a vector index of its own), each embedding model by name with its endpoint's model, revision and dimension, " +
+        "the prompt its questions get and its counterpart at each remote provider (the first is the default), the rerank endpoint (model), and the " +
+        "text extractors found on PATH (pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from, and whether " +
+        "each remote embedding provider is configured (read from the settings, without calling it). Run this before concluding the server is broken.",
       inputSchema: {},
     },
     handled(() => checkHealth(deps)),
@@ -47,8 +48,10 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
     {
       title: "Create a collection",
       description:
-        "Make a named collection to index documents into; it records the embedding model and dimension the server uses now, and only that model " +
-        "can search or grow it later. Creating one that exists with the same description is a no-op. The first collection also creates the tables. " +
+        "Make a named collection to index documents into, embedded by one of the server's embedding models (embedding_model, the default unless " +
+        "named); it records that model's revision and dimension, and only that model can search or grow it later. Creating one that exists with " +
+        "the same description is a no-op, except that a collection made before each had a vector index of its own gets it built (minutes for a " +
+        "large one; search and indexing go on meanwhile). The first collection also creates the tables. " +
         "embedding_provider says where its chunks are embedded when indexed: local (the server's own embed endpoint, the default) or a remote " +
         `service running the same model, which is faster for a large corpus and sends the documents' text there. A remote provider is accepted only after it ` +
         `embeds probe texts as the local endpoint does (cosine at least ${MIN_PROBE_COSINE}), since every question is embedded locally. Naming another ` +
@@ -56,13 +59,20 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       inputSchema: {
         name: z.string().trim().describe("Lowercase letters, digits, - and _, at most 63 characters."),
         description: z.string().max(500).optional().describe("What the collection holds, for whoever lists it later."),
+        embedding_model: z
+          .string()
+          .trim()
+          .min(1)
+          .max(63)
+          .optional()
+          .describe("The embedding model, by the name health lists. Default: the server's default for a new collection; an existing one keeps its own."),
         embedding_provider: z
           .enum(PROVIDERS)
           .optional()
           .describe("Where indexing embeds this collection's chunks. Default: local for a new collection, unchanged for an existing one."),
       },
     },
-    handled((a) => createCollection(deps, { name: a.name, description: a.description, provider: a.embedding_provider })),
+    handled((a) => createCollection(deps, { name: a.name, description: a.description, provider: a.embedding_provider, embeddingModel: a.embedding_model })),
   );
 
   server.registerTool(
@@ -144,7 +154,8 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       description:
         "Find the passages that answer a question, in any language the model reads (a Romanian question finds a Romanian passage worded " +
         "differently). Hybrid: the nearest chunks by embedding and the full-text matches of any of its words (accents ignored), fused by " +
-        "reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Each result has its " +
+        "reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Collections built with " +
+        "different embedding models are each searched with their own, the question embedded once per model. Each result has its " +
         "collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole " +
         "document. Reranking is the slow part: about 0.5 s per candidate on a CPU.",
       inputSchema: {

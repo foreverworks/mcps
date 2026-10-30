@@ -69,7 +69,10 @@ The commands above set only what is required; [Configuration](#configuration) ha
 |---|---|---|
 | `RAG_DATABASE_URL` | yes | `postgresql://user@host:port/database` of a database where the `vector` extension exists (or that the user may create). The password may be left out and given by the next variable. |
 | `RAG_DATABASE_PASSWORD_FILE` | no | File holding the database password. For a local run, `RAG_DATABASE_PASSWORD` may hold it instead. |
-| `RAG_EMBED_URL` | yes | Base URL of a text-embeddings-inference server with an embedding model, such as `http://127.0.0.1:8530`. |
+| `RAG_EMBED_URL` | yes | Base URL of a text-embeddings-inference server with an embedding model, such as `http://127.0.0.1:8530`: the default model. Not needed when `RAG_EMBED_MODELS` names one. |
+| `RAG_EMBED_NAME` | no | The name of that model, which `create_collection` and `health` use. Default `default`. |
+| `RAG_EMBED_QUERY_PROMPT` | no | The prompt questions get with that model, by the name its own configuration gives it (text-embeddings-inference's `prompt_name`), for a model trained with one. Documents never get it. |
+| `RAG_EMBED_MODELS` | no | More embedding models, as a JSON object by name: `{"<name>": {"url": "...", "query_prompt": "...", "cloudflare_model": "...", "cloudflare_batch": 32}}`, only `url` required. See [Several embedding models](#several-embedding-models). |
 | `RAG_RERANK_URL` | yes | Base URL of a text-embeddings-inference server with a reranker model, such as `http://127.0.0.1:8531`. |
 | `RAG_SOURCE_ROOTS` | no | Folders, separated by `:`, the server may index from in place, besides `MCP_FILE_ROOTS`. Links inside them are never followed. |
 | `RAG_OCR_LANGUAGE` | no | Tesseract language code(s) for OCR when a call names none. Default `eng`. |
@@ -78,7 +81,7 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_RERANK_BATCH` | no | Passages per rerank request; a search with more candidates sends several. Default 32, text-embeddings-inference's default `--max-client-batch-size`. |
 | `RAG_CLOUDFLARE_ACCOUNT_ID` | no | The Cloudflare account that runs Workers AI, for collections indexed there. |
 | `RAG_CLOUDFLARE_API_TOKEN_FILE` | no | File holding a Cloudflare API token that may run Workers AI on that account: the account permission Workers AI Read is enough. For a local run, `RAG_CLOUDFLARE_API_TOKEN` may hold it instead. |
-| `RAG_CLOUDFLARE_MODEL` | no | The Workers AI model that matches the local embedding model. Default `@cf/baai/bge-m3`, which is `BAAI/bge-m3`. |
+| `RAG_CLOUDFLARE_MODEL` | no | The Workers AI model that matches the default embedding model. Default `@cf/baai/bge-m3`, which is `BAAI/bge-m3`. |
 | `RAG_CLOUDFLARE_BATCH` | no | Texts per Workers AI request. Default 64. |
 | `RAG_REMOTE_CONCURRENCY` | no | Files indexed at once for a collection embedded at a remote provider. Default 8; the local endpoint always takes one at a time. |
 
@@ -100,7 +103,50 @@ CREATE EXTENSION vector;
 ```
 
 Give the server a database of its own. One database holds vectors of one
-dimension, so a second embedding model needs a second database.
+dimension, so a model of another dimension needs a second database; models of
+the same dimension share one.
+
+Each collection has an HNSW index of its own, partial on the collection's name,
+as pgvector advises for filtering by a few values: a search reads only its
+collection's graph, and collections embedded by different models never share
+one. Tables made by an earlier version had one index for every collection
+(`rag_chunk_embedding`); `health` lists the collections still without their own,
+and `create_collection` with each one's name builds it (concurrently: search and
+indexing go on meanwhile; 105,882 chunks took about three minutes) and drops the
+shared index once no collection needs it.
+
+### Several embedding models
+
+A collection is embedded by one model, which the server finds again by the
+model and revision it recorded: `create_collection` takes `embedding_model`, the
+name `health` lists, and a collection keeps that model for good. The models are
+`RAG_EMBED_URL` (the default) and the ones `RAG_EMBED_MODELS` names, each served
+by its own endpoint. A search over collections built with different models
+embeds the question once per model and fuses each model's nearest chunks as a
+ranked list of its own, since cosines from two models do not compare; the
+reranker then reads them all against the question.
+
+```json
+{
+  "qwen3-0.6b": {
+    "url": "http://127.0.0.1:8532",
+    "query_prompt": "query",
+    "cloudflare_model": "@cf/qwen/qwen3-embedding-0.6b",
+    "cloudflare_batch": 32
+  }
+}
+```
+
+`query_prompt` names a prompt from the model's own sentence-transformers
+configuration, which text-embeddings-inference puts before the question.
+`Qwen/Qwen3-Embedding-0.6B` defines `query` as `Instruct: Given a web search
+query, retrieve relevant passages that answer the query` and a new line, and
+Qwen says retrieval loses 1 to 5% without it; bge-m3 needs none. Naming the
+prompt rather than writing it here keeps the model's own text, which holds a
+new line an environment file would mangle. `cloudflare_model` and
+`cloudflare_batch` are that model's counterpart at Workers AI and the texts it
+takes per request (Qwen3's takes 32); without them the model indexes locally
+only.
 
 ### Embedding providers
 
@@ -112,12 +158,13 @@ Each collection records where its chunks are embedded when it is indexed:
   your CPU: 100 MB of English text is about 27 million bge-m3 tokens, many
   hours of work for a CPU (see the measurements under How it works).
 
-Questions are always embedded by the local endpoint, so a collection indexed at
-Cloudflare is searched exactly like one indexed locally. That holds only while
+Questions are always embedded by the model's local endpoint, so a collection
+indexed at Cloudflare is searched exactly like one indexed locally. That holds only while
 both give the same vectors, so `create_collection` sends three probe texts to
 both and refuses the provider unless every pair has a cosine similarity of at
 least 0.999. `BAAI/bge-m3` served by text-embeddings-inference and
-`@cf/baai/bge-m3` agree to 0.99999. Naming a provider for an existing
+`@cf/baai/bge-m3` agree to 0.99999. `Qwen/Qwen3-Embedding-0.6B` is
+`@cf/qwen/qwen3-embedding-0.6b`. Naming a provider for an existing
 collection moves it there (with the same probe); what it already holds stays,
 and only new chunks go to the new provider.
 
@@ -142,7 +189,9 @@ context) with `BAAI/bge-reranker-v2-m3` works well. On a CPU, serve a model
 with ONNX weights (`onnx/model.onnx` in its repository): text-embeddings-inference
 runs those through ONNX Runtime, and its other CPU backend was five times
 slower for the reranker on the same machine. `onnx-community/bge-reranker-v2-m3-ONNX`
-is that reranker exported to ONNX.
+is that reranker exported to ONNX. `Qwen/Qwen3-Embedding-0.6B` (1024
+dimensions, Apache-2.0) has no ONNX weights and runs on the other backend; on
+the server measured below it embeds a question in about 0.7 s and holds 2.7 GiB.
 
 ## First run
 
@@ -207,8 +256,9 @@ it".
   goes on where the last call stopped. `prune` removes the sources no longer in
   the folder (only its own files when `recursive` is false), once the whole
   folder has been listed.
-- **Search** takes the 50 nearest chunks by cosine (HNSW, with pgvector's
-  iterative scan so filters still fill the list) and the 50 best full-text
+- **Search** takes the 50 nearest chunks by cosine (each collection's own HNSW
+  index, with pgvector's iterative scan so a source filter still fills the
+  list; one list per embedding model) and the 50 best full-text
   matches of any of the question's words of three letters or more (accents
   removed on both sides), fuses them by reciprocal rank (k = 60), and lets the
   reranker read the best `candidates` (20) against the question.
@@ -232,7 +282,7 @@ endpoint, 28.4 at Workers AI with 8 files at a time. A search over those
 - **One OCR language per call.** A pair such as `ron+eng` let the English model
   strip Romanian accents in a test; index each language's files in its own call.
 - **One embedding dimension per database**, and a collection only with the model
-  that built it.
+  that built it: another model means another collection, indexed again.
 - **Slow on a CPU**, as measured above: index large folders in several calls
   (`max_files`) or at a remote provider, and keep `candidates` near 20.
 - **One remote provider**, Cloudflare Workers AI, and only for indexing: the

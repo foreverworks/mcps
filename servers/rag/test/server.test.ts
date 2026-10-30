@@ -9,10 +9,10 @@ import { join } from "node:path";
 import { checkPolicy, connectInMemory, guard, idempotentWrites, McpServer } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
-import type { Deps, RemoteEmbedder, Reranker, Store } from "../src/app/ports.js";
-import { fail } from "../src/domain/errors.js";
+import type { Deps, EmbeddingModel, RemoteEmbedder, Reranker, Store } from "../src/app/ports.js";
+import { asAppError, fail } from "../src/domain/errors.js";
 import { PROBE_TEXTS } from "../src/domain/provider.js";
-import { buildDeps } from "../src/composition.js";
+import { buildDeps, embeddingModelsFrom } from "../src/composition.js";
 import { makeExtractor } from "../src/infra/extract.js";
 import { makeSources } from "../src/infra/sources.js";
 import { POLICY } from "../src/mcp/policy.js";
@@ -40,7 +40,35 @@ const fakeRemote = (over: Partial<RemoteEmbedder> & { readonly sent?: string[] }
   ...over,
 });
 
-const connected = async (over: { readonly reranker?: Reranker; readonly wrapStore?: (store: Store) => Store; readonly remote?: RemoteEmbedder } = {}) => {
+/**
+ * A second embedding model whose vectors live in another space than the default's (its words are
+ * salted), with a prompt for questions; what it was asked to embed, and with which prompt, is kept.
+ */
+const otherModel = (seen: { texts: string[]; prompts: (string | undefined)[] }, over: Partial<EmbeddingModel> = {}): EmbeddingModel => ({
+  name: "other",
+  queryPrompt: "query",
+  embedder: {
+    info: async () => ({ model: "test/other", revision: "r2" }),
+    embed: async (texts, options) => {
+      if (!(texts.length === 1 && texts[0] === "dimension") && texts !== PROBE_TEXTS) {
+        seen.texts.push(...texts);
+        seen.prompts.push(options?.prompt);
+      }
+      return texts.map((t) => fakeEmbed(t.replace(/(\p{L}+)/gu, "$1x")));
+    },
+  },
+  remote: {},
+  ...over,
+});
+
+const connected = async (
+  over: {
+    readonly reranker?: Reranker;
+    readonly wrapStore?: (store: Store) => Store;
+    readonly remote?: RemoteEmbedder;
+    readonly models?: (first: EmbeddingModel) => readonly EmbeddingModel[];
+  } = {},
+) => {
   const inbox = await mkdtemp(join(tmpdir(), "rag-inbox-"));
   for (const [path, text] of Object.entries(DOCS)) {
     await mkdir(join(inbox, path, ".."), { recursive: true });
@@ -48,8 +76,9 @@ const connected = async (over: { readonly reranker?: Reranker; readonly wrapStor
   }
   const store = memoryStore();
   const embedded: string[] = [];
-  const deps: Deps = {
-    store: over.wrapStore === undefined ? store : over.wrapStore(store),
+  const remote = over.remote ?? fakeRemote();
+  const first: EmbeddingModel = {
+    name: "default",
     embedder: {
       info: async () => ({ model: "test/embed", revision: "r1" }),
       embed: async (texts) => {
@@ -58,7 +87,13 @@ const connected = async (over: { readonly reranker?: Reranker; readonly wrapStor
         return texts.map((t) => fakeEmbed(t));
       },
     },
-    remote: { cloudflare: over.remote ?? fakeRemote() },
+    remote: { cloudflare: remote },
+  };
+  const models = over.models?.(first) ?? [first];
+  const deps: Deps = {
+    store: over.wrapStore === undefined ? store : over.wrapStore(store),
+    models: () => models,
+    providers: { cloudflare: { missing: remote.missing } },
     reranker: over.reranker ?? {
       info: async () => ({ model: "test/rerank" }),
       rerank: async (query, texts) => {
@@ -320,7 +355,9 @@ describe("index, search, read", () => {
     const bare = await connected({ remote: fakeRemote({ missing: async () => ["RAG_CLOUDFLARE_ACCOUNT_ID", "RAG_CLOUDFLARE_API_TOKEN_FILE"] }) });
     const unset = await bare.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
     expect(unset.error).toMatchObject({ kind: "config", variable: "RAG_CLOUDFLARE_ACCOUNT_ID" });
-    expect((await bare.call("health")).providers).toEqual({ cloudflare: { model: "@cf/test/embed", configured: false, missing: ["RAG_CLOUDFLARE_ACCOUNT_ID", "RAG_CLOUDFLARE_API_TOKEN_FILE"] } });
+    const health = await bare.call("health");
+    expect(health.providers).toEqual({ cloudflare: { configured: false, missing: ["RAG_CLOUDFLARE_ACCOUNT_ID", "RAG_CLOUDFLARE_API_TOKEN_FILE"] } });
+    expect(health.embedding_models).toEqual([{ name: "default", ok: true, model: "test/embed@r1", dimension: 64, remote: { cloudflare: "@cf/test/embed" } }]);
   });
 
   it("moves a collection between providers without embedding again what it holds", async () => {
@@ -328,7 +365,7 @@ describe("index, search, read", () => {
     const s = await connected({ remote: fakeRemote({ sent }) });
     await s.call("create_collection", { name: "docs", description: "kept" });
     const first = await s.call("index_path", { collection: "docs", path: s.inbox, max_files: 1 });
-    expect(first.embedding).toEqual({ provider: "local", model: "test/embed@r1", requests: expect.any(Number), texts: first.chunks_embedded });
+    expect(first.embedding).toEqual({ embedding_model: "default", provider: "local", model: "test/embed@r1", requests: expect.any(Number), texts: first.chunks_embedded });
     const moved = await s.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
     expect(moved).toMatchObject({ created: false, switched: { from: "local", to: "cloudflare" }, collection: { description: "kept", provider: "cloudflare" } });
     const rest = await s.call("index_path", { collection: "docs", path: s.inbox });
@@ -393,5 +430,112 @@ describe("index, search, read", () => {
     const found = await s.call("search", { query: "Who pays for major repairs to the structure?", limit: 1 });
     expect(found.results[0]?.source).toMatch(/contract\.md$/u);
     expect(found.note).toMatch(/full-text half ran past its time bound/u);
+  });
+});
+
+describe("several embedding models", () => {
+  it("keeps each collection with the model that built it, and searches each with its own", async () => {
+    const seen = { texts: [] as string[], prompts: [] as (string | undefined)[] };
+    const s = await connected({ models: (first) => [first, otherModel(seen)] });
+    expect((await s.call("create_collection", { name: "docs" })).embedding_model).toBe("default");
+    const made = await s.call("create_collection", { name: "salted", embedding_model: "other" });
+    expect(made).toMatchObject({ created: true, embedding_model: "other", collection: { model: "test/other@r2", provider: "local" } });
+    await s.call("index_path", { collection: "docs", path: s.inbox });
+    const before = s.embedded.length;
+    const salted = await s.call("index_path", { collection: "salted", path: s.inbox });
+    expect(salted.embedding).toMatchObject({ embedding_model: "other", model: "test/other@r2" });
+    // The second collection's chunks went to its model alone, and documents get no prompt.
+    expect(s.embedded.length).toBe(before);
+    expect(seen.texts).toHaveLength(salted.chunks_embedded);
+    expect(seen.prompts.every((p) => p === undefined)).toBe(true);
+
+    seen.texts.length = 0;
+    seen.prompts.length = 0;
+    const question = "Who pays for major repairs to the structure?";
+    const found = await s.call("search", { query: question, limit: 4 });
+    expect(found.embedding_models).toEqual([
+      { name: "default", collections: ["docs"] },
+      { name: "other", collections: ["salted"] },
+    ]);
+    // Once per model, the second with its prompt; each collection's best answer is found by its own model.
+    expect(s.embedded.slice(before)).toEqual([question]);
+    expect([seen.texts, seen.prompts]).toEqual([[question], ["query"]]);
+    const firstOf = (collection: string) => found.results.find((r: { collection: string }) => r.collection === collection);
+    expect(firstOf("docs")?.source).toMatch(/contract\.md$/u);
+    expect(firstOf("salted")?.source).toMatch(/contract\.md$/u);
+    expect(firstOf("salted")?.scores.vector_rank).toBe(1);
+    // A search of one collection embeds the question with its model alone.
+    const embeddedBefore = s.embedded.length;
+    expect((await s.call("search", { query: question, collections: ["salted"], limit: 1 })).results[0].source).toMatch(/contract\.md$/u);
+    expect([s.embedded.length, seen.texts.length]).toEqual([embeddedBefore, 2]);
+  });
+
+  it("refuses to change a collection's model, an unknown model, and a remote provider a model has no counterpart at", async () => {
+    const s = await connected({ models: (first) => [first, otherModel({ texts: [], prompts: [] })] });
+    await s.call("create_collection", { name: "docs" });
+    const moved = await s.call("create_collection", { name: "docs", embedding_model: "other" });
+    expect(moved.error).toMatchObject({ kind: "input" });
+    expect(moved.error.message).toContain("a collection keeps its model");
+    expect((await s.call("create_collection", { name: "docs", embedding_model: "default" })).created).toBe(false);
+    const unknown = await s.call("create_collection", { name: "more", embedding_model: "nope" });
+    expect(unknown.error.message).toContain("default, other");
+    const remote = await s.call("create_collection", { name: "more", embedding_model: "other", embedding_provider: "cloudflare" });
+    expect(remote.error).toMatchObject({ kind: "config", variable: "RAG_EMBED_MODELS" });
+  });
+
+  it("refuses a collection no endpoint serves the model of any more, naming what they serve", async () => {
+    let revision = "r1";
+    const s = await connected({ models: (first) => [{ ...first, embedder: { ...first.embedder, info: async () => ({ model: "test/embed", revision }) } }] });
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: s.inbox });
+    revision = "r9";
+    const found = await s.call("search", { query: "heating season" });
+    expect(found.error).toMatchObject({ kind: "mismatch" });
+    expect(found.error.message).toContain("default: test/embed@r9");
+    expect((await s.call("index_path", { collection: "docs", path: s.inbox, force: true })).error).toMatchObject({ kind: "mismatch" });
+  });
+
+  it("lists every model in health, the default first, and fails health when one does not answer", async () => {
+    const s = await connected({
+      models: (first) => [first, otherModel({ texts: [], prompts: [] }, { embedder: { info: async () => fail({ kind: "model", endpoint: "embed", message: "http://x did not answer" }), embed: async () => [] } })],
+    });
+    const health = await s.call("health");
+    expect(health.ok).toBe(false);
+    expect(health.embed).toMatchObject({ name: "default", ok: true, model: "test/embed@r1" });
+    expect(health.embedding_models[1]).toMatchObject({ name: "other", ok: false, query_prompt: "query", remote: {} });
+    expect(health.problems).toEqual([expect.stringContaining("embed (other): model: http://x did not answer")]);
+  });
+});
+
+describe("embedding settings", () => {
+  const names = (env: NodeJS.ProcessEnv) => embeddingModelsFrom(env)().map((m) => [m.name, m.queryPrompt, m.remote.cloudflare?.model, m.remote.cloudflare?.batch]);
+  const failure = (env: NodeJS.ProcessEnv) => {
+    try {
+      embeddingModelsFrom(env)();
+      return undefined;
+    } catch (thrown) {
+      return asAppError(thrown);
+    }
+  };
+
+  it("takes RAG_EMBED_URL as the default and RAG_EMBED_MODELS as more models by name", () => {
+    expect(names({ RAG_EMBED_URL: "http://a" })).toEqual([["default", undefined, "@cf/baai/bge-m3", 64]]);
+    const more = JSON.stringify({ "qwen3-0.6b": { url: "http://b", query_prompt: "query", cloudflare_model: "@cf/qwen/qwen3-embedding-0.6b", cloudflare_batch: 32 }, plain: { url: "http://c" } });
+    expect(names({ RAG_EMBED_URL: "http://a", RAG_EMBED_NAME: "bge-m3", RAG_EMBED_QUERY_PROMPT: "q", RAG_CLOUDFLARE_BATCH: "50", RAG_EMBED_MODELS: more })).toEqual([
+      ["bge-m3", "q", "@cf/baai/bge-m3", 50],
+      ["qwen3-0.6b", "query", "@cf/qwen/qwen3-embedding-0.6b", 32],
+      ["plain", undefined, undefined, undefined],
+    ]);
+    // Without RAG_EMBED_URL the first named model is the default.
+    expect(names({ RAG_EMBED_MODELS: more })[0]?.[0]).toBe("qwen3-0.6b");
+  });
+
+  it("answers a configuration error naming the setting that cannot be read", () => {
+    expect(failure({})).toMatchObject({ kind: "config", variable: "RAG_EMBED_URL" });
+    expect(failure({ RAG_EMBED_URL: "http://a", RAG_EMBED_MODELS: "{not json" })).toMatchObject({ kind: "config", variable: "RAG_EMBED_MODELS" });
+    expect(failure({ RAG_EMBED_MODELS: JSON.stringify({ Big: { url: "http://b" } }) })?.message).toContain("lowercase");
+    expect(failure({ RAG_EMBED_MODELS: JSON.stringify({ b: { url: "http://b", prefix: "x" } }) })).toMatchObject({ variable: "RAG_EMBED_MODELS" });
+    expect(failure({ RAG_EMBED_URL: "http://a", RAG_EMBED_MODELS: JSON.stringify({ default: { url: "http://b" } }) })?.message).toContain("RAG_EMBED_NAME");
+    expect(failure({ RAG_EMBED_URL: "http://a", RAG_EMBED_NAME: "Bad Name" })).toMatchObject({ variable: "RAG_EMBED_NAME" });
   });
 });

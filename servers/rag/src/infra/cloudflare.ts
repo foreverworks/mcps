@@ -14,10 +14,15 @@ import type { Usage } from "../domain/provider.js";
  * text-embeddings-inference makes from the same weights; create_collection
  * proves that with a probe before a collection uses it.
  *
- * Settings: RAG_CLOUDFLARE_ACCOUNT_ID, the API token from
+ * `@cf/qwen/qwen3-embedding-0.6b` is Qwen/Qwen3-Embedding-0.6B, which takes
+ * at most 32 texts per request. `text` is the field every Workers AI embedding
+ * model reads, and for Qwen3 it means documents: no instruction is put before them.
+ *
+ * Settings: RAG_CLOUDFLARE_ACCOUNT_ID and the API token from
  * RAG_CLOUDFLARE_API_TOKEN_FILE (or RAG_CLOUDFLARE_API_TOKEN for a local run),
- * RAG_CLOUDFLARE_MODEL, RAG_CLOUDFLARE_BATCH. Read on every call, so a missing
- * one fails only the collections that use this provider.
+ * shared by every model; the model and the texts per request are each embedding
+ * model's (composition.ts). Read on every call, so a missing one fails only the
+ * collections that use this provider.
  */
 
 export const DEFAULT_MODEL = "@cf/baai/bge-m3";
@@ -85,9 +90,17 @@ export const usageOf = (result: RunResult["result"], texts: number): Usage => {
   return { requests: 1, texts, tokens, neurons };
 };
 
-export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, options: HttpOptions & { readonly fetch?: typeof fetch } = {}): RemoteEmbedder => {
+export type CloudflareOptions = HttpOptions & {
+  readonly fetch?: typeof fetch;
+  /** The Workers AI model; default RAG_CLOUDFLARE_MODEL, else bge-m3. */
+  readonly model?: string | undefined;
+  /** Texts per request; default RAG_CLOUDFLARE_BATCH, else 64. */
+  readonly batch?: number | undefined;
+};
+
+export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, { model: chosen, batch, ...options }: CloudflareOptions = {}): RemoteEmbedder => {
   const account = () => env["RAG_CLOUDFLARE_ACCOUNT_ID"]?.trim() ?? "";
-  const model = env["RAG_CLOUDFLARE_MODEL"]?.trim() || DEFAULT_MODEL;
+  const model = chosen?.trim() || env["RAG_CLOUDFLARE_MODEL"]?.trim() || DEFAULT_MODEL;
   const token = async (): Promise<string> =>
     (await readSecret(env, TOKEN, (message) => fail(configError(message, TOKEN.file)))) ??
     fail(configError("no Cloudflare API token: RAG_CLOUDFLARE_API_TOKEN_FILE names the file that holds it", TOKEN.file));
@@ -106,7 +119,7 @@ export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, options: HttpOpti
   return {
     provider: "cloudflare",
     model,
-    batch: positive(env["RAG_CLOUDFLARE_BATCH"], DEFAULT_BATCH),
+    batch: batch ?? positive(env["RAG_CLOUDFLARE_BATCH"], DEFAULT_BATCH),
     // A service's absent credential is a file holding a lone newline: the token is read, never only its setting.
     missing: async () => {
       const hasToken = await token().then(

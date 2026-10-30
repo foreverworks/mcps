@@ -1,7 +1,7 @@
 import { fuse } from "../../domain/rrf.js";
 import { asAppError, describeFailure, fail, inputError } from "../../domain/errors.js";
-import type { Deps, Hit, StoredChunk } from "../ports.js";
-import { assertSameModel, embeddingModel, findCollection } from "./collections.js";
+import type { CollectionInfo, Deps, EmbeddingModel, Hit, StoredChunk } from "../ports.js";
+import { findCollection, modelFor } from "./collections.js";
 
 export type SearchArgs = {
   readonly query: string;
@@ -34,10 +34,27 @@ const rerankAll = async (deps: Deps, query: string, texts: readonly string[]): P
 
 const clip = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max).replace(/\s+\S*$/u, "")} …`);
 
+/** The collections in scope grouped by the model that embeds their questions, in the order they were named. */
+const byModel = async (deps: Deps, collections: readonly CollectionInfo[]) => {
+  const models = await Promise.all(collections.map((c) => modelFor(deps, c)));
+  const groups = new Map<string, { readonly model: EmbeddingModel; readonly collections: CollectionInfo[] }>();
+  collections.forEach((c, i) => {
+    const model = models[i] as EmbeddingModel;
+    const group = groups.get(model.name) ?? { model, collections: [] };
+    group.collections.push(c);
+    groups.set(model.name, group);
+  });
+  return [...groups.values()];
+};
+
 /**
  * Hybrid search: the query's nearest chunks by embedding and its full-text
  * matches (any of its words, accents ignored), fused by reciprocal rank, and
  * the best candidates read again by the reranker, which decides the order.
+ * Collections built with different models are searched each with its own:
+ * the question is embedded once per model (with the prompt that model gives
+ * questions), and each model's nearest chunks are one more ranked list in
+ * the fusion, since their similarities do not compare.
  * If the reranker fails the fused order stands and the reply says so.
  */
 export const search = async (deps: Deps, args: SearchArgs) => {
@@ -46,31 +63,39 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   const all = await deps.store.collections();
   const names = args.collections === undefined || args.collections.length === 0 ? all.map((c) => c.name) : [...new Set(args.collections)];
   if (names.length === 0) return { query, results: [], note: "there are no collections yet" };
-  const model = await embeddingModel(deps);
-  for (const name of names) assertSameModel(await findCollection(deps, name), model);
-  const [vector] = await deps.embedder.embed([query]);
-  if (vector === undefined) return fail({ kind: "model", endpoint: "embed", message: "no vector for the query" });
-  const scope = { collections: names, sourcePrefix: args.sourcePrefix };
+  const groups = await byModel(deps, await Promise.all(names.map((name) => findCollection(deps, name))));
   // The full-text half gives up past its time bound (a question of only frequent words over a large
   // collection); the vector half then stands alone and the reply says so.
   let textNote: string | undefined;
   const [nearest, matching] = await Promise.all([
-    deps.store.nearest(scope, vector, RETRIEVE),
-    deps.store.matching(scope, query, RETRIEVE).catch((thrown: unknown): Hit[] => {
+    Promise.all(
+      groups.map(async ({ model, collections }) => {
+        const [vector] = await model.embedder.embed([query], { prompt: model.queryPrompt });
+        if (vector === undefined) return fail({ kind: "model", endpoint: "embed", message: `no vector for the query from ${model.name}` });
+        const odd = collections.find((c) => c.dimension !== vector.length);
+        if (odd !== undefined) return fail({ kind: "mismatch", message: `collection "${odd.name}" holds ${odd.dimension}-dimension vectors, and ${model.name} embedded the question in ${vector.length}` });
+        return deps.store.nearest({ collections: collections.map((c) => c.name), sourcePrefix: args.sourcePrefix }, vector, RETRIEVE);
+      }),
+    ),
+    deps.store.matching({ collections: names, sourcePrefix: args.sourcePrefix }, query, RETRIEVE).catch((thrown: unknown): Hit[] => {
       const e = asAppError(thrown);
       if (e?.kind !== "database" || e.code !== "57014") throw thrown;
       textNote = "the full-text half ran past its time bound and was left out; results come from the vector half";
       return [];
     }),
   ]);
-  const fused = fuse([nearest.map(keyOf), matching.map(keyOf)]).slice(0, Math.max(args.candidates, args.limit));
+  // One ranked list per model, then the full-text one: a chunk is in at most one of the first.
+  const lists = [...nearest, matching];
+  const textList = lists.length - 1;
+  const fused = fuse(lists.map((hits) => hits.map(keyOf))).slice(0, Math.max(args.candidates, args.limit));
   if (fused.length === 0) return { query, collections: names, results: [] };
   const valueOf = (hits: readonly Hit[]) => new Map(hits.map((h) => [keyOf(h), h.value]));
-  const similarity = valueOf(nearest);
+  const similarity = valueOf(nearest.flat());
   const rank = valueOf(matching);
   const rows = new Map((await deps.store.chunks(fused.map((f) => { const [collection = "", id = ""] = f.key.split("\u0000"); return { collection, id }; }))).map((c) => [keyOf(c), c]));
   const candidates = fused.flatMap((f) => { const chunk = rows.get(f.key); return chunk === undefined ? [] : [{ fused: f, chunk }]; });
 
+  const vectorRank = (ranks: readonly (number | undefined)[]) => ranks.slice(0, textList).find((r) => r !== undefined);
   let order = candidates.map((c, i) => ({ ...c, rerank: undefined as number | undefined, i }));
   let rerankNote: string | undefined;
   if (args.rerank && candidates.length > 1) {
@@ -91,13 +116,14 @@ export const search = async (deps: Deps, args: SearchArgs) => {
       ...(c.rerank === undefined ? {} : { rerank: Math.round(c.rerank * 10_000) / 10_000 }),
       fused: Math.round(c.fused.score * 100_000) / 100_000,
       ...(similarity.has(keyOf(c.chunk)) ? { similarity: Math.round((similarity.get(keyOf(c.chunk)) ?? 0) * 10_000) / 10_000 } : {}),
-      ...(rank.has(keyOf(c.chunk)) ? { text_rank: c.fused.ranks[1] } : {}),
-      ...(c.fused.ranks[0] === undefined ? {} : { vector_rank: c.fused.ranks[0] }),
+      ...(rank.has(keyOf(c.chunk)) ? { text_rank: c.fused.ranks[textList] } : {}),
+      ...(vectorRank(c.fused.ranks) === undefined ? {} : { vector_rank: vectorRank(c.fused.ranks) }),
     },
   });
   return {
     query,
     collections: names,
+    ...(groups.length > 1 ? { embedding_models: groups.map((g) => ({ name: g.model.name, collections: g.collections.map((c) => c.name) })) } : {}),
     candidates: candidates.length,
     reranked: args.rerank && rerankNote === undefined && candidates.length > 1,
     ...(rerankNote === undefined && textNote === undefined ? {} : { note: [textNote, rerankNote].filter((n) => n !== undefined).join("; ") }),

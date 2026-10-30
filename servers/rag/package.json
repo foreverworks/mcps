@@ -25,7 +25,13 @@
         "title": "Embedding server",
         "type": "text",
         "required": true,
-        "description": "Base URL of a text-embeddings-inference server running an embedding model."
+        "description": "Base URL of a text-embeddings-inference server running an embedding model: the default model."
+      },
+      "RAG_EMBED_MODELS": {
+        "title": "More embedding models",
+        "type": "text",
+        "required": false,
+        "description": "A JSON object of more embedding models by name, each with its server's url and optionally its query prompt and Workers AI counterpart."
       },
       "RAG_RERANK_URL": {
         "title": "Rerank server",

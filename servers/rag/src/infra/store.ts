@@ -1,3 +1,4 @@
+import { createHash } from "node:crypto";
 import type pg from "pg";
 
 import type { ChunkToStore, CollectionInfo, CollectionRow, DocumentRow, Hit, SaveResult, SearchScope, Store, StoredChunk } from "../app/ports.js";
@@ -8,9 +9,16 @@ import type { Pool } from "./database.js";
 /**
  * The index in Postgres with pgvector: collections, the documents in each
  * (one per source path, with the sha256 that makes a re-run incremental) and
- * their chunks, each with its embedding (HNSW, cosine) and a full-text vector
- * with accents removed (GIN). Every name is prefixed rag_ so the tables can
- * share a database.
+ * their chunks, each with its embedding and a full-text vector with accents
+ * removed (GIN). Every name is prefixed rag_ so the tables can share a database.
+ *
+ * Each collection has an HNSW index of its own (cosine), partial on its name, as
+ * pgvector advises for a filter of few values: collections embedded by different
+ * models share the table but never a graph, whose neighbours would otherwise be
+ * vectors from another model's space, and a search reads only its collection's
+ * graph. Tables made before that had one index for every collection
+ * (rag_chunk_embedding); ensureIndex builds a collection's own and drops that
+ * one once no collection needs it.
  *
  * `vector` must already exist in the database, or the role must be allowed to
  * create it: pgvector is not a trusted extension, so it is usually created by
@@ -90,10 +98,27 @@ const schemaSql = (dimension: number): readonly string[] => [
      PRIMARY KEY (collection, id),
      FOREIGN KEY (collection, source) REFERENCES rag_document (collection, source) ON DELETE CASCADE)`,
   ...UPGRADES,
-  "CREATE INDEX IF NOT EXISTS rag_chunk_embedding ON rag_chunk USING hnsw (embedding vector_cosine_ops)",
   "CREATE INDEX IF NOT EXISTS rag_chunk_fts ON rag_chunk USING gin (fts)",
   "CREATE INDEX IF NOT EXISTS rag_chunk_document ON rag_chunk (collection, source, ordinal)",
 ];
+
+/** The index every collection shared before each had its own. */
+const SHARED_INDEX = "rag_chunk_embedding";
+
+/**
+ * A collection's own vector index: its name hashed, as the collection name may be 63 characters with
+ * dashes; Postgres's md5 of the name gives the same, which the status query relies on.
+ */
+const indexOf = (collection: string): string => `rag_hnsw_${createHash("md5").update(collection).digest("hex").slice(0, 16)}`;
+
+/** A collection name inside DDL, which takes no parameters; names are checked to [a-z0-9_-] before they get here. */
+const literal = (text: string): string => `'${text.replaceAll("'", "''")}'`;
+
+const indexSql = (collection: string, concurrently: boolean): string =>
+  `CREATE INDEX ${concurrently ? "CONCURRENTLY " : ""}IF NOT EXISTS ${indexOf(collection)} ON rag_chunk USING hnsw (embedding vector_cosine_ops) WHERE collection = ${literal(collection)}`;
+
+/** Whether an index exists and is usable: a concurrent build that failed leaves one marked invalid. */
+const INDEX_STATE = "SELECT i.indisvalid AS valid FROM pg_class x JOIN pg_index i ON i.indexrelid = x.oid WHERE x.relname = $1";
 
 /** `left(source, length(prefix)) = prefix`, not LIKE: a path may hold % and _. */
 const PREFIX = "($PREFIX::text IS NULL OR left(source, length($PREFIX::text)) = $PREFIX::text)";
@@ -172,10 +197,21 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
       const db = await pool();
       const ext = await query<{ extname: string; extversion: string }>(db, "SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'unaccent')");
       const version = (name: string) => ext.rows.find((r) => r.extname === name)?.extversion;
-      if (!(await tablesExist(db))) return { vector: version("vector"), unaccent: version("unaccent"), dimension: undefined, collections: 0 };
+      if (!(await tablesExist(db))) return { vector: version("vector"), unaccent: version("unaccent"), dimension: undefined, collections: 0, unindexed: [] };
       const meta = await query<{ value: string }>(db, "SELECT value FROM rag_meta WHERE key = 'dimension'");
-      const count = await query<{ n: string }>(db, "SELECT count(*) AS n FROM rag_collection");
-      return { vector: version("vector"), unaccent: version("unaccent"), dimension: meta.rows[0] ? Number(meta.rows[0].value) : undefined, collections: Number(count.rows[0]?.n ?? 0) };
+      const names = await query<{ name: string; indexed: boolean }>(
+        db,
+        `SELECT c.name, EXISTS (SELECT 1 FROM pg_class x JOIN pg_index i ON i.indexrelid = x.oid
+                               WHERE x.relname = 'rag_hnsw_' || left(md5(c.name), 16) AND i.indisvalid) AS indexed
+         FROM rag_collection c ORDER BY c.name`,
+      );
+      return {
+        vector: version("vector"),
+        unaccent: version("unaccent"),
+        dimension: meta.rows[0] ? Number(meta.rows[0].value) : undefined,
+        collections: names.rows.length,
+        unindexed: names.rows.filter((r) => !r.indexed).map((r) => r.name),
+      };
     },
 
     ensureSchema: async (dimension) => {
@@ -214,14 +250,36 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
       return rows.rows.map(collectionOf);
     },
 
-    createCollection: async (row) => {
-      const out = await query(
-        await pool(),
-        `INSERT INTO rag_collection (name, description, model, dimension, provider, provider_model, provider_probe)
-         VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) ON CONFLICT (name) DO NOTHING`,
-        [row.name, row.description, row.model, row.dimension, row.provider, row.provider_model, row.provider_probe === undefined ? null : JSON.stringify(row.provider_probe)],
+    createCollection: async (row) =>
+      inTransaction(await pool(), async (client) => {
+        const out = await query(
+          client,
+          `INSERT INTO rag_collection (name, description, model, dimension, provider, provider_model, provider_probe)
+           VALUES ($1, $2, $3, $4, $5, $6, $7::jsonb) ON CONFLICT (name) DO NOTHING`,
+          [row.name, row.description, row.model, row.dimension, row.provider, row.provider_model, row.provider_probe === undefined ? null : JSON.stringify(row.provider_probe)],
+        );
+        // Empty, so made at once; a leftover of a dropped namesake would hold none of its rows either.
+        if ((out.rowCount ?? 0) > 0) await query(client, indexSql(row.name, false));
+        return (out.rowCount ?? 0) > 0;
+      }),
+
+    ensureIndex: async (name) => {
+      const db = await pool();
+      const state = await query<{ valid: boolean }>(db, INDEX_STATE, [indexOf(name)]);
+      let built = false;
+      if (state.rows[0]?.valid !== true) {
+        // Concurrently: searches and indexing go on meanwhile. A failed build leaves an invalid index, which is dropped first.
+        if (state.rows[0] !== undefined) await query(db, `DROP INDEX CONCURRENTLY IF EXISTS ${indexOf(name)}`);
+        await query(db, indexSql(name, true));
+        built = true;
+      }
+      const left = await query<{ n: string }>(
+        db,
+        `SELECT count(*) AS n FROM rag_collection c WHERE NOT EXISTS (SELECT 1 FROM pg_class x JOIN pg_index i ON i.indexrelid = x.oid
+           WHERE x.relname = 'rag_hnsw_' || left(md5(c.name), 16) AND i.indisvalid)`,
       );
-      return (out.rowCount ?? 0) > 0;
+      if (Number(left.rows[0]?.n ?? 0) === 0) await query(db, `DROP INDEX CONCURRENTLY IF EXISTS ${SHARED_INDEX}`);
+      return built;
     },
 
     setProvider: async (name, setting) => {
@@ -249,6 +307,7 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
         );
         const gone = await query(client, "DELETE FROM rag_collection WHERE name = $1", [name]);
         if ((gone.rowCount ?? 0) === 0) return undefined;
+        await query(client, `DROP INDEX IF EXISTS ${indexOf(name)}`);
         return { documents: Number(counts.rows[0]?.documents ?? 0), chunks: Number(counts.rows[0]?.chunks ?? 0) };
       }),
 
@@ -335,19 +394,24 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
 
     nearest: async (scope, embedding, limit) =>
       inTransaction(await pool(), async (client) => {
-        // A filter (collection, source) applied after an HNSW scan can leave fewer rows than asked;
+        // A source filter applied after an HNSW scan can leave fewer rows than asked;
         // pgvector 0.8's iterative scan keeps reading the index until the limit is met.
         await query(client, "SET LOCAL hnsw.ef_search = 100");
         await query(client, "SET LOCAL hnsw.iterative_scan = relaxed_order");
-        const r = await query<{ collection: string; id: string; value: number }>(
-          client,
-          `SELECT collection, id, 1 - (embedding <=> $1::vector) AS value FROM rag_chunk
-           WHERE collection = ANY($2::text[]) AND ${PREFIX.replaceAll("$PREFIX", "$3")}
-           ORDER BY embedding <=> $1::vector LIMIT $4`,
-          [vectorText(embedding), scope.collections, scope.sourcePrefix ?? null, limit],
-        );
+        // One collection per query, so the planner proves its partial index applies; their cosines compare, as one model embedded them all.
+        const hits: Hit[] = [];
+        for (const collection of scope.collections) {
+          const r = await query<{ collection: string; id: string; value: number }>(
+            client,
+            `SELECT collection, id, 1 - (embedding <=> $1::vector) AS value FROM rag_chunk
+             WHERE collection = $2 AND ${PREFIX.replaceAll("$PREFIX", "$3")}
+             ORDER BY embedding <=> $1::vector LIMIT $4`,
+            [vectorText(embedding), collection, scope.sourcePrefix ?? null, limit],
+          );
+          hits.push(...r.rows.map((x): Hit => ({ collection: x.collection, id: x.id, value: Number(x.value) })));
+        }
         // relaxed_order may return neighbours slightly out of order: sort them again.
-        return r.rows.map((x): Hit => ({ collection: x.collection, id: x.id, value: Number(x.value) })).sort((a, b) => b.value - a.value);
+        return hits.sort((a, b) => b.value - a.value).slice(0, limit);
       }),
 
     matching: async (scope: SearchScope, text, limit) =>

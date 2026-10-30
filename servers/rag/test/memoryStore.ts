@@ -49,7 +49,7 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
 
   return {
     rows: () => chunks,
-    status: async () => ({ vector: "0.8.7", unaccent: "1.1", dimension, collections: collections.size }),
+    status: async () => ({ vector: "0.8.7", unaccent: "1.1", dimension, collections: collections.size, unindexed: [] }),
     ensureSchema: async (d) => {
       dimension ??= d;
     },
@@ -63,6 +63,8 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
       collections.set(row.name, { ...row, created: "2026-01-01T00:00:00.000Z", spent_tokens: 0, spent_neurons: 0 });
       return true;
     },
+    // Every collection made here has its own index: there is no older one to build.
+    ensureIndex: async () => false,
     setProvider: async (name, setting) => {
       const row = collections.get(name);
       if (row === undefined) return false;

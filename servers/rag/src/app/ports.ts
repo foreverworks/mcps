@@ -13,12 +13,15 @@ export type ModelInfo = { readonly model: string; readonly revision?: string | u
 
 export type Embedder = {
   readonly info: () => Promise<ModelInfo>;
-  /** One vector per text, in order; the endpoint's batch limit is the port's to respect. */
-  readonly embed: (texts: readonly string[]) => Promise<readonly (readonly number[])[]>;
+  /**
+   * One vector per text, in order; the endpoint's batch limit is the port's to respect. `prompt` names a
+   * prompt the model's own configuration defines (text-embeddings-inference's prompt_name), put before each text.
+   */
+  readonly embed: (texts: readonly string[], options?: { readonly prompt?: string | undefined }) => Promise<readonly (readonly number[])[]>;
 };
 
 /**
- * An embedding service elsewhere serving the model the local endpoint serves,
+ * An embedding service elsewhere serving the model a local endpoint serves,
  * used to index a collection set to it. Questions are always embedded locally.
  */
 export type RemoteEmbedder = {
@@ -31,6 +34,20 @@ export type RemoteEmbedder = {
   readonly missing: () => Promise<readonly string[]>;
   /** One vector per text, in order, and what the provider says the request cost. */
   readonly embed: (texts: readonly string[]) => Promise<{ readonly vectors: readonly (readonly number[])[]; readonly usage: Usage }>;
+};
+
+/**
+ * An embedding model the server is configured with: its local endpoint, which
+ * embeds every question for the collections it built, the prompt a question
+ * gets, and the same model at each remote provider that serves it.
+ */
+export type EmbeddingModel = {
+  /** The name a configuration gives it, which create_collection takes. */
+  readonly name: string;
+  readonly embedder: Embedder;
+  /** The prompt questions are embedded with (documents never get one), as the model's configuration names it. */
+  readonly queryPrompt?: string | undefined;
+  readonly remote: Readonly<Partial<Record<RemoteProvider, RemoteEmbedder>>>;
 };
 
 export type Reranker = {
@@ -84,7 +101,7 @@ export type Sources = {
 export type CollectionInfo = {
   readonly name: string;
   readonly description: string;
-  /** The local embed endpoint's model and dimension: every question is embedded with it. */
+  /** The model that embedded it, as its local endpoint names it (model@revision), and its dimension: every question is embedded with it. */
   readonly model: string;
   readonly dimension: number;
   readonly created: string;
@@ -141,6 +158,8 @@ export type StoreStatus = {
   /** The embedding dimension the tables were made for, when they exist. */
   readonly dimension: number | undefined;
   readonly collections: number;
+  /** Collections searched without a vector index of their own (made before collections had one): create_collection builds it. */
+  readonly unindexed: readonly string[];
 };
 
 export type Store = {
@@ -150,7 +169,13 @@ export type Store = {
   readonly collections: () => Promise<readonly CollectionRow[]>;
   /** The collections as recorded, without the counts: what a call checks before it works on one. */
   readonly collectionInfos: () => Promise<readonly CollectionInfo[]>;
+  /** Records a collection and makes its own (empty) vector index; false when one by that name exists. */
   readonly createCollection: (row: { readonly name: string; readonly description: string; readonly model: string; readonly dimension: number } & ProviderSetting) => Promise<boolean>;
+  /**
+   * Builds the vector index of a collection made before each had its own, which takes minutes for a large
+   * one, and then drops the index all collections shared once none relies on it. Whether it built one.
+   */
+  readonly ensureIndex: (name: string) => Promise<boolean>;
   /** Sets where an existing collection's chunks are embedded; false when there is no such collection. */
   readonly setProvider: (name: string, setting: ProviderSetting) => Promise<boolean>;
   /** Adds what a remote provider reported for indexing into the collection. */
@@ -170,7 +195,7 @@ export type Store = {
    */
   readonly prune: (collection: string, folder: string, options: { readonly present: ReadonlySet<string>; readonly recursive: boolean }) => Promise<number>;
   readonly documents: (collection: string, options: { readonly prefix?: string | undefined; readonly limit: number; readonly offset: number }) => Promise<{ readonly total: number; readonly rows: readonly DocumentRow[] }>;
-  /** Nearest by cosine; value is the cosine similarity. */
+  /** Nearest by cosine, over collections embedded by one model; value is the cosine similarity. */
   readonly nearest: (scope: SearchScope, embedding: readonly number[], limit: number) => Promise<readonly Hit[]>;
   /** Full-text matches of any word of the query; value is the rank. */
   readonly matching: (scope: SearchScope, query: string, limit: number) => Promise<readonly Hit[]>;
@@ -191,8 +216,10 @@ export type Settings = {
 
 export type Deps = {
   readonly store: Store;
-  readonly embedder: Embedder;
-  readonly remote: Readonly<Record<RemoteProvider, RemoteEmbedder>>;
+  /** Every embedding model configured, the default first; a configuration error when there is none or it cannot be read. */
+  readonly models: () => readonly EmbeddingModel[];
+  /** What each remote provider lacks to be called, from the settings every model there shares. */
+  readonly providers: Readonly<Record<RemoteProvider, { readonly missing: () => Promise<readonly string[]> }>>;
   readonly reranker: Reranker;
   readonly extractor: Extractor;
   readonly sources: Sources;

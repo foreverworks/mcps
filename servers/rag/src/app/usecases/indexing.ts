@@ -7,8 +7,8 @@ import { extractionKey, incompleteKey } from "../../domain/extraction.js";
 import { kindOf, SUPPORTED_EXTENSIONS } from "../../domain/kinds.js";
 import { addUsage, batches, NO_USAGE, type Usage } from "../../domain/provider.js";
 import { normaliseText } from "../../domain/text.js";
-import type { CollectionInfo, Deps, DocumentToStore } from "../ports.js";
-import { assertSameModel, embeddingModel, findCollection } from "./collections.js";
+import type { CollectionInfo, Deps, DocumentToStore, EmbeddingModel, RemoteEmbedder } from "../ports.js";
+import { findCollection, modelFor, remoteFor } from "./collections.js";
 
 /** How many entries each list in a reply shows; the counts always cover everything. */
 const LISTED = 25;
@@ -49,20 +49,22 @@ const cancelled = (): boolean => callSignal()?.aborted === true;
 
 type Embedded = { readonly vectors: readonly (readonly number[])[]; readonly usage: Usage };
 
+/** The collection a call indexes into, with the model that embeds it and the remote provider, if any, that its chunks go to. */
+type Target = { readonly collection: CollectionInfo; readonly model: EmbeddingModel; readonly remote: RemoteEmbedder | undefined };
+
 /**
  * Embeds texts where the collection's chunks are embedded, in batches that
  * provider accepts, keeping their order, and stops between batches when the
  * call is cancelled. A remote provider's usage is what it reported; the local
  * endpoint's counts requests and texts only.
  */
-const embedAll = async (deps: Deps, collection: CollectionInfo, texts: readonly string[]): Promise<Embedded> => {
-  const remote = collection.provider === "local" ? undefined : deps.remote[collection.provider];
+const embedAll = async (deps: Deps, { collection, model, remote }: Target, texts: readonly string[]): Promise<Embedded> => {
   const vectors: (readonly number[])[] = [];
   let usage = NO_USAGE;
   for (const batch of batches(texts, remote?.batch ?? deps.settings.embedBatch)) {
     if (cancelled()) return fail(inputError("the call was cancelled"));
     if (remote === undefined) {
-      vectors.push(...(await deps.embedder.embed(batch)));
+      vectors.push(...(await model.embedder.embed(batch)));
       usage = addUsage(usage, { ...NO_USAGE, requests: 1, texts: batch.length });
     } else {
       const out = await remote.embed(batch);
@@ -71,6 +73,8 @@ const embedAll = async (deps: Deps, collection: CollectionInfo, texts: readonly 
     }
   }
   if (vectors.length !== texts.length) return fail({ kind: "model", endpoint: "embed", message: `asked for ${texts.length} vectors, got ${vectors.length}` });
+  const odd = vectors.find((v) => v.length !== collection.dimension);
+  if (odd !== undefined) return fail({ kind: "mismatch", message: `collection "${collection.name}" holds ${collection.dimension}-dimension vectors, and its embedding came back with ${odd.length}` });
   return { vectors, usage };
 };
 
@@ -80,13 +84,14 @@ const embedAll = async (deps: Deps, collection: CollectionInfo, texts: readonly 
  * if another call removed some meanwhile, those are embedded and the save is
  * tried once more, so a document is never stored without chunks it claims.
  */
-const save = async (deps: Deps, collection: CollectionInfo, document: DocumentToStore, chunks: readonly Chunk[]) => {
+const save = async (deps: Deps, target: Target, document: DocumentToStore, chunks: readonly Chunk[]) => {
+  const { collection } = target;
   let known = await deps.store.chunkIds(collection.name, document.source);
   const vectors = new Map<string, readonly number[]>();
   let usage = NO_USAGE;
   for (let attempt = 0; attempt < 2; attempt += 1) {
     const need = chunks.filter((c) => !known.has(c.id) && !vectors.has(c.id));
-    const embedded = await embedAll(deps, collection, need.map((c) => c.body));
+    const embedded = await embedAll(deps, target, need.map((c) => c.body));
     usage = addUsage(usage, embedded.usage);
     need.forEach((c, i) => vectors.set(c.id, embedded.vectors[i] ?? []));
     const result = await deps.store.saveDocument(collection.name, document, chunks.map((c) => ({ ...c, embedding: known.has(c.id) ? undefined : vectors.get(c.id) })));
@@ -99,7 +104,8 @@ const save = async (deps: Deps, collection: CollectionInfo, document: DocumentTo
   return fail(inputError(`${document.source} was changed in the index by another call while this one indexed it; index it again`));
 };
 
-const indexOne = async (deps: Deps, collection: CollectionInfo, source: string, args: IndexArgs, language: string): Promise<Outcome> => {
+const indexOne = async (deps: Deps, target: Target, source: string, args: IndexArgs, language: string): Promise<Outcome> => {
+  const { collection } = target;
   const kind = kindOf(source);
   if (kind === undefined) return { status: "skipped", source, reason: "not a format this server reads" };
   const wanted = extractionKey(kind, { language, ocr: args.ocr });
@@ -111,7 +117,7 @@ const indexOne = async (deps: Deps, collection: CollectionInfo, source: string, 
   const chunks = chunkDocument(source, sections);
   // Saved even with no chunks: the old ones go, and an unchanged file with no text is not read (or OCRed) again on every run.
   const document = { source, sha256: file.sha256, size: file.size, kind: kind.kind, pages: extracted.pages, extraction: extracted.complete ? wanted : incompleteKey(wanted) };
-  const saved = await save(deps, collection, document, chunks);
+  const saved = await save(deps, target, document, chunks);
   if (chunks.length === 0) return { status: "skipped", source, reason: extracted.warnings.join("; ") || "no text found" };
   return {
     status: "indexed",
@@ -163,7 +169,8 @@ const stopsTheCall = (thrown: unknown): boolean => {
 export const indexPath = async (deps: Deps, args: IndexArgs) => {
   const started = deps.now().getTime();
   const collection = await findCollection(deps, args.collection);
-  assertSameModel(collection, await embeddingModel(deps), deps);
+  const model = await modelFor(deps, collection);
+  const target: Target = { collection, model, remote: remoteFor(collection, model) };
   const language = args.language?.trim() || deps.settings.language;
   if (!/^[a-z_]+(\+[a-z_]+)*$/u.test(language)) return fail(inputError(`"${language}" is not a tesseract language: codes such as eng, ron or ron+eng`));
   const listing = await deps.sources.list(args.path, { recursive: args.recursive, limit: MAX_LISTED, readable: (name) => kindOf(name) !== undefined });
@@ -186,7 +193,7 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
     // Never more files at once than max_files still allows, so a call reads at most max_files.
     const batch = listing.files.slice(i, i + Math.min(parallel, args.maxFiles - read));
     reportProgress(i, listing.files.length, basename(batch[0] ?? ""));
-    const settled = await Promise.allSettled(batch.map((source) => indexOne(deps, collection, source, args, language)));
+    const settled = await Promise.allSettled(batch.map((source) => indexOne(deps, target, source, args, language)));
     let stop: unknown;
     settled.forEach((r, k) => {
       if (r.status === "fulfilled") {
@@ -233,6 +240,7 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
     chunks_kept: indexed.reduce((n, o) => n + o.kept, 0),
     chunks_removed: indexed.reduce((n, o) => n + o.removed, 0),
     embedding: {
+      embedding_model: model.name,
       provider: collection.provider,
       model: collection.provider_model,
       requests: usage.requests,

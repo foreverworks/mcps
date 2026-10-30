@@ -29,19 +29,28 @@ const main = async (): Promise<void> => {
   await cp(join(import.meta.dirname, "..", "test", "fixtures"), folder, { recursive: true });
   await writeFile(join(folder, "lease.md"), "# Lease\n\n## Repairs\n\nMajor repairs to the structure are paid by the landlord in full.\n");
   const pool = makePool(process.env);
+  // A remote provider that embeds as the local one does, and bills a token per word.
+  const remote = {
+    provider: "cloudflare" as const,
+    model: "fake/bow-remote",
+    batch: 5,
+    missing: async () => [],
+    embed: async (texts: readonly string[]) => ({ vectors: texts.map((t) => fakeEmbed(t, 128)), usage: { requests: 1, texts: texts.length, tokens: texts.join(" ").split(/\s+/u).length, neurons: 0.001 } }),
+  };
+  const models = [
+    { name: "bow", embedder: { info: async () => ({ model: "fake/bow", revision: "1" }), embed: async (texts: readonly string[]) => texts.map((t) => fakeEmbed(t, 128)) }, remote: { cloudflare: remote } },
+    // A second model in another space (its words salted), with a prompt for questions.
+    {
+      name: "salted",
+      queryPrompt: "query",
+      embedder: { info: async () => ({ model: "fake/salted", revision: "2" }), embed: async (texts: readonly string[]) => texts.map((t) => fakeEmbed(t.replace(/(\p{L}+)/gu, "$1x"), 128)) },
+      remote: {},
+    },
+  ];
   const deps: Deps = {
     store: makeStore(pool),
-    embedder: { info: async () => ({ model: "fake/bow", revision: "1" }), embed: async (texts) => texts.map((t) => fakeEmbed(t, 128)) },
-    // A remote provider that embeds as the local one does, and bills a token per word.
-    remote: {
-      cloudflare: {
-        provider: "cloudflare",
-        model: "fake/bow-remote",
-        batch: 5,
-        missing: async () => [],
-        embed: async (texts) => ({ vectors: texts.map((t) => fakeEmbed(t, 128)), usage: { requests: 1, texts: texts.length, tokens: texts.join(" ").split(/\s+/u).length, neurons: 0.001 } }),
-      },
-    },
+    models: () => models,
+    providers: { cloudflare: { missing: remote.missing } },
     reranker: { info: async () => ({ model: "fake/overlap" }), rerank: async (q, texts) => texts.map((t, index) => ({ index, score: fakeRerankScore(q, t) })).sort((a, b) => b.score - a.score) },
     extractor: makeExtractor(),
     sources: makeSources([folder], { maxBytes: 50 * 1024 * 1024 }),
@@ -49,6 +58,9 @@ const main = async (): Promise<void> => {
     now: () => new Date(),
   };
   const name = `it-${Date.now()}`;
+  const other = `${name}-salted`;
+  const ownIndex = async (collection: string): Promise<boolean> =>
+    ((await (await pool()).query("SELECT 1 FROM pg_class WHERE relname = 'rag_hnsw_' || left(md5($1), 16)", [collection])).rowCount ?? 0) > 0;
   try {
     console.log("health:", JSON.stringify(await checkHealth(deps)).slice(0, 400));
     assert.equal((await createCollection(deps, { name, description: "integration" })).created, true);
@@ -123,9 +135,25 @@ const main = async (): Promise<void> => {
     // The language is part of how a file was read: a change reads it again and keeps every embedding.
     const relang = await indexPath(deps, { collection: name, path: folder, recursive: true, ocr: true, force: false, prune: false, maxFiles: 50, language: "eng" });
     assert.deepEqual([relang.indexed + relang.skipped, relang.failed, relang.chunks_embedded > 0], [5, 0, true]);
+
+    // A second model's collection: its own index, searched with its own model beside the first.
+    assert.equal((await createCollection(deps, { name: other, embeddingModel: "salted" })).collection.model, "fake/salted@2");
+    assert.ok((await ownIndex(name)) && (await ownIndex(other)));
+    const salted = await indexPath(deps, { collection: other, path: folder, recursive: true, ocr: true, force: false, prune: false, maxFiles: 50, language: undefined });
+    assert.equal(salted.failed, 0);
+    const both = await search(deps, { query: "who pays major repairs structure", collections: [name, other], limit: 6, candidates: 12, rerank: true, maxChars: 200 });
+    console.log("search (two models):", JSON.stringify("embedding_models" in both ? both.embedding_models : undefined));
+    assert.deepEqual(new Set(both.results.slice(0, 2).map((r) => `${r.collection} ${r.source}`)), new Set([`${name} ${lease}`, `${other} ${lease}`]));
+
+    // A collection made before each had an index of its own: create_collection builds it, then the shared one goes.
+    await (await pool()).query(`DROP INDEX ${(await (await pool()).query("SELECT 'rag_hnsw_' || left(md5($1), 16) AS i", [other])).rows[0].i}`);
+    assert.deepEqual((await checkHealth(deps)).database, { ok: true, ...(await deps.store.status()) });
+    assert.ok((await deps.store.status()).unindexed.includes(other));
+    assert.equal((await createCollection(deps, { name: other })).vector_index, "built: the collection had none of its own");
+    assert.ok(await ownIndex(other));
     console.log("integration: ok");
   } finally {
-    console.log("drop:", JSON.stringify(await dropCollection(deps, name).catch((e: unknown) => String(e))));
+    for (const c of [name, other]) console.log("drop:", JSON.stringify(await dropCollection(deps, c).catch((e: unknown) => String(e))), "index left:", await ownIndex(c));
     await (await pool()).end();
     await rm(folder, { recursive: true, force: true });
   }
