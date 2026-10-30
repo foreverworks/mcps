@@ -383,4 +383,15 @@ describe("index, search, read", () => {
     expect(rest).toMatchObject({ indexed: 1, unchanged: 2, failed: 0 });
     expect(rest.more).toBeUndefined();
   });
+
+  it("searches with the vector half alone when the full-text half runs past its time bound", async () => {
+    const s = await connected({
+      wrapStore: (store) => ({ ...store, matching: async () => fail({ kind: "database", code: "57014", message: "canceling statement due to statement timeout" }) }),
+    });
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: s.inbox });
+    const found = await s.call("search", { query: "Who pays for major repairs to the structure?", limit: 1 });
+    expect(found.results[0]?.source).toMatch(/contract\.md$/u);
+    expect(found.note).toMatch(/full-text half ran past its time bound/u);
+  });
 });

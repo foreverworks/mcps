@@ -1,5 +1,5 @@
 import { fuse } from "../../domain/rrf.js";
-import { describeFailure, fail, inputError } from "../../domain/errors.js";
+import { asAppError, describeFailure, fail, inputError } from "../../domain/errors.js";
 import type { Deps, Hit, StoredChunk } from "../ports.js";
 import { assertSameModel, embeddingModel, findCollection } from "./collections.js";
 
@@ -51,7 +51,18 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   const [vector] = await deps.embedder.embed([query]);
   if (vector === undefined) return fail({ kind: "model", endpoint: "embed", message: "no vector for the query" });
   const scope = { collections: names, sourcePrefix: args.sourcePrefix };
-  const [nearest, matching] = await Promise.all([deps.store.nearest(scope, vector, RETRIEVE), deps.store.matching(scope, query, RETRIEVE)]);
+  // The full-text half gives up past its time bound (a question of only frequent words over a large
+  // collection); the vector half then stands alone and the reply says so.
+  let textNote: string | undefined;
+  const [nearest, matching] = await Promise.all([
+    deps.store.nearest(scope, vector, RETRIEVE),
+    deps.store.matching(scope, query, RETRIEVE).catch((thrown: unknown): Hit[] => {
+      const e = asAppError(thrown);
+      if (e?.kind !== "database" || e.code !== "57014") throw thrown;
+      textNote = "the full-text half ran past its time bound and was left out; results come from the vector half";
+      return [];
+    }),
+  ]);
   const fused = fuse([nearest.map(keyOf), matching.map(keyOf)]).slice(0, Math.max(args.candidates, args.limit));
   if (fused.length === 0) return { query, collections: names, results: [] };
   const valueOf = (hits: readonly Hit[]) => new Map(hits.map((h) => [keyOf(h), h.value]));
@@ -89,7 +100,7 @@ export const search = async (deps: Deps, args: SearchArgs) => {
     collections: names,
     candidates: candidates.length,
     reranked: args.rerank && rerankNote === undefined && candidates.length > 1,
-    ...(rerankNote === undefined ? {} : { note: rerankNote }),
+    ...(rerankNote === undefined && textNote === undefined ? {} : { note: [textNote, rerankNote].filter((n) => n !== undefined).join("; ") }),
     results: order.slice(0, args.limit).map(result),
   };
 };

@@ -145,6 +145,9 @@ const DOCUMENT_COLUMNS = `d.source, d.sha256, d.size, d.kind, d.pages, d.extract
 
 type ChunkSql = { collection: string; source: string; id: string; ordinal: number; location: string; body: string };
 
+/** How long the full-text half of a search may take before it is left out. */
+const MATCH_TIMEOUT_MS = 5000;
+
 /** New chunks per INSERT: one statement for a whole long document would carry hundreds of MB of vectors as one parameter. */
 const INSERT_BATCH = 256;
 
@@ -347,23 +350,32 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
         return r.rows.map((x): Hit => ({ collection: x.collection, id: x.id, value: Number(x.value) })).sort((a, b) => b.value - a.value);
       }),
 
-    matching: async (scope: SearchScope, text, limit) => {
-      // ANY word of the query (OR), accents removed on both sides, words of one or two letters left out:
-      // a question rarely shares all its words with the passage that answers it.
-      const r = await query<{ collection: string; id: string; value: number }>(
-        await pool(),
-        `WITH q AS (
-           SELECT to_tsquery('simple', string_agg(quote_literal(t.lexeme), ' | ')) AS tsq
-           FROM unnest(to_tsvector('simple', unaccent($1))) AS t
-           WHERE length(t.lexeme) > 2)
-         SELECT c.collection, c.id, ts_rank_cd(c.fts, q.tsq) AS value
-         FROM rag_chunk c, q
-         WHERE q.tsq IS NOT NULL AND c.fts @@ q.tsq AND c.collection = ANY($2::text[]) AND ${PREFIX.replaceAll("$PREFIX", "$3").replaceAll("source", "c.source")}
-         ORDER BY value DESC, c.id LIMIT $4`,
-        [text, scope.collections, scope.sourcePrefix ?? null, limit],
-      );
-      return r.rows.map((x) => ({ collection: x.collection, id: x.id, value: Number(x.value) }));
-    },
+    matching: async (scope: SearchScope, text, limit) =>
+      inTransaction(await pool(), async (client) => {
+        // The full-text half is bounded: a question whose every word is frequent still matches most of a
+        // large collection, and ranking every match took 50 s over 105,882 chunks. Past the bound the
+        // query is cancelled (SQLSTATE 57014) and search goes on with the vector half.
+        await query(client, `SET LOCAL statement_timeout = ${MATCH_TIMEOUT_MS}`);
+        // ANY word of the query (OR), accents removed on both sides, words of one or two letters and the
+        // stop words of Postgres's english and romanian configurations left out ("the", "when": they match
+        // nearly every passage and rank nothing):
+        // a question rarely shares all its words with the passage that answers it.
+        const r = await query<{ collection: string; id: string; value: number }>(
+          client,
+          `WITH q AS (
+             SELECT to_tsquery('simple', string_agg(quote_literal(t.lexeme), ' | ')) AS tsq
+             FROM unnest(to_tsvector('simple', unaccent($1))) AS t
+             WHERE length(t.lexeme) > 2
+               AND to_tsvector('english', t.lexeme) <> ''::tsvector
+               AND to_tsvector('romanian', t.lexeme) <> ''::tsvector)
+           SELECT c.collection, c.id, ts_rank(c.fts, q.tsq) AS value
+           FROM rag_chunk c, q
+           WHERE q.tsq IS NOT NULL AND c.fts @@ q.tsq AND c.collection = ANY($2::text[]) AND ${PREFIX.replaceAll("$PREFIX", "$3").replaceAll("source", "c.source")}
+           ORDER BY value DESC, c.id LIMIT $4`,
+          [text, scope.collections, scope.sourcePrefix ?? null, limit],
+        );
+        return r.rows.map((x) => ({ collection: x.collection, id: x.id, value: Number(x.value) }));
+      }),
 
     chunks: async (keys) => {
       if (keys.length === 0) return [];
