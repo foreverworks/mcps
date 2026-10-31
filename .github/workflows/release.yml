@@ -66,10 +66,10 @@ jobs:
           fetch-depth: 0
       - uses: ./.github/actions/prepare-release
       - run: npx tsx scripts/release.ts publish
+        # npm takes no token: each package trusts this workflow and this
+        # environment, and npm publishes with the job's OIDC token. A package's
+        # first publish needs one (docs/releasing.md, The first release).
         env:
-          # Only for a package's first publish, which trusted publishing cannot
-          # make; delete the secret once each package trusts this workflow.
-          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
           MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
       # A tag's GitHub release carries every public server's bundle, so each
       # README's link to the newest release finds one.

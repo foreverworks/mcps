@@ -104,17 +104,20 @@ Once only, in order:
 6. **Rehearse** as in [Cutting a release](#cutting-a-release), step 4. It is
    the first run of the release workflow, so let it find what is wrong before
    anything is sent.
-7. **Give the workflow a token, once.** npm's trusted publishing needs a
-   package that exists, so each first publish needs a token. On npmjs.com,
-   create a granular access token with "Bypass two-factor authentication"
-   (the workflow cannot answer a 2FA prompt), "Read and write (publish and
-   stage)" on the `@foreverworks` scope only, no access to organizations,
-   and the shortest expiry, and save it as the repository secret
-   `NPM_TOKEN`:
+7. **Give the workflow a token, for the first publish only.** npm's trusted
+   publishing needs a package that exists, so a package's first publish
+   needs a token. On npmjs.com, create a granular access token with "Bypass
+   two-factor authentication" (the workflow cannot answer a 2FA prompt),
+   "Read and write (publish and stage)" on the `@foreverworks` scope only, no
+   access to organizations, and the shortest expiry, and save it as the
+   `release` environment's secret `NPM_TOKEN`:
 
    ```bash
-   gh secret set NPM_TOKEN -R foreverworks/mcps
+   gh secret set NPM_TOKEN -R foreverworks/mcps --env release
    ```
+
+   Then give it to the publish step in `release.yml`, beside the registry
+   key: `NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}`.
 
    npm refuses to make a token while the account is suspended, as it is for
    72 hours after a two-factor recovery code is used. npm says such tokens
@@ -137,13 +140,19 @@ Once only, in order:
    Without `--allow-publish`, a connection made after 2026-09-03 allows only
    staged publishing, and the workflow runs `npm publish`. A granular token
    that bypasses two-factor authentication cannot make these connections.
-10. **Retire the token.** Delete the secret
-    (`gh secret delete NPM_TOKEN -R foreverworks/mcps`) and revoke the token on
-    npmjs.com. From then on the workflow publishes with its OIDC token alone.
+10. **Retire the token.** Take `NODE_AUTH_TOKEN` out of `release.yml`, delete
+    the secret (`gh secret delete NPM_TOKEN -R foreverworks/mcps --env
+    release`) and revoke the token on npmjs.com. From then on the workflow
+    publishes with its OIDC token alone.
 11. **Prove it within two days.** A new connection lapses unless a publish
     through it succeeds within two days, so release a patch (a changeset, then
     [Cutting a release](#cutting-a-release)) with no token in place. If one
-    lapsed, delete it on npmjs.com and run step 9 again.
+    lapsed, delete it on npmjs.com and run step 9 again. Each version
+    published this way names its publisher as GitHub Actions with a trusted
+    publisher: `npm view <package>@<version> _npmUser`.
+
+A package published for the first time in a later release, such as a server
+made public, takes steps 7 to 11 again.
 
 ## Before the repository goes public
 
