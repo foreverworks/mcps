@@ -1,8 +1,7 @@
 # Releasing
 
 For maintainers: how the packages reach npm, the MCP Registry and Claude
-Desktop. Nothing is published yet: the repository is private and every
-package is still `"private": true`. The first release starts at
+Desktop. A repository's first release is
 [The first release](#the-first-release); every later one is
 [Cutting a release](#cutting-a-release).
 
@@ -53,7 +52,8 @@ what ([What the workflow does](#what-the-workflow-does)).
 
    runs everything a release runs before it sends anything, then npm's dry
    run of each publish and a login to the registry with its key. It sends
-   nothing, and it works while the repository is private.
+   nothing. It runs in the `release` environment, which holds the key, so
+   only from `main`.
 5. **Tag and push.** Push `main`, then tag the release commit:
 
    ```bash
@@ -86,19 +86,24 @@ Once only, in order:
    `npx tsx scripts/check-docs.ts --write`, which drops the "not on npm yet"
    note from those servers' install blocks, and commit. Nothing is published
    while the repository is private, so this can come first.
-3. **The registry key.** Set the repository secret `MCP_REGISTRY_PRIVATE_KEY`
-   ([below](#the-registry-namespace-comforeverworks)).
-4. **Rehearse** as in [Cutting a release](#cutting-a-release), step 4. It is
-   the first run of the release workflow, so let it find what is wrong while
-   nothing can be sent.
-5. **Go public.** Work through
+3. **Go public.** Work through
    [Before the repository goes public](#before-the-repository-goes-public),
    then change the repository's visibility.
-6. **Protect the environment.** In the repository's Settings, Environments,
-   create `release`, with required reviewers if every release should wait for
-   a person. A private repository on GitHub's free plan cannot have
-   environments, so this comes after going public. If you skip it, the first
-   run creates `release` with no protection rule.
+4. **Make the environment.** In the repository's Settings, Environments,
+   create `release` and limit its deployment branches and tags to the branch
+   `main` and the tag pattern `release-*`, the refs a release starts on. It
+   holds every secret the release uses, so a workflow pushed on any other
+   branch, which anyone who can push may write, cannot read them. Add
+   required reviewers if every release should wait for a person. A private
+   repository on GitHub's free plan cannot have environments, so this comes
+   after going public.
+5. **The registry key.** Set the `release` environment's secret
+   `MCP_REGISTRY_PRIVATE_KEY`
+   ([below](#the-registry-namespace-comforeverworks)), never a repository
+   secret, which a workflow on any branch can read.
+6. **Rehearse** as in [Cutting a release](#cutting-a-release), step 4. It is
+   the first run of the release workflow, so let it find what is wrong before
+   anything is sent.
 7. **Give the workflow a token, once.** npm's trusted publishing needs a
    package that exists, so each first publish needs a token. On npmjs.com,
    create a granular access token with "Bypass two-factor authentication"
@@ -165,8 +170,10 @@ Once only, in order:
   fork, runs on a self-hosted runner.
 - [x] **GitHub settings**: private vulnerability reporting on (SECURITY.md
   relies on it), branch protection on `main` (no force pushes, no deletion),
-  Dependabot alerts and security updates, and version updates for npm and
-  actions (`.github/dependabot.yml`).
+  Dependabot alerts and security updates, version updates for npm and
+  actions (`.github/dependabot.yml`), and a read-only default workflow token
+  (Settings, Actions, General, Workflow permissions): every workflow
+  declares the permissions its jobs need.
 - [x] **Decide per server what ships.** The rule: an extras server is never
   published; every other server is. Each server's package.json `mcp.audience` holds the
   decision ([What a release publishes](#what-a-release-publishes)), and the
@@ -200,11 +207,15 @@ it:
 6. on a tag only, creates the GitHub release named after the tag, with every
    bundle. A run started by hand publishes the same but attaches no bundles.
 
-Started by hand with `rehearse`, it runs a separate job instead, on any
-repository and outside the `release` environment: steps 1 to 4 and the plan,
-then `scripts/release.ts rehearse`, which logs in to the registry with the
-key (proving the secret and the DNS record) and runs `npm publish --dry-run`
-for each package npm lacks. It holds no npm token and sends nothing.
+Started by hand with `rehearse`, it runs a separate job instead, in the same
+environment: steps 1 to 4 and the plan, then `scripts/release.ts rehearse`,
+which logs in to the registry with the key (proving the secret and the DNS
+record) and runs `npm publish --dry-run` for each package npm lacks. It holds
+no npm token and sends nothing.
+
+The release's secrets live in the `release` environment, never among the
+repository's own: the environment deploys only from `main` and `release-*`
+tags, so a workflow pushed on any other branch cannot read them.
 
 ## The registry namespace: com.foreverworks
 
@@ -218,8 +229,10 @@ grants the namespace to whoever proves the domain with a DNS record:
   `com.foreverworks/*` and `com.foreverworks.*/*`. See it with
   `dig +short TXT foreverworks.com`.
 - **The private key** (the hex seed `mcp-publisher` takes, and the PEM) is in
-  the maintainers' password vault, and the hex seed is the repository secret
-  `MCP_REGISTRY_PRIVATE_KEY`. To test it without publishing anything:
+  the maintainers' password vault, and the hex seed is the `release`
+  environment's secret `MCP_REGISTRY_PRIVATE_KEY` (`gh secret set
+  MCP_REGISTRY_PRIVATE_KEY -R foreverworks/mcps --env release`, the seed on
+  standard input). To test it without publishing anything:
   `mcp-publisher login dns --domain foreverworks.com --private-key <hex seed>`.
 - **To rotate it**: `openssl genpkey -algorithm Ed25519 -out key.pem`; the new
   record's `p=` is `openssl pkey -in key.pem -pubout -outform DER | tail -c 32 |

@@ -4,7 +4,9 @@ name: release
 # scripts/release.ts says what, docs/releasing.md says when and how. Started by
 # hand, or by pushing a tag `release-<date>` on main once the versions are bumped.
 # Started by hand with `rehearse`, it runs everything up to the publish and
-# sends nothing, even while the repository is private.
+# sends nothing. Both jobs run in the `release` environment, the only place the
+# release's secrets are kept: it deploys from main and `release-*` tags only,
+# so a workflow pushed on any other branch cannot read them.
 on:
   workflow_dispatch:
     inputs:
@@ -26,10 +28,10 @@ permissions:
 jobs:
   rehearse:
     if: ${{ inputs.rehearse }}
-    # Outside the `release` environment, which a private repository on the
-    # free plan cannot have, and with nothing to publish with but the
-    # registry key, which it only logs in with.
+    # In the `release` environment for the registry key, which it only logs
+    # in with; it is given no npm token.
     runs-on: ubuntu-latest
+    environment: release
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v7
@@ -48,8 +50,9 @@ jobs:
     if: ${{ !github.event.repository.private && !inputs.rehearse }}
     # GitHub-hosted only: npm trusted publishing does not accept self-hosted runners.
     runs-on: ubuntu-latest
-    # The environment npm's trusted publisher names; give it required reviewers
-    # to make every release wait for a person.
+    # The environment npm's trusted publisher names, and the one that holds
+    # the secrets; give it required reviewers to make every release wait for
+    # a person.
     environment: release
     timeout-minutes: 30
     permissions:
