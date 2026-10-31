@@ -503,7 +503,8 @@ describe("several embedding models", () => {
     expect(health.ok).toBe(false);
     expect(health.embed).toMatchObject({ name: "default", ok: true, model: "test/embed@r1" });
     expect(health.embedding_models[1]).toMatchObject({ name: "other", ok: false, query_prompt: "query", remote: {} });
-    expect(health.problems).toEqual([expect.stringContaining("embed (other): model: http://x did not answer")]);
+    // Only the models' problems: the host's own tools (pdftotext, ocrmypdf...) may be missing too, as on CI's runners.
+    expect(health.problems.filter((p: string) => p.startsWith("embed"))).toEqual([expect.stringContaining("embed (other): model: http://x did not answer")]);
   });
 });
 
