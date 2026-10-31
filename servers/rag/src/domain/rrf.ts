@@ -30,3 +30,15 @@ export const fuse = (lists: readonly (readonly string[])[], k: number = RRF_K): 
     .map(([key, r]) => ({ key, ranks: r, score: r.reduce<number>((sum, rank) => (rank === undefined ? sum : sum + 1 / (k + rank)), 0) }))
     .sort((a, b) => b.score - a.score || a.key.localeCompare(b.key));
 };
+
+/**
+ * Reciprocal rank fusion of lists given in order of preference (a question
+ * first, then its other phrasings): the same scores as `fuse`, but ties go to
+ * the item that appears earliest in the earliest list, so the question as
+ * asked wins them.
+ */
+export const fuseInOrder = (lists: readonly (readonly string[])[], k: number = RRF_K): readonly Fused[] => {
+  const first = new Map<string, number>();
+  lists.forEach((list, which) => list.forEach((key, index) => { if (!first.has(key)) first.set(key, which * 1_000_000 + index); }));
+  return [...fuse(lists, k)].sort((a, b) => b.score - a.score || (first.get(a.key) ?? 0) - (first.get(b.key) ?? 0));
+};

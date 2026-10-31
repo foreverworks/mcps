@@ -357,7 +357,7 @@
   {
     "name": "search",
     "title": "Search",
-    "description": "Find the passages that answer a question, in any language the model reads (a Romanian question finds a Romanian passage worded differently). Hybrid: the nearest chunks by embedding and the full-text matches of any of its words (accents ignored), fused by reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Collections built with different embedding models are each searched with their own, the question embedded once per model. Each result has its collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole document. Reranking is the slow part: about 0.5 s per candidate on a CPU.",
+    "description": "Find the passages that answer a question, in any language the model reads (a Romanian question finds a Romanian passage worded differently). Hybrid: the nearest chunks by embedding and the full-text matches of any of its words (accents ignored), fused by reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Collections built with different embedding models are each searched with their own, the question embedded once per model. Each result has its collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole document. Reranking is the slow part: about 0.5 s per candidate on a CPU. Pass `also`: rephrasings cost little and find more.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -366,6 +366,16 @@
           "minLength": 1,
           "maxLength": 2000,
           "description": "The question, in full sentences: the reranker reads it as written."
+        },
+        "also": {
+          "description": "Two or three other phrasings of the same question, written before searching: a keyword version, a rewording in other words, and for a question in another language than the documents a translation into theirs. Each is retrieved like the query, the candidates merged, and the reranker reads them against the query. Finds passages the query's own words miss; no answer guesses.",
+          "maxItems": 4,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 2000
+          }
         },
         "collections": {
           "description": "Where to search. Default: every collection.",

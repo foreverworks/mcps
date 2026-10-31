@@ -165,6 +165,17 @@ describe("index, search, read", () => {
     expect(scoped.results.every((r: { source: string }) => r.source.startsWith(join(s.inbox, "lease/")))).toBe(true);
   });
 
+  it("retrieves each phrasing in `also` as well, and reranks the merged candidates against the query", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: "." });
+    const query = "Cine plătește reparațiile capitale?";
+    const helped = await s.call("search", { query, also: ["Who pays for major repairs to the structure?", query], limit: 1, candidates: 2 });
+    expect(helped.also).toEqual(["Who pays for major repairs to the structure?"]);
+    expect(helped.results[0].source).toBe(join(s.inbox, "lease/contract.md"));
+    expect((await s.call("search", { query, limit: 1 })).also).toBeUndefined();
+  });
+
   it("re-indexes only what changed, and prunes a file that is gone", async () => {
     const s = await connected();
     await s.call("create_collection", { name: "docs" });

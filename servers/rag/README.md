@@ -215,7 +215,7 @@ each call (see Confirmation in [docs/security.md](../../docs/security.md)).
 | `index_path` | write | Indexes a file or a folder: text extracted (OCR for scanned pages and images), cut into chunks with stable ids and their page or heading, and only new chunks embedded; unchanged files are passed over and do not count toward `max_files`, so a second call goes on from the first. `prune` removes sources no longer in the folder. |
 | `remove_source` | write | Removes one indexed file, or every one under a folder. |
 | `list_sources` | read | The indexed files of a collection, with sha256, size, pages and chunks. |
-| `search` | read | Hybrid search (vectors and full text, fused by reciprocal rank) reranked; passages with source, location and scores. |
+| `search` | read | Hybrid search (vectors and full text, fused by reciprocal rank) reranked, optionally over several phrasings of the question merged; passages with source, location and scores. |
 | `expand` | read | The chunks around a search result, in order. |
 | `read_document` | read | A document's indexed text, chunk by chunk with locations, a page of it at a time. |
 
@@ -262,6 +262,14 @@ it".
   matches of any of the question's words of three letters or more (accents
   removed on both sides), fuses them by reciprocal rank (k = 60), and lets the
   reranker read the best `candidates` (20) against the question.
+- **Other phrasings** (`also`, up to 4) are each retrieved the same way, in
+  parallel; their fused lists are fused again (the question's own first on
+  ties), and the reranker still reads the best `candidates` against the
+  question as asked. A client writes them before it searches: a keyword
+  version, a rewording, and for a question in another language than the
+  documents a translation. Words the question lacks (a synonym, the documents'
+  language) reach the full-text half that way, and the cost is one more
+  embedding and two queries per phrasing, not more reranking.
 
 Measured on one 16-vCPU AMD EPYC server with no GPU, 8 cores per model,
 `bge-m3` and `bge-reranker-v2-m3` as ONNX: 1.4 chunks of 512 tokens embedded per
@@ -273,6 +281,13 @@ Indexing 24,959 English documents (100 MB of text, 105,882 chunks, about 27
 million tokens) on the same server: 1.74 chunks per second on the local
 endpoint, 28.4 at Workers AI with 8 files at a time. A search over those
 105,882 chunks takes 3.5 s before the reranker and about 16 s with it.
+
+On 100 questions over that corpus, each with every file that answers it,
+`gte-multilingual-reranker-base` reranking 20 candidates: the first result
+held the answer for 54 questions alone and for 64 with two or three
+rephrasings in `also` (10 won, none lost, McNemar p = 0.002), in the same 5 s.
+50 candidates instead of 20 gave 58 (not significant) and took 11 s; without
+the reranker, 38.
 
 ## Limitations
 

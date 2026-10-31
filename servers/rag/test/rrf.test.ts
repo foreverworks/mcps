@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { fuse, RRF_K } from "../src/domain/rrf.js";
+import { fuse, fuseInOrder, RRF_K } from "../src/domain/rrf.js";
 
 describe("fuse", () => {
   it("adds 1/(k + rank) over the lists, so an item both retrievers found beats one found first by one", () => {
@@ -20,5 +20,12 @@ describe("fuse", () => {
       ["y", 3],
     ]);
     expect(fuse([["b"], ["a"]]).map((f) => f.key)).toEqual(["a", "b"]);
+  });
+});
+
+describe("fuseInOrder", () => {
+  it("scores as fuse does, and gives ties to the earliest list", () => {
+    expect(fuseInOrder([["b", "x"], ["a", "y"]]).map((f) => f.key)).toEqual(["b", "a", "x", "y"]);
+    expect(fuseInOrder([["a", "b"], ["b", "c"]]).map((f) => f.key)).toEqual(["b", "a", "c"]);
   });
 });

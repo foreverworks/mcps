@@ -157,9 +157,18 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Collections built with " +
         "different embedding models are each searched with their own, the question embedded once per model. Each result has its " +
         "collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole " +
-        "document. Reranking is the slow part: about 0.5 s per candidate on a CPU.",
+        "document. Reranking is the slow part: about 0.5 s per candidate on a CPU. Pass `also`: rephrasings cost little and find more.",
       inputSchema: {
         query: z.string().trim().min(1).max(2000).describe("The question, in full sentences: the reranker reads it as written."),
+        also: z
+          .array(z.string().trim().min(1).max(2000))
+          .max(4)
+          .optional()
+          .describe(
+            "Two or three other phrasings of the same question, written before searching: a keyword version, a rewording in other words, " +
+              "and for a question in another language than the documents a translation into theirs. Each is retrieved like the query, " +
+              "the candidates merged, and the reranker reads them against the query. Finds passages the query's own words miss; no answer guesses.",
+          ),
         collections: z.array(collection).max(50).optional().describe("Where to search. Default: every collection."),
         source_prefix: z.string().optional().describe("Only sources whose path starts with this; end a folder with /."),
         limit: z.number().int().min(1).max(50).default(5).describe("Results returned."),
@@ -169,7 +178,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       },
     },
     handled((a) =>
-      search(deps, { query: a.query, collections: a.collections, sourcePrefix: a.source_prefix, limit: a.limit, candidates: a.candidates, rerank: a.rerank, maxChars: a.max_chars }),
+      search(deps, { query: a.query, also: a.also, collections: a.collections, sourcePrefix: a.source_prefix, limit: a.limit, candidates: a.candidates, rerank: a.rerank, maxChars: a.max_chars }),
     ),
   );
 
