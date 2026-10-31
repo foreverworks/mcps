@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-enable-banking",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for bank accounts through Enable Banking's PSD2 API: read and search statements across accounts, export them as CSV, read balances, and manage the consents; it moves no money",
   "mcpName": "com.foreverworks/enable-banking",
   "mcp": {
@@ -68,7 +68,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "proper-lockfile": "^4.1.2",
     "zod": "^4.6.7"
   },

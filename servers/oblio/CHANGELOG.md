@@ -1,5 +1,13 @@
 # @foreverworks/mcp-oblio
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. Oblio invoicing for one company: its clients, products, document series and VAT rates, the invoices it issued (so "what is still unpaid?" has an answer), invoices and proformas looked up and issued with exact totals, and the payments a client makes. An invoice sent without an idempotency key gets one derived from its content, so a retry never issues a second copy.

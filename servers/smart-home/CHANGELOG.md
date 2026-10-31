@@ -1,5 +1,13 @@
 # @foreverworks/mcp-smart-home
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. Infrared remote control through BroadLink RM blasters on the local network, over BroadLink's own local protocol: each blaster's status (online, model, firmware, whether it is locked in BroadLink's app), a catalog of your devices and their buttons, pressing a button by name, and learning a remote's button by pressing it on the real remote.

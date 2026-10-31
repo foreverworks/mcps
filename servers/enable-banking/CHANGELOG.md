@@ -1,5 +1,13 @@
 # @foreverworks/mcp-enable-banking
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. Your bank accounts through Enable Banking, a licensed PSD2 provider: statements searched across accounts by text, direction and amount, exported as CSV, balances, and the consents themselves with the date each one ends. Amounts stay exact decimal strings from the bank to the answer.

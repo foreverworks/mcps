@@ -1,5 +1,13 @@
 # @foreverworks/mcp-onrc
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. Romania's trade register portal for one signed-in account: the filings made there and their status, a filing's documents, the fee notes and the invoices. You grant the session once, in the browser you already use for the portal.

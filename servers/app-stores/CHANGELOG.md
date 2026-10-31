@@ -1,5 +1,13 @@
 # @foreverworks/mcp-app-stores
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. What people say about your app in both stores: App Store and Google Play reviews with the reply you gave each, and TestFlight feedback, with the crash log behind a crash report. It reads App Store Connect with a team API key and Google Play with a service account, both from files.

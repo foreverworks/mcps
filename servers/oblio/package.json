@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-oblio",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for the Oblio invoicing platform: issue invoices and proformas with exact totals, record payments, cancel or reverse invoices, and read clients, products and series",
   "mcpName": "com.foreverworks/oblio",
   "mcp": {
@@ -60,7 +60,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   }
 }

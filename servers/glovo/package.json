@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-glovo",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for Glovo order history: itemised receipts, item search, spending by store and month, and each bank card charge matched to its order; read-only",
   "mcp": {
@@ -64,8 +64,8 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
-    "@foreverworks/receipts": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
+    "@foreverworks/receipts": "^0.1.1",
     "zod": "^4.6.7"
   }
 }

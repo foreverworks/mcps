@@ -3,7 +3,7 @@
   "name": "com.foreverworks/home-assistant",
   "title": "Home Assistant",
   "description": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/home-assistant/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-home-assistant",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

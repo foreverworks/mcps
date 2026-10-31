@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-porkbun",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for Porkbun domains, DNS and hosting: Porkbun's official tools, served with per-client tokens, an audit line per call, purchases marked for the client to confirm, and files uploaded by path",
   "mcpName": "com.foreverworks/porkbun",
@@ -77,7 +77,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "@porkbunllc/mcp-server": "0.52.0",
     "zod": "^4.6.7"
   }

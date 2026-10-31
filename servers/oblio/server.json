@@ -3,7 +3,7 @@
   "name": "com.foreverworks/oblio",
   "title": "Oblio",
   "description": "Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/oblio/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-oblio",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

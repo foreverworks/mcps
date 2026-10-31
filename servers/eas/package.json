@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-eas",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for Expo Application Services: builds, workflow runs with each job's log and why it failed, store submissions with the store's error text, a credentials audit, fingerprints and updates",
   "mcpName": "com.foreverworks/eas",
@@ -65,7 +65,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "yaml": "2.9.1",
     "zod": "^4.6.7"
   }

@@ -1,5 +1,13 @@
 # @foreverworks/mcp-printer
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. One network printer and its flatbed scanner, over IPP Everywhere and eSCL: the device's state, paper and toner, printing a PDF or image as the printer's own lossless raster (corrected for its measured response once you calibrate it), and scanning what lies on the glass.

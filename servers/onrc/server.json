@@ -3,7 +3,7 @@
   "name": "com.foreverworks/onrc",
   "title": "ONRC trade register",
   "description": "Follow your filings at Romania's trade register, with their documents, fee notes and invoices.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/onrc/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-onrc",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

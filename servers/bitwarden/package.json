@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-bitwarden",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for a Bitwarden vault, through the official CLI: find, create and update logins, store secure notes, generate and hand out passwords, compute 2FA codes, and check passwords against known breaches",
   "mcpName": "com.foreverworks/bitwarden",
@@ -78,7 +78,7 @@
   },
   "dependencies": {
     "@bitwarden/cli": "2026.10.0",
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   }
 }

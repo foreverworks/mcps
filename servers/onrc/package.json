@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-onrc",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for Romania's trade register portal (myportal.onrc.ro): the filings made there and their status, the documents listed on each filing, fee notes and invoices",
   "mcpName": "com.foreverworks/onrc",
@@ -53,7 +53,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   }
 }

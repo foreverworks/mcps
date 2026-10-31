@@ -3,7 +3,7 @@
   "name": "com.foreverworks/anaf-spv",
   "title": "ANAF SPV",
   "description": "Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/anaf-spv/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-anaf-spv",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

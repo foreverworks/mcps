@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-smart-home",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for BroadLink RM infrared blasters on the local network: blaster status, pressing a device's remote buttons by name, and learning a remote's codes",
   "mcp": {
@@ -61,7 +61,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   }
 }

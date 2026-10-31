@@ -1,5 +1,13 @@
 # @foreverworks/mcp-devices
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. A broker for agents that share a few phones and desktops: leases on the Android emulators and iOS simulators its catalog names, on desktops and Batocera retro-gaming boxes beside them and on build slots, a fair queue when everything is taken, spare devices started within each host's budget, and a plain reason when nothing can serve a request.

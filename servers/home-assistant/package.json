@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-home-assistant",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for Home Assistant over its REST and WebSocket APIs: entities and their states, areas, history, the logbook, templates, and running actions, with locks, alarms, covers and valves confirmed",
   "mcpName": "com.foreverworks/home-assistant",
@@ -72,7 +72,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   }
 }

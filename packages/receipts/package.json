@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/receipts",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "The shared shape of delivery-app receipt servers: itemised receipts, the join from a bank card charge to the order it paid, item search and CSV exports",
   "keywords": [
@@ -58,7 +58,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   }
 }

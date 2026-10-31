@@ -3,7 +3,7 @@
   "name": "com.foreverworks/porkbun",
   "title": "Porkbun",
   "description": "Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/porkbun/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-porkbun",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-app-stores",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "private": true,
   "description": "MCP server for App Store Connect and Google Play: read and answer App Store and Play reviews, and read TestFlight feedback and crash logs",
   "mcpName": "com.foreverworks/app-stores",
@@ -84,7 +84,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   }
 }

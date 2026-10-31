@@ -1,5 +1,13 @@
 # @foreverworks/mcp-bnr
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. The National Bank of Romania's reference exchange rates: the rate in force on a day with the date BNR published it, amounts converted to and from RON, several currencies or a window of fixings at once, and the annual average ANAF uses for foreign income in the D212. Rates are BNR's exact text, and every conversion is computed in exact decimals. In the first days of January, before BNR publishes the new year's file, today's rate is December's last fixing.

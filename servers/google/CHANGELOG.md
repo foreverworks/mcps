@@ -1,5 +1,13 @@
 # @foreverworks/mcp-google
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. Several Google accounts through one server: Gmail, Calendar, a Drive, Docs, Sheets and Slides (as simple operations and through their full APIs, every batch checked against Google's own schema), comments, sharing and revisions on any file, Google Tasks, contacts with a Workspace directory, and what Meet recorded of a meeting. Reads that make sense across accounts read all of them; every write names its account.

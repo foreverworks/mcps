@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-rag",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "MCP server for retrieval over your own documents: index PDFs (with OCR), images, docx and Markdown into Postgres with pgvector, then search them with hybrid retrieval and a reranker, on your machine or with indexing at Cloudflare Workers AI",
   "mcp": {
@@ -106,7 +106,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.1.0",
+    "@foreverworks/mcp-kit": "^0.2.0",
     "pg": "8.23.1",
     "pg-connection-string": "2.14.1",
     "zod": "^4.6.7"

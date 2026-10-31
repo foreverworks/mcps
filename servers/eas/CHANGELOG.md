@@ -1,5 +1,13 @@
 # @foreverworks/mcp-eas
 
+## 0.1.1
+
+### Patch Changes
+
+- Updated dependencies [2447a0d]
+- Updated dependencies [db52a0b]
+  - @foreverworks/mcp-kit@0.2.0
+
 ## 0.1.0
 
 The first release. Expo Application Services through its GraphQL API: builds, workflow runs with each job's log and the reason a run failed, App Store Connect and Google Play submissions with the store's own error text, a credentials audit per bundle id and package, fingerprints, and EAS Update channels and rollouts.
