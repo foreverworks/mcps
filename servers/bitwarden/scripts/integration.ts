@@ -18,7 +18,7 @@
  *   openssl x509 -req -in server.csr -CA ca.pem -CAkey ca.key -CAcreateserial -out cert.pem -days 30 -extfile ext.cnf
  *   docker run -d --rm --name vaultwarden-it -v "$PWD:/ssl:ro" -e 'ROCKET_TLS={certs="/ssl/cert.pem",key="/ssl/key.pem"}' \
  *     -e SIGNUPS_ALLOWED=true -e I_REALLY_WANT_VOLATILE_STORAGE=true -e ROCKET_PORT=443 -e DOMAIN=https://127.0.0.1:8580 \
- *     -p 127.0.0.1:8580:443 vaultwarden/server:latest
+ *     -e LOGIN_RATELIMIT_MAX_BURST=1000 -e LOGIN_RATELIMIT_SECONDS=1 -p 127.0.0.1:8580:443 vaultwarden/server:latest
  *
  *   npm run build -w @foreverworks/mcp-bitwarden
  *   cd servers/bitwarden
@@ -26,7 +26,11 @@
  *
  * DOMAIN must be the address the CLI reaches the server at: the CLI takes its
  * API and identity URLs from the server's own configuration. Each run makes a
- * new account, so it can run again against the same server.
+ * new account, so it can run again against the same server. The raised login
+ * limit is for runs back to back: Vaultwarden allows 10 sign-ins a minute from
+ * one address by default, refilled at one a minute, and every run makes an
+ * account and signs in with it; once the limit refuses one, each CLI call that
+ * renews its token is refused too ("Error refreshing access token").
  */
 import assert from "node:assert/strict";
 import { chmod, mkdtemp, writeFile } from "node:fs/promises";
