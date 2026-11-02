@@ -18,6 +18,7 @@ export const summaryOf = (login: Login, collections: readonly Collection[]) => (
   urls: login.uris.map((u) => u.uri),
   hasPassword: login.password !== null && login.password !== "",
   hasTotp: login.totp !== null && login.totp !== "",
+  passkeys: login.passkeys.length,
   collections: collectionNames(login.collectionIds, collections),
   revisionDate: login.revisionDate,
 });

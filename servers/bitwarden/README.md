@@ -4,14 +4,19 @@ Give your AI assistant a [Bitwarden](https://bitwarden.com) account of its own
 to sign up and sign in with. It finds, creates and updates logins, generates
 passwords and hands one out only to type it, computes 2FA codes, keeps other
 secrets (an API token, a key file) in secure notes, moves items between an
-organization's collections, and checks passwords against Have I Been Pwned.
-Only `create_login`, `update_login`, `create_note` and `move_item` write;
-nothing deletes, exports or changes settings, and no tool is `money`.
+organization's collections, and checks passwords against Have I Been Pwned. It
+is also a passkey authenticator: it registers passkeys and signs WebAuthn
+sign-ins with them, stored the way Bitwarden's own apps store passkeys, so
+either can use the other's. `create_login`, `update_login`, `create_note`,
+`move_item`, `create_passkey` and `import_passkeys` write; `delete_passkey`
+removes one passkey from its login, and nothing else deletes. Nothing exports
+or changes settings, and no tool is `money`.
 
 **You need** a Bitwarden account set aside for the agent, not your personal
 vault (any plan: Premium is not needed), with its personal API key and master
 password each in a file. Every call runs Bitwarden's CLI, so tools take
-seconds, not milliseconds.
+seconds, not milliseconds. The account is for the agent's own identities:
+your own passkeys belong on your own devices.
 
 ## What you can ask
 
@@ -25,6 +30,8 @@ seconds, not milliseconds.
 - "Store the key in example-key.json as a secure note called 'Example Cloud
   deploy key'."
 - "Move the Example Shop login into the Shared collection."
+- "Which passkeys does the vault hold for example.com?"
+- "Import the passkeys in example-export.json, then delete the file."
 
 ## Install
 
@@ -84,6 +91,7 @@ under its own Node and never uses a `bw` on your PATH.
 | `BITWARDEN_SERVER` | no | A self-hosted or EU server, e.g. `https://vault.bitwarden.eu`. Unset is bitwarden.com. |
 | `BITWARDEN_DEFAULT_COLLECTION` | no | The collection a new login or note goes in when the call names none, by name or id. Unset, or naming no collection the account has: the account's own vault, outside any collection. |
 | `BITWARDEN_STATE_DIR` | no | The CLI's data folder (its `data.json`), created 0700; the default is in [docs/configuration.md](../../docs/configuration.md). |
+| `NODE_EXTRA_CA_CERTS` | no | For a self-hosted server whose certificate your own authority signed: that authority's certificate (PEM). The server hands it to the CLI, which talks to a server over HTTPS only. |
 
 `BITWARDEN_CLIENT_ID`, `BITWARDEN_CLIENT_SECRET` and
 `BITWARDEN_MASTER_PASSWORD` are read only when their `_FILE` twin is unset.
@@ -92,7 +100,8 @@ named file that is missing or empty is a `config` error, never a fallback to
 the variable. Without the secrets the server still starts and lists its
 tools, and each call answers a `config` error naming what is missing.
 
-`password_file` and a note field's `file` are read from `MCP_FILE_ROOTS`; that
+`password_file`, a note field's `file` and the export `import_passkeys` takes
+are read from `MCP_FILE_ROOTS`; that
 and the other variables every server shares are in
 [docs/configuration.md](../../docs/configuration.md).
 
@@ -118,11 +127,18 @@ and the other variables every server shares are in
    refused API key or master password shows up here as `auth`.
 2. To sign up somewhere, the assistant calls `create_login` first, so the
    password is stored before the site sees it, then `get_password` to type it.
+3. Passkeys need a program in the browser's place: whatever handles the
+   site's WebAuthn request (a browser extension, an automation driver) builds
+   the client data, checks the site's RP ID against the page's origin, and
+   calls `create_passkey` or `assert_passkey` with the client data's hash.
+   The answer is what a browser hands back to the page.
 
 ## Tools
 
 **read** changes nothing in the vault; **write** adds an item or changes one.
-Nothing deletes.
+Only `delete_passkey` removes anything: one passkey, from a login that stays.
+
+### Logins and notes
 
 | Tool | Access | What it does |
 |---|---|---|
@@ -139,11 +155,24 @@ Nothing deletes.
 | `create_note` | write | A new secure note for secrets that are not a login, each in a hidden field, typed or read whole from a file; the result gives lengths and a file's SHA-256, never a value. |
 | `move_item` | write | Put a login or secure note in exactly one collection of its own organization, by name or id; the result gives its collections before and after. |
 
+### Passkeys
+
+| Tool | Access | What it does |
+|---|---|---|
+| `list_passkeys` | read | Every passkey with its site, account, credential id, counter, login and collections, and whether a person shared it with this account; never a key. |
+| `assert_passkey` | read | Sign a WebAuthn sign-in for a site with the vault's passkey: authenticator data and an ES256 signature over it and the client data's hash. Several candidates are answered as `several`, for the caller to pick one. |
+| `create_passkey` | write | Register a new passkey: an ES256 key pair made here, the private key stored in a login, the answer an attestation of format none with the public key. |
+| `import_passkeys` | write | Import the logins that carry passkeys from a Bitwarden JSON export (not encrypted) or one exported item, skipping passkeys the vault already holds. |
+| `delete_passkey` | write | Remove one passkey from its login; the login and its password stay. |
+
 `get_password`, `get_field` and `totp` return a secret and are still `read`:
 the account holds the agent's own logins, made for it to use without asking
 (`src/mcp/policy.ts`). What they return is for typing or piping where it goes,
 never for a file, a commit, a message or a reply. Keep your own passwords in a
 vault this account cannot reach, and lend it one through a shared collection.
+`assert_passkey` is `read` on the same terms: it hands out a signature, as
+`get_password` hands out a password, and writes only a counter that is already
+above 0. No tool returns a passkey's private key.
 
 ## Troubleshooting
 
@@ -174,6 +203,24 @@ saved, look for it with `find_logins` before trying again.
 **`unavailable`.** Have I Been Pwned could not be read, and the vault was not
 changed. Retry in a minute; a deployment that limits its hosts must allow
 `api.pwnedpasswords.com`.
+
+**`no_credential`.** No passkey in the vault can answer that sign-in: none
+for the RP ID, none the site's allow list names, or none discoverable when the
+request names no passkey. `list_passkeys` shows what the vault holds.
+
+**`several`.** More than one passkey can answer a request that names none.
+The error's `candidates` lists them, without keys; call again with
+`credential_id` set to the account you mean.
+
+**`excluded`.** The site's exclude list names a passkey the vault holds: it
+already has one from this vault for the account. Sign in with it instead.
+
+**`unsupported`.** The site accepts no ES256 key, which is the only kind this
+vault makes (as Bitwarden's apps), or a stored passkey's key cannot sign.
+
+**`cli`: "Insecure URL not allowed. All URLs must use HTTPS."** The CLI talks
+to a server over HTTPS only. Serve a self-hosted Bitwarden or Vaultwarden over
+HTTPS; if your own authority signed its certificate, set `NODE_EXTRA_CA_CERTS`.
 
 **`BITWARDEN_SERVER` seems ignored.** It applies when the CLI first logs in,
 and a state folder logged in to another server keeps that one. Start from an
@@ -230,6 +277,50 @@ is safe to repeat. After a move the server syncs and reads the item back, and
 the answer is what Bitwarden holds rather than what the CLI printed. A move
 stays inside the item's own organization: see [Limitations](#limitations).
 
+**Passkeys.** The vault answers WebAuthn as an authenticator does: it gets
+the RP ID, the client data's hash and the credential ids a site named, never
+the page, and answers authenticator data and a signature, or an attestation
+object. The program in the browser's place builds the client data, checks the
+RP ID against the page's origin and assembles the credential a page receives.
+Everything about the stored form and the answers follows Bitwarden's own
+authenticator, so a passkey made here signs in Bitwarden's apps and one they
+made signs here. Bitwarden documents what a person sees: a login keeps
+[one passkey](https://bitwarden.com/help/storing-passkeys/#save-and-autofill-passkeys-with-bitwarden),
+and passkeys travel in its
+[JSON exports](https://bitwarden.com/help/storing-passkeys/#export-and-import-passkeys).
+The fields are in its source, bitwarden/clients at the tag
+`cli-v2026.10.0` (commit `b449ac1d255784380d75ef026343198891286be7`):
+`libs/common/src/platform/services/fido2/fido2-authenticator.service.ts`,
+`credential-id-utils.ts`, `guid-utils.ts` and
+`libs/common/src/models/export/fido2-credential.export.ts`. In short:
+
+- A passkey lives in a login's `fido2Credentials`, one per login, with
+  `keyType` `public-key`, `keyAlgorithm` `ECDSA`, `keyCurve` `P-256`, and
+  `keyValue` the private key as PKCS#8 in base64url. The CLI's JSON writes
+  `counter` and `discoverable` as text (`"0"`, `"true"`); a JSON boolean would
+  be stored as false.
+- The credential id is a random GUID, and a site knows it by the GUID's 16
+  bytes; an id from another provider is stored as `b64.` and its base64url.
+- The AAGUID is Bitwarden's, `d548826e-79b4-db40-a3d8-11116f7e8349`, since the
+  passkey lives in a Bitwarden vault. The flags say user present, backup
+  eligible and backed up, and user verified only when the caller says so.
+- The counter starts at 0, and a 0 is never advanced, so signing with a
+  passkey made here or in Bitwarden's apps writes nothing to the vault. A
+  passkey imported with a counter above 0 is advanced and stored, from a
+  fresh sync, before it signs.
+- A new passkey goes into the login named by `item_id`, else into the one
+  login saved for that site with that username and no passkey, so an
+  identity's password, 2FA key and passkey stay one item, else into a new
+  login.
+
+`bw edit item` replaces a login with what it is given, so an edit that left
+`fido2Credentials` out would drop the passkey: every edit here starts from the
+item as read, and `scripts/integration.ts` proves that `create_login`,
+`update_login` and the passkey tools keep passkeys through the pinned CLI. It
+runs the built server against a throwaway account on a local Vaultwarden and
+checks every registration and signature with an independent verifier
+(`@simplewebauthn/server`); its header says how to run it.
+
 **Breached passwords.** `check_exposed` uses Have I Been Pwned's keyless
 range API: the first five hex characters of the password's SHA-1 go out, and
 the answer (every hash suffix in that range with its count, padded with
@@ -238,13 +329,19 @@ leave the server. This is the one request the server makes itself.
 
 `npx tsx scripts/smoke.ts` drives the built server against a real account,
 read-only unless given `--write`, which creates a login and a secure note
-named "mcp smoke test" and "mcp smoke test note". Nothing deletes, so remove
-them in the web vault afterwards.
+named "mcp smoke test" and "mcp smoke test note". Nothing here deletes them,
+so remove them in the web vault afterwards.
 
 ## Limitations
 
-- **No delete, no export, no settings, no attachments, no Sends**: only what
-  an agent needs to sign up and sign in, and nothing that loses data.
+- **No export, no settings, no attachments, no Sends, and no delete but one
+  passkey's**: only what an agent needs to sign up and sign in, and nothing
+  else that loses data.
+- **Passkeys are ES256 only**, as in Bitwarden's apps, with an attestation of
+  format none. No extension (PRF, large blobs) is answered: the program in the
+  browser's place answers `credProps` itself, from `discoverable`.
+- **The import reads Bitwarden's JSON export** (not encrypted) or one exported
+  item. The FIDO Alliance's Credential Exchange Format is not read yet.
 - **Moves stay inside an organization.** Bitwarden encrypts an
   organization's items with that organization's key, so moving an item out
   of the account's own vault hands it to the organization, and Bitwarden has
@@ -286,5 +383,7 @@ This one is the narrow surface an agent needs to sign up and sign in.
 returning it, so it never passes through the model on the way in; only
 `get_password`, `get_field` and `totp` return a secret, for typing. Its 2FA
 codes work on a free account, and a new authenticator key is checked, stored
-and proven by the current code. Nothing deletes or exports, and it runs over
-HTTP as its own service, unlocking itself from secrets held in files.
+and proven by the current code. It is also a WebAuthn authenticator whose
+private keys never leave it. Nothing exports, the one delete is a single
+passkey's, and it runs over HTTP as its own service, unlocking itself from
+secrets held in files.

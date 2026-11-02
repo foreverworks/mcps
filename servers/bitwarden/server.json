@@ -2,7 +2,7 @@
   "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
   "name": "com.foreverworks/bitwarden",
   "title": "Bitwarden",
-  "description": "Give your assistant its own Bitwarden vault to create logins, type passwords and read 2FA codes.",
+  "description": "Give your assistant its own Bitwarden vault for logins, passwords, 2FA codes and passkeys.",
   "version": "0.1.1",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/bitwarden/",
   "repository": {

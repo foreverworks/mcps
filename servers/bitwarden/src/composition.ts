@@ -1,14 +1,16 @@
-import { createHash, createHmac, randomInt } from "node:crypto";
+import { createHash, createHmac, randomInt, randomUUID } from "node:crypto";
 import { mkdir } from "node:fs/promises";
 
 import { inputFilesFrom, once, stateDirOf } from "@foreverworks/mcp-kit";
 
 import type { Deps } from "./app/ports.js";
 import { MAX_INPUT_FILE_BYTES } from "./domain/note.js";
+import { MAX_EXPORT_BYTES } from "./domain/passkey/exportFile.js";
 import type { Hmac } from "./domain/totp.js";
 import { makeRunBw, serialized, type RunBw } from "./infra/bw/run.js";
 import { makeBwVault } from "./infra/bwVault.js";
 import { loadCredentials } from "./infra/credentials.js";
+import { makePasskeyCrypto } from "./infra/passkeyCrypto.js";
 import { makePwnedRange } from "./infra/pwned.js";
 
 const hmac: Hmac = (algorithm, key, message) => new Uint8Array(createHmac(algorithm.toLowerCase(), key).update(message).digest());
@@ -21,7 +23,8 @@ const lazyRun = (env: NodeJS.ProcessEnv): RunBw => {
   const ready = once(async () => {
     const dir = stateDirOf(env, "bitwarden", "BITWARDEN_STATE_DIR");
     await mkdir(dir, { recursive: true, mode: 0o700 });
-    return serialized(makeRunBw(dir));
+    const caCerts = env["NODE_EXTRA_CA_CERTS"]?.trim();
+    return serialized(makeRunBw(dir, caCerts ? { NODE_EXTRA_CA_CERTS: caCerts } : {}));
   });
   return async (args, options) => (await ready())(args, options);
 };
@@ -45,4 +48,7 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => ({
   readInput: inputFilesFrom(env, { maxBytes: MAX_INPUT_FILE_BYTES }),
   sha1: (text) => createHash("sha1").update(text, "utf8").digest("hex"),
   pwnedRange: makePwnedRange(),
+  passkeyCrypto: makePasskeyCrypto(),
+  newCredentialId: () => randomUUID(),
+  readExport: inputFilesFrom(env, { maxBytes: MAX_EXPORT_BYTES }),
 });

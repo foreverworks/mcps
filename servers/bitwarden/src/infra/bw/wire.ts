@@ -1,6 +1,7 @@
 import { z } from "zod";
 
-import type { Collection, Field, Login, LoginDraft, NoteDraft, Organization, VaultStatus } from "../../domain/schema.js";
+import { passkeyFromExport } from "../../domain/passkey/exportFile.js";
+import type { Collection, Field, Login, LoginDraft, NoteDraft, Organization, Passkey, VaultStatus } from "../../domain/schema.js";
 
 /**
  * The CLI's JSON, the parts this server reads. Loose objects: the CLI adds
@@ -25,6 +26,8 @@ export const itemWire = z.looseObject({
       totp: z.string().nullable().optional(),
       uris: z.array(uri).nullable().optional(),
       passwordRevisionDate: z.string().nullable().optional(),
+      /** Passkeys, as Bitwarden's Fido2CredentialExport (passkeyFromExport reads each); an entry it cannot read is kept as it is. */
+      fido2Credentials: z.array(z.unknown()).nullable().optional(),
     })
     .nullable()
     .optional(),
@@ -76,7 +79,57 @@ export const loginOf = (item: ItemWire): Login => ({
   previousPasswords: (item.passwordHistory ?? [])
     .flatMap((h) => (h.password ? [{ password: h.password, until: h.lastUsedDate ?? null }] : []))
     .sort((a, b) => (b.until ?? "").localeCompare(a.until ?? "")),
+  passkeys: (item.login?.fido2Credentials ?? []).flatMap((raw) => {
+    const passkey = passkeyFromExport(raw);
+    return "refused" in passkey ? [] : [passkey];
+  }),
 });
+
+/**
+ * A passkey as `bw create item` and `bw edit item` take it (Bitwarden's
+ * Fido2CredentialExport): the counter and `discoverable` as TEXT. The CLI
+ * reads `discoverable` with `=== "true"` (Fido2CredentialExport.toView), so a
+ * JSON boolean would be stored as false.
+ */
+export const passkeyPayload = (p: Passkey): Record<string, unknown> => ({
+  credentialId: p.credentialId,
+  keyType: p.keyType,
+  keyAlgorithm: p.keyAlgorithm,
+  keyCurve: p.keyCurve,
+  keyValue: p.keyValue,
+  rpId: p.rpId,
+  userHandle: p.userHandle,
+  userName: p.userName,
+  counter: String(p.counter),
+  rpName: p.rpName,
+  userDisplayName: p.userDisplayName,
+  discoverable: p.discoverable ? "true" : "false",
+  creationDate: p.creationDate,
+});
+
+const storedId = (raw: unknown): string | undefined => {
+  const read = passkeyFromExport(raw);
+  return "refused" in read ? undefined : read.credentialId;
+};
+
+/**
+ * A login's `fido2Credentials` after an edit that leaves it holding `wanted`:
+ * an entry of `wanted` already stored is written over its stored self (so a
+ * field this server does not model survives), a stored one this server reads
+ * and `wanted` leaves out is removed, one it cannot read is kept untouched,
+ * and a new one is added at the end.
+ */
+export const passkeysAfter = (stored: readonly unknown[], wanted: readonly Passkey[]): unknown[] => {
+  const byId = new Map(wanted.map((p) => [p.credentialId, p]));
+  const kept = stored.flatMap((raw) => {
+    const id = storedId(raw);
+    if (id === undefined) return [raw];
+    const next = byId.get(id);
+    return next === undefined ? [] : [{ ...(raw as Record<string, unknown>), ...passkeyPayload(next) }];
+  });
+  const storedIds = new Set(stored.map(storedId));
+  return [...kept, ...wanted.filter((p) => !storedIds.has(p.credentialId)).map(passkeyPayload)];
+};
 
 export const statusOf = (s: z.infer<typeof statusWire>): VaultStatus => ({
   status: s.status,
@@ -107,6 +160,7 @@ export const itemPayload = (draft: LoginDraft, base: Record<string, unknown> = {
     password: draft.password,
     totp: draft.totp,
     uris: draft.uris.map((u) => ({ uri: u.uri, match: null })),
+    ...(draft.passkeys === undefined ? {} : { fido2Credentials: draft.passkeys.map(passkeyPayload) }),
   },
 });
 

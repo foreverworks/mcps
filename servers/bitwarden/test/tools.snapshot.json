@@ -1,5 +1,61 @@
 [
   {
+    "name": "assert_passkey",
+    "title": "Sign in with a passkey",
+    "description": "Sign a WebAuthn sign-in, as an authenticator does for navigator.credentials.get(): authenticator data and an ES256 signature over it and the client data's hash, with the vault's passkey for the site, plus the credential id and user handle a browser returns. With allow_credentials, only a passkey those ids name; without (a discoverable request), any discoverable passkey for the RP ID. When several can answer, the call is refused as several with the candidates: call again with credential_id. No passkey for the site is refused as no_credential. Hand the result only to the page that asked; the key never leaves this server.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rp_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "description": "The RP ID: the site's domain the passkey is bound to, e.g. example.com or login.example.com."
+        },
+        "client_data_hash": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "SHA-256 of the client data JSON the browser (or the program in its place) built for this request, base64url (43 characters)."
+        },
+        "allow_credentials": {
+          "default": [],
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "A credential id, base64url as WebAuthn's JSON carries it."
+          },
+          "description": "The request's allowCredentials ids; empty for a discoverable request."
+        },
+        "credential_id": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "The passkey to sign with, from an earlier answer's candidates or list_passkeys."
+        },
+        "user_verified": {
+          "default": false,
+          "description": "Whether the user was verified for this request, which sets the UV flag. True only when the caller verified them: an agent signing in as its own identity, or a person who approved the request.",
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "rp_id",
+        "client_data_hash"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
     "name": "check_exposed",
     "title": "Check a password against breaches",
     "description": "Whether a login's password appears in Have I Been Pwned's list of passwords seen in data breaches, and how many times. Only the first five hex characters of the password's SHA-1 leave this server (k-anonymity); the password and its full hash never do, and the answer is a count. A count above 0 means the password is known to attackers: rotate it (update_login with rotate_password, then change it on the site). With previous, the password the current one replaced.",
@@ -249,6 +305,148 @@
     }
   },
   {
+    "name": "create_passkey",
+    "title": "Create passkey",
+    "description": "Register a new passkey, as an authenticator does for WebAuthn's navigator.credentials.create(): an ES256 (P-256) key pair is made here, the private key stored in the vault exactly as Bitwarden's own apps store a passkey (so they can sign with it too), and the answer is what a browser needs to finish the registration: the credential id, the attestation object (format none), the authenticator data and the public key (SPKI). The private key is never in the answer. It goes into the login item_id names, else into the one login already saved for this site with this username and no passkey, else into a new login named after the site (filed like create_login). Refused as excluded when the site's exclude list names a passkey the vault holds, and as unsupported when the site accepts no ES256 key. Use it for an agent's own identity; a person's own passkeys belong on their own devices.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rp_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253,
+          "description": "The RP ID: the site's domain the passkey is bound to, e.g. example.com or login.example.com."
+        },
+        "rp_name": {
+          "description": "The site's name as the request gives it (rp.name).",
+          "type": "string",
+          "maxLength": 200
+        },
+        "user": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "maxLength": 4096,
+              "description": "The site's id for the account (user.id), base64url, 1 to 64 bytes."
+            },
+            "name": {
+              "type": "string",
+              "maxLength": 500,
+              "description": "The account's name at the site (user.name), usually its email or username."
+            },
+            "display_name": {
+              "default": "",
+              "description": "The account's display name (user.displayName).",
+              "type": "string",
+              "maxLength": 500
+            }
+          },
+          "required": [
+            "id",
+            "name"
+          ],
+          "description": "The account, as the request's `user`."
+        },
+        "client_data_hash": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "SHA-256 of the client data JSON for this request, base64url. An attestation of format none signs nothing, so it is only checked."
+        },
+        "exclude_credentials": {
+          "default": [],
+          "maxItems": 64,
+          "type": "array",
+          "items": {
+            "type": "string",
+            "maxLength": 4096,
+            "description": "A credential id, base64url as WebAuthn's JSON carries it."
+          },
+          "description": "The request's excludeCredentials ids: passkeys the site already holds for this account."
+        },
+        "algorithms": {
+          "default": [],
+          "description": "The COSE algorithm ids in the request's pubKeyCredParams, e.g. [-7, -257]. Empty means the default, which includes ES256 (-7).",
+          "maxItems": 16,
+          "type": "array",
+          "items": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          }
+        },
+        "resident_key": {
+          "default": true,
+          "description": "Whether the passkey is discoverable (a resident key), as the request's authenticatorSelection asks.",
+          "type": "boolean"
+        },
+        "user_verified": {
+          "default": false,
+          "description": "Whether the user was verified for this request, which sets the UV flag. True only when the caller verified them: an agent signing in as its own identity, or a person who approved the request.",
+          "type": "boolean"
+        },
+        "item_id": {
+          "description": "The login to put it in: one without a passkey, or whose passkey is for the same account on this site (it is replaced).",
+          "type": "string"
+        },
+        "collection": {
+          "description": "For a new login: a collection name from health.",
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "rp_id",
+        "user",
+        "client_data_hash"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "delete_passkey",
+    "title": "Delete passkey",
+    "description": "Remove one passkey from its login. The login and everything else in it (username, password, 2FA key) stay. The site keeps its copy of the public key, so remove the passkey there too if it should stop being offered. Not undone by anything here.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "item_id": {
+          "type": "string",
+          "description": "The login's item id, from list_passkeys or find_logins."
+        },
+        "credential_id": {
+          "type": "string",
+          "maxLength": 4096,
+          "description": "The passkey's credential id, base64url, as list_passkeys gives it."
+        }
+      },
+      "required": [
+        "item_id",
+        "credential_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
     "name": "find_logins",
     "title": "Find logins",
     "description": "Search the vault's logins and secure notes (`kind` says which). `search` matches name, username and URL; `url` finds the logins saved for a site (its host, as Bitwarden's autofill matches). Returns ids, names, usernames and URLs, and whether each has a password and an authenticator key, never the secrets themselves. Syncs first, so an item just added in the web vault shows up.",
@@ -382,10 +580,100 @@
   {
     "name": "health",
     "title": "Health",
-    "description": "Check that the vault is reachable and unlocked, and say as whom: the account, the server, when it last synced, how many logins it holds, and the organizations and collections it can file into. Run this before concluding the MCP is broken.",
+    "description": "Check that the vault is reachable and unlocked, and say as whom: the account, the server, when it last synced, how many logins and passkeys it holds, and the organizations and collections it can file into. Run this before concluding the MCP is broken.",
     "inputSchema": {
       "type": "object",
       "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "import_passkeys",
+    "title": "Import passkeys",
+    "description": "Import the logins that carry passkeys from a Bitwarden JSON export (not encrypted), or from one exported item: each becomes a new login here with its username, password, 2FA key, URLs, notes, custom fields and passkeys, filed like create_login. A passkey the vault already holds is skipped, and so is one this server cannot sign with (only ES256 P-256 keys sign, as in Bitwarden's apps). The answer lists what was imported and what was skipped with the reason, and the file's SHA-256 and size: compare them with the source, then delete the file, which holds private keys.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "object",
+          "properties": {
+            "path": {
+              "description": "A path: a file in /srv/bitwarden-inbox (copy it there with cp; a bare name is taken from /srv/bitwarden-inbox). Links are refused.",
+              "type": "string"
+            },
+            "content_base64": {
+              "description": "The bytes as standard base64, only as a script that read the file wrote them, never typed. Needs sha256.",
+              "type": "string"
+            },
+            "sha256": {
+              "description": "Hex SHA-256 of the source file, as sha256sum prints it. Required with content_base64, checked with path.",
+              "type": "string"
+            },
+            "filename": {
+              "description": "The file's name, for the answer.",
+              "type": "string",
+              "maxLength": 255
+            }
+          },
+          "description": "The export. Never type or paste a file's base64 yourself: a retyped file can arrive changed. Copy the file into /srv/bitwarden-inbox and give its path, or have a script that read the file send content_base64 with its sha256."
+        },
+        "collection": {
+          "description": "A collection name from health, for every imported login. Default: as create_login.",
+          "type": "string",
+          "maxLength": 200
+        }
+      },
+      "required": [
+        "file"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": false,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "list_passkeys",
+    "title": "List passkeys",
+    "description": "The passkeys the vault holds, each with its site (rpId and name), account (userName, userDisplayName, userHandle), credential id (base64url), counter, whether it is discoverable, when it was made, its login (itemId, itemName), the login's collections, and whether a person shared it with this account rather than the account keeping it as its own. Never a key. Syncs first.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "rp_id": {
+          "description": "Only the passkeys for this RP ID, e.g. example.com.",
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 253
+        },
+        "search": {
+          "description": "Words in the site, its name, the account's names or the login's name.",
+          "type": "string",
+          "maxLength": 200
+        },
+        "limit": {
+          "default": 200,
+          "description": "Return at most this many; `count` says how many matched.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 1000
+        }
+      },
       "$schema": "https://json-schema.org/draft/2020-12/schema",
       "additionalProperties": false
     },

@@ -1,5 +1,6 @@
 import { authError, fail } from "../../domain/errors.js";
 import type { Deps } from "../ports.js";
+import { countPasskeys } from "./passkeys.js";
 
 /**
  * Is this alive, as whom, and what can it reach. `status` logs in and unlocks
@@ -21,6 +22,7 @@ export const checkHealth = async (deps: Deps) => {
     server: status.serverUrl ?? "https://vault.bitwarden.com",
     lastSync: status.lastSync,
     logins: logins.length,
+    passkeys: countPasskeys(logins),
     organizations: organizations.map((o) => o.name),
     collections: collections.map((c) => c.name),
     defaultCollection: deps.defaultCollection ?? null,

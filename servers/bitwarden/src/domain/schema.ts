@@ -34,6 +34,38 @@ export type Login = {
   readonly passwordRevisionDate: string | null;
   /** The passwords this login had before, newest first, as Bitwarden keeps them (its last five). */
   readonly previousPasswords: readonly PreviousPassword[];
+  /** The login's passkeys (Bitwarden's apps keep one per login). */
+  readonly passkeys: readonly Passkey[];
+};
+
+/**
+ * A passkey as Bitwarden stores it in a login (`login.fido2Credentials`, the
+ * shape of its Fido2CredentialExport): every field kept, so an edit writes back
+ * exactly what was read.
+ */
+export type Passkey = {
+  /** As stored: a GUID (what Bitwarden's authenticator makes) or "b64." and the id's base64url (domain/passkey/ids.ts). */
+  readonly credentialId: string;
+  /** "public-key". */
+  readonly keyType: string;
+  /** "ECDSA". */
+  readonly keyAlgorithm: string;
+  /** "P-256". */
+  readonly keyCurve: string;
+  /** The private key, base64url of its PKCS#8 DER. Used inside this process to sign; never in a result, an error or a log. */
+  readonly keyValue: string;
+  readonly rpId: string;
+  readonly rpName: string | null;
+  /** The site's id for the account (WebAuthn's user.id), base64url. */
+  readonly userHandle: string | null;
+  readonly userName: string | null;
+  readonly userDisplayName: string | null;
+  /** The signature counter; Bitwarden's apps make it 0 and never advance a 0 (see domain/passkey.ts). */
+  readonly counter: number;
+  /** Whether a site may find it without naming it (a resident key). */
+  readonly discoverable: boolean;
+  /** ISO 8601, when it was made. */
+  readonly creationDate: string | null;
 };
 
 /** A replaced password, and when it stopped being the login's. */
@@ -60,6 +92,8 @@ export type LoginDraft = {
   readonly totp: string | null;
   readonly uris: readonly Uri[];
   readonly fields: readonly Field[];
+  /** A new login's passkeys; an edit through editLogin leaves the stored ones as they are. */
+  readonly passkeys?: readonly Passkey[];
 };
 
 /** A secure note to create: what the CLI is handed. Its secrets are in `fields`, hidden ones by default. */

@@ -9,6 +9,7 @@ import { createNote } from "../app/usecases/notes.js";
 import { MAX_FIELD_BYTES, MAX_NOTES_BYTES } from "../domain/note.js";
 import { MAX_GIVEN_LENGTH, MAX_LENGTH, MIN_LENGTH } from "../domain/password.js";
 import { handled } from "./envelope.js";
+import { registerPasskeys } from "./passkeys.js";
 
 const id = z.string().trim().describe("The item id, from find_logins.");
 const url = z.string().trim().min(1).max(2000).describe("The site's URL, e.g. https://github.com/login; its host is what find_logins' url matches.");
@@ -99,7 +100,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       title: "Health",
       description:
         "Check that the vault is reachable and unlocked, and say as whom: the account, the server, when it last synced, how many " +
-        "logins it holds, and the organizations and collections it can file into. Run this before concluding the MCP is broken.",
+        "logins and passkeys it holds, and the organizations and collections it can file into. Run this before concluding the MCP is broken.",
       inputSchema: {},
     },
     handled(() => checkHealth(deps)),
@@ -345,4 +346,6 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
     },
     handled(() => syncVault(deps)),
   );
+
+  registerPasskeys(server, deps);
 };

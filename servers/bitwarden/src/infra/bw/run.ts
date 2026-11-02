@@ -19,8 +19,13 @@ export type BwResult = { readonly code: number; readonly stdout: string; readonl
  */
 export type RunBw = (args: readonly string[], options?: { readonly env?: Readonly<Record<string, string>>; readonly input?: string }) => Promise<BwResult>;
 
+/**
+ * `inherit`: variables of this process the CLI is given as well, such as
+ * NODE_EXTRA_CA_CERTS for a self-hosted server whose certificate a private
+ * authority signed (the CLI talks to the server over HTTPS only).
+ */
 export const makeRunBw =
-  (appDataDir: string): RunBw =>
+  (appDataDir: string, inherit: Readonly<Record<string, string>> = {}): RunBw =>
   (args, options = {}) =>
     new Promise((resolve) => {
       const child = spawn(process.execPath, [BW_JS, ...args], {
@@ -29,6 +34,7 @@ export const makeRunBw =
           HOME: appDataDir,
           BITWARDENCLI_APPDATA_DIR: appDataDir,
           BW_NOINTERACTION: "true",
+          ...inherit,
           ...options.env,
         },
         stdio: ["pipe", "pipe", "pipe"],

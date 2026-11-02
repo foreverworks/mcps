@@ -2,13 +2,13 @@
   "name": "@foreverworks/mcp-bitwarden",
   "version": "0.1.1",
   "private": true,
-  "description": "MCP server for a Bitwarden vault, through the official CLI: find, create and update logins, store secure notes, generate and hand out passwords, compute 2FA codes, and check passwords against known breaches",
+  "description": "MCP server for a Bitwarden vault, through the official CLI: find, create and update logins, store secure notes, generate and hand out passwords, compute 2FA codes, check passwords against known breaches, and register and sign in with passkeys",
   "mcpName": "com.foreverworks/bitwarden",
   "mcp": {
     "title": "Bitwarden",
     "audience": "general",
     "maturity": "stable",
-    "tagline": "Give your assistant its own Bitwarden vault to create logins, type passwords and read 2FA codes.",
+    "tagline": "Give your assistant its own Bitwarden vault for logins, passwords, 2FA codes and passkeys.",
     "inputs": {
       "BITWARDEN_CLIENT_ID_FILE": {
         "title": "API key client id file",
@@ -80,5 +80,8 @@
     "@bitwarden/cli": "2026.10.0",
     "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
+  },
+  "devDependencies": {
+    "@simplewebauthn/server": "^14.0.3"
   }
 }

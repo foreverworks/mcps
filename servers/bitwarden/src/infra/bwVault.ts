@@ -17,6 +17,7 @@ import {
   notePayload,
   organizationOf,
   organizationWire,
+  passkeysAfter,
   statusOf,
   statusWire,
 } from "./bw/wire.js";
@@ -143,6 +144,15 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
       const result = await withSession(["edit", "item-collections", id], encoded(collectionIds));
       if (result.code !== 0 && /not found/i.test(bwMessage(result))) return fail(notFound(`no item ${id}`));
       if (result.code !== 0) failed(result);
+    },
+    // `bw edit item` replaces the login with what it is given (CipherExport.toView builds a new LoginView), so a
+    // payload without `fido2Credentials` would drop every passkey: the edit starts from the item as read.
+    setPasskeys: async (id, passkeys) => {
+      const base = await getItem(id, "edit");
+      const login = (base.login ?? {}) as Record<string, unknown>;
+      const stored = Array.isArray(login["fido2Credentials"]) ? (login["fido2Credentials"] as unknown[]) : [];
+      const payload = { ...base, login: { ...login, fido2Credentials: passkeysAfter(stored, passkeys) } };
+      return loginOf(parsed(await withSession(["edit", "item", id], encoded(payload)), itemWire));
     },
     collections: () => collections("all"),
     organizations: () => organizations("all"),
