@@ -231,7 +231,10 @@ empty `BITWARDEN_STATE_DIR` to switch.
 **The CLI.** Calls run the official CLI one at a time, because each run
 reads and writes its single `data.json`. The process keeps only the session
 key from `bw unlock`; after a restart, the next call logs in and unlocks
-again. Secrets reach the CLI through its environment or stdin, never its
+again. Calls that arrive while there is no key share that one unlock: every
+`bw unlock` stores the vault's key under a new session key and the one before
+stops opening it, so two unlocks at once left one call holding a stale key.
+Secrets reach the CLI through its environment or stdin, never its
 arguments, which every local user can read. As a child process, the CLI is not
 covered by `MCP_EGRESS_ALLOW` ([docs/configuration.md](../../docs/configuration.md)).
 

@@ -5,7 +5,8 @@
  * WebAuthn verifier (@simplewebauthn/server). A second CLI, logged in on its
  * own, reads back what was stored, as Bitwarden's apps would, and signs with
  * it the way their authenticator does. Keys are made in this run and printed
- * nowhere.
+ * nowhere. First, calls that arrive together on a first start and after a
+ * restart must all answer, which they did not while each one unlocked.
  *
  * The CLI talks to a server over HTTPS only, so Vaultwarden gets a
  * certificate from a throwaway authority, which the server and the CLI trust
@@ -41,7 +42,7 @@ import { Client, sha256Of, StdioClientTransport } from "@foreverworks/mcp-kit";
 
 import { b64u, bitwardenMade, bitwardenSigns, clientData, exportOf, guidId, user, verifyCreate, verifyGet, type Credential } from "../test/webauthn.js";
 import { makeTestAccount } from "./integration/account.js";
-import { makeReader } from "./integration/cli.js";
+import { makeReader, staleAfterSecondUnlock } from "./integration/cli.js";
 
 const ORIGIN = "https://example.com";
 const RP = "example.com";
@@ -81,20 +82,42 @@ const main = async (): Promise<void> => {
     MCP_FILE_ROOTS: inbox,
     ...(process.env["NODE_EXTRA_CA_CERTS"] ? { NODE_EXTRA_CA_CERTS: process.env["NODE_EXTRA_CA_CERTS"] } : {}),
   };
-  const client = new Client({ name: "integration", version: "1.0.0" });
-  await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, "..", "dist", "index.js")], env }));
   const answers: unknown[] = [];
-  const call = async (name: string, args: Record<string, unknown> = {}): Promise<Answer> => {
-    const result = (await client.callTool({ name, arguments: args })) as { content: { text: string }[] };
-    const answer = JSON.parse(result.content[0]?.text ?? "{}");
-    answers.push(answer);
-    return answer;
+  /** The built server over stdio, on the state directory in env: a second start on the same one is a restart. */
+  const start = async () => {
+    const client = new Client({ name: "integration", version: "1.0.0" });
+    await client.connect(new StdioClientTransport({ command: process.execPath, args: [join(import.meta.dirname, "..", "dist", "index.js")], env }));
+    const call = async (name: string, args: Record<string, unknown> = {}): Promise<Answer> => {
+      const result = (await client.callTool({ name, arguments: args })) as { content: { text: string }[] };
+      const answer = JSON.parse(result.content[0]?.text ?? "{}");
+      answers.push(answer);
+      return answer;
+    };
+    return { client, call };
   };
+  // Calls that arrive together, as a deploy's health check and an agent's call do after a restart. Each used to
+  // log in and unlock on its own; the CLI keeps the vault's key under one session key in data.json, so the second
+  // unlock turned the first call's key stale ("the vault is locked after unlocking", "Vault is locked.").
+  const together = async (call: (name: string, args?: Record<string, unknown>) => Promise<Answer>): Promise<void> => {
+    const all = await Promise.all([call("health"), call("find_logins", { search: "nothing here" }), call("list_passkeys", {}), call("health")]);
+    for (const answer of all) assert.equal(answer.error, undefined, JSON.stringify(answer.error));
+  };
+  const first = await start();
   const reader = await makeReader(server, account);
 
-  const { tools } = await client.listTools();
+  const { tools } = await first.client.listTools();
   for (const name of ["list_passkeys", "create_passkey", "assert_passkey", "import_passkeys", "delete_passkey"]) assert.ok(tools.some((t) => t.name === name), name);
   ok("the built server lists the five passkey tools");
+  await together(first.call);
+  ok("four calls at once on a first start (not logged in): every one answers");
+  await first.client.close();
+  const { client, call } = await start();
+  await together(call);
+  ok("four calls at once after a restart (logged in, locked): every one answers, none finds the vault locked");
+  // The CLI's own rule that makes it matter: after a second unlock of one data.json the first key opens nothing.
+  assert.deepEqual(await staleAfterSecondUnlock(server, account), { first: "locked", second: "unlocked" });
+  ok("the pinned CLI: after a second `bw unlock` of one data.json, the first session key reads `locked`");
+
   const health = await call("health");
   assert.equal(health.ok, true, JSON.stringify(health.error));
   assert.equal(health.passkeys, 0);

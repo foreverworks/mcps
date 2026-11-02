@@ -59,9 +59,18 @@ const checkId = (id: string): void => {
  * The vault through the official CLI. It holds ONE piece of state, the session
  * key from `bw unlock`, in this process's memory; losing it (a restart) costs
  * one login and one unlock on the next call.
+ *
+ * Every `bw unlock` stores the vault's key in data.json under a NEW session
+ * key, and the key any earlier unlock handed out stops opening it: `bw status`
+ * then answers "locked" and every other command "Vault is locked.". So calls
+ * that find no key share one unlock rather than each running its own (two
+ * calls just after a restart used to, and the one whose key went stale
+ * answered "the vault is locked after unlocking"), and a call whose key went
+ * stale drops it only if no other call has replaced it already.
  */
 export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions): VaultPort => {
   let session: string | undefined;
+  let unlocking: Promise<string> | undefined;
   let lastSyncAt = 0;
 
   const unlock = async (): Promise<string> => {
@@ -81,15 +90,30 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
     return key;
   };
 
-  /** Run with the session, unlocking first if needed, and once more if the CLI says the session is gone. */
-  const withSession = async (args: readonly string[], input?: string): Promise<BwResult> => {
-    for (let attempt = 0; ; attempt++) {
-      session ??= await unlock();
-      const result = await run(args, { env: { BW_SESSION: session }, ...(input === undefined ? {} : { input }) });
-      if (result.code === 0 || attempt > 0 || !SESSION_GONE.test(bwMessage(result))) return result;
-      session = undefined;
-    }
+  /** The key every call uses: the one held, else the unlock in flight, else a new one; a refused unlock fails every call waiting on it. */
+  const sessionKey = (): Promise<string> => {
+    if (session !== undefined) return Promise.resolve(session);
+    unlocking ??= unlock()
+      .then((key) => (session = key))
+      .finally(() => (unlocking = undefined));
+    return unlocking;
   };
+
+  /** Use the key; when the CLI says it no longer opens the vault, once more with a new one. */
+  const sessioned = async <T>(use: (key: string) => Promise<T>, stale: (value: T) => boolean): Promise<T> => {
+    const key = await sessionKey();
+    const value = await use(key);
+    if (!stale(value)) return value;
+    if (session === key) session = undefined;
+    return use(await sessionKey());
+  };
+
+  /** Run with the session, unlocking first if needed, and once more if the CLI says the session is gone. */
+  const withSession = (args: readonly string[], input?: string): Promise<BwResult> =>
+    sessioned(
+      (key) => run(args, { env: { BW_SESSION: key }, ...(input === undefined ? {} : { input }) }),
+      (result) => result.code !== 0 && SESSION_GONE.test(bwMessage(result)),
+    );
 
   /** A login or a secure note to read; a login only, to edit. */
   const getItem = async (id: string, use: "read" | "edit" = "read") => {
@@ -113,10 +137,12 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
   );
 
   return {
-    status: async () => {
-      session ??= await unlock();
-      return statusOf(parsed(await run(["status"], { env: { BW_SESSION: session } }), statusWire));
-    },
+    // `bw status` exits 0 with a stale key and says "locked": that is the CLI's word that the key went stale.
+    status: () =>
+      sessioned(
+        async (key) => statusOf(parsed(await run(["status"], { env: { BW_SESSION: key } }), statusWire)),
+        (status) => status.status !== "unlocked",
+      ),
     sync: async (options) => {
       if (options?.force !== true && now() - lastSyncAt < SYNC_EVERY_MS) return;
       const result = await withSession(["sync"]);

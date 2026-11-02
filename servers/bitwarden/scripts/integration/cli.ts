@@ -34,6 +34,26 @@ const run = (dir: string, args: readonly string[], env: Record<string, string> =
     child.on("close", (code) => resolve({ code: code ?? -1, stdout, stderr }));
   });
 
+/**
+ * What `bw status` says with each of two session keys after two unlocks of one data.json: the CLI stores the
+ * vault's key under the latest session key only, which is why the server unlocks once for every call waiting.
+ */
+export const staleAfterSecondUnlock = async (server: string, account: TestAccount): Promise<{ first: string; second: string }> => {
+  const dir = await mkdtemp(join(tmpdir(), "bw-twice-"));
+  const must = async (args: readonly string[], env: Record<string, string> = {}): Promise<string> => {
+    const result = await run(dir, args, env);
+    if (result.code !== 0) throw new Error(`bw ${args[0]}: ${(result.stderr || result.stdout).split("\n")[0]}`);
+    return result.stdout;
+  };
+  await must(["config", "server", server]);
+  await must(["login", "--apikey"], { BW_CLIENTID: account.clientId, BW_CLIENTSECRET: account.clientSecret });
+  const unlock = async (): Promise<string> => (await must(["unlock", "--passwordenv", "BW_MASTER_PASSWORD", "--raw"], { BW_MASTER_PASSWORD: account.masterPassword })).trim();
+  const first = await unlock();
+  const second = await unlock();
+  const statusWith = async (session: string): Promise<string> => (JSON.parse(await must(["status"], { BW_SESSION: session })) as { status: string }).status;
+  return { first: await statusWith(first), second: await statusWith(second) };
+};
+
 export type Reader = { readonly item: (id: string) => Promise<Record<string, unknown>> };
 
 export const makeReader = async (server: string, account: TestAccount): Promise<Reader> => {
