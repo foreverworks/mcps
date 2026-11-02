@@ -1,3 +1,5 @@
+import { join } from "node:path";
+
 import { describe, expect, it } from "vitest";
 
 import { envPath, stateDirOf, timeZoneOf } from "../src/env.js";
@@ -16,6 +18,10 @@ describe("stateDirOf", () => {
     expect(stateDirOf({ STATE_DIRECTORY: "/var/lib/a:/var/lib/b" }, "oblio", "OBLIO_STATE_DIR")).toBe("/var/lib/a");
     expect(stateDirOf({ XDG_STATE_HOME: "/x" }, "oblio", "OBLIO_STATE_DIR")).toBe("/x/mcps/oblio");
     expect(stateDirOf({ HOME: "/home/u" }, "oblio", "OBLIO_STATE_DIR")).toBe("/home/u/.local/state/mcps/oblio");
+    expect(stateDirOf({ HOME: "/home/u", APPDATA: "/appdata" }, "oblio", "OBLIO_STATE_DIR", "linux")).toBe("/home/u/.local/state/mcps/oblio");
+    expect(stateDirOf({ HOME: "/home/u", APPDATA: "/appdata" }, "oblio", "OBLIO_STATE_DIR", "win32")).toBe(join("/appdata", "mcps", "oblio"));
+    expect(stateDirOf({ HOME: "/home/u", APPDATA: "/appdata", XDG_STATE_HOME: "/x" }, "oblio", "OBLIO_STATE_DIR", "win32")).toBe("/x/mcps/oblio");
+    expect(stateDirOf({ HOME: "/home/u" }, "oblio", "OBLIO_STATE_DIR", "win32")).toBe("/home/u/.local/state/mcps/oblio");
   });
 });
 

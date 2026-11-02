@@ -13,7 +13,8 @@ import { join, resolve } from "node:path";
  * - STATE the server writes itself (token caches, grants it was given through
  *   its own consent tools, stores) has one default for every server:
  *   systemd's StateDirectory when the unit has one, else
- *   `$XDG_STATE_HOME/mcps/<server>` (`~/.local/state/mcps/<server>`). A stdio
+ *   `$XDG_STATE_HOME/mcps/<server>` (`~/.local/state/mcps/<server>`, or
+ *   `%APPDATA%\mcps\<server>` on Windows). A stdio
  *   user then needs no setup beyond their credentials, and a test, whose HOME is
  *   an empty temp dir (testing/isolate.ts), cannot reach anyone's state.
  */
@@ -30,12 +31,18 @@ export const unsetPath = (name: string): string => `${name} is not set; this ser
 /**
  * The directory a server writes its state in: its own variable when set, else
  * the unit's StateDirectory (the first, if systemd lists several), else the
- * user's XDG state directory.
+ * user's XDG state directory. On Windows, where nothing sets XDG_STATE_HOME, the
+ * default is `%APPDATA%\mcps\<server>`, the folder Windows keeps a user's
+ * application settings in.
  */
-export const stateDirOf = (env: NodeJS.ProcessEnv, server: string, variable: string): string =>
+export const stateDirOf = (env: NodeJS.ProcessEnv, server: string, variable: string, platform: NodeJS.Platform = process.platform): string =>
   envPath(env, variable) ??
   envPath({ STATE_DIRECTORY: env["STATE_DIRECTORY"]?.split(":")[0] }, "STATE_DIRECTORY") ??
-  join(envPath(env, "XDG_STATE_HOME") ?? join(env["HOME"]?.trim() || homedir(), ".local", "state"), "mcps", server);
+  join(envPath(env, "XDG_STATE_HOME") ?? userStateBase(env, platform), "mcps", server);
+
+/** Where a user's state goes when XDG_STATE_HOME is unset: `%APPDATA%` on Windows, `~/.local/state` elsewhere. */
+const userStateBase = (env: NodeJS.ProcessEnv, platform: NodeJS.Platform): string =>
+  (platform === "win32" ? envPath(env, "APPDATA") : undefined) ?? join(env["HOME"]?.trim() || homedir(), ".local", "state");
 
 /**
  * The IANA time zone a server reads calendar dates in: its own variable when

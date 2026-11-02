@@ -9,7 +9,7 @@ credentials, its accounts) are in its README, under Configuration.
 | What | Where the server finds it |
 |---|---|
 | A secret | In a file. A single secret (an API key, a password) is named by a variable ending in `_FILE` that holds its path; for a local stdio run, the same name without `_FILE` takes the value itself. A credential that is a JSON file or a folder of files is named by its path. The server's README says which. |
-| State it writes itself: token caches, grants given through its own consent tools, stores | `<SERVER>_STATE_DIR`, else systemd's `STATE_DIRECTORY` when the unit has one, else `$XDG_STATE_HOME/mcps/<server>`, which is `~/.local/state/mcps/<server>` by default. |
+| State it writes itself: token caches, grants given through its own consent tools, stores | `<SERVER>_STATE_DIR`, else systemd's `STATE_DIRECTORY` when the unit has one, else `$XDG_STATE_HOME/mcps/<server>`, which is `~/.local/state/mcps/<server>` by default (`%APPDATA%\mcps\<server>` on Windows). |
 | Files it hands back | Its outbox, named in its README: usually `<SERVER>_OUTBOX_DIR`, else an `outbox` folder in its state directory. |
 | The time zone of calendar dates | Its own `..._TIME_ZONE` variable where it has one, else the process's zone (`TZ`, else the system's). Servers for Romanian institutions (ANAF, ONRC, BNR) use Romania's zone. |
 | Which of its tools it serves, for a server with toolsets (google's products, porkbun's areas) | `<SERVER>_TOOLSETS` where it has toolsets: the toolsets to load, separated by commas. Unset, empty or `all` loads every one; the tools of the others are not registered at all. Its README lists the names. |
@@ -105,6 +105,7 @@ and in `_meta["foreverworks.com/access"]`.
 | `STATE_DIRECTORY` | Set by systemd for a unit with `StateDirectory=`: the default state directory (the first, when it lists several). |
 | `CREDENTIALS_DIRECTORY` | Set by systemd for a unit with `LoadCredential=`: where servers that read several named credentials look. |
 | `XDG_STATE_HOME` | The base of the default state directory outside systemd. |
+| `APPDATA` | Set by Windows: the base of the default state directory there, when `XDG_STATE_HOME` is not set. |
 
 ### Smoke scripts
 
