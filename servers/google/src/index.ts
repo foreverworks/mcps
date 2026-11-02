@@ -2,6 +2,7 @@
 import { packageIdentity, packageVersion, productIcons, serve } from "@foreverworks/mcp-kit";
 
 import { runHealthCheck } from "./cli/health.js";
+import { runSetupCommand } from "./cli/setup.js";
 import { buildRegistries } from "./composition.js";
 import { instructionsFor } from "./mcp/instructions.js";
 import { policyFor } from "./mcp/policy.js";
@@ -28,9 +29,13 @@ import { loadedToolsets, productsOf } from "./mcp/toolsets.js";
  * consent and Meet reach into other products' registries.
  */
 const main = async (): Promise<void> => {
-  // One binary, two modes. `--health [gmail|calendar|drive|editors|tasks|contacts|meet]` is for a scheduled
-  // check; it shares this server's composition, so the check can never drift from
-  // what the server itself would do.
+  // One binary, three modes. `setup` is the interactive setup for a person at a terminal;
+  // `--health [gmail|calendar|drive|editors|tasks|contacts|meet]` is for a scheduled check.
+  // Both share this server's composition, so neither can drift from what the server itself
+  // would do.
+  if (process.argv[2] === "setup") {
+    process.exit(await runSetupCommand());
+  }
   const at = process.argv.indexOf("--health");
   if (at !== -1) {
     process.exit(await runHealthCheck(process.argv[at + 1]));

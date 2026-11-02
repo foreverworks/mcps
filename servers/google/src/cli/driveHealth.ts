@@ -1,7 +1,7 @@
 import { OK, PERMANENT, verdictOf } from "@foreverworks/mcp-kit";
 
 import { checkHealth } from "../drive/app/usecases/health.js";
-import { buildDeps } from "../drive/composition.js";
+import { buildDeps, buildGrant } from "../drive/composition.js";
 import { asAppError, remedyFor } from "../drive/domain/errors.js";
 import { needsHuman } from "../domain/errors.js";
 
@@ -11,6 +11,12 @@ import { needsHuman } from "../domain/errors.js";
  * before reaching one. Drive holds one grant, so there is one account to report.
  */
 export const runDriveHealth = async (log: (line: string) => void, env: NodeJS.ProcessEnv): Promise<number> => {
+  // Nothing set up for Drive at all (no grant of its own, no rclone remote) is not a failure, as for
+  // Tasks, contacts and Meet: nothing that was working has stopped. A grant that is there and broken is.
+  if (buildGrant(env).grant().source === "none") {
+    log("DRIVE: ok Drive has no grant yet (begin_consent, product drive)");
+    return OK;
+  }
   try {
     const health = await checkHealth(buildDeps(env));
     const used = health.quotaUsedBytes === null ? "?" : `${(health.quotaUsedBytes / 1e9).toFixed(1)}G`;

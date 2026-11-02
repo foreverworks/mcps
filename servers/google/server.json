@@ -38,25 +38,6 @@
       },
       "environmentVariables": [
         {
-          "name": "GOOGLE_OAUTH_CLIENT_FILE",
-          "description": "Path of your OAuth client's JSON (a Desktop app client from the Google Cloud console).",
-          "isRequired": true,
-          "isSecret": false,
-          "format": "filepath"
-        },
-        {
-          "name": "GMAIL_ADDRESSES",
-          "description": "Each account's label and address, e.g. personal=ana@example.com,work=ana@example.org.",
-          "isRequired": true,
-          "isSecret": false
-        },
-        {
-          "name": "GMAIL_MODIFY_ACCOUNTS",
-          "description": "Where each mailbox's Gmail grant is kept, e.g. personal=/path/to/grants/gmail-personal.json; consent writes it there. Without it the other products work, but no mailbox does.",
-          "isRequired": true,
-          "isSecret": false
-        },
-        {
           "name": "CALENDAR_TIME_ZONE",
           "description": "The time zone a time without an offset is read in, e.g. Europe/Paris.",
           "isRequired": false,

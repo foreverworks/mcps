@@ -9,24 +9,6 @@
     "maturity": "stable",
     "tagline": "Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts.",
     "inputs": {
-      "GOOGLE_OAUTH_CLIENT_FILE": {
-        "title": "OAuth client file",
-        "type": "file",
-        "required": true,
-        "description": "Path of your OAuth client's JSON (a Desktop app client from the Google Cloud console)."
-      },
-      "GMAIL_ADDRESSES": {
-        "title": "Accounts and their addresses",
-        "type": "text",
-        "required": true,
-        "description": "Each account's label and address, e.g. personal=ana@example.com,work=ana@example.org."
-      },
-      "GMAIL_MODIFY_ACCOUNTS": {
-        "title": "Where Gmail grants are kept",
-        "type": "text",
-        "required": true,
-        "description": "Where each mailbox's Gmail grant is kept, e.g. personal=/path/to/grants/gmail-personal.json; consent writes it there. Without it the other products work, but no mailbox does."
-      },
       "CALENDAR_TIME_ZONE": {
         "title": "Calendar time zone",
         "type": "text",

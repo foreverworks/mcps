@@ -193,11 +193,11 @@ describe("health verdicts", () => {
     }
   });
 
-  it("checks calendar alone when asked, with its own prefix", async () => {
+  it("checks calendar alone when asked, with its own prefix, and passes it with no calendar set up, as every product", async () => {
     const env = await envWith();
     const lines: string[] = [];
-    expect(await runHealthCheck("calendar", (line) => lines.push(line), env)).toBe(PERMANENT);
-    expect(lines).toEqual([expect.stringMatching(/^CALENDAR: FAIL no account has a grant under /)]);
+    expect(await runHealthCheck("calendar", (line) => lines.push(line), env)).toBe(OK);
+    expect(lines).toEqual([expect.stringMatching(/^CALENDAR: ok no account has a calendar grant yet under /)]);
   });
 });
 

@@ -20,7 +20,7 @@ import * as gmail from "../gmail/mcp/controllers/accounts.js";
 import { describeThrown as describeGmail } from "../gmail/domain/errors.js";
 import { listed } from "../domain/words.js";
 import { handled } from "./envelope.js";
-import type { Toolset } from "./policy.js";
+import { GRANT_TOOLSETS, type Toolset } from "./policy.js";
 
 /**
  * One product's section, or why it has none. A product whose configuration is
@@ -51,7 +51,7 @@ type Section = "gmail" | "calendar" | "drive" | "editors" | "tasks" | "contacts"
  */
 const SECTIONS: Readonly<Record<Section, { readonly toolsets: readonly Toolset[]; readonly listed?: string; readonly checked?: string }>> = {
   gmail: {
-    toolsets: ["gmail"],
+    toolsets: GRANT_TOOLSETS.gmail,
     listed:
       "Under `gmail`: the mailboxes, which one a tool uses when no account is given, and which grant each runs on: " +
       "`modify` (its own; the write tools work) or `readonly` (a read-only grant; the write tools refuse).",
@@ -61,19 +61,19 @@ const SECTIONS: Readonly<Record<Section, { readonly toolsets: readonly Toolset[]
       "hold its own gmail.modify grant and a gmail.readonly one, and `activeGrant` is the one the tools use.",
   },
   calendar: {
-    toolsets: ["calendar"],
+    toolsets: GRANT_TOOLSETS.calendar,
     listed: "Under `calendar`: the accounts whose calendars it reaches, the address each grant must resolve to, and the time zone.",
     checked:
       "Under `calendar`: that the grant refreshes, which account it resolves to (the consent screen offers every account " +
       "signed in), and whether it carries the scopes the tools need.",
   },
   drive: {
-    toolsets: ["drive"],
+    toolsets: GRANT_TOOLSETS.drive,
     listed: "Under `drive`: which grant Drive runs on (its own once begin_consent made one, else an rclone remote's when one is configured).",
     checked: "Under `drive`: which account the grant acts as and the storage used.",
   },
   editors: {
-    toolsets: ["docs", "sheets", "slides", "collaboration"],
+    toolsets: GRANT_TOOLSETS.editors,
     listed:
       "Under `editors`: the accounts Docs, Sheets and Slides can act as (one may run on the Drive grant; any other needs " +
       "a grant made with begin_consent).",
@@ -81,9 +81,9 @@ const SECTIONS: Readonly<Record<Section, { readonly toolsets: readonly Toolset[]
       "Under `editors` (Docs, Sheets, Slides), per account: the address, the granted scopes, and whether each of the three " +
       "APIs is enabled in the grant's Cloud project.",
   },
-  tasks: { toolsets: ["tasks"] },
-  contacts: { toolsets: ["contacts"] },
-  meet: { toolsets: ["meet"] },
+  tasks: { toolsets: GRANT_TOOLSETS.tasks },
+  contacts: { toolsets: GRANT_TOOLSETS.contacts },
+  meet: { toolsets: GRANT_TOOLSETS.meet },
 };
 
 /** The one-grant-per-account products, and what list_accounts says each grant is for. */
@@ -118,6 +118,7 @@ const checkedDescription = (sections: readonly Section[]): string => {
           `Under ${listed(grants.map((s) => `\`${s}\``), "and")}, per account with a grant: the address, the granted scopes, and whether ` +
             `the API answers (\`disabled\` when its Cloud project has not enabled it)${grants.includes("contacts") ? "; contacts also says which sources it reads" : ""}.`,
         ]),
+    "Under `config`: where the state directory, the OAuth client, the mailboxes and each account's address come from (a variable, or what setup or a consent saved; a variable that is set wins).",
     "Checks EVERY account by default. Run this before concluding the server is broken, and before retrying a write that refused.",
   ].join(" ");
 };
@@ -177,7 +178,7 @@ export const registerAccounts = (server: McpServer, registries: Registries, load
     },
     handled(async (args: { account: string }) => {
       const checked = await Promise.all(sections.map(async (s) => [s, await CHECK[s](registries, args.account)] as const));
-      return { ...Object.fromEntries(checked), allOk: checked.every(([, c]) => allOk(c)) };
+      return { ...Object.fromEntries(checked), config: registries.config(), allOk: checked.every(([, c]) => allOk(c)) };
     }),
   );
 };

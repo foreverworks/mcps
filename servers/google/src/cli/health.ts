@@ -1,5 +1,8 @@
 import { inSeries, PERMANENT, worst } from "@foreverworks/mcp-kit";
 
+import { configLines } from "../configReport.js";
+import { buildRegistries } from "../composition.js";
+import { asAppError } from "../domain/errors.js";
 import { runCalendarHealth } from "./calendarHealth.js";
 import { runDriveHealth } from "./driveHealth.js";
 import { runEditorsHealth } from "./editorsHealth.js";
@@ -11,7 +14,8 @@ import { runContactsHealth, runMeetHealth, runTasksHealth } from "./grantHealth.
  *
  * The products keep separate checks and separate line prefixes so a scheduled
  * check can report them separately: each has its own grant and its own fix.
- * All at once is for a human at a terminal.
+ * All at once is for a human at a terminal, and starts with `CONFIG:` lines
+ * saying where each setting came from.
  */
 const PRODUCTS = {
   gmail: runGmailHealth,
@@ -33,6 +37,12 @@ export const runHealthCheck = async (
   env: NodeJS.ProcessEnv = process.env,
 ): Promise<number> => {
   if (product === undefined) {
+    // For a person at a terminal: where each setting came from, before the checks that use them.
+    try {
+      for (const line of configLines(buildRegistries(env).config())) log(line);
+    } catch (thrown) {
+      log(`CONFIG: FAIL ${asAppError(thrown)?.message ?? String(thrown)}`);
+    }
     return worst(await inSeries(Object.values(PRODUCTS), (run) => run(log, env)));
   }
   if (!isProduct(product)) {

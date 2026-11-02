@@ -6,7 +6,8 @@ import { configError, fail } from "../domain/errors.js";
 import type { Paths } from "../app/ports.js";
 
 import { LABEL } from "../../domain/accounts.js";
-import { googleStateDir } from "../../infra/locations.js";
+import { discoverGrants, type GrantFs, realFs } from "../../grants/registry.js";
+import { gmailGrantRootOf, googleStateDir } from "../../infra/locations.js";
 
 export { ALL_ACCOUNTS } from "../../domain/accounts.js";
 
@@ -31,10 +32,19 @@ export type Resolved = {
    * to say who it is.
    */
   readonly addresses: ReadonlyMap<string, string>;
+  /** Where each address came from: GMAIL_ADDRESSES, or the grant file whose consent recorded it. */
+  readonly addressFrom: ReadonlyMap<string, string>;
+  /**
+   * Where a mailbox's grant is found and a consent writes it, when
+   * GMAIL_MODIFY_ACCOUNTS does not say: `<root>/<label>/credentials.json`.
+   * Undefined while that variable lists the mailboxes.
+   */
+  readonly grantRoot?: string;
 };
 
 /** What a call says when no mailbox is configured at all. */
-export const NO_MAILBOX = "no mailbox is configured: set GMAIL_MODIFY_ACCOUNTS (label=path of each account's gmail.modify grant), GMAIL_ACCOUNTS, or both";
+export const NO_MAILBOX =
+  "no mailbox is set up: run `npx @foreverworks/mcp-google setup` in a terminal, or begin_consent for gmail, or set GMAIL_MODIFY_ACCOUNTS (label=path of each account's gmail.modify grant), GMAIL_ACCOUNTS, or both";
 
 /**
  * An account's state, and where its attachments land: GMAIL_ATTACHMENTS_DIR/<label> when set (a
@@ -83,14 +93,24 @@ export const parsePairs = (spec: string, what: string): readonly (readonly [stri
  *   GMAIL_STATE_DIR         the token caches, <dir>/<label>/
  *   GMAIL_DEFAULT_ACCOUNT   the account a read uses when none is named; else the first
  *
- * An account is any label in either of the first two. None at all is a
- * server whose Gmail tools answer with a config error naming these.
+ * An account is any label in either of the first two. With
+ * GMAIL_MODIFY_ACCOUNTS unset, the modify grants are the ones consent (or
+ * `setup`) wrote under `<state>/gmail/<label>/credentials.json`, and each
+ * mailbox's address is the one its grant recorded, unless GMAIL_ADDRESSES
+ * names another: a variable that is set always wins. None at all is a server
+ * whose Gmail tools answer with a config error naming these.
  */
-export const resolveAccounts = (env: NodeJS.ProcessEnv = process.env): Resolved => {
+export const resolveAccounts = (env: NodeJS.ProcessEnv = process.env, fs: GrantFs = realFs): Resolved => {
   const stateRoot = envPath(env, "GMAIL_STATE_DIR") ?? join(googleStateDir(env), "gmail", "state");
   const readonly = new Map(parsePairs(env["GMAIL_ACCOUNTS"]?.trim() ?? "", "GMAIL_ACCOUNTS"));
-  const modify = new Map(parsePairs(env["GMAIL_MODIFY_ACCOUNTS"]?.trim() ?? "", "GMAIL_MODIFY_ACCOUNTS"));
-  const addresses = new Map(parsePairs(env["GMAIL_ADDRESSES"]?.trim() ?? "", "GMAIL_ADDRESSES"));
+  const listed = env["GMAIL_MODIFY_ACCOUNTS"]?.trim() ?? "";
+  const grantRoot = listed ? undefined : gmailGrantRootOf(env);
+  const found = grantRoot ? discoverGrants(grantRoot, fs) : [];
+  const modify = grantRoot ? new Map(found.map((g) => [g.label, g.credentials] as const)) : new Map(parsePairs(listed, "GMAIL_MODIFY_ACCOUNTS"));
+  const configured = parsePairs(env["GMAIL_ADDRESSES"]?.trim() ?? "", "GMAIL_ADDRESSES");
+  const recorded = found.flatMap((g) => (g.address ? [[g.label, g.address, g.credentials] as const] : []));
+  const addresses = new Map([...recorded.map(([label, address]) => [label, address] as const), ...configured]);
+  const addressFrom = new Map([...recorded.map(([label, , file]) => [label, file] as const), ...configured.map(([label]) => [label, "GMAIL_ADDRESSES"] as const)]);
   const labels = [...new Set([...readonly.keys(), ...modify.keys()])];
 
   const accounts = labels.map((label): AccountSpec => {
@@ -109,5 +129,5 @@ export const resolveAccounts = (env: NodeJS.ProcessEnv = process.env): Resolved 
   const wanted = env["GMAIL_DEFAULT_ACCOUNT"]?.trim();
   if (wanted && !labels.includes(wanted)) return fail(configError(`GMAIL_DEFAULT_ACCOUNT "${wanted}" is not registered`));
 
-  return { accounts, defaultLabel: wanted || labels[0] || "", addresses };
+  return { accounts, defaultLabel: wanted || labels[0] || "", addresses, addressFrom, ...(grantRoot ? { grantRoot } : {}) };
 };

@@ -104,7 +104,7 @@ describe("GOOGLE_TOOLSETS=gmail,calendar", () => {
     const listed = parse(await client.callTool({ name: "list_accounts", arguments: {} }));
     expect(Object.keys(listed)).toEqual(["gmail", "calendar"]);
     const checked = parse(await client.callTool({ name: "health", arguments: {} }));
-    expect(Object.keys(checked)).toEqual(["gmail", "calendar", "allOk"]);
+    expect(Object.keys(checked)).toEqual(["gmail", "calendar", "config", "allOk"]);
     const described = (await client.listTools()).tools.filter((t) => t.name === "list_accounts" || t.name === "health").map((t) => t.description ?? "");
     for (const description of described) {
       expect(description).toMatch(/Under `gmail`/);

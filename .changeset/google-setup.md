@@ -1,0 +1,9 @@
+---
+"@foreverworks/mcp-google": minor
+---
+
+`npx -y @foreverworks/mcp-google setup` sets the server up from nothing, in a terminal. It asks which products and accounts to connect, creates the Google Cloud project and enables its APIs through gcloud when gcloud is signed in (otherwise it opens one console link that enables them all), opens each Google Auth Platform page with what to choose and the exact scopes to add, picks up the client file you download and keeps it readable only by you, and runs each approval in your browser with Google's redirect received on `127.0.0.1`. Each account's address is learned from its first approval. At the end it prints the command that adds the server to your client.
+
+The server now needs no variables: `claude mcp add google -- npx -y @foreverworks/mcp-google` is the whole install line. Without `GOOGLE_OAUTH_CLIENT_FILE` it uses the client setup saved in its state directory; without `GMAIL_MODIFY_ACCOUNTS` every `gmail/<label>/credentials.json` there is a mailbox, found on each call like the other products' grants; without `GMAIL_ADDRESSES` each account's address is the one its grant recorded. A variable that is set still wins, so a configuration that lists its paths works as before. `health` has a `config` section, and `--health` with no product starts with `CONFIG:` lines, saying where the state directory, the OAuth client, the mailboxes and each account's address came from. The VS Code and Claude Desktop installs no longer ask for those three settings.
+
+`--health` passes a product nobody has set up yet, saying so, as it already did for Tasks, contacts and Meet: Gmail, Calendar, Drive and Docs, Sheets and Slides no longer fail it just for having no grant, so a server set up for some products checks clean. A grant that exists and does not work still fails it.

@@ -1,21 +1,16 @@
 import type { Registry as CalendarRegistry } from "../../calendar/composition.js";
 import type { Registry as ContactsRegistry } from "../../contacts/composition.js";
-import { OPTIONAL_SCOPES as CONTACTS_OPTIONAL, REQUIRED_SCOPES as CONTACTS_REQUIRED } from "../../contacts/domain/grants.js";
 import type { Registry as MeetRegistry } from "../../meet/composition.js";
-import { REQUIRED_SCOPES as MEET_REQUIRED } from "../../meet/domain/grants.js";
 import type { Registry as TasksRegistry } from "../../tasks/composition.js";
-import { REQUIRED_SCOPES as TASKS_REQUIRED } from "../../tasks/domain/grants.js";
-import { CALENDAR_EVENTS, CALENDAR_EVENTS_FREEBUSY, CALENDAR_LIST_READONLY } from "../../calendar/domain/grants.js";
 import type { DriveGrant } from "../../drive/composition.js";
 import type { Editors } from "../../editors/composition.js";
-import { NARROW_SCOPES } from "../../editors/domain/grants.js";
 import type { Registry as GmailRegistry } from "../../gmail/composition.js";
-import { GMAIL_MODIFY, GMAIL_SETTINGS_BASIC } from "../../gmail/domain/grants.js";
 import type { ClientConfig } from "../../domain/credentials.js";
-import { DRIVE } from "../../domain/scopes.js";
 import { readClient } from "../../infra/credentials.js";
+import type { ClientSource } from "../../infra/locations.js";
 import type { Target } from "../app/ports.js";
 import type { ConsentProduct } from "../domain/consent.js";
+import { CONSENT_SCOPES } from "../domain/products.js";
 import { configError, fail, inputError } from "../domain/errors.js";
 
 /** The registries that know where each product keeps each account's grant. */
@@ -27,11 +22,14 @@ export type Directory = {
   readonly tasks: TasksRegistry;
   readonly contacts: ContactsRegistry;
   readonly meet: MeetRegistry;
-  /** GOOGLE_OAUTH_CLIENT_FILE: the OAuth client new grants are made on, when the deployment names one. */
-  readonly oauthClient?: string | undefined;
+  /** The OAuth client new grants are made on, when the deployment names one or setup saved one; asked when a consent begins. */
+  readonly oauthClient: () => ClientSource | undefined;
 };
 
-const NO_CLIENT = "set GOOGLE_OAUTH_CLIENT_FILE to the OAuth client JSON downloaded from the Google Cloud console (a Desktop app client)";
+const NO_CLIENT = "run `npx @foreverworks/mcp-google setup`, or set GOOGLE_OAUTH_CLIENT_FILE to the OAuth client JSON downloaded from the Google Cloud console (a Desktop app client)";
+
+/** An address, and what said it: GMAIL_ADDRESSES, or the grant file whose consent recorded it. */
+export type KnownAddress = { readonly address: string; readonly from: string };
 
 /**
  * Where a consent's grant goes, per product, read from the registries the
@@ -53,23 +51,33 @@ const NO_CLIENT = "set GOOGLE_OAUTH_CLIENT_FILE to the OAuth client JSON downloa
  *   meet      <meet root>/<account>/credentials.json                           meetings.space.readonly
  *
  * The address a consent must be approved as is the one configured for the
- * account (GMAIL_ADDRESSES first, then the address an earlier grant recorded).
- * The client is GOOGLE_OAUTH_CLIENT_FILE's when it is set, else the one in any
- * credentials file the account already has (Drive's: its own grant's, else
- * the rclone remote's).
+ * account (GMAIL_ADDRESSES first, then the address an earlier grant recorded);
+ * an account nothing knows yet has none, and only a consent begun to learn it
+ * (setup's) may go ahead without one. The client is GOOGLE_OAUTH_CLIENT_FILE's
+ * when it is set, else the one setup saved, else the one in any credentials
+ * file the account already has (Drive's: its own grant's, else the rclone
+ * remote's).
  */
 export const makeTargets = (dir: Directory) => {
-  const addressOf = (account: string): string =>
-    dir.gmail.addressOf(account) ??
-    dir.calendar.specOf(account)?.address ??
-    [dir.tasks, dir.contacts, dir.meet].map((r) => r.specOf(account)?.address).find((a) => a !== undefined) ??
-    dir.editors.specs().flatMap((s) => (s.label === account && s.source === "credentials" && s.address ? [s.address] : []))[0] ??
-    fail(configError(`no address is known for "${account}": add ${account}=<address> to GMAIL_ADDRESSES so a consent can be checked against it`));
+  /** The account's address and its source, in the order they are trusted; undefined when nothing knows it yet. */
+  const knownAddress = (account: string): KnownAddress | undefined => {
+    const gmail = dir.gmail.addressOf(account);
+    if (gmail) return { address: gmail, from: dir.gmail.addressFromOf(account) ?? "GMAIL_ADDRESSES" };
+    const specs = [dir.calendar, dir.tasks, dir.contacts, dir.meet].map((r) => r.specOf(account));
+    const spec = specs.find((s) => s?.address !== undefined);
+    if (spec?.address) return { address: spec.address, from: spec.credentials };
+    return dir.editors
+      .specs()
+      .flatMap((s) => (s.label === account && s.source === "credentials" && s.address ? [{ address: s.address, from: s.credentials }] : []))[0];
+  };
+  const addressOf = (account: string): string | undefined => knownAddress(account)?.address;
 
-  /** The deployment's client, when it names one. */
+  /** The deployment's client, or setup's, when there is one. */
   const configured = async (): Promise<ClientConfig | undefined> => {
-    if (dir.oauthClient === undefined) return undefined;
-    return (await readClient(dir.oauthClient)) ?? fail(configError(`GOOGLE_OAUTH_CLIENT_FILE (${dir.oauthClient}) holds no OAuth client (client_id and client_secret)`));
+    const source = dir.oauthClient();
+    if (source === undefined) return undefined;
+    const what = source.from === "setup" ? "the OAuth client setup saved" : "GOOGLE_OAUTH_CLIENT_FILE";
+    return (await readClient(source.path)) ?? fail(configError(`${what} (${source.path}) holds no OAuth client (client_id and client_secret)`));
   };
 
   /** The configured client, else the one the account's existing credentials files carry, in the order they are trusted. */
@@ -94,16 +102,23 @@ export const makeTargets = (dir: Directory) => {
   };
 
   const gmail = (account: string): Target => {
-    const spec = dir.gmail.specOf(account) ?? fail(configError(`"${account}" is not a mailbox here: add ${account}=<path> to GMAIL_MODIFY_ACCOUNTS`));
-    return {
-      product: "gmail",
-      account,
-      address: addressOf(account),
-      scopes: [GMAIL_MODIFY, GMAIL_SETTINGS_BASIC],
-      credentialsPath: spec.modify ?? fail(configError(`"${account}" has no modify grant path: add ${account}=<path> to GMAIL_MODIFY_ACCOUNTS`)),
-      client: clientOf(account),
-      forget: () => dir.gmail.forget(account, "modify"),
-    };
+    const credentialsPath =
+      dir.gmail.modifyPathOf(account) ??
+      fail(
+        configError(
+          dir.gmail.specOf(account)
+            ? `"${account}" has no modify grant path: add ${account}=<path> to GMAIL_MODIFY_ACCOUNTS`
+            : `"${account}" is not a mailbox here: add ${account}=<path> to GMAIL_MODIFY_ACCOUNTS`,
+        ),
+      );
+    return { ...scoped("gmail", account), credentialsPath, client: clientOf(account), forget: () => dir.gmail.forget(account, "modify") };
+  };
+
+  /** What every target says about its product and account: who must approve, and what it asks for. */
+  const scoped = (product: ConsentProduct, account: string) => {
+    const { required, optional } = CONSENT_SCOPES[product];
+    const address = addressOf(account);
+    return { product, account, ...(address ? { address } : {}), scopes: required, ...(optional.length ? { optionalScopes: optional } : {}) };
   };
 
   /**
@@ -117,10 +132,7 @@ export const makeTargets = (dir: Directory) => {
       return fail(inputError(`Drive's grant is the "${bound}" account's (GOOGLE_EDITORS_DRIVE_ACCOUNT), not "${account}"`));
     }
     return {
-      product: "drive",
-      account,
-      address: addressOf(account),
-      scopes: [DRIVE],
+      ...scoped("drive", account),
       credentialsPath: dir.drive.credentials,
       client: async () => (await configured()) ?? dir.drive.client(),
       // One token provider serves Drive and the editors account that runs on it.
@@ -128,56 +140,50 @@ export const makeTargets = (dir: Directory) => {
     };
   };
 
-  /** A product holding one grant per account under its root (src/grants/registry.ts). */
+  /** A product holding one grant per account under its root (src/grants/registry.ts), Calendar and the editors included. */
   const grantTarget = (
     product: ConsentProduct,
     account: string,
     registry: { readonly credentialsPath: (label: string) => string; readonly forget: (label: string) => Promise<void> },
-    scopes: readonly string[],
-    optionalScopes: readonly string[] = [],
   ): Target => ({
-    product,
-    account,
-    address: addressOf(account),
-    scopes,
-    ...(optionalScopes.length ? { optionalScopes } : {}),
+    ...scoped(product, account),
     credentialsPath: registry.credentialsPath(account),
     client: clientOf(account),
     forget: () => registry.forget(account),
   });
 
-  return async (product: ConsentProduct, account: string): Promise<Target> => {
+  const target = async (product: ConsentProduct, account: string): Promise<Target> => {
     switch (product) {
       case "gmail":
         return gmail(account);
       case "drive":
         return drive(account);
       case "calendar":
-        return {
-          product,
-          account,
-          address: addressOf(account),
-          scopes: [CALENDAR_EVENTS, CALENDAR_LIST_READONLY, CALENDAR_EVENTS_FREEBUSY],
-          credentialsPath: dir.calendar.credentialsPath(account),
-          client: clientOf(account),
-          forget: () => dir.calendar.forget(account),
-        };
+        return grantTarget(product, account, dir.calendar);
       case "editors":
-        return {
-          product,
-          account,
-          address: addressOf(account),
-          scopes: NARROW_SCOPES,
-          credentialsPath: dir.editors.credentialsPath(account),
-          client: clientOf(account),
-          forget: () => dir.editors.forget(account),
-        };
+        return grantTarget(product, account, dir.editors);
       case "tasks":
-        return grantTarget(product, account, dir.tasks, TASKS_REQUIRED);
+        return grantTarget(product, account, dir.tasks);
       case "contacts":
-        return grantTarget(product, account, dir.contacts, CONTACTS_REQUIRED, CONTACTS_OPTIONAL);
+        return grantTarget(product, account, dir.contacts);
       case "meet":
-        return grantTarget(product, account, dir.meet, MEET_REQUIRED);
+        return grantTarget(product, account, dir.meet);
     }
   };
+
+  /**
+   * Every account any product knows, with its address and where that address
+   * came from, by name: what health reports as the accounts' configuration.
+   */
+  const known = (): readonly (readonly [string, KnownAddress | undefined])[] => {
+    const labels = new Set([
+      ...dir.gmail.labels,
+      ...dir.gmail.addressed(),
+      ...[dir.calendar, dir.tasks, dir.contacts, dir.meet].flatMap((r) => r.labels),
+      ...dir.editors.specs().map((s) => s.label),
+    ]);
+    return [...labels].sort((a, b) => a.localeCompare(b)).map((label) => [label, knownAddress(label)] as const);
+  };
+
+  return { target, known };
 };

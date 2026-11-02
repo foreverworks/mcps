@@ -11,8 +11,8 @@ import type { ConsentProduct, Pending } from "../domain/consent.js";
 export type Target = {
   readonly product: ConsentProduct;
   readonly account: string;
-  /** The address the approving Google account must have. */
-  readonly address: string;
+  /** The address the approving Google account must have; undefined while nothing knows it (an account setup is adding). */
+  readonly address?: string;
   /** Every scope the product needs; a grant without one is refused. */
   readonly scopes: readonly string[];
   /** Scopes asked for as well, which the grant may come back without: what only some accounts can give (a Workspace directory). */
@@ -33,6 +33,8 @@ export type PendingStore = {
 
 export type Deps = {
   readonly target: (product: ConsentProduct, account: string) => Promise<Target>;
+  /** Every account any product knows, with its address and where that came from (health's configuration section). */
+  readonly known: () => readonly (readonly [string, { readonly address: string; readonly from: string } | undefined])[];
   readonly pending: PendingStore;
   readonly exchange: (client: ClientConfig, code: string, redirectUri: string, verifier: string) => Promise<Granted>;
   /** What Google says about an access token: who it belongs to. */

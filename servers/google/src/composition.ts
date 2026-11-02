@@ -15,6 +15,7 @@ import { buildRegistry as buildSlides, type Registry as SlidesRegistry } from ".
 import { tasksDue } from "./tasks/app/usecases.js";
 import { buildRegistry as buildTasks, type Registry as TasksRegistry } from "./tasks/composition.js";
 import { reconsent } from "./domain/errors.js";
+import { type ConfigReport, configReport } from "./configReport.js";
 
 export type Registries = {
   readonly gmail: GmailRegistry;
@@ -36,6 +37,8 @@ export type Registries = {
   readonly meet: MeetRegistry;
   /** Consent through the server: where each product's grant goes, and the consents waiting for their redirect. */
   readonly consent: ConsentDeps;
+  /** Where the configuration came from, read when asked: health's `config` section. */
+  readonly config: () => ConfigReport;
 };
 
 /** The agenda's tasks: the accounts it reads that have a Tasks grant. */
@@ -95,6 +98,7 @@ export const buildRegistries = (env: NodeJS.ProcessEnv = process.env): Registrie
   const calendar = buildCalendar(env, { tasksDue: tasksDueFor(tasks) });
   const contacts = buildContacts(env);
   const meet = buildMeet(env, eventReader(calendar));
+  const consent = buildConsent(env, { gmail, calendar, editors, drive: grant, tasks, contacts, meet });
   return {
     gmail,
     calendar,
@@ -107,6 +111,7 @@ export const buildRegistries = (env: NodeJS.ProcessEnv = process.env): Registrie
     sheets: buildSheets(editors),
     slides: buildSlides(editors),
     collaboration: buildCollaboration(editors),
-    consent: buildConsent(env, { gmail, calendar, editors, drive: grant, tasks, contacts, meet }),
+    consent,
+    config: () => configReport(env, gmail, consent),
   };
 };

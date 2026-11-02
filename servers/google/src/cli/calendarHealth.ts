@@ -34,12 +34,10 @@ const verdictFor = async (deps: Deps, log: (line: string) => void): Promise<numb
 };
 
 /** Every account, or the fault that stopped the registry from building or left it empty. */
-const accountsOf = (env: NodeJS.ProcessEnv): readonly Deps[] | { readonly fault: string } => {
+const accountsOf = (env: NodeJS.ProcessEnv): readonly Deps[] | { readonly fault: string } | { readonly none: string } => {
   try {
     const registry = buildRegistry(env);
-    return registry.labels.length === 0
-      ? { fault: `no account has a grant under ${registry.root}` }
-      : registry.labels.map((label) => registry.get(label));
+    return registry.labels.length === 0 ? { none: registry.root } : registry.labels.map((label) => registry.get(label));
   } catch (thrown) {
     const error = asAppError(thrown);
     return { fault: `registry ${error ? error.message : String(thrown)}` };
@@ -51,6 +49,11 @@ export const runCalendarHealth = async (log: (line: string) => void, env: NodeJS
   if ("fault" in accounts) {
     log(`CALENDAR: FAIL ${accounts.fault}`);
     return PERMANENT;
+  }
+  // No calendar set up at all is not a failure, as for every other product: nothing that was working has stopped.
+  if ("none" in accounts) {
+    log(`CALENDAR: ok no account has a calendar grant yet under ${accounts.none} (begin_consent, product calendar)`);
+    return OK;
   }
   return worst(await inSeries(accounts, (deps) => verdictFor(deps, log)));
 };

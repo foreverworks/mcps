@@ -5,7 +5,8 @@ import type { Deps, GrantHandle } from "./app/ports.js";
 import { configError, fail } from "./domain/errors.js";
 import { MAX_ATTACHMENTS_BYTES } from "./domain/compose.js";
 import type { GrantRole } from "./domain/grants.js";
-import { ALL_ACCOUNTS, type AccountSpec, NO_MAILBOX, resolveAccounts } from "./infra/accounts.js";
+import { ALL_ACCOUNTS, type AccountSpec, NO_MAILBOX, type Resolved, resolveAccounts } from "./infra/accounts.js";
+import { credentialsPathOf, type GrantFs, realFs } from "../grants/registry.js";
 import { loadCredentials } from "../infra/credentials.js";
 import { makeFiles } from "./infra/files.js";
 import { makeGmailApi } from "./infra/gmailApi.js";
@@ -87,8 +88,20 @@ export type Registry = {
   readonly inputFiles: InputFiles;
   /** What the registry says about one account (its grant files, its address), or undefined. */
   readonly specOf: (label: string) => AccountSpec | undefined;
-  /** The address GMAIL_ADDRESSES gives a label, whether or not it is a mailbox here. */
+  /** The address GMAIL_ADDRESSES gives a label (whether or not it is a mailbox here), else the one its grant recorded. */
   readonly addressOf: (label: string) => string | undefined;
+  /** Where that address came from: GMAIL_ADDRESSES, or the grant file that recorded it. */
+  readonly addressFromOf: (label: string) => string | undefined;
+  /** Every label with an address, mailbox or not. */
+  readonly addressed: () => readonly string[];
+  /**
+   * Where the account's own gmail.modify grant is, or goes when a consent
+   * writes it: GMAIL_MODIFY_ACCOUNTS' path, else `<root>/<label>/credentials.json`
+   * when that variable is unset. Undefined for a label the variable leaves out.
+   */
+  readonly modifyPathOf: (label: string) => string | undefined;
+  /** The folder mailboxes are found in when GMAIL_MODIFY_ACCOUNTS does not list them. */
+  readonly grantRoot?: string;
   /**
    * One of the account's grants was replaced (a consent): drop what was built on
    * it and that grant's cached token. The next call chooses the active grant
@@ -105,15 +118,22 @@ export type Registry = {
  * server from starting and serving the other — the failure belongs to the call
  * that touches it. Kept, because the token cache lives inside the bundle and
  * rebuilding it per call would re-read and re-refresh on every tool use.
+ *
+ * Where GMAIL_MODIFY_ACCOUNTS lists the mailboxes, the list is read once. Without
+ * it, a mailbox is a grant on disk, found again on every lookup as Calendar's
+ * are, so a consent needs no restart.
  */
-export const buildRegistry = (env: NodeJS.ProcessEnv = process.env): Registry => {
-  const { accounts, defaultLabel, addresses } = resolveAccounts(env);
+export const buildRegistry = (env: NodeJS.ProcessEnv = process.env, fs: GrantFs = realFs): Registry => {
+  // Read once here whatever the mode, so a malformed variable stops the process at start.
+  const first = resolveAccounts(env, fs);
+  const current = (): Resolved => (first.grantRoot ? resolveAccounts(env, fs) : first);
   const readInput = inputFilesFrom(env, { maxBytes: MAX_ATTACHMENTS_BYTES });
   // The readers' zone: Gmail's own, else the one the calendar already reads times in, else the process's.
   const timeZone = timeZoneOf(env, env["GMAIL_TIME_ZONE"]?.trim() ? "GMAIL_TIME_ZONE" : "CALENDAR_TIME_ZONE");
   const built = new Map<string, Deps>();
 
   const get = (label?: string): Deps => {
+    const { accounts, defaultLabel } = current();
     if (accounts.length === 0) return fail(configError(NO_MAILBOX));
     const wanted = label?.trim() || defaultLabel;
     if (wanted === ALL_ACCOUNTS) return fail(configError(`this tool takes one account, not "${ALL_ACCOUNTS}"`));
@@ -128,20 +148,31 @@ export const buildRegistry = (env: NodeJS.ProcessEnv = process.env): Registry =>
     return deps;
   };
 
+  const specOf = (label: string) => current().accounts.find((a) => a.label === label);
+
   return {
     inputFiles: readInput,
-    labels: accounts.map((a) => a.label),
-    defaultLabel,
+    get labels() {
+      return current().accounts.map((a) => a.label);
+    },
+    get defaultLabel() {
+      return current().defaultLabel;
+    },
     get,
     select: (label?: string) => {
       if (label?.trim() !== ALL_ACCOUNTS) return [get(label)];
+      const { accounts } = current();
       return accounts.length === 0 ? fail(configError(NO_MAILBOX)) : accounts.map((a) => get(a.label));
     },
-    specOf: (label) => accounts.find((a) => a.label === label),
-    addressOf: (label) => addresses.get(label),
+    specOf,
+    addressOf: (label) => current().addresses.get(label),
+    addressFromOf: (label) => current().addressFrom.get(label),
+    addressed: () => [...current().addresses.keys()],
+    modifyPathOf: (label) => specOf(label)?.modify ?? (first.grantRoot ? credentialsPathOf(first.grantRoot, label) : undefined),
+    ...(first.grantRoot ? { grantRoot: first.grantRoot } : {}),
     forget: async (label, role) => {
       built.delete(label);
-      const spec = accounts.find((a) => a.label === label);
+      const spec = specOf(label);
       if (spec) await tokenStore(role, spec.paths.stateDir).clear?.();
     },
   };

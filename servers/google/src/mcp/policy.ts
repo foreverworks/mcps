@@ -1,6 +1,7 @@
 import { mergePolicies, toolsetPolicy, type ToolPolicy, type Toolsets } from "@foreverworks/mcp-kit";
 
 import { COLLABORATION } from "../collaboration/policy.js";
+import type { ConsentProduct } from "../consent/domain/consent.js";
 import { CONSENT } from "../consent/policy.js";
 import { CONTACTS } from "../contacts/policy.js";
 import { DOCS } from "../docs/policy.js";
@@ -125,6 +126,22 @@ export const TOOLSETS = {
 } as const satisfies Toolsets;
 
 export type Toolset = keyof typeof TOOLSETS;
+
+/**
+ * The toolsets whose tools run on each product's grants: list_accounts and
+ * health show a product's section when one of them is loaded, and `setup`
+ * consents a product when one of them is chosen. Comments, sharing and
+ * revisions act as a Docs, Sheets and Slides account, so they run on its grant.
+ */
+export const GRANT_TOOLSETS = {
+  gmail: ["gmail"],
+  calendar: ["calendar"],
+  drive: ["drive"],
+  editors: ["docs", "sheets", "slides", "collaboration"],
+  tasks: ["tasks"],
+  contacts: ["contacts"],
+  meet: ["meet"],
+} as const satisfies Readonly<Record<ConsentProduct, readonly Toolset[]>>;
 
 /** Every toolset, which is what an unset GOOGLE_TOOLSETS loads. */
 export const ALL_TOOLSETS: readonly Toolset[] = Object.keys(TOOLSETS) as Toolset[];

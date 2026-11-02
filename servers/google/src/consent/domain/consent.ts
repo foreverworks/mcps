@@ -25,6 +25,12 @@ export type Pending = {
   readonly redirectUri: string;
   /** Epoch milliseconds. */
   readonly createdAt: number;
+  /**
+   * Begun for an account nothing knew the address of (setup adding one): the
+   * grant is saved as whoever approved it, and that address is the account's
+   * from then on.
+   */
+  readonly learn?: true;
 };
 
 /** How long a begun consent waits for its redirect: long enough to approve, short enough that a stale one cannot be replayed. */

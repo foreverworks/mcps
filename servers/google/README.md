@@ -11,12 +11,13 @@ publishing a revision are `write` tools that tell your assistant to wait for
 your explicit go. The server does not ask you itself; your client can, before
 each call. `MCP_MAX_ACCESS=read` makes the server read-only.
 
-**You need** one or more Google accounts, your own Google Cloud project with a
-Desktop app OAuth client ([step by step](#getting-the-oauth-client)), and a
-browser to approve each product for each account once. Google expires the
-grants of an app left in Testing after seven days. The Workspace directory,
-Meet transcripts and smart notes, and focus time and out of office events need
-a Google Workspace account.
+**You need** one or more Google accounts, a browser, and about ten minutes
+for `npx -y @foreverworks/mcp-google setup`, which walks you through the rest:
+an OAuth client of your own in a free Google Cloud project, made with a few
+clicks Google lets no program make, and one approval per product and account
+([what it does](#getting-the-oauth-client)). Nothing to set by hand. The
+Workspace directory, Meet transcripts and smart notes, and focus time and out
+of office events need a Google Workspace account.
 
 ## What you can ask
 
@@ -34,12 +35,12 @@ a Google Workspace account.
 ## Install
 
 <!-- install:begin -->
-[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=google&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_oauth_client_file%22%2C%22description%22%3A%22Path%20of%20your%20OAuth%20client's%20JSON%20(a%20Desktop%20app%20client%20from%20the%20Google%20Cloud%20console).%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_addresses%22%2C%22description%22%3A%22Each%20account's%20label%20and%20address%2C%20e.g.%20personal%3Dana%40example.com%2Cwork%3Dana%40example.org.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22gmail_modify_accounts%22%2C%22description%22%3A%22Where%20each%20mailbox's%20Gmail%20grant%20is%20kept%2C%20e.g.%20personal%3D%2Fpath%2Fto%2Fgrants%2Fgmail-personal.json%3B%20consent%20writes%20it%20there.%20Without%20it%20the%20other%20products%20work%2C%20but%20no%20mailbox%20does.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22calendar_time_zone%22%2C%22description%22%3A%22Optional.%20The%20time%20zone%20a%20time%20without%20an%20offset%20is%20read%20in%2C%20e.g.%20Europe%2FParis.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_toolsets%22%2C%22description%22%3A%22Optional.%20The%20products%20whose%20tools%20the%20server%20loads%2C%20separated%20by%20commas%2C%20e.g.%20gmail%2Ccalendar.%20Empty%20loads%20every%20product.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-google%22%5D%2C%22env%22%3A%7B%22GOOGLE_OAUTH_CLIENT_FILE%22%3A%22%24%7Binput%3Agoogle_oauth_client_file%7D%22%2C%22GMAIL_ADDRESSES%22%3A%22%24%7Binput%3Agmail_addresses%7D%22%2C%22GMAIL_MODIFY_ACCOUNTS%22%3A%22%24%7Binput%3Agmail_modify_accounts%7D%22%2C%22CALENDAR_TIME_ZONE%22%3A%22%24%7Binput%3Acalendar_time_zone%7D%22%2C%22GOOGLE_TOOLSETS%22%3A%22%24%7Binput%3Agoogle_toolsets%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=google&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWdvb2dsZSJdLCJlbnYiOnsiR09PR0xFX09BVVRIX0NMSUVOVF9GSUxFIjoiJHtlbnY6R09PR0xFX09BVVRIX0NMSUVOVF9GSUxFfSIsIkdNQUlMX0FERFJFU1NFUyI6IiR7ZW52OkdNQUlMX0FERFJFU1NFU30iLCJHTUFJTF9NT0RJRllfQUNDT1VOVFMiOiIke2VudjpHTUFJTF9NT0RJRllfQUNDT1VOVFN9IiwiQ0FMRU5EQVJfVElNRV9aT05FIjoiJHtlbnY6Q0FMRU5EQVJfVElNRV9aT05FfSIsIkdPT0dMRV9UT09MU0VUUyI6IiR7ZW52OkdPT0dMRV9UT09MU0VUU30ifX0%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-google.mcpb)
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=google&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22calendar_time_zone%22%2C%22description%22%3A%22Optional.%20The%20time%20zone%20a%20time%20without%20an%20offset%20is%20read%20in%2C%20e.g.%20Europe%2FParis.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22google_toolsets%22%2C%22description%22%3A%22Optional.%20The%20products%20whose%20tools%20the%20server%20loads%2C%20separated%20by%20commas%2C%20e.g.%20gmail%2Ccalendar.%20Empty%20loads%20every%20product.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-google%22%5D%2C%22env%22%3A%7B%22CALENDAR_TIME_ZONE%22%3A%22%24%7Binput%3Acalendar_time_zone%7D%22%2C%22GOOGLE_TOOLSETS%22%3A%22%24%7Binput%3Agoogle_toolsets%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=google&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWdvb2dsZSJdLCJlbnYiOnsiQ0FMRU5EQVJfVElNRV9aT05FIjoiJHtlbnY6Q0FMRU5EQVJfVElNRV9aT05FfSIsIkdPT0dMRV9UT09MU0VUUyI6IiR7ZW52OkdPT0dMRV9UT09MU0VUU30ifX0%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-google.mcpb)
 
 With Claude Code:
 
 ```bash
-claude mcp add google -e GOOGLE_OAUTH_CLIENT_FILE="<path to OAuth client file>" -e GMAIL_ADDRESSES="<Accounts and their addresses>" -e GMAIL_MODIFY_ACCOUNTS="<Where Gmail grants are kept>" -- npx -y @foreverworks/mcp-google
+claude mcp add google -- npx -y @foreverworks/mcp-google
 ```
 
 Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON:
@@ -49,51 +50,65 @@ Claude Desktop (Settings, Developer, Edit Config) and most other clients read th
   "mcpServers": {
     "google": {
       "command": "npx",
-      "args": ["-y", "@foreverworks/mcp-google"],
-      "env": {
-        "GOOGLE_OAUTH_CLIENT_FILE": "<path to OAuth client file>",
-        "GMAIL_ADDRESSES": "<Accounts and their addresses>",
-        "GMAIL_MODIFY_ACCOUNTS": "<Where Gmail grants are kept>"
-      }
+      "args": ["-y", "@foreverworks/mcp-google"]
     }
   }
 }
 ```
 
-Each runs the published package on Node 22.19 or newer. VS Code and the Claude Desktop bundle ask for each setting as they add the server; leave an optional one empty. Cursor reads each from your environment instead (`${env:GOOGLE_OAUTH_CLIENT_FILE}` and so on), so set them before you start Cursor. The commands above set only what is required; [Configuration](#configuration) has the rest.
+Each runs the published package on Node 22.19 or newer. VS Code and the Claude Desktop bundle ask for each setting as they add the server; leave an optional one empty. Cursor reads each from your environment instead (`${env:CALENDAR_TIME_ZONE}` and so on), so set them before you start Cursor. Every setting is optional; [Configuration](#configuration) says which ones you need for which tools.
 
 ### From a clone
 
 ```bash
 git clone https://github.com/foreverworks/mcps.git && cd mcps
 npm ci && npm run build
-claude mcp add google -e GOOGLE_OAUTH_CLIENT_FILE="<path to OAuth client file>" -e GMAIL_ADDRESSES="<Accounts and their addresses>" -e GMAIL_MODIFY_ACCOUNTS="<Where Gmail grants are kept>" -- node "$PWD/servers/google/dist/index.js"
+claude mcp add google -- node "$PWD/servers/google/dist/index.js"
 ```
 
 In a JSON configuration, the command is `node` and its one argument the full path of `servers/google/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
+
+**Then run setup once**, in a terminal, before your first question:
+
+```bash
+npx -y @foreverworks/mcp-google setup
+```
+
+It asks which products and accounts to connect, opens each Google page you
+need, picks up the file you download, and has you approve each product in
+your browser. At the end it prints the command above, with `GOOGLE_TOOLSETS`
+added if you chose only some products. Run it again to add an account or a
+product; it keeps what is already done.
 
 Over HTTP (`MCP_HTTP_PORT`), one process serves every session, with one token
 cache per grant.
 
 ## Configuration
 
-The server starts with nothing set: a product not set up yet answers with a
-`config` error naming what to set. Four variables cover most setups.
+Nothing needs setting. `setup` saves the OAuth client and every grant in the
+server's state directory, `~/.local/state/mcps/google` (on Windows
+`%APPDATA%\mcps\google`), and the server finds them there. Each grant records
+the address it was approved as, which is how the server knows which Google
+account each label stands for. A label is lowercase letters, digits and
+hyphens (`personal`, `work`, `client-a`), and stands for one Google identity
+in every product.
+
+The variables below are for a deployment that keeps these files elsewhere, or
+lists its accounts itself. **A variable that is set always wins** over what
+setup saved, and `health` says where each value came from.
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `GOOGLE_OAUTH_CLIENT_FILE` | for consent | The OAuth client JSON from the Google Cloud console (a Desktop app client). New grants are made on it. Without it, a consent borrows the client of a credentials file the account already has. |
-| `GMAIL_ADDRESSES` | for consent | `label=address,...`: the Google address each account label stands for, in every product. A consent approved as anyone else is refused, and `health` checks Gmail grants against it. |
-| `GMAIL_MODIFY_ACCOUNTS` | for Gmail | `label=path,...`: where each mailbox's own `gmail.modify` grant is kept. `begin_consent` writes it there. |
+| `GOOGLE_OAUTH_CLIENT_FILE` | no | The OAuth client JSON from the Google Cloud console (a Desktop app client), on which new grants are made. Default: the one setup saved, `oauth-client.json` in the state directory. Without either, a consent borrows the client of a credentials file the account already has. |
+| `GMAIL_ADDRESSES` | no | `label=address,...`: the Google address each account label stands for, in every product. Default: the address each grant recorded. A consent approved as anyone else is refused, and `health` checks Gmail grants against it. |
+| `GMAIL_MODIFY_ACCOUNTS` | no | `label=path,...`: where each mailbox's own `gmail.modify` grant is kept, which `begin_consent` writes. Default: every `gmail/<label>/credentials.json` in the state directory is a mailbox. Set, it lists the mailboxes on its own. |
 | `CALENDAR_TIME_ZONE` | no | The IANA zone a time without an offset is read in, and working hours default to; default the process's zone (`TZ`). |
 
-A label is lowercase letters, digits and hyphens (`personal`, `work`,
-`client-a`), and stands for one Google identity in every product. Everything
-the server writes (token caches, grants, waiting consents, downloads) goes
-under `GOOGLE_STATE_DIR`: by default systemd's `STATE_DIRECTORY`, else
-`$XDG_STATE_HOME/mcps/google` (`~/.local/state/mcps/google`), unless a
-variable below moves a product's part.
+Everything the server writes (token caches, grants, waiting consents,
+downloads) goes under `GOOGLE_STATE_DIR`: by default systemd's
+`STATE_DIRECTORY`, else `$XDG_STATE_HOME/mcps/google`, unless a variable below
+moves a product's part.
 
 <details>
 <summary>Every other variable (all optional)</summary>
@@ -197,6 +212,59 @@ refuses the writes. The shell's `--health` checks every product whatever
 
 ### Getting the OAuth client
 
+The server reaches Google through an OAuth client that belongs to you, in a
+Google Cloud project of your own. Google's terms do not let a client ship
+inside an open-source program, so each person makes one. It costs nothing,
+and your grants then depend on no one else's project.
+
+`npx -y @foreverworks/mcp-google setup` makes it with you. Run it in a
+terminal on the computer whose browser you use:
+
+1. **Products and accounts.** It asks which products to connect (the
+   [toolsets](#toolsets)) and a label for each Google account, such as
+   `personal` and `work`.
+2. **A project and its APIs.** With
+   [gcloud](https://cloud.google.com/sdk/docs/install) installed and signed
+   in, it offers to create the project and enable the APIs itself. Otherwise
+   it opens the console to create a project, then one link that enables every
+   API your products need.
+3. **Google Auth Platform.** Four pages that no program may fill in. Setup
+   opens each one in turn and says what to choose:
+   - **Branding.** On a new project, click **Get started**, then give an app
+     name only you will see and your address. For an *External* app, Google
+     also wants an **App domain** before it lets you publish: setup gives you
+     this server's home page and its
+     [privacy policy](https://github.com/foreverworks/mcps/blob/main/servers/google/PRIVACY.md)
+     to paste, with `github.com` as the authorized domain.
+   - **Audience.** Choose *Internal* if every account belongs to the Google
+     Workspace organisation that owns the project. Otherwise choose
+     *External*, then **Publish app**: Google expires the grants of an app
+     left in *Testing* after seven days. Only someone holding your client
+     file can ask for an approval, and your own accounts need no
+     verification.
+   - **Data Access.** Setup prints the exact scopes your products ask for, to
+     paste under **Manually add scopes**.
+   - **Clients.** **Create client** of type **Desktop app**, then click
+     **Download JSON** in the dialog that follows. Google shows the client's
+     secret only there.
+4. **The client file.** Setup watches your Downloads folder for the
+   `client_secret_....json` you downloaded (or takes a path you type), checks
+   that it is a Desktop app client, and moves it into the state directory,
+   readable only by you.
+5. **Approvals.** For each product and account, setup opens Google's consent
+   page. Choose the account it names. For an *External* app, Google first
+   warns that it "hasn't verified this app": the app is yours, so click
+   **Advanced**, then **Go to** followed by your app's name. Click
+   **Continue**, tick **Select all**, and continue again. Google then sends
+   your browser back to setup on `127.0.0.1`, which
+   checks the grant and saves it. An account's first approval records its
+   address, and every later one must be approved as that address. If your
+   browser runs on another computer (setup over SSH), the page it lands on
+   fails to load: paste that page's address into setup instead.
+
+<details>
+<summary>Doing it by hand instead</summary>
+
 One OAuth client of your own serves every account and product.
 
 1. In the [Google Cloud console](https://console.cloud.google.com/), create a
@@ -206,10 +274,13 @@ One OAuth client of your own serves every account and product.
    Google Sheets API, Google Slides API, Google Tasks API, People API (contacts
    and the directory) and Google Meet REST API.
 3. Open **Google Auth Platform**. Under **Branding**, name the app and give
-   your e-mail. Under **Audience**, pick who may use it, then add every account
-   as a test user or **Publish app**: Google expires the refresh tokens of an
-   app left in *Testing* after seven days. A published app can stay unverified
-   for your own accounts; at consent, continue past Google's warning screen.
+   your e-mail; for an *External* app, also fill in **App domain** (a home
+   page and a privacy policy link on an authorized domain), which Google
+   requires before publishing. Under **Audience**, pick who may use it, then
+   add every account as a test user or **Publish app**: Google expires the
+   refresh tokens of an app left in *Testing* after seven days. A published
+   app can stay unverified for your own accounts; at consent, continue past
+   Google's warning screen.
 4. Under **Data Access**, add the scopes of the products you will use (each is
    `https://www.googleapis.com/auth/` followed by the name below):
 
@@ -227,44 +298,43 @@ One OAuth client of your own serves every account and product.
    approved it.
 5. Under **Clients**, **Create client** of application type **Desktop app**,
    and download its JSON (its `installed` block holds the `client_id` and
-   `client_secret`). Keep the file private, and point
-   `GOOGLE_OAUTH_CLIENT_FILE` at it.
-6. Name your accounts and, for Gmail, where each mailbox's grant goes:
+   `client_secret`). Keep the file private: save it as `oauth-client.json` in
+   the state directory, or point `GOOGLE_OAUTH_CLIENT_FILE` at it.
+6. Name your accounts, since the server checks each consent against the
+   address of its label, then make each grant from your assistant
+   ([First run](#first-run)):
 
    ```
    GMAIL_ADDRESSES=personal=ana@example.com,work=ana@example.org
-   GMAIL_MODIFY_ACCOUNTS=personal=/path/to/grants/gmail-personal.json,work=/path/to/grants/gmail-work.json
    ```
 
-   Add them to the server's configuration in your client, and restart it.
+</details>
 
 ## First run
 
-Each product needs a grant per account, made once in your browser.
+1. Restart your client after adding the server, and ask your assistant for
+   `health`. Every grant should refresh as the address you meant, with the
+   scopes you ticked, and every API it checks should answer. Under `config` it
+   says where each setting came from: a variable, or what setup saved.
+2. To add a product or an account later, run setup again. Your assistant can
+   also make a grant for an account the server already knows: ask it to
+   "run begin_consent for calendar, account work" (the product is `gmail`,
+   `calendar`, `drive`, `editors`, `tasks`, `contacts` or `meet`), open the
+   URL it returns, and approve as the address it names. The browser then fails
+   to load `http://localhost:8123/?state=...&code=...`, as expected: nothing
+   listens there. Within 15 minutes, copy the whole address from the address
+   bar and give it to your assistant for `complete_consent`. The product uses
+   the grant from its next call, with no restart.
 
-1. Ask your assistant for `list_accounts`: the labels each product knows (the
-   mailboxes in `GMAIL_MODIFY_ACCOUNTS`; for other products, the accounts with
-   a grant).
-2. Ask it to begin a consent, for instance "Run begin_consent for calendar,
-   account work". The product is `gmail`, `calendar`, `drive`, `editors`,
-   `tasks`, `contacts` or `meet`.
-3. Open the URL it returns, sign in as the address it names, and tick every
-   box. A client with MCP URL elicitation offers you the page itself.
-4. The browser then fails to load `http://localhost:8123/?state=...&code=...`,
-   as expected: nothing listens there. Within 15 minutes, copy the whole
-   address from the address bar and give it to your assistant for
-   `complete_consent`. The product uses the grant from its next call.
-5. Repeat for each product and account. **Drive holds one grant**: consent
-   `drive` once, for the account whose Drive the Drive tools should reach.
-   That account's Docs, Sheets and Slides can share it
-   (`GOOGLE_EDITORS_DRIVE_ACCOUNT=personal`); every other account consents
-   `editors` for its own.
-6. Ask for `health`. Every grant should refresh as the address you meant,
-   with the scopes you ticked, and every API it checks should answer.
+**Drive holds one grant**: setup asks which account's Drive the Drive tools
+should reach, and consents `drive` for that one. That account's Docs, Sheets
+and Slides can share it (`GOOGLE_EDITORS_DRIVE_ACCOUNT=personal`); every other
+account consents `editors` for its own.
 
-From a shell, `node dist/index.js --health [gmail|calendar|drive|editors|tasks|contacts|meet]`
+From a shell, `npx -y @foreverworks/mcp-google --health [gmail|calendar|drive|editors|tasks|contacts|meet]`
 prints one line per account and grant and exits with the worst line's code,
-for a timer.
+for a timer. With no product named, it starts with `CONFIG:` lines saying
+where each setting came from.
 
 ## Tools
 
@@ -436,14 +506,30 @@ A failure comes back as `{"error": {"kind", "message", "remedy"}}`, and the
 remedy names the next step.
 
 **`config`: "credentials at ... are missing or unparseable"**, "Drive has no
-grant", or "no calendar grant for "work"" (the same for other products). Run
-that product's consent for the account ([First run](#first-run)); the message
-lists the accounts that have one.
+grant", "no mailbox is set up" or "no calendar grant for "work"" (the same for
+other products). Run setup again and choose that product and account, or make
+the grant from your assistant ([First run](#first-run)); the message lists the
+accounts that have one.
 
-**`config`: "no address is known for "work"" or ""work" is not a mailbox
-here".** Add `work=<address>` to `GMAIL_ADDRESSES`, or `work=<path>` to
-`GMAIL_MODIFY_ACCOUNTS`. "no OAuth client is known" means
-`GOOGLE_OAUTH_CLIENT_FILE` is not set.
+**`config`: "no address is known for "work"".** Nothing has recorded which
+Google account `work` stands for yet. Run setup with that label: its first
+approval records the address. Or add `work=<address>` to `GMAIL_ADDRESSES`.
+""work" is not a mailbox here" means `GMAIL_MODIFY_ACCOUNTS` is set and does
+not list it: add `work=<path>`. "no OAuth client is known" means setup has not
+saved one and `GOOGLE_OAUTH_CLIENT_FILE` is not set.
+
+**setup: "it is a Web application client".** The client was created with the
+wrong type. In **Clients**, create another of type **Desktop app**, download
+its JSON, and give setup that file.
+
+**setup: Publish app is greyed out.** Google wants the **App domain** on the
+Branding page first: a home page, a privacy policy link and the domain they
+are on, saved. Setup prints values you can use.
+
+**setup waits for the client file and nothing happens.** Your browser saved it
+somewhere other than your Downloads folder, or you closed Google's dialog
+before downloading it. Type the file's path; if you have none, create another
+Desktop app client, since Google shows a secret only once.
 
 **`input`: "no consent is waiting for that state".** The consent expired
 after 15 minutes, was already completed, or was begun by a copy of the server
@@ -501,7 +587,8 @@ Call again with `file_id`, one of the ids listed.
   never reaches Gmail.
 - **Grants are found, not listed**: Calendar, Docs, Sheets and Slides, Tasks,
   contacts and Meet look for `<root>/<label>/credentials.json` on every call,
-  so a new consent needs no restart.
+  and so does Gmail when `GMAIL_MODIFY_ACCOUNTS` is unset, so a new consent
+  needs no restart.
 - **Credentials are google.oauth2 JSON** (`refresh_token`, `client_id`,
   `client_secret`, `token_uri`, `scopes`, `account`). A stored access token is
   ignored: the server refreshes under a lock, so copies sharing a state
@@ -512,7 +599,9 @@ Call again with `file_id`, one of the ids listed.
 - **Consent** uses PKCE (S256) and `prompt=consent` (a refresh token every
   time), with `login_hint` set to the account's address. A grant approved as
   another address, missing a required scope, or without a refresh token is
-  refused with nothing written; an optional scope may be left out. Waiting
+  refused with nothing written; an optional scope may be left out. Only setup
+  may consent an account no address is known for yet, because it shows the
+  person who approved; that address is then the account's. Waiting
   consents and grants are written with mode 0600, a replaced grant is kept as
   `.bak`, and no token appears in a result.
 
@@ -657,8 +746,10 @@ clean up after themselves.
 - **Drive holds one grant**, so the Drive tools reach one account's Drive;
   other accounts reach their files through the Docs, Sheets, Slides, comment
   and sharing tools.
-- **Consent needs a browser**, and the redirect address copied back by hand:
-  nothing listens on the loopback port.
+- **Consent needs a browser.** Setup receives Google's redirect on
+  `127.0.0.1` itself; a consent begun from your assistant (`begin_consent`)
+  has the redirect address copied back by hand, since a server shared over
+  HTTP cannot listen on your computer's loopback.
 - **`read_doc` reads a Sheet as CSV of its first tab** (Drive's export has no
   tab selector); `read_rows` reads any tab.
 - **Docs' markdown tools**: a bullet under a number comes out as a sub-number

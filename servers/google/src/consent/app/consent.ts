@@ -3,7 +3,7 @@ import { authorizeUrl, newPkce, newState, offerLink, parseRedirect } from "@fore
 import { LABEL } from "../../domain/accounts.js";
 import { splitScopes } from "../../domain/scopes.js";
 import { type ConsentProduct, expiresAt, missingScopes, requestedScopes, sameAddress } from "../domain/consent.js";
-import { authError, fail, inputError } from "../domain/errors.js";
+import { authError, configError, fail, inputError } from "../domain/errors.js";
 import type { Deps } from "./ports.js";
 
 /**
@@ -18,9 +18,17 @@ import type { Deps } from "./ports.js";
  * user itself (MCP URL elicitation), it does, and the result then tells the
  * model only what comes next.
  */
-export const beginConsent = async (deps: Deps, args: { readonly product: ConsentProduct; readonly account: string }) => {
+export const beginConsent = async (deps: Deps, args: { readonly product: ConsentProduct; readonly account: string; readonly learn?: boolean }) => {
   if (!LABEL.test(args.account)) return fail(inputError(`"${args.account}" is not an account label`));
   const target = await deps.target(args.product, args.account);
+  // Only setup, which shows the person who approved, may add an account nothing knows yet.
+  const learn = target.address === undefined;
+  if (learn && !args.learn) {
+    return fail(
+      configError(`no address is known for "${args.account}": run \`npx @foreverworks/mcp-google setup\` to add it, or add ${args.account}=<address> to GMAIL_ADDRESSES so a consent can be checked against it`),
+    );
+  }
+  const who = target.address ?? `the Google account you want as "${target.account}"`;
   const client = await target.client();
   const pkce = newPkce(deps.random);
   const state = newState(deps.random);
@@ -33,6 +41,7 @@ export const beginConsent = async (deps: Deps, args: { readonly product: Consent
     scopes: target.scopes,
     redirectUri: deps.redirectUri,
     createdAt: deps.now(),
+    ...(learn ? { learn: true as const } : {}),
   };
   await deps.pending.put(pending);
   const url = authorizeUrl({
@@ -43,16 +52,16 @@ export const beginConsent = async (deps: Deps, args: { readonly product: Consent
     state,
     pkce,
     // offline + consent: a refresh token every time, not only on the first approval.
-    extra: { access_type: "offline", prompt: "consent", login_hint: target.address },
+    extra: { access_type: "offline", prompt: "consent", ...(target.address ? { login_hint: target.address } : {}) },
   });
   const expires = new Date(expiresAt(pending)).toISOString();
   offerLink({
     url,
     message:
-      `Approve ${target.product} for ${target.address} at Google, signed in as that account, and tick every box. ` +
+      `Approve ${target.product} for ${who} at Google, signed in as that account, and tick every box. ` +
       "The page it then goes to fails to load: copy its whole address and paste it into this conversation within 15 minutes.",
     next:
-      `the user is approving as ${target.address} in their browser; ask them for the address it then fails to load ` +
+      `the user is approving as ${who} in their browser; ask them for the address it then fails to load ` +
       `(${deps.redirectUri}?...) and pass that whole URL to complete_consent before ${expires}`,
   });
   return {
@@ -60,11 +69,11 @@ export const beginConsent = async (deps: Deps, args: { readonly product: Consent
     expires_at: expires,
     product: target.product,
     account: target.account,
-    address: target.address,
+    ...(target.address ? { address: target.address } : {}),
     scopes: [...target.scopes, ...(target.optionalScopes ?? [])],
     ...(target.optionalScopes?.length ? { optional: target.optionalScopes } : {}),
     next:
-      `open the url in a browser; approve as ${target.address} and tick every box; ` +
+      `open the url in a browser; approve as ${who} and tick every box; ` +
       `the browser then fails to load ${deps.redirectUri}?...: pass that whole URL to complete_consent`,
   };
 };
@@ -95,12 +104,16 @@ export const completeConsent = async (deps: Deps, args: { readonly redirectUrl: 
   }
   if (!granted.refreshToken) return fail(authError("no_refresh_token", "Google gave no refresh token; nothing was saved"));
   const approvedAs = (await deps.whoApproved(granted.accessToken)).email;
-  if (!approvedAs || !sameAddress(approvedAs, target.address)) {
-    return fail(authError("wrong_account", `approved as ${approvedAs ?? "an account Google did not name"}, not ${target.address}; nothing was saved`));
+  if (!approvedAs) return fail(authError("wrong_account", "Google did not name the account that approved; nothing was saved"));
+  // An address learned meanwhile (another consent of this account finished first) binds this one too.
+  const expected = target.address ?? (pending.learn ? approvedAs : undefined);
+  if (expected === undefined) return fail(configError(`no address is known for "${pending.account}"; nothing was saved`));
+  if (!sameAddress(approvedAs, expected)) {
+    return fail(authError("wrong_account", `approved as ${approvedAs}, not ${expected}; nothing was saved`));
   }
 
   const scopes = splitScopes(granted.scope);
-  await deps.save(target.credentialsPath, { client: pending.client, refreshToken: granted.refreshToken, scopes, account: target.address });
+  await deps.save(target.credentialsPath, { client: pending.client, refreshToken: granted.refreshToken, scopes, account: expected });
   await target.forget();
-  return { product: target.product, account: target.account, address: target.address, scopes, saved: true as const, path: target.credentialsPath };
+  return { product: target.product, account: target.account, address: expected, scopes, saved: true as const, path: target.credentialsPath };
 };

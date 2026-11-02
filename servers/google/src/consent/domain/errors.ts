@@ -12,7 +12,7 @@ const AGAIN = "begin_consent again, have the account's user approve it in a brow
 export const remedyFor = (error: AppError): string => {
   switch (error.kind) {
     case "config":
-      return "the account needs an address in GMAIL_ADDRESSES and an OAuth client (GOOGLE_OAUTH_CLIENT_FILE, or a credentials file the account already has); the message names which is missing";
+      return "the account needs an address and an OAuth client: run `npx @foreverworks/mcp-google setup` in a terminal, or set GMAIL_ADDRESSES and GOOGLE_OAUTH_CLIENT_FILE; the message names which is missing";
     case "input":
       return `${AGAIN}, within 15 minutes`;
     case "auth":

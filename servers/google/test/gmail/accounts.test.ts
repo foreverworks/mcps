@@ -88,7 +88,7 @@ describe("resolveAccounts", () => {
   });
 
   it("is empty, not an error, with nothing configured: a tool then names the variables", () => {
-    expect(resolveAccounts({})).toEqual({ accounts: [], defaultLabel: "", addresses: new Map() });
+    expect(resolveAccounts({})).toMatchObject({ accounts: [], defaultLabel: "", addresses: new Map() });
   });
 
   it("keeps every state dir under the server's own state directory by default", () => {

@@ -46,10 +46,10 @@ const verdictFor = async (deps: Deps, grant: GrantHandle, log: (line: string) =>
 };
 
 /** Every account, or the fault that stopped the registry from building. */
-const accountsOf = (env: NodeJS.ProcessEnv): readonly Deps[] | { readonly fault: string } => {
+const accountsOf = (env: NodeJS.ProcessEnv): readonly Deps[] | { readonly fault: string } | { readonly none: true } => {
   try {
     const registry = buildRegistry(env);
-    return registry.labels.length === 0 ? { fault: NO_MAILBOX } : registry.labels.map((label) => registry.get(label));
+    return registry.labels.length === 0 ? { none: true } : registry.labels.map((label) => registry.get(label));
   } catch (thrown) {
     // A registry that will not build is a config fault, and naming it here is
     // the difference between "re-run the OAuth flow" and "fix the env var".
@@ -63,6 +63,11 @@ export const runGmailHealth = async (log: (line: string) => void, env: NodeJS.Pr
   if ("fault" in accounts) {
     log(`GMAIL: FAIL registry ${accounts.fault}`);
     return PERMANENT;
+  }
+  // No mailbox set up at all is not a failure, as for every other product: nothing that was working has stopped.
+  if ("none" in accounts) {
+    log(`GMAIL: ok ${NO_MAILBOX.replace("no mailbox is set up", "no mailbox is set up yet")}`);
+    return OK;
   }
   const grants = accounts.flatMap((deps) => deps.grants.map((grant) => ({ deps, grant })));
   return worst(await inSeries(grants, ({ deps, grant }) => verdictFor(deps, grant, log)));

@@ -41,9 +41,10 @@ const lineFor = async (editors: Editors, label: string, log: (line: string) => v
 export const runEditorsHealth = async (log: (line: string) => void, env: NodeJS.ProcessEnv): Promise<number> => {
   const { editors } = buildDriveAndEditors(env);
   const labels = editors.specs().map((s) => s.label);
+  // As for Drive, Tasks, contacts and Meet: nothing set up yet is not a failure.
   if (labels.length === 0) {
-    log("EDITORS: FAIL no account has a Docs/Sheets/Slides grant");
-    return PERMANENT;
+    log("EDITORS: ok no account has a Docs/Sheets/Slides grant yet (begin_consent, product editors)");
+    return OK;
   }
   return worst(await inSeries(labels, (label) => lineFor(editors, label, log)));
 };
