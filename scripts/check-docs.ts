@@ -3,7 +3,9 @@
  * server does. Run by `npm run check` after the build:
  *
  * 1. Every server STARTS with an empty environment (credentials are a tool's
- *    config failure, never a refusal to start), so a client can always list it.
+ *    config failure, never a refusal to start), so a client can always list it,
+ *    and lists the same with each of its inputs set to empty, as a plugin
+ *    passes a setting nobody filled in (scripts/plugins.ts).
  * 2. Its README's tool tables name every tool it registers, each once, with the
  *    access class its policy gives it (read, write or money, as `tools/list`
  *    carries it in `_meta`), and no tool it does not register.
@@ -203,6 +205,8 @@ type Started = {
   readonly icons: number;
   /** Where a client of protocol 2026-07-28 is told something else than one of 2025-11-25 (empty when they agree). */
   readonly eras: readonly string[];
+  /** Where the server, started with each of its inputs set to empty, lists something else (empty when it agrees). */
+  readonly blanks: readonly string[];
 };
 
 /** JSON with every object's keys in order: the two generations put `$schema` at different places. */
@@ -229,14 +233,30 @@ const differences = (legacy: Awaited<ReturnType<typeof listServer>>, modern: Awa
   ];
 };
 
+/** The variables a server's package.json says a person sets (`mcp.inputs`), however else it is broken. */
+const inputsOf = (dir: string): readonly string[] => {
+  const pkg = JSON.parse(readFileSync(join(dir, "package.json"), "utf8")) as { readonly mcp?: { readonly inputs?: unknown } };
+  const inputs = pkg.mcp?.inputs;
+  return typeof inputs === "object" && inputs !== null ? Object.keys(inputs) : [];
+};
+
+/**
+ * Lists a server as each client generation sees it and, when it has inputs,
+ * again with every input set to empty: a plugin passes a setting nobody filled
+ * in as an empty string, so the server must read empty as unset
+ * (docs/configuration.md) and start the same.
+ */
 const listTools = async (dir: string): Promise<Started> => {
   const [legacy, modern] = [await listServer(dir, "legacy"), await listServer(dir, "modern")];
+  const inputs = inputsOf(dir);
+  const blank = inputs.length === 0 ? legacy : await listServer(dir, "legacy", Object.fromEntries(inputs.map((name) => [name, ""]))).catch((error: unknown) => String(error));
   const { tools, instructions, server } = legacy;
   return {
     tools: new Map(tools.map((t) => [t.name, { access: String(t._meta?.[ACCESS_META] ?? "unclassified"), description: t.description ?? "" }])),
     instructions,
     icons: server?.icons?.length ?? 0,
     eras: differences(legacy, modern),
+    blanks: typeof blank === "string" ? [`it does not start: ${blank.slice(0, 160)}`] : differences(legacy, blank),
   };
 };
 
@@ -383,6 +403,9 @@ const checkServer = async (name: string, shared: ReadonlySet<string>, write: boo
   problems.push(...checkIcons(name, started.icons));
   if (started.eras.length > 0) {
     problems.push(`lists differently to protocol 2025-11-25 and 2026-07-28 clients (${started.eras.join(", ")}): both generations must see one surface`);
+  }
+  if (started.blanks.length > 0) {
+    problems.push(`lists differently with its inputs set to empty, as a plugin passes a setting nobody filled in (${started.blanks.join(", ")}): read an empty variable as unset`);
   }
   if (started.instructions.trim() === "") problems.push("gives no server instructions: pass serve() `instructions` saying what it serves and which tool to start with");
   const packaging = checkPackaging(dir, name, documentedIn(original), write);

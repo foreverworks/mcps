@@ -14,7 +14,7 @@ credentials, its accounts) are in its README, under Configuration.
 | The time zone of calendar dates | Its own `..._TIME_ZONE` variable where it has one, else the process's zone (`TZ`, else the system's). Servers for Romanian institutions (ANAF, ONRC, BNR) use Romania's zone. |
 | Which of its tools it serves, for a server with toolsets (google's products, porkbun's areas) | `<SERVER>_TOOLSETS` where it has toolsets: the toolsets to load, separated by commas. Unset, empty or `all` loads every one; the tools of the others are not registered at all. Its README lists the names. |
 
-Three rules hold everywhere:
+Four rules hold everywhere:
 
 - **No credential has a default.** A server reads its environment and nothing
   else: no config file, no assumed path. Without its credential it still
@@ -24,6 +24,10 @@ Three rules hold everywhere:
 - **A named file must be there.** A `_FILE` variable that points at a missing
   or empty file is a configuration error, never a quiet fallback to the plain
   variable.
+- **Empty is unset.** A variable set to an empty value counts as unset, with
+  the same default: an installer that asks for each setting (a plugin's
+  settings dialog) passes one nobody filled in as an empty string.
+  `check:docs` starts every server that way and holds it to the same tools.
 - **A setting the server cannot read stops it.** A port that is not a port, an
   unknown access class or confirmation mode, a limit that is not a positive
   number, a time zone that does not exist, or a toolset the server does not
