@@ -1,12 +1,25 @@
-# TypeSafe plugin from Forever Works
+# TypeSafe
 
-Get calibrated yes or no answers, choices and scores from TypeSafe's Jev, for one item or 1000 rows. Typed, calibrated judgments over text or JSON (a yes or no with its probability, one of a set, a score), one at a time or in batches.
+Get calibrated yes or no answers, choices and scores from TypeSafe's Jev, for one item or 1000 rows.
 
-This plugin adds the TypeSafe MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/typesafe/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/typesafe/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Go through the 300 postings in postings.jsonl and list the remote senior
+  roles, with how sure Jev is of each."
+- "Is this support email urgent, and which team should take it: billing,
+  technical or sales?"
+- "Sort last month's 600 card transactions into groceries, transport, software
+  or other, and count each."
+- "Rate these 40 reviews on how likely the customer is to leave, and show me
+  the ten most at risk."
+- "Which of these passages answer 'how do I reset my password'? Flag the ones
+  Jev is unsure about for me to read."
 
 ## What it can change
 
-It has 3 tools, and every one only reads.
+All 3 of its tools only read, so it cannot change anything.
 
 ## Install
 

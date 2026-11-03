@@ -1,8 +1,18 @@
-# App Store and Google Play plugin from Forever Works
+# App Store and Google Play
 
-Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs. Read and answer App Store and Play reviews, and read TestFlight feedback and crash logs.
+Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs.
 
-This plugin adds the App Store and Google Play MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/app-stores/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/app-stores/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "What did people say about the last release, and which App Store reviews
+  still have no reply?"
+- "Show this week's Google Play reviews of com.example.app, translated into
+  English, worst first."
+- "What crashed for TestFlight testers on build 42?"
+- "Draft replies to the App Store reviews from Germany that mention signing
+  in." Then, once you have read them: "Send these."
 
 ## What it can change
 

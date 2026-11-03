@@ -1,8 +1,18 @@
-# Expo Application Services plugin from Forever Works
+# Expo Application Services
 
-Find out why an Expo build, workflow run or store submission failed, and roll out updates. Builds, workflow runs with each job's log and why it failed, store submissions with the store's error text, a credentials audit, fingerprints and updates.
+Find out why an Expo build, workflow run or store submission failed, and roll out updates.
 
-This plugin adds the Expo Application Services MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/eas/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/eas/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Why did the last iOS workflow run of @acme/my-app fail?"
+- "Does every iOS bundle have a key set for TestFlight submissions, and does
+  any certificate expire in the next 30 days?"
+- "Run ios-beta.yml on main and tell me when it finishes."
+- "Which fingerprints have updates but no build yet?"
+- "Promote the latest update on the staging branch to production."
+- "Raise the rollout of the latest production update to 50%."
 
 ## What it can change
 

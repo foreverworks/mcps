@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-bnr",
+  "displayName": "BNR exchange rates",
   "version": "0.1.1",
   "description": "Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.",
   "author": {

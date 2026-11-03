@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-anaf-efactura",
+  "displayName": "ANAF e-Factura",
   "version": "0.1.1",
   "description": "Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF.",
   "author": {

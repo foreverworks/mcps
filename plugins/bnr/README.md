@@ -1,12 +1,21 @@
-# BNR exchange rates plugin from Forever Works
+# BNR exchange rates
 
-Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON. The rate in force on any day, conversions to and from RON, rates over a period, and the yearly averages ANAF converts foreign income at.
+Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.
 
-This plugin adds the BNR exchange rates MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/bnr/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/bnr/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "What was BNR's euro rate on 14 March 2025?"
+- "Convert an invoice of 1,250.50 EUR dated 3 October 2026 to lei, at the
+  last rate BNR published before that date."
+- "How much is 10,000 HUF in RON today?"
+- "Give me BNR's EUR and USD rates for every banking day of September 2026."
+- "Which annual average USD rate goes into my D212 for 2025?"
 
 ## What it can change
 
-It has 5 tools, and every one only reads.
+All 5 of its tools only read, so it cannot change anything.
 
 ## Install
 

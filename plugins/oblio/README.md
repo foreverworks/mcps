@@ -1,8 +1,18 @@
-# Oblio plugin from Forever Works
+# Oblio
 
-Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them. Issue invoices and proformas with exact totals, record payments, cancel or reverse invoices, and read clients, products and series.
+Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them.
 
-This plugin adds the Oblio MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/oblio/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/oblio/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Which invoices from September are still unpaid?"
+- "Invoice Client SRL for 8 hours of consulting at 1,000 RON an hour plus 21%
+  VAT, due in 30 days."
+- "Client SRL paid 1,000 EUR on invoice FCT 0042 by bank transfer today.
+  Record it."
+- "Turn proforma PRF 0007 into an invoice."
+- "Reverse invoice FCT 0042, and keep the payment recorded on it."
 
 ## What it can change
 

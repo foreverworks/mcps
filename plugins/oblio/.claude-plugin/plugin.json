@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-oblio",
+  "displayName": "Oblio",
   "version": "0.1.1",
   "description": "Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them.",
   "author": {

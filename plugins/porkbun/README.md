@@ -1,8 +1,21 @@
-# Porkbun plugin from Forever Works
+# Porkbun
 
-Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first. Porkbun's official tools, served with per-client tokens, an audit line per call, purchases marked for the client to confirm, and files uploaded by path.
+Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.
 
-This plugin adds the Porkbun MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/porkbun/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/porkbun/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Which of my domains expire in the next three months, and which of those
+  have auto-renew off?"
+- "Is talonbakery.com available? If it costs less than $15 a year, register
+  it."
+- "Back up the DNS of example.com, then point shop.example.com at
+  203.0.113.10."
+- "Publish the site in ./dist to example.com's static hosting."
+- "If I moved example.org to my Cloudflare account, which DNS records would be
+  dropped?"
+- "Save last month's Porkbun invoice as a PDF."
 
 ## What it can change
 

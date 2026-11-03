@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-home-assistant",
+  "displayName": "Home Assistant",
   "version": "0.1.2",
   "description": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
   "author": {

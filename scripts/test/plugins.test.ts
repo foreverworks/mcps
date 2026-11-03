@@ -42,7 +42,8 @@ const manifestOf = (pkg: Readonly<Record<string, unknown>> = {}): Manifest => {
   return manifest as Manifest;
 };
 
-const README = ["| Tool | Access | What it does |", "|---|---|---|", "| `list_records` | read | Lists them. |", "| `file_record` / `pay_fee` | **money** | Files one. |"].join("\n");
+const ASK = ["## What you can ask", "", "- \"Which records are due this week?\"", "", "## Tools", ""].join("\n");
+const README = ASK + ["| Tool | Access | What it does |", "|---|---|---|", "| `list_records` | read | Lists them. |", "| `file_record` / `pay_fee` | **money** | Files one. |"].join("\n");
 
 const MARKET = marketplaceOf("https://github.com/foreverworks/mcps", "MCP servers for example services", "Forever Works");
 
@@ -60,6 +61,7 @@ describe("a plugin's manifests", () => {
   it("names the plugin after its publisher, and links the listing to the site, the issues and the privacy page", () => {
     expect(claudePlugin(manifestOf(), "Forever Works")).toMatchObject({
       name: "foreverworks-example",
+      displayName: MCP.title,
       version: "1.2.3",
       description: MCP.tagline,
       author: { name: "Forever Works", url: "https://foreverworks.github.io/mcps/" },
@@ -126,7 +128,7 @@ describe("the marketplaces", () => {
       name: "foreverworks-mcps",
       owner: { name: "Forever Works", url: "https://foreverworks.github.io/mcps/" },
       description: "MCP servers for example services",
-      plugins: [{ name: "foreverworks-example", source: "./plugins/example", description: MCP.tagline, version: "1.2.3" }],
+      plugins: [{ name: "foreverworks-example", displayName: MCP.title, source: "./plugins/example", description: MCP.tagline, version: "1.2.3" }],
     });
     expect(cursorMarketplace(MARKET, [manifestOf()])).toEqual({
       name: "foreverworks-mcps",
@@ -141,7 +143,8 @@ describe("a plugin's README", () => {
   const readme = pluginReadme(manifestOf(), README, MARKET);
 
   it("says what the server does, what it can change, how to install it and what each setting is", () => {
-    expect(readme).toMatch(/^# Example plugin from Forever Works\n\nRead and file the records of an example service\. Read its records and file new ones\.\n/);
+    expect(readme).toMatch(/^# Example\n\nRead and file the records of an example service\.\n\nFree and open source, from \[Forever Works\]/);
+    expect(readme).toContain('## What you can ask\n\n- "Which records are due this week?"\n\n## What it can change');
     expect(readme).toContain("It has 3 tools, and 2 of them are **money**");
     expect(readme).toContain("`file_record` and `pay_fee`");
     expect(readme).toContain("/plugin install foreverworks-example --marketplace foreverworks/mcps");
@@ -156,7 +159,11 @@ describe("a plugin's README", () => {
   });
 
   it("says a read-only server only reads", () => {
-    expect(pluginReadme(manifestOf(), "| `list_records` | read | Lists them. |", MARKET)).toContain("It has 1 tool, and it only reads.");
+    expect(pluginReadme(manifestOf(), `${ASK}| \`list_records\` | read | Lists them. |`, MARKET)).toContain("Its one tool only reads, so it cannot change anything.");
+  });
+
+  it("refuses a server README without questions to ask", () => {
+    expect(() => pluginReadme(manifestOf(), "| `list_records` | read | Lists them. |", MARKET)).toThrow(/What you can ask/);
   });
 });
 

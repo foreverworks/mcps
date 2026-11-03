@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-onrc",
+  "displayName": "ONRC trade register",
   "version": "0.1.2",
   "description": "Follow your filings at Romania's trade register, with their documents, fee notes and invoices.",
   "author": {

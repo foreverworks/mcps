@@ -1,8 +1,17 @@
-# Home Assistant plugin from Forever Works
+# Home Assistant
 
-Read your Home Assistant's states, areas and history, and run its actions, approving locks first. Entities and their states, areas, history, the logbook, templates, and running actions, with locks, alarms, covers and valves confirmed.
+Read your Home Assistant's states, areas and history, and run its actions, approving locks first.
 
-This plugin adds the Home Assistant MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/home-assistant/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/home-assistant/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Which lights are on right now?"
+- "How did the living room temperature change overnight?"
+- "Who or what unlocked the front door this morning?"
+- "Which devices are in the hallway?"
+- "Dim the kitchen light to 30 percent."
+- "Lock the front door." (you approve it first)
 
 ## What it can change
 

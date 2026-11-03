@@ -1,8 +1,17 @@
-# ONRC trade register plugin from Forever Works
+# ONRC trade register
 
-Follow your filings at Romania's trade register, with their documents, fee notes and invoices. The filings made there and their status, the documents listed on each filing, fee notes and invoices.
+Follow your filings at Romania's trade register, with their documents, fee notes and invoices.
 
-This plugin adds the ONRC trade register MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/onrc/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/onrc/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Which of my ONRC filings are still being worked on?"
+- "What is the status of the mențiune I filed for Client SRL in September, and
+  when will its documents be released?"
+- "Which documents are in the file of my latest filing?"
+- "Do I have any ONRC fee notes I have not paid yet?"
+- "How much is outstanding on my ONRC invoices this year?"
 
 ## What it can change
 

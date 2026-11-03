@@ -1,8 +1,21 @@
-# Google Workspace plugin from Forever Works
+# Google Workspace
 
-Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts. Gmail, Calendar, Drive, Docs, Sheets, Slides, Tasks, contacts and Meet transcripts.
+Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts.
 
-This plugin adds the Google Workspace MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/google/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/google/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "What's on my calendar this week across both accounts, and does anything
+  clash?"
+- "Find 45 minutes with Ana Popescu next week, mornings first."
+- "Save every PDF that came to my work mailbox as an attachment in September."
+- "Draft a reply to Ana's last email saying Thursday at 10 works. I'll send it
+  myself."
+- "Add these invoices to the Invoices sheet, and update any row whose invoice
+  number is already there."
+- "What did we decide in yesterday's call with Client SRL? Read me the
+  transcript."
 
 ## What it can change
 

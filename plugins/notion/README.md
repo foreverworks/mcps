@@ -1,8 +1,18 @@
-# Notion plugin from Forever Works
+# Notion
 
-Search, read and write your Notion workspaces, with pages as Markdown and typed database queries. Search, pages read and written as Markdown, typed database queries, saved views, comments and files.
+Search, read and write your Notion workspaces, with pages as Markdown and typed database queries.
 
-This plugin adds the Notion MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/notion/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/notion/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Find the Q3 roadmap page in my work workspace and summarise it."
+- "How many rows of the Tasks database are in each Status?"
+- "Show me my Due this week view."
+- "Add 'Thinking in Systems' to the Reading List with status To read and the
+  tag Books."
+- "In the Onboarding page, replace 'Slack' with 'Mattermost' everywhere."
+- "Download the PDFs attached to the Client SRL row of the Contracts database."
 
 ## What it can change
 

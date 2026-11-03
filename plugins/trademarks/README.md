@@ -1,12 +1,21 @@
-# Trademark search plugin from Forever Works
+# Trademark search
 
-Check whether a name is already a registered or pending trademark in the US or the EU. Whether a name is already a registered or pending mark, by office and Nice class (USPTO, EUIPO), and a US mark's history and documents.
+Check whether a name is already a registered or pending trademark in the US or the EU.
 
-This plugin adds the Trademark search MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/trademarks/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/trademarks/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Is Turnip already a trademark for software, in the US or the EU?"
+- "Search Blue Night in classes 9 and 42, dead marks included, and show me what
+  sounds alike."
+- "Which live US marks contain the word talon and cover mobile applications?"
+- "What happened in the file of the closest US match? Was it opposed?"
+- "Save the office actions in that mark's file since January 2025 as one PDF."
 
 ## What it can change
 
-It has 6 tools, and every one only reads.
+All 6 of its tools only read, so it cannot change anything.
 
 ## Install
 

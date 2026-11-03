@@ -1,8 +1,18 @@
-# ANAF e-Factura plugin from Forever Works
+# ANAF e-Factura
 
-Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF. Read the invoices a company received and sent, check and render them, file new invoices and e-Transport declarations, and look up companies in the VAT registry.
+Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF.
 
-This plugin adds the ANAF e-Factura MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/anaf-efactura/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/anaf-efactura/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Which invoices did suppliers send us in the last two weeks?"
+- "Download the newest invoice we received, check ANAF's seal on it, and list
+  its lines."
+- "Is RO87654329 a VAT payer, and does it apply VAT on collection?"
+- "Invoice Client SRL for 10 hours of consulting at 500 RON an hour plus 21%
+  VAT, have ANAF validate it, and file it in the test environment."
+- "How many days are left on our ANAF authorization?"
 
 ## What it can change
 

@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-bitwarden",
+  "displayName": "Bitwarden",
   "version": "0.2.1",
   "description": "Give your assistant its own Bitwarden vault for logins, passwords, 2FA codes and passkeys.",
   "author": {

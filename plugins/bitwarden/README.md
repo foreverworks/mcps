@@ -1,8 +1,23 @@
-# Bitwarden plugin from Forever Works
+# Bitwarden
 
-Give your assistant its own Bitwarden vault for logins, passwords, 2FA codes and passkeys. Find, create and update logins, store secure notes, generate and hand out passwords, compute 2FA codes, check passwords against known breaches, and register and sign in with passkeys.
+Give your assistant its own Bitwarden vault for logins, passwords, 2FA codes and passkeys.
 
-This plugin adds the Bitwarden MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/bitwarden/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/bitwarden/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Create a login for example.com with the username bot@example.com and a
+  32-character password without symbols."
+- "Which logins do we have saved for example.com?"
+- "What is the current 2FA code for the Example Shop login?"
+- "Generate a new password for the Example Shop login, and keep the old one in
+  case the site refuses the change."
+- "Is the password of any of our Example Cloud logins in a known breach?"
+- "Store the key in example-key.json as a secure note called 'Example Cloud
+  deploy key'."
+- "Move the Example Shop login into the Shared collection."
+- "Which passkeys does the vault hold for example.com?"
+- "Import the passkeys in example-export.json, then delete the file."
 
 ## What it can change
 

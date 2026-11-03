@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-anaf-spv",
+  "displayName": "ANAF SPV",
   "version": "0.1.2",
   "description": "Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations.",
   "author": {

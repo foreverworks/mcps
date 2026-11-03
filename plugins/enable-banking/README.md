@@ -1,8 +1,18 @@
-# Enable Banking plugin from Forever Works
+# Enable Banking
 
-Read, search and export statements and balances from banks across Europe, without moving money. Read and search statements across accounts, export them as CSV, read balances, and manage the consents; it moves no money.
+Read, search and export statements and balances from banks across Europe, without moving money.
 
-This plugin adds the Enable Banking MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/enable-banking/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/enable-banking/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Which bank consents do we have, and when does each one run out?"
+- "What did we pay Example Supplier SRL this year?"
+- "Show incoming payments over 1,000 RON in September, across all our
+  accounts."
+- "What is the available balance on our EUR account?"
+- "Export last quarter's transactions as CSV for our accountant."
+- "Our consent with Example Bank ends next week. Renew it."
 
 ## What it can change
 

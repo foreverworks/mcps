@@ -1,5 +1,6 @@
 {
   "name": "foreverworks-trademarks",
+  "displayName": "Trademark search",
   "version": "0.1.2",
   "description": "Check whether a name is already a registered or pending trademark in the US or the EU.",
   "author": {

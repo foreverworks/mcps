@@ -1,8 +1,18 @@
-# ANAF SPV plugin from Forever Works
+# ANAF SPV
 
-Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations. Download what ANAF posts to a taxpayer, request new documents, validate declarations and file a D212; it signs in by itself.
+Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations.
 
-This plugin adds the ANAF SPV MCP server from [Forever Works](https://foreverworks.github.io/mcps/) to Claude Code and Cursor. [Its documentation](https://foreverworks.github.io/mcps/servers/anaf-spv/) says what you need before you start, what each tool does, and what to do when something goes wrong.
+Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/). It runs on your own computer, in Claude Code or Cursor, and [its documentation](https://foreverworks.github.io/mcps/servers/anaf-spv/) walks you through setup, every tool, and what to do when something goes wrong.
+
+## What you can ask
+
+- "Is there anything new from ANAF in my SPV?"
+- "Download the decision ANAF posted last week into my 2026-10 folder."
+- "Ask ANAF for my Obligatii de plata statement and save it when it arrives."
+- "Save every SPV document I have not saved yet."
+- "Check the D300 for September in d300-2026-09.xml with ANAF's validator.
+  How much VAT does it make payable?"
+- "What is the status of the filing INTERNT-123456789-2026?"
 
 ## What it can change
 

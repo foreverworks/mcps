@@ -1,8 +1,10 @@
 /**
  * A plugin's README.md, which Claude's directory shows as the listing's
- * description and Cursor's marketplace shows beside it. Every sentence about
- * the server comes from its package.json `mcp` block, its npm description
- * and its README's tool tables (which check-docs holds to the code); the
+ * description and Cursor's marketplace shows beside it, so it is written to
+ * sell: what the reader gets first, then the questions they can ask. Every
+ * sentence about the server comes from its package.json `mcp` block and its
+ * README's "What you can ask" section and tool tables (which check-docs holds
+ * to the code); the
  * rest is the same for every plugin and true of every one. The full
  * documentation stays the server's own README, which this links to.
  */
@@ -10,11 +12,21 @@ import { pluginNameOf, privacyUrl, SITE, type Input, type Manifest } from "../pa
 import { accessOf } from "../readme.js";
 import { pinnedCommand, type Marketplace } from "./manifests.js";
 
-/** The npm description's details, after its head (`MCP server for X: ...`), as a sentence. */
-const detailsOf = (description: string): string => {
-  const colon = description.indexOf(": ");
-  const details = colon === -1 ? description : description.slice(colon + 2);
-  return `${details.charAt(0).toUpperCase()}${details.slice(1)}${details.endsWith(".") ? "" : "."}`;
+/**
+ * The questions a reader can ask, as the server's README lists them under
+ * "What you can ask" (a section check-docs requires): the lines between that
+ * heading and the next, verbatim, so the listing sells with the README's own
+ * examples and never a second copy of them.
+ */
+export const questionsOf = (readme: string, server: string): string => {
+  const lines = readme.split("\n");
+  const start = lines.findIndex((line) => line.trim() === "## What you can ask");
+  if (start === -1) throw new Error(`servers/${server}/README.md has no "What you can ask" section`);
+  const rest = lines.slice(start + 1);
+  const end = rest.findIndex((line) => line.startsWith("## "));
+  const section = (end === -1 ? rest : rest.slice(0, end)).join("\n").trim();
+  if (section === "") throw new Error(`servers/${server}/README.md has an empty "What you can ask" section`);
+  return section;
 };
 
 /** `a`, `b` and `c`. */
@@ -39,7 +51,7 @@ const reachOf = (readme: string): string => {
     ].join(" ");
   }
   if (access.some(([, a]) => a === "write")) return `${count}. Some of them change things in your account, and none moves money.`;
-  return `${count}, and ${access.length === 1 ? "it" : "every one"} only reads.`;
+  return `${access.length === 1 ? "Its one tool only reads" : `All ${access.length} of its tools only read`}, so it cannot change anything.`;
 };
 
 const cell = (text: string): string => text.replace(/\|/g, "\\|");
@@ -65,11 +77,15 @@ export const pluginReadme = (m: Manifest, readme: string, market: Marketplace): 
   const node = m.node.replace(/^>=\s*/, "");
   const source = `${m.repository.url}/blob/main/${m.repository.directory}/README.md`;
   return [
-    `# ${m.title} plugin from ${publisher}`,
+    `# ${m.title}`,
     "",
-    `${m.tagline} ${detailsOf(m.description)}`,
+    m.tagline,
     "",
-    `This plugin adds the ${m.title} MCP server from [${publisher}](${SITE}) to Claude Code and Cursor. [Its documentation](${m.homepage}) says what you need before you start, what each tool does, and what to do when something goes wrong.`,
+    `Free and open source, from [${publisher}](${SITE}). It runs on your own computer, in Claude Code or Cursor, and [its documentation](${m.homepage}) walks you through setup, every tool, and what to do when something goes wrong.`,
+    "",
+    "## What you can ask",
+    "",
+    questionsOf(readme, m.server),
     "",
     "## What it can change",
     "",

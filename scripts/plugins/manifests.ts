@@ -31,6 +31,7 @@ export const pinnedCommand = (m: Manifest): { readonly command: string; readonly
  */
 export const claudePlugin = (m: Manifest, publisher: string): Readonly<Record<string, unknown>> => ({
   name: pluginNameOf(m.server),
+  displayName: m.title,
   version: m.version,
   description: m.tagline,
   author: { name: publisher, url: SITE },
@@ -131,7 +132,13 @@ export const claudeMarketplace = (market: Marketplace, listed: readonly Manifest
   name: market.name,
   owner: { name: market.publisher, url: SITE },
   description: market.description,
-  plugins: listed.map((m) => ({ name: pluginNameOf(m.server), source: `./${PLUGINS_DIR}/${m.server}`, description: m.tagline, version: m.version })),
+  plugins: listed.map((m) => ({
+    name: pluginNameOf(m.server),
+    displayName: m.title,
+    source: `./${PLUGINS_DIR}/${m.server}`,
+    description: m.tagline,
+    version: m.version,
+  })),
 });
 
 /** Cursor's `.cursor-plugin/marketplace.json`: each plugin by its folder under `pluginRoot`. */
