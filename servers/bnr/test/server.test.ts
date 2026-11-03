@@ -5,8 +5,9 @@
  * www.bnr.ro addresses answer with. No network.
  */
 import { readFileSync } from "node:fs";
+import { request } from "node:http";
 
-import { checkPolicy, connectInMemory, guard, McpServer } from "@foreverworks/mcp-kit";
+import { checkPolicy, connectInMemory, guard, MCP_PATH, McpServer, serve } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
 import { buildDeps } from "../src/composition.js";
@@ -41,17 +42,20 @@ const FILES: Readonly<Record<string, { readonly status?: number; readonly text: 
 /** 2026-10-18 08:00 in Bucharest, a Sunday. */
 const NOW = Date.UTC(2026, 9, 18, 5, 0, 0);
 
-const connected = async () => {
-  const clock = { t: NOW };
-  const asked: string[] = [];
-  const fetch = (async (input: Parameters<typeof globalThis.fetch>[0]) => {
+/** curs.bnr.ro, answering FILES; each path asked is pushed to `asked`. */
+const fakeBnr = (asked: string[]): typeof globalThis.fetch =>
+  (async (input: Parameters<typeof globalThis.fetch>[0]) => {
     const url = new URL(String(input));
     asked.push(url.pathname);
     const file = url.origin === "https://curs.bnr.ro" ? FILES[url.pathname] : undefined;
     if (file === undefined) return new Response("<html><body>Not Found</body></html>", { status: 404, headers: { "content-type": "text/html" } });
     return new Response(file.text, { status: file.status ?? 200, headers: { "content-type": file.type ?? "text/xml" } });
   }) as typeof globalThis.fetch;
-  const deps = buildDeps({ fetch, now: () => clock.t, sleep: async () => undefined });
+
+const connected = async () => {
+  const clock = { t: NOW };
+  const asked: string[] = [];
+  const deps = buildDeps({ fetch: fakeBnr(asked), now: () => clock.t, sleep: async () => undefined });
   const server = new McpServer({ name: "bnr", version: "test" });
   registerAll(guard(server, { service: "bnr", policy: POLICY, log: () => undefined }), deps);
   const client = await connectInMemory(server);
@@ -301,5 +305,39 @@ describe("the tool surface", () => {
     const { tools } = await s.client.listTools();
     await expect(`${JSON.stringify(tools, null, 2)}\n`).toMatchFileSnapshot("./tools.snapshot.json");
     expect(() => checkPolicy("bnr", (server) => registerAll(server, buildDeps()), POLICY)).not.toThrow();
+  });
+});
+
+describe("served publicly, with no sign-in", () => {
+  it("starts, since every tool reads, and answers a caller the proxy forwards, with no token", async () => {
+    const deps = buildDeps({ fetch: fakeBnr([]), now: () => NOW, sleep: async () => undefined });
+    const audit: string[] = [];
+    const served = await serve({
+      name: "bnr",
+      version: "test",
+      policy: POLICY,
+      register: (server) => registerAll(server, deps),
+      env: { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_CLIENT_IP_HEADER: "cf-connecting-ip" },
+      log: (line) => audit.push(line),
+    });
+    try {
+      // As the proxy forwards it: the public Host, the caller's address in its header, and no Authorization.
+      const answer = await new Promise<{ readonly status: number; readonly body: string }>((resolve, reject) => {
+        const headers = { host: "rates.example.com", "cf-connecting-ip": "192.0.2.10", "content-type": "application/json", accept: "application/json, text/event-stream" };
+        const req = request(`http://127.0.0.1:${served.port}${MCP_PATH}`, { method: "POST", headers }, (res) => {
+          const chunks: Buffer[] = [];
+          res.on("data", (chunk: Buffer) => chunks.push(chunk));
+          res.on("end", () => resolve({ status: res.statusCode ?? 0, body: Buffer.concat(chunks).toString("utf8") }));
+        });
+        req.on("error", reject);
+        req.end(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "rate", arguments: { currency: "EUR", date: "2026-10-17" } } }));
+      });
+      expect(answer.status).toBe(200);
+      const result = (JSON.parse(answer.body) as { result: { content: { text: string }[] } }).result;
+      expect(JSON.parse(result.content[0]?.text ?? "{}")).toMatchObject({ rate: "5.0910", published_on: "2026-10-16" });
+      expect(audit.map((line) => JSON.parse(line.replace(/^audit /, "")) as Record<string, unknown>)).toEqual([expect.objectContaining({ tool: "rate", client: "public", outcome: "ok" })]);
+    } finally {
+      await served.close();
+    }
   });
 });

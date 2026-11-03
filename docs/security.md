@@ -15,7 +15,7 @@ report a vulnerability, see [SECURITY.md](../SECURITY.md).
 | **A model gets a payload slightly wrong**: a retyped file, an amount, an id, one wrong character that nothing notices until an accountant does. | Strict inputs, exact decimals, checked responses ([exact data](#exact-data)), and files by path or with a checksum ([files going in](#files-going-in)). |
 | **A credential leaks** into a log, an error message, a tool result, a test fixture or a repository. | Secrets from files, credentials blanked in error bodies, an audit line without arguments, tests that cannot reach a real credential ([secrets](#secrets)). |
 | **A server is talked into reaching somewhere else**: a URL pointed at an internal service, a path pointed at another file. | An egress list and an OS sandbox ([the network](#the-network)), and file roots that refuse links ([files going in](#files-going-in)). |
-| **Something other than the intended client reaches the server**: another process or a web page on the same machine. | Loopback only, a bearer token per client, refused preflights and foreign `Host` headers ([the network](#the-network)). |
+| **Something other than the intended client reaches the server**: another process or a web page on the same machine. | Loopback only, a bearer token per client, refused preflights and foreign `Host` headers ([the network](#the-network)). A server open to anyone on purpose runs reads only ([a public server](#a-public-server)). |
 
 ## Where the protections stop
 
@@ -203,6 +203,24 @@ the path does.
 - **Egress**: `MCP_EGRESS_ALLOW` narrows outbound fetches to the server's
   hosts, refused before a connection is made. The OS sandbox is the outer wall
   ([below](#running-a-server-as-a-service)).
+
+### A public server
+
+`MCP_HTTP_PUBLIC_HOSTS` replaces the tokens: anyone who reaches the public
+address through the reverse proxy in front may call the server, with no
+sign-in, as ChatGPT and Claude do when they connect to a server by its URL
+alone. Because anyone can, the server refuses to start unless every tool a
+call could run is `read`; a `write` or `money` tool may stay registered only
+when a `read` ceiling (`MCP_MAX_ACCESS=read`) refuses every call to it, and
+the startup check asks the same function the guard refuses calls by. Read is not public: a read tool over a mailbox would read it
+to anyone, so make public only a server whose data already is. Each caller's
+address has its own rate limit, taken from the header the proxy sets, with
+the map of callers bounded so that a flood of addresses cannot grow memory.
+The audit line names every caller `public` and never logs an address. The
+server still listens on loopback only; TLS, the firewall and any static page
+are the proxy's, and `Host` headers other than the public names and loopback
+get a 421. File roots are refused, since anyone could read them
+([configuration.md](configuration.md#a-public-server-with-no-sign-in)).
 
 ## Secrets
 

@@ -69,11 +69,13 @@ export {
   type ClientTokens,
 } from "./serve.js";
 export type { Product } from "./serve/icons.js";
+export { PUBLIC_CLIENT, type PublicHost } from "./serve/public.js";
 export { idempotentWrites, isIdempotent, mergePolicies, needsPerson, summaryFrom, unclassified, type Access, type Confirmation, type ConfirmedRule, type ToolArgs, type ToolPolicy, type ToolRule } from "./policy.js";
 export { ALL_TOOLSETS, toolsetPolicy, toolsetsFrom, type Toolsets } from "./toolsets.js";
 export { ACCESS_META, annotationsFor, auditText, guard, registeredNames, REQUIRES_USER_META, requestContext, type AuditLine, type GuardOptions, type ServerVocabulary } from "./serve/guard.js";
 export {
   ACCESS_ORDER,
+  ceilingRefusing,
   CONFIRM_MODES,
   DEFAULT_SETTINGS,
   describeSettings,
@@ -83,7 +85,7 @@ export {
   type GuardSettings,
 } from "./serve/confirm.js";
 export { asGuardError, failGuard, guardRemedy, type GuardError } from "./guardErrors.js";
-export { DEFAULT_LIMITS, egressFrom, hostAllowed, limitsFrom, take, type Bucket, type Limits } from "./serve/limits.js";
+export { admit, DEFAULT_LIMITS, egressFrom, hostAllowed, limitsFrom, MAX_CALLERS, take, type Bucket, type Limits } from "./serve/limits.js";
 export type { DeepReadonly, OutputOf, Wire } from "./readonly.js";
 export { makeHttp, NOT_JSON, OUTCOME_UNKNOWN, redactCredentials, type HttpAuth, type HttpFailure, type HttpOptions, type HttpPolicy, type HttpRequest, type Query, type RequestSpec, type Sleep } from "./http.js";
 export { epochNow, fileTokenStore, makeTokenSource, memoryTokenStore, type Minted, type TokenSource, type TokenSourceOptions, type TokenStore } from "./tokens.js";

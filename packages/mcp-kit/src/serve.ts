@@ -12,7 +12,8 @@ import { describeSettings, type GuardSettings, guardSettingsFrom } from "./serve
 import { installEgress, installKeepAlive } from "./serve/egress.js";
 import { guard, registeredNames, requestContext, type ServerVocabulary } from "./serve/guard.js";
 import { toolIconsOf, type Product } from "./serve/icons.js";
-import { egressFrom, limitsFrom, take, type Bucket, type Limits } from "./serve/limits.js";
+import { admit, egressFrom, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
+import { callerKey, checkPublic, clientIpHeaderFrom, hostAccepted, PUBLIC_CLIENT, publicHostsFrom, type PublicHost } from "./serve/public.js";
 import { shareClientRoots, shareRootsOf } from "./clientRoots.js";
 import { unclassified, type ToolPolicy } from "./policy.js";
 
@@ -22,7 +23,9 @@ import { unclassified, type ToolPolicy } from "./policy.js";
  * stdio is the default: a session spawns the server and owns it. HTTP is the
  * same server run ONCE on the box, as a service every session connects to.
  * What a server registers does not change with the transport; only how it is
- * reached, and, over HTTP, who may reach it and how often.
+ * reached, and, over HTTP, who may reach it and how often: a client with a
+ * bearer token, or, for a server that only reads public data, anyone
+ * (serve/public.ts).
  */
 
 /** Where the one HTTP route lives. Anything else is a 404. */
@@ -33,27 +36,57 @@ export type ClientTokenFiles =
   | { readonly kind: "dir"; readonly dir: string }
   | { readonly kind: "file"; readonly file: string; readonly client: string };
 
-export type Listen = { readonly kind: "stdio" } | { readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles };
+export type Listen =
+  | { readonly kind: "stdio" }
+  | { readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles }
+  /** Anyone may call, with no sign-in, through a proxy that forwards these hosts; callers told apart by `clientIpHeader`, else the connection. */
+  | { readonly kind: "public"; readonly port: number; readonly hosts: readonly PublicHost[]; readonly clientIpHeader?: string };
 
 /**
  * The transport, read from the environment: MCP_HTTP_PORT switches to HTTP, and
- * then MCP_HTTP_TOKENS_DIR (one `token-<client>` file per client, as systemd's
- * credentials directory holds them) or MCP_HTTP_TOKEN_FILE (one token, for the
- * client MCP_HTTP_TOKEN_CLIENT, default `default`) is mandatory. A plain throw,
- * not a tagged failure: this is a process that must not start.
+ * then who may call is mandatory. Either MCP_HTTP_TOKENS_DIR (one
+ * `token-<client>` file per client, as systemd's credentials directory holds
+ * them) or MCP_HTTP_TOKEN_FILE (one token, for the client
+ * MCP_HTTP_TOKEN_CLIENT, default `default`); or MCP_HTTP_PUBLIC_HOSTS, the
+ * public names a proxy forwards, for a server anyone may call
+ * (serve/public.ts), with MCP_HTTP_CLIENT_IP_HEADER naming the header that
+ * carries each caller's address. Tokens and public hosts together are a
+ * contradiction, and so are public hosts and file roots: with no sign-in,
+ * anyone could read the files there through a tool that takes a path.
+ *
+ * A plain throw, not a tagged failure: this is a process that must not start.
  */
 export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
   const port = env["MCP_HTTP_PORT"]?.trim();
-  if (!port) return { kind: "stdio" };
+  const publicHosts = env["MCP_HTTP_PUBLIC_HOSTS"]?.trim();
+  if (!port) {
+    if (publicHosts) throw new Error("MCP_HTTP_PUBLIC_HOSTS is set without MCP_HTTP_PORT: there is no HTTP listener to make public");
+    return { kind: "stdio" };
+  }
   const parsed = Number(port);
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
     throw new Error(`MCP_HTTP_PORT "${port}" is not a port`);
   }
+  const ipHeader = env["MCP_HTTP_CLIENT_IP_HEADER"]?.trim();
+  const tokenSettings = ["MCP_HTTP_TOKENS_DIR", "MCP_HTTP_TOKEN_FILE"].filter((name) => env[name]?.trim());
+  if (publicHosts) {
+    if (tokenSettings.length > 0) {
+      throw new Error(`MCP_HTTP_PUBLIC_HOSTS and ${tokenSettings.join(" and ")} are both set: a server is either open to anyone or behind tokens, not both`);
+    }
+    if (env["MCP_FILE_ROOTS"]?.trim()) {
+      throw new Error("MCP_HTTP_PUBLIC_HOSTS and MCP_FILE_ROOTS are both set: with no sign-in, anyone could read the files there through a tool that takes a path");
+    }
+    return { kind: "public", port: parsed, hosts: publicHostsFrom(publicHosts), ...(ipHeader ? { clientIpHeader: clientIpHeaderFrom(ipHeader) } : {}) };
+  }
+  if (ipHeader) throw new Error("MCP_HTTP_CLIENT_IP_HEADER is set without MCP_HTTP_PUBLIC_HOSTS: a caller with a token is told apart by its token");
   const dir = env["MCP_HTTP_TOKENS_DIR"]?.trim();
   if (dir) return { kind: "http", port: parsed, tokens: { kind: "dir", dir } };
   const file = env["MCP_HTTP_TOKEN_FILE"]?.trim();
   if (file) return { kind: "http", port: parsed, tokens: { kind: "file", file, client: env["MCP_HTTP_TOKEN_CLIENT"]?.trim() || "default" } };
-  throw new Error("MCP_HTTP_PORT is set without MCP_HTTP_TOKENS_DIR or MCP_HTTP_TOKEN_FILE: the server would answer anyone on this machine");
+  throw new Error(
+    "MCP_HTTP_PORT is set without MCP_HTTP_TOKENS_DIR or MCP_HTTP_TOKEN_FILE: the server would answer anyone on this machine " +
+      "(MCP_HTTP_PUBLIC_HOSTS serves one whose tools only read, to anyone, on purpose)",
+  );
 };
 
 /** client label -> token */
@@ -267,6 +300,42 @@ export const asksProgress = (body: unknown): boolean =>
   });
 
 /**
+ * Who may come in over HTTP: how a request names its caller, or is turned
+ * away (undefined: a 401), which public Host headers it may carry besides the
+ * loopback ones, and how the startup line says so.
+ */
+type Door = {
+  /** The caller's client name, for the guard and the audit line, and the key its rate limit counts under. */
+  readonly callerOf: (req: IncomingMessage) => { readonly client: string; readonly bucket: string } | undefined;
+  readonly publicHosts: readonly PublicHost[];
+  readonly describe: string;
+};
+
+/** A client presents its bearer token; its name is its identity and its bucket. */
+const tokenDoor = (tokens: ClientTokens): Door => ({
+  callerOf: (req) => {
+    const client = clientFor(req.headers.authorization, tokens);
+    return client === undefined ? undefined : { client, bucket: client };
+  },
+  publicHosts: [],
+  describe: `for ${[...tokens.keys()].join(", ")}`,
+});
+
+/** Anyone comes in, all as the one client `public`; each address has its own bucket. */
+const publicDoor = (hosts: readonly PublicHost[], clientIpHeader: string | undefined): Door => ({
+  callerOf: (req) => ({
+    client: PUBLIC_CLIENT,
+    bucket: callerKey(clientIpHeader === undefined ? undefined : req.headers[clientIpHeader], req.socket.remoteAddress),
+  }),
+  publicHosts: hosts,
+  describe:
+    `for anyone, with no sign-in, as ${hosts.map((h) => (h.port === 443 ? h.name : `${h.name}:${h.port}`)).join(", ")}; ` +
+    (clientIpHeader === undefined
+      ? "callers told apart by the connection's address (behind a proxy that is the proxy's: set MCP_HTTP_CLIENT_IP_HEADER)"
+      : `callers told apart by ${clientIpHeader}`),
+});
+
+/**
  * Stateless: no session id, and a fresh server per request. Nothing about a
  * connection outlives its request, so a restart of the service costs a session
  * only the call that was in flight, and a client that hangs up cancels its
@@ -279,25 +348,25 @@ export const asksProgress = (body: unknown): boolean =>
  * responses, or a stream for a call that asks for progress (asksProgress).
  * Kept so because plain clients (a script with curl) read one JSON answer.
  */
-const serveHttp = async (runtime: Runtime, port: number, tokens: ClientTokens, limits: Limits): Promise<Served> => {
+const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits): Promise<Served> => {
   const { options } = runtime;
   const buckets = new Map<string, Bucket>();
-  const hostsFor = (bound: number): readonly string[] => [`127.0.0.1:${bound}`, `localhost:${bound}`];
-  const state = { hosts: [] as readonly string[] };
+  const state = { bound: 0 };
   const onerror = (error: Error): void => console.error(`${options.name}: request failed:`, error);
   const modern = createMcpHandler(({ era }) => fresh(runtime, era, "http"), { legacy: "reject", onerror, maxRequestBodySize: limits.maxBodyBytes });
   const serveModern = toNodeHandler(modern, { onerror, maxRequestBodySize: limits.maxBodyBytes });
 
   const answer = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
-    const client = clientFor(req.headers.authorization, tokens);
-    if (client === undefined) return reply(res, 401, "unauthorized");
-    // A DNS-rebinding page cannot present the token anyway; this refuses a stray Host too.
-    if (!state.hosts.includes(req.headers.host ?? "")) return reply(res, 421, "wrong host");
+    const caller = door.callerOf(req);
+    if (caller === undefined) return reply(res, 401, "unauthorized");
+    const { client } = caller;
+    // A DNS-rebinding page cannot present a token anyway; this refuses a stray Host too, and on a public server it is the only check.
+    if (!hostAccepted(req.headers.host, state.bound, door.publicHosts)) return reply(res, 421, "wrong host");
     if (new URL(req.url ?? "/", "http://localhost").pathname !== MCP_PATH) return reply(res, 404, "not found");
+    // Also a CORS preflight, answered with no CORS headers: ChatGPT and Claude call from their servers, never from a page.
     if (req.method !== "POST") return reply(res, 405, "stateless server: POST only");
 
-    const step = take(buckets.get(client), Date.now(), limits);
-    buckets.set(client, step.bucket);
+    const step = admit(buckets, caller.bucket, Date.now(), limits);
     if (!step.allowed) return reply(res, 429, "too many requests", { "retry-after": String(step.retryAfterSec) });
 
     const read = await readBody(req, limits.maxBodyBytes);
@@ -338,12 +407,9 @@ const serveHttp = async (runtime: Runtime, port: number, tokens: ClientTokens, l
     http.listen(port, "127.0.0.1", resolve);
   });
   const bound = (http.address() as AddressInfo).port;
-  state.hosts = hostsFor(bound);
+  state.bound = bound;
   // stderr, never stdout: the rule every server here keeps, whatever the transport.
-  console.error(
-    `${options.name}: listening on http://127.0.0.1:${bound}${MCP_PATH} for ${[...tokens.keys()].join(", ")}; ` +
-      describeSettings(runtime.settings),
-  );
+  console.error(`${options.name}: listening on http://127.0.0.1:${bound}${MCP_PATH} ${door.describe}; ${describeSettings(runtime.settings)}`);
   return {
     port: bound,
     address: (http.address() as AddressInfo).address,
@@ -358,16 +424,23 @@ export const serve = async (options: ServeOptions): Promise<Served> => {
   const env = options.env ?? process.env;
   checkPolicy(options.name, options.register, options.policy);
   const listen = listenFrom(env);
+  const settings = options.settings ?? guardSettingsFrom(env);
+  if (listen.kind === "public") checkPublic(options.name, options.policy, settings);
   const egress = egressFrom(env);
   if (egress !== undefined) installEgress(egress);
   installKeepAlive(env);
   const runtime: Runtime = {
     options,
     toolIcons: toolIconsOf(options.name, options.policy, options.products ?? []),
-    settings: options.settings ?? guardSettingsFrom(env),
+    settings,
     log: options.log ?? ((line: string) => console.error(line)),
   };
-  return listen.kind === "stdio"
-    ? serveStdio(runtime)
-    : serveHttp(runtime, listen.port, await loadTokens(listen.tokens), limitsFrom(env));
+  switch (listen.kind) {
+    case "stdio":
+      return serveStdio(runtime);
+    case "http":
+      return serveHttp(runtime, listen.port, tokenDoor(await loadTokens(listen.tokens)), limitsFrom(env));
+    case "public":
+      return serveHttp(runtime, listen.port, publicDoor(listen.hosts, listen.clientIpHeader), limitsFrom(env));
+  }
 };

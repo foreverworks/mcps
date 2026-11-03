@@ -16,8 +16,12 @@ describe("smokeTarget", () => {
     });
   });
 
-  it("refuses a URL without a token file, and a URL that is not one", () => {
-    expect(() => smokeTarget({ MCP_URL: "http://127.0.0.1:3000/mcp" })).toThrow(/MCP_TOKEN_FILE/);
+  it("talks to a public server with no token file", () => {
+    expect(smokeTarget({ MCP_URL: "https://rates.example.com/mcp" })).toEqual({ kind: "http", url: new URL("https://rates.example.com/mcp") });
+    expect(smokeTarget({ MCP_URL: "https://rates.example.com/mcp", MCP_TOKEN_FILE: "" })).toEqual({ kind: "http", url: new URL("https://rates.example.com/mcp") });
+  });
+
+  it("refuses a URL that is not one", () => {
     expect(() => smokeTarget({ MCP_URL: "3000", MCP_TOKEN_FILE: "/t" })).toThrow();
   });
 });

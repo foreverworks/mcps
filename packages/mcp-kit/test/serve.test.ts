@@ -43,6 +43,43 @@ describe("listenFrom", () => {
     expect(() => listenFrom({ MCP_HTTP_PORT: "http", MCP_HTTP_TOKEN_FILE: "/t" })).toThrow(/not a port/);
     expect(() => listenFrom({ MCP_HTTP_PORT: "70000", MCP_HTTP_TOKEN_FILE: "/t" })).toThrow(/not a port/);
   });
+
+  it("is public with a list of the hosts a proxy forwards, and the header that carries each caller's address", () => {
+    expect(listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com, rates.example.org:8443" })).toEqual({
+      kind: "public",
+      port: 3000,
+      hosts: [
+        { name: "rates.example.com", port: 443 },
+        { name: "rates.example.org", port: 8443 },
+      ],
+    });
+    expect(listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_CLIENT_IP_HEADER: "X-Forwarded-For", MCP_HTTP_TOKENS_DIR: "" })).toEqual({
+      kind: "public",
+      port: 3000,
+      hosts: [{ name: "rates.example.com", port: 443 }],
+      clientIpHeader: "x-forwarded-for",
+    });
+  });
+
+  it("refuses public hosts with tokens, with file roots, without a port, or listing nothing", () => {
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_TOKEN_FILE: "/t" })).toThrow(
+      /MCP_HTTP_PUBLIC_HOSTS and MCP_HTTP_TOKEN_FILE are both set/,
+    );
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_TOKENS_DIR: "/d" })).toThrow(/MCP_HTTP_TOKENS_DIR are both set/);
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_FILE_ROOTS: "/srv/inbox" })).toThrow(/anyone could read the files/);
+    expect(() => listenFrom({ MCP_HTTP_PUBLIC_HOSTS: "rates.example.com" })).toThrow(/without MCP_HTTP_PORT/);
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: " , " })).toThrow(/names no host/);
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "https://rates.example.com/mcp" })).toThrow(/not a host name/);
+  });
+
+  it("refuses a client address header on a server with tokens, where the token tells callers apart", () => {
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_TOKEN_FILE: "/t", MCP_HTTP_CLIENT_IP_HEADER: "x-forwarded-for" })).toThrow(/without MCP_HTTP_PUBLIC_HOSTS/);
+  });
+
+  it("takes an empty public host list as unset, as every variable", () => {
+    expect(listenFrom({ MCP_HTTP_PUBLIC_HOSTS: "" })).toEqual({ kind: "stdio" });
+    expect(listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "", MCP_HTTP_TOKEN_FILE: "/t" })).toMatchObject({ kind: "http" });
+  });
 });
 
 describe("tokens", () => {
@@ -244,5 +281,113 @@ describe("serve over http, a long call", () => {
     await call;
     await new Promise((resolve) => setTimeout(resolve, 50));
     expect(audit.map((l) => JSON.parse(l.replace(/^audit /, "")) as Record<string, unknown>)).toContainEqual(expect.objectContaining({ tool: "wait", outcome: "cancelled" }));
+  });
+});
+
+describe("serve over http, public", () => {
+  const register = (server: McpServer): void => {
+    server.registerTool("ping", { description: "answers pong", inputSchema: {} }, async () => ({
+      content: [{ type: "text" as const, text: "pong" }],
+    }));
+  };
+  const env = { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_CLIENT_IP_HEADER: "x-forwarded-for", MCP_HTTP_RATE: "1/8" };
+  let served: Served;
+  let url: URL;
+  const audit: string[] = [];
+
+  beforeAll(async () => {
+    served = await serve({ name: "rates", version: "0.0.0", register, policy: { ping: { access: "read" } }, env, log: (line) => audit.push(line) });
+    url = new URL(`http://127.0.0.1:${served.port}${MCP_PATH}`);
+  });
+
+  afterAll(() => served.close());
+
+  /** A POST as the proxy would forward it: the caller's address in x-forwarded-for, and the public Host. */
+  const post = (from: string, body: unknown = { jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }, host = "rates.example.com"): Promise<number> =>
+    new Promise((resolve, reject) => {
+      const headers = { "content-type": "application/json", accept: "application/json, text/event-stream", host, "x-forwarded-for": from };
+      const req = request(url, { method: "POST", headers }, (res) => {
+        res.resume();
+        resolve(res.statusCode ?? 0);
+      });
+      req.on("error", reject);
+      req.end(JSON.stringify(body));
+    });
+
+  it("binds to the loopback address only, as a server with tokens does", () => {
+    expect(served.address).toBe("127.0.0.1");
+  });
+
+  it.each(["legacy", "modern"] as const)("answers initialize, tools/list and tools/call with no Authorization, protocol %s", async (era) => {
+    const client = testClient("test-client", era);
+    // Each protocol from its own address, so the two do not share a bucket.
+    const from = era === "modern" ? "192.0.2.21" : "192.0.2.20";
+    await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { "x-forwarded-for": from } } }));
+    expect((await client.listTools()).tools.map((t) => t.name)).toEqual(["ping"]);
+    expect(await client.callTool({ name: "ping", arguments: {} })).toMatchObject({ content: [{ type: "text" as const, text: "pong" }] });
+    await client.close();
+  });
+
+  it("audits each call as the client `public`, never by address", () => {
+    const lines = audit.map((line) => line.replace(/^audit /, ""));
+    expect(lines.length).toBeGreaterThan(0);
+    expect(JSON.parse(lines[0]!)).toMatchObject({ svc: "rates", tool: "ping", client: "public", access: "read", outcome: "ok" });
+    expect(lines.join("\n")).not.toMatch(/192\.0\.2\./);
+  });
+
+  it("answers the public host with or without its port, and loopback, and refuses another host with a 421", async () => {
+    expect(await post("192.0.2.30")).toBe(200);
+    expect(await post("192.0.2.30", undefined, "rates.example.com:443")).toBe(200);
+    expect(await post("192.0.2.30", undefined, `127.0.0.1:${served.port}`)).toBe(200);
+    expect(await post("192.0.2.30", undefined, "evil.example")).toBe(421);
+    expect(await post("192.0.2.30", undefined, "rates.example.com:8443")).toBe(421);
+  });
+
+  it("limits each caller's address on its own: one over its limit gets 429, another still passes", async () => {
+    const first = await Promise.all(Array.from({ length: 12 }, () => post("198.51.100.7")));
+    expect(first).toContain(429);
+    expect(first.filter((status) => status === 200).length).toBeGreaterThanOrEqual(8);
+    // The proxy appended 198.51.100.7 to what the caller sent: the same caller, whatever it wrote before.
+    expect(await post("203.0.113.99, 198.51.100.7")).toBe(429);
+    expect(await post("198.51.100.8")).toBe(200);
+  });
+
+  it("refuses a GET and a CORS preflight, with no CORS headers", async () => {
+    const preflight = await fetch(url, { method: "OPTIONS", headers: { origin: "https://page.example", "access-control-request-method": "POST" } });
+    expect(preflight.status).toBe(405);
+    expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
+    expect((await fetch(url, { method: "GET" })).status).toBe(405);
+  });
+});
+
+describe("serve over http, public, with tools that are not reads", () => {
+  const register = (server: McpServer): void => {
+    for (const name of ["ping", "label", "pay"]) {
+      server.registerTool(name, { description: name, inputSchema: {} }, async () => ({ content: [{ type: "text" as const, text: name }] }));
+    }
+  };
+  const policy = { ping: { access: "read" }, label: { access: "write" }, pay: { access: "money", summary: () => "pay" } } as const;
+  const env = { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com" };
+
+  it("refuses to start, naming each tool anyone could run", async () => {
+    await expect(serve({ name: "mixed", version: "0.0.0", register, policy, env, log: () => undefined })).rejects.toThrow(
+      /mixed: MCP_HTTP_PUBLIC_HOSTS serves this server with no sign-in, so anyone can call it, and only read tools may run there; label \(write\), pay \(money\) could/,
+    );
+    await expect(serve({ name: "mixed", version: "0.0.0", register, policy, env: { ...env, MCP_MAX_ACCESS: "write" }, log: () => undefined })).rejects.toThrow(/label \(write\) could/);
+  });
+
+  it("starts under a read ceiling, which refuses every call to the others", async () => {
+    const served = await serve({ name: "mixed", version: "0.0.0", register, policy, env: { ...env, MCP_MAX_ACCESS: "read" }, log: () => undefined });
+    try {
+      const client = testClient("test-client");
+      await client.connect(new StreamableHTTPClientTransport(new URL(`http://127.0.0.1:${served.port}${MCP_PATH}`)));
+      expect(await client.callTool({ name: "ping", arguments: {} })).toMatchObject({ content: [{ type: "text" as const, text: "ping" }] });
+      const paid = (await client.callTool({ name: "pay", arguments: {} })) as { isError?: boolean; content: { text: string }[] };
+      expect(paid.isError).toBe(true);
+      expect(JSON.parse(paid.content[0]!.text)).toMatchObject({ error: { kind: "access_denied", access: "money", allowed: "read" } });
+      await client.close();
+    } finally {
+      await served.close();
+    }
   });
 });

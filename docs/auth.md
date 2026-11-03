@@ -46,6 +46,11 @@ asks; every caller is named `stdio`. Over HTTP (`MCP_HTTP_PORT` set,
   `servers/devices` (never an argument).
 - **No OAuth**, no Protected Resource Metadata, no `WWW-Authenticate`
   challenge: nothing off the machine reaches the listener, by design.
+- **Or no sign-in at all, on purpose**: `MCP_HTTP_PUBLIC_HOSTS` opens a
+  server whose tools all read public data to anyone a reverse proxy forwards,
+  as the client `public`, with a rate limit per caller's address. It refuses
+  to start if anything but a read could run
+  ([security.md](security.md#a-public-server)).
 
 ### Layer B today
 

@@ -55,6 +55,19 @@ export const DEFAULT_SETTINGS: GuardSettings = { maxAccess: "money", confirm: "c
 /** Whether `access` is within `ceiling`. */
 export const within = (access: Access, ceiling: Access): boolean => ACCESS_ORDER.indexOf(access) <= ACCESS_ORDER.indexOf(ceiling);
 
+/**
+ * The ceiling that refuses a tool of class `access` to `client`: the server's
+ * own first, then the client's (`client` set). Undefined when the tool runs.
+ * The guard refuses each call by it, and a public server's startup check
+ * (serve/public.ts) reads it, so what the check lets through is exactly what
+ * a call can run.
+ */
+export const ceilingRefusing = (access: Access, settings: GuardSettings, client: string): { readonly allowed: Access; readonly client?: string } | undefined => {
+  if (!within(access, settings.maxAccess)) return { allowed: settings.maxAccess };
+  const own = settings.clientMaxAccess?.[client];
+  return own !== undefined && !within(access, own) ? { allowed: own, client } : undefined;
+};
+
 /** The settings from the environment; a value that is not one of the options is a process that must not start. */
 export const guardSettingsFrom = (env: NodeJS.ProcessEnv): GuardSettings => {
   const max = env["MCP_MAX_ACCESS"]?.trim() || "money";

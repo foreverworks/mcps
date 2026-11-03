@@ -5,7 +5,8 @@
  * that calls a tool in a tight loop would otherwise spend a shared API quota
  * (Oblio allows 30 document calls per 100 s for the whole account) for every
  * other session on the box. So each CLIENT, the label of the token it
- * presented, has its own bucket.
+ * presented, has its own bucket. A public server has no tokens, so there each
+ * caller's address has one (serve/public.ts).
  */
 
 export type Limits = {
@@ -63,6 +64,53 @@ export const take = (
   return refilled >= 1
     ? { bucket: { tokens: refilled - 1, at: nowMs }, allowed: true, retryAfterSec: 0 }
     : { bucket: { tokens: refilled, at: nowMs }, allowed: false, retryAfterSec: Math.max(1, Math.ceil((1 - refilled) / ratePerSec)) };
+};
+
+/**
+ * Whether a bucket has refilled to the brim by `nowMs`. It then holds what a
+ * caller never seen before starts with, so forgetting it changes nothing.
+ */
+export const isFull = (bucket: Bucket, nowMs: number, { ratePerSec, burst }: Pick<Limits, "ratePerSec" | "burst">): boolean =>
+  bucket.tokens + ((nowMs - bucket.at) / 1000) * ratePerSec >= burst;
+
+/**
+ * The most callers whose buckets are kept at once. On a public server the
+ * callers are addresses, which anyone can bring by the thousand. A bucket
+ * keyed by an IPv6 /64 holds about 230 bytes of heap (measured 2026-11-03,
+ * Node 22, 100,000 of them), so this is about 2.3 MB at worst; and at the
+ * default rate a bucket is full again, and forgotten, 10 s after its caller's
+ * last request.
+ */
+export const MAX_CALLERS = 10_000;
+
+/**
+ * One request from `caller`, against the buckets of every caller: `take` on
+ * the caller's own, then what memory needs. The map is the state, kept in the
+ * order callers were last seen, and this is the one function that changes it.
+ *
+ * From the quiet end, a bucket that is full is dropped, which changes nothing
+ * (isFull). When the map is still at `maxCallers`, the quietest caller is
+ * forgotten even though its bucket is not full: that many distinct callers
+ * within seconds is a flood the proxy in front must answer, and forgetting
+ * costs that one caller a fresh burst, where keeping it would cost memory
+ * without bound. A bucket is dropped once at most, so on average a request
+ * costs the same however many callers there are.
+ */
+export const admit = (
+  buckets: Map<string, Bucket>,
+  caller: string,
+  nowMs: number,
+  limits: Pick<Limits, "ratePerSec" | "burst">,
+  maxCallers: number = MAX_CALLERS,
+): { readonly allowed: boolean; readonly retryAfterSec: number } => {
+  const step = take(buckets.get(caller), nowMs, limits);
+  buckets.delete(caller);
+  for (const [key, bucket] of buckets) {
+    if (buckets.size < maxCallers && !isFull(bucket, nowMs, limits)) break;
+    buckets.delete(key);
+  }
+  buckets.set(caller, step.bucket);
+  return { allowed: step.allowed, retryAfterSec: step.retryAfterSec };
 };
 
 /**

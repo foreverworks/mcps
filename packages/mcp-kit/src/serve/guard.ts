@@ -8,7 +8,7 @@ import { inCall, type LinkForPerson, type Progress, progressSender } from "../ca
 import { failGuard } from "../guardErrors.js";
 import { asFailure, failure, outcomeOf } from "../envelope.js";
 import { type Access, type ConfirmedRule, isIdempotent, needsPerson, type ToolArgs, type ToolPolicy, type ToolRule } from "../policy.js";
-import { DEFAULT_SETTINGS, type GuardSettings, within } from "./confirm.js";
+import { ceilingRefusing, DEFAULT_SETTINGS, type GuardSettings, within } from "./confirm.js";
 import { answering, answerTo, canOpenLink, canShowForm, clientCapabilities, digestOf, stateFor } from "./asking.js";
 import { answeredResult } from "./link.js";
 
@@ -391,24 +391,23 @@ const wrapCallback = (
     const started = performance.now();
     const args = (hadSchema ? (cbArgs[0] ?? {}) : {}) as ToolArgs;
     const ctx = hadSchema ? cbArgs[1] : cbArgs[0];
-    const { maxAccess, clientMaxAccess } = options.settings;
     const client = requestContext.getStore()?.client ?? "stdio";
-    const clientCeiling = clientMaxAccess?.[client];
     const call = callOf(ctx);
     const asking: Asking = { server, ctx, tool: name, client, midCall: options.midCall !== false };
     const offered: { link?: LinkForPerson } = {};
     const outcome = await inCall({ ...call, offer: (link) => (offered.link = link) }, async (): Promise<Ran> => {
-      if (!within(rule.access, maxAccess)) {
-        return failGuard({ kind: "access_denied", access: rule.access, allowed: maxAccess, message: `${name} is ${rule.access}; this server runs ${maxAccess} tools at most` });
-      }
-      if (clientCeiling !== undefined && !within(rule.access, clientCeiling)) {
+      const refused = ceilingRefusing(rule.access, options.settings, client);
+      if (refused?.client !== undefined) {
         return failGuard({
           kind: "access_denied",
           access: rule.access,
-          allowed: clientCeiling,
+          allowed: refused.allowed,
           client,
-          message: `${name} is ${rule.access}; client ${client} may run ${clientCeiling} tools at most here`,
+          message: `${name} is ${rule.access}; client ${client} may run ${refused.allowed} tools at most here`,
         });
+      }
+      if (refused !== undefined) {
+        return failGuard({ kind: "access_denied", access: rule.access, allowed: refused.allowed, message: `${name} is ${rule.access}; this server runs ${refused.allowed} tools at most` });
       }
       const answered = await answering(ctx, name, client);
       if (answered?.kind === "link") return linkAnswered(asking, answered);

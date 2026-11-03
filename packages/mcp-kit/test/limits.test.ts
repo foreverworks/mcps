@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { DEFAULT_LIMITS, egressFrom, hostAllowed, limitsFrom, take, type Bucket } from "../src/serve/limits.js";
+import { admit, DEFAULT_LIMITS, egressFrom, hostAllowed, isFull, limitsFrom, take, type Bucket } from "../src/serve/limits.js";
 import { mergePolicies } from "../src/policy.js";
 
 describe("take", () => {
@@ -20,6 +20,43 @@ describe("take", () => {
 
   it("never holds more than the burst", () => {
     expect(take({ tokens: 0, at: 0 }, 1_000_000, limits).bucket.tokens).toBe(2);
+  });
+});
+
+describe("admit", () => {
+  const limits = { ratePerSec: 2, burst: 3 };
+
+  it("keeps a bucket per caller: one at its limit does not hold up another", () => {
+    const buckets = new Map<string, Bucket>();
+    const a = [0, 0, 0, 0].map(() => admit(buckets, "192.0.2.10", 0, limits).allowed);
+    expect(a).toEqual([true, true, true, false]);
+    expect(admit(buckets, "198.51.100.20", 0, limits)).toEqual({ allowed: true, retryAfterSec: 0 });
+    expect(admit(buckets, "192.0.2.10", 0, limits)).toEqual({ allowed: false, retryAfterSec: 1 });
+  });
+
+  it("forgets a caller once its bucket is full again, which changes nothing it is allowed", () => {
+    const buckets = new Map<string, Bucket>();
+    for (let i = 0; i < 50; i += 1) admit(buckets, `192.0.2.${i}`, 0, limits);
+    expect(buckets.size).toBe(50);
+    expect(isFull(buckets.get("192.0.2.0")!, 499, limits)).toBe(false);
+    expect(isFull(buckets.get("192.0.2.0")!, 500, limits)).toBe(true);
+    admit(buckets, "198.51.100.20", 500, limits);
+    expect([...buckets.keys()]).toEqual(["198.51.100.20"]);
+  });
+
+  it("keeps a caller that is still spending, and drops a quiet one", () => {
+    const buckets = new Map<string, Bucket>();
+    admit(buckets, "quiet", 0, limits);
+    for (let t = 0; t <= 2000; t += 100) admit(buckets, "busy", t, limits);
+    expect([...buckets.keys()]).toEqual(["busy"]);
+  });
+
+  it("stays bounded under a flood of callers, forgetting the quietest first", () => {
+    const buckets = new Map<string, Bucket>();
+    for (let i = 0; i < 10_000; i += 1) admit(buckets, `caller-${i}`, i / 1000, limits, 100);
+    expect(buckets.size).toBe(100);
+    expect(buckets.has("caller-9999")).toBe(true);
+    expect(buckets.has("caller-9899")).toBe(false);
   });
 });
 

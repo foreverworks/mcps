@@ -45,13 +45,51 @@ Read by `@foreverworks/mcp-kit`, so by every server.
 | `MCP_HTTP_TOKENS_DIR` | | A directory of `token-<client>` files, one bearer token per client; other files in it are ignored. The client's name is what the audit line, the rate limit and `MCP_CLIENT_MAX_ACCESS` count. An empty file is a client this deployment does not have. |
 | `MCP_HTTP_TOKEN_FILE` | | One token file, for one client, when there is no directory. |
 | `MCP_HTTP_TOKEN_CLIENT` | `default` | The client name for `MCP_HTTP_TOKEN_FILE`. |
+| `MCP_HTTP_PUBLIC_HOSTS` | | Instead of tokens: serve anyone, with no sign-in, as these public host names (`rates.example.com`), separated by commas, each with `:<port>` if clients reach it on a port other than 443. Only for a server whose tools all read; [below](#a-public-server-with-no-sign-in). |
+| `MCP_HTTP_CLIENT_IP_HEADER` | unset: the connection's address | With `MCP_HTTP_PUBLIC_HOSTS`: the header your proxy puts each caller's address in (`cf-connecting-ip`, `x-forwarded-for`), so each address has its own rate limit. |
 
-Over HTTP one of the two token settings is required, and the directory wins
-when both are set. Without a token the server refuses to start, because
-loopback is open to every process and browser on the machine; it also refuses
-a token shorter than 16 characters, and a directory whose token files are all
-empty. Tokens are read once, at startup, so a new or changed one takes a
-restart. [auth.md](auth.md) has what else is possible and planned.
+Over HTTP one of the two token settings, or `MCP_HTTP_PUBLIC_HOSTS`, is
+required, and the directory wins when both token settings are set. Without
+any the server refuses to start, because loopback is open to every process and
+browser on the machine; it also refuses a token shorter than 16 characters,
+and a directory whose token files are all empty. Tokens are read once, at
+startup, so a new or changed one takes a restart. [auth.md](auth.md) has what
+else is possible and planned.
+
+#### A public server, with no sign-in
+
+For a server whose tools only read public data (BNR's exchange rates, say),
+hosted at a public HTTPS address that ChatGPT, Claude or any other client
+connects to with no account. Set `MCP_HTTP_PORT` and `MCP_HTTP_PUBLIC_HOSTS`,
+and put a reverse proxy in front:
+
+```bash
+MCP_HTTP_PORT=8750 MCP_HTTP_PUBLIC_HOSTS=rates.example.com \
+MCP_HTTP_CLIENT_IP_HEADER=cf-connecting-ip npx -y @foreverworks/mcp-bnr
+```
+
+- **Only reads may run.** Anyone can call a public server, so it refuses to
+  start if a `write` or `money` tool could run, and names each one. A server
+  that has some can still be made public with `MCP_MAX_ACCESS=read`: those
+  tools stay listed, say they are disabled, and refuse every call. Read is
+  not the same as public, though: a read tool over a mailbox reads that
+  mailbox to anyone. Make public only a server whose data already is.
+- **It still listens on `127.0.0.1` only.** The proxy owns TLS, the firewall
+  and anything static the address needs (a privacy page, files under
+  `/.well-known/`). It forwards `POST /mcp` with the public `Host` it was
+  reached at, or the loopback one; any other `Host` gets a 421.
+- **Each caller's address has its own rate limit** (`MCP_HTTP_RATE`). Name the
+  header your proxy sets in `MCP_HTTP_CLIENT_IP_HEADER`: its last address is
+  taken, the one the proxy added, so `x-forwarded-for` works when the proxy
+  appends to it. Without it every request seems to come from the proxy, and
+  all callers share one limit. An IPv6 caller counts as its /64. ChatGPT and
+  Claude call from their own servers, so many of their users share a few
+  addresses: keep the rate generous.
+- **Nothing identifies a caller in the log.** Every audit line names the
+  client `public`, never an address.
+- **Not with tokens, and not with `MCP_FILE_ROOTS`**: with no sign-in, anyone
+  could read the files in a root through a tool that takes a path. The server
+  refuses to start with either.
 
 ### Limits (HTTP)
 
@@ -59,7 +97,7 @@ restart. [auth.md](auth.md) has what else is possible and planned.
 |---|---|---|
 | `MCP_HTTP_MAX_BODY` | `4194304` (4 MiB) | The largest request body, in bytes; a larger one gets a 413. |
 | `MCP_HTTP_TIMEOUT_MS` | `900000` (15 min) | The longest a request may take before a 504. |
-| `MCP_HTTP_RATE` | `20/200` | `<per second>/<burst>` per client, as a token bucket; a request over it gets a 429 with `Retry-After`. |
+| `MCP_HTTP_RATE` | `20/200` | `<per second>/<burst>` per client, or per caller's address on a public server, as a token bucket; a request over it gets a 429 with `Retry-After`. |
 
 ### Network
 
@@ -119,7 +157,7 @@ by default over stdio with your environment.
 | Variable | Meaning |
 |---|---|
 | `MCP_URL` | Drive a running server at this URL (`http://127.0.0.1:<port>/mcp`) instead. |
-| `MCP_TOKEN_FILE` | The file holding the bearer token for `MCP_URL`; required with it. |
+| `MCP_TOKEN_FILE` | The file holding the bearer token for `MCP_URL`. Unset, no token is sent, as a public server needs none. |
 
 ## Keeping this page true
 

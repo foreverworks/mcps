@@ -4,12 +4,14 @@
  *
  * With `MCP_URL` set it talks to a RUNNING server over HTTP: where a service
  * holds the grants under its own user, it is the only process that can make a
- * live call at all. The bearer token is read from `MCP_TOKEN_FILE`. Without it
- * the built server in the current directory is spawned over stdio, with the
- * environment given (this process's by default), which is how a developer's
- * own credentials are exercised.
+ * live call at all. The bearer token is read from `MCP_TOKEN_FILE`; without
+ * one none is sent, which suits a public server (MCP_HTTP_PUBLIC_HOSTS), and
+ * any other answers 401. Without `MCP_URL` the built server in the current
+ * directory is spawned over stdio, with the environment given (this process's
+ * by default), which is how a developer's own credentials are exercised.
  *
  *   MCP_URL=http://127.0.0.1:3000/mcp MCP_TOKEN_FILE=/path/to/token npx tsx scripts/smoke.ts
+ *   MCP_URL=https://rates.example.com/mcp npx tsx scripts/smoke.ts
  */
 import { readFileSync } from "node:fs";
 import { Client, type ClientCapabilities, InMemoryTransport, StreamableHTTPClientTransport, type Transport } from "@modelcontextprotocol/client";
@@ -26,15 +28,14 @@ export type SmokeOptions = {
 
 /** Where the smoke client connects, decided from the environment alone. */
 export type SmokeTarget =
-  | { readonly kind: "http"; readonly url: URL; readonly tokenFile: string }
+  | { readonly kind: "http"; readonly url: URL; readonly tokenFile?: string }
   | { readonly kind: "stdio" };
 
 export const smokeTarget = (env: NodeJS.ProcessEnv): SmokeTarget => {
   const url = env["MCP_URL"];
   if (!url) return { kind: "stdio" };
-  const tokenFile = env["MCP_TOKEN_FILE"];
-  if (!tokenFile) throw new Error("MCP_URL needs MCP_TOKEN_FILE, the file holding that service's bearer token");
-  return { kind: "http", url: new URL(url), tokenFile };
+  const tokenFile = env["MCP_TOKEN_FILE"]?.trim();
+  return { kind: "http", url: new URL(url), ...(tokenFile ? { tokenFile } : {}) };
 };
 
 /** This process's environment without its unset entries, as a child's environment. */
@@ -43,9 +44,10 @@ export const definedEnv = (env: NodeJS.ProcessEnv): Record<string, string> =>
 
 const transportFor = (target: SmokeTarget, childEnv: Readonly<Record<string, string>>): Transport =>
   target.kind === "http"
-    ? new StreamableHTTPClientTransport(target.url, {
-        requestInit: { headers: { authorization: `Bearer ${readFileSync(target.tokenFile, "utf8").trim()}` } },
-      })
+    ? new StreamableHTTPClientTransport(
+        target.url,
+        target.tokenFile === undefined ? {} : { requestInit: { headers: { authorization: `Bearer ${readFileSync(target.tokenFile, "utf8").trim()}` } } },
+      )
     : new StdioClientTransport({ command: "node", args: ["dist/index.js"], env: { ...childEnv } });
 
 /** A connected client; the caller closes it. */
