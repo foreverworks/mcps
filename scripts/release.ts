@@ -106,16 +106,41 @@ const npmIsAtLeast = (wanted: readonly number[]): boolean => {
 };
 
 /**
- * Connects each published package to the release workflow, once per package;
- * a package that already names the workflow is left alone. npm asks for the
- * maintainer's second factor, so this runs on their machine, never in CI.
+ * Whether this version reached npm through a trusted publisher, which only a
+ * package that already trusts one can do. Unlike `npm trust list`, it needs no
+ * login: npm shows every version's publisher to anyone. Read from the registry
+ * itself, since npm 12's `npm view _npmUser` prints only "name <email>".
  */
-const trust = (shipping: readonly Workspace[], dryRun: boolean): void => {
+const publishedByTrustedPublisher = async (w: Workspace): Promise<boolean> => {
+  const answer = await fetch(`https://registry.npmjs.org/${w.name.replace("/", "%2f")}/${encodeURIComponent(w.version)}`);
+  if (!answer.ok) return false;
+  const version = (await answer.json()) as { readonly _npmUser?: { readonly trustedPublisher?: unknown } };
+  return version._npmUser?.trustedPublisher !== undefined;
+};
+
+/**
+ * Connects each published package to the release workflow, once per package;
+ * a package that already trusts it is left alone. npm asks for the
+ * maintainer's second factor, so this runs on their machine, never in CI.
+ *
+ * `npm trust list` wants that second factor too, and run with its output
+ * captured it cannot ask, so it fails and proves nothing: on 2026-11-03 it
+ * sent mcp-kit, trusted since 2026-10-31, on to `npm trust github`, whose 409
+ * ("a trusted publisher configuration ... already exists") ended the run before
+ * any package that needed trust. The version's publisher is read first, and a
+ * failed `npm trust github` no longer stops the packages after it.
+ */
+const trust = async (shipping: readonly Workspace[], dryRun: boolean): Promise<void> => {
   if (!npmIsAtLeast(NPM_TRUST)) throw new Error(`npm trust needs npm ${NPM_TRUST.join(".")} or newer: npm install -g npm@latest`);
   const repo = repository();
+  const failed: string[] = [];
   for (const w of shipping) {
     if (!onNpm(w)) {
       console.log(`${w.name}: not on npm yet, so it cannot trust a workflow; publish it first`);
+      continue;
+    }
+    if (await publishedByTrustedPublisher(w)) {
+      console.log(`${w.name}: ${w.version} was published by a trusted publisher, so it trusts one already`);
       continue;
     }
     const listed = spawnSync("npm", ["trust", "list", w.name, "--json"], { cwd: ROOT, encoding: "utf8" });
@@ -123,7 +148,16 @@ const trust = (shipping: readonly Workspace[], dryRun: boolean): void => {
       console.log(`${w.name}: already trusts ${WORKFLOW}`);
       continue;
     }
-    run("npm", ["trust", "github", w.name, "--file", WORKFLOW, "--repo", repo, "--env", ENVIRONMENT, "--allow-publish", "--yes", ...(dryRun ? ["--dry-run"] : [])]);
+    try {
+      run("npm", ["trust", "github", w.name, "--file", WORKFLOW, "--repo", repo, "--env", ENVIRONMENT, "--allow-publish", "--yes", ...(dryRun ? ["--dry-run"] : [])]);
+    } catch {
+      failed.push(w.name);
+      console.log(`${w.name}: npm trust failed, as npm says above (E409 means it trusts a workflow already); going on with the rest`);
+    }
+  }
+  if (failed.length > 0) {
+    console.error(`npm trust failed for ${failed.join(", ")}`);
+    process.exit(1);
   }
 };
 
@@ -152,7 +186,7 @@ const main = async (): Promise<void> => {
   }
   const shipping = all.filter((w) => w.ships && !w.private);
   if (mode === "trust") {
-    trust(shipping, process.argv.includes("--dry-run"));
+    await trust(shipping, process.argv.includes("--dry-run"));
     return;
   }
   const key = process.env["MCP_REGISTRY_PRIVATE_KEY"]?.trim() ?? "";
