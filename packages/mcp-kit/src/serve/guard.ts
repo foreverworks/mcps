@@ -70,14 +70,27 @@ const accountOf = (args: ToolArgs): string | null => {
  * spec's default (true) is the safe reading for a write nobody described.
  * `openWorldHint` is true unless the tool says otherwise: every tool here
  * reaches a service outside the server, and a tool that does not knows it.
+ *
+ * All four are always stated, never left to a client's default: a read is
+ * not destructive, money is, and a write nobody described says the spec's
+ * default out loud. Directories check for them (OpenAI's asks for
+ * `readOnlyHint`, `destructiveHint` and `openWorldHint` on every tool), and a
+ * client that reads a missing hint differently from the spec cannot guess.
  */
 export const annotationsFor = (rule: ToolRule, own: Readonly<Record<string, unknown>> | undefined): Readonly<Record<string, unknown>> => ({
   openWorldHint: true,
   ...own,
   readOnlyHint: rule.access === "read",
-  ...(rule.access === "money" ? { destructiveHint: true } : {}),
+  destructiveHint: destructiveFor(rule, own?.["destructiveHint"]),
   idempotentHint: isIdempotent(rule),
 });
+
+/** A read never destroys and money always may; a write keeps its own word, or the spec's default (true). */
+const destructiveFor = (rule: ToolRule, own: unknown): boolean => {
+  if (rule.access === "read") return false;
+  if (rule.access === "money") return true;
+  return typeof own === "boolean" ? own : true;
+};
 
 /**
  * `tools/list` in name order, whatever order a server registers in. The

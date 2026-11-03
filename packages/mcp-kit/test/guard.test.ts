@@ -76,8 +76,8 @@ describe("guard", () => {
     const { client } = await connect();
     const { tools } = await client.listTools();
     expect(Object.fromEntries(tools.map((t) => [t.name, t.annotations]))).toEqual({
-      read_it: { readOnlyHint: true, idempotentHint: true, openWorldHint: true },
-      lose_it: { readOnlyHint: false, idempotentHint: false, openWorldHint: true },
+      read_it: { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      lose_it: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
       pay_it: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: true },
     });
     expect(Object.fromEntries(tools.map((t) => [t.name, t._meta]))).toEqual({
@@ -253,8 +253,7 @@ describe("guard, a write a person approves (confirm: true)", () => {
     const { client, tool, audit } = await connectPrint(ALL);
     const listed = await tool();
     expect(listed?._meta).toEqual({ [ACCESS_META]: "write", [REQUIRES_USER_META]: true });
-    expect(listed?.annotations).toMatchObject({ readOnlyHint: false });
-    expect(listed?.annotations?.destructiveHint).toBeUndefined();
+    expect(listed?.annotations).toMatchObject({ readOnlyHint: false, destructiveHint: true });
     expect(listed?.description).toBe("prints. Acts outside the computer: the client asks the user to approve each call.");
     expect(parse(await client.callTool({ name: "print_it", arguments: { copies: 2 } }))).toEqual({ printed: 2 });
     expect(audit()[0]).toMatchObject({ tool: "print_it", access: "write", outcome: "ok" });

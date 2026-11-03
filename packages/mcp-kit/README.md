@@ -45,7 +45,7 @@ Run it and a client lists `greet` with the annotations its class implies, the
 class itself, and a strict schema:
 
 ```
-"annotations": { "openWorldHint": true, "readOnlyHint": true, "idempotentHint": true },
+"annotations": { "openWorldHint": true, "readOnlyHint": true, "destructiveHint": false, "idempotentHint": true },
 "_meta": { "foreverworks.com/access": "read" },
 "inputSchema": { "properties": { "name": { "type": "string" } }, "additionalProperties": false, ... }
 ```

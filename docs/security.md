@@ -55,14 +55,17 @@ Each tool is:
 
 The guard derives everything else from that class:
 
-- **Annotations.** `readOnlyHint` is true exactly for `read` tools, and
-  `destructiveHint` for `money` tools (a write keeps its own, or the
-  specification's default, destructive). `idempotentHint` is true for a `read`,
-  and for a `write` whose policy line says `idempotent`, which a test proves by
-  calling it twice; never for money, and never on a tool's own say-so, since a
-  client may read it as leave to retry. `openWorldHint` is true unless a tool
-  says otherwise. The class itself is in `_meta["foreverworks.com/access"]`,
-  for a client or a gateway to build rules from.
+- **Annotations.** `readOnlyHint` is true exactly for `read` tools.
+  `destructiveHint` is false for `read` tools and true for `money` tools; a
+  write keeps its own, or says the specification's default, destructive.
+  `idempotentHint` is true for a `read`, and for a `write` whose policy line
+  says `idempotent`, which a test proves by calling it twice; never for money,
+  and never on a tool's own say-so, since a client may read it as leave to
+  retry. `openWorldHint` is true unless a tool says otherwise. All four are
+  always stated, so no client falls back on a default of its own, and
+  directories that require them (OpenAI's does) find them on every tool. The
+  class itself is in `_meta["foreverworks.com/access"]`, for a client or a
+  gateway to build rules from.
 - **Strict inputs.** An argument the tool does not name is refused by name,
   not dropped: a misspelt `days` must not run on the default.
 - **A ceiling.** With `MCP_MAX_ACCESS=read|write|money`, a tool above it stays

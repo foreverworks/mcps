@@ -84,7 +84,7 @@ Every call passes the guard ([`guard.ts`](../packages/mcp-kit/src/serve/guard.ts
 [security.md](security.md#every-call-passes-the-guard) explains step by step.
 Each tool is `read`, `write` or `money` in its server's policy, or the process
 does not start, and clients see the class in the annotations (`readOnlyHint`
-only for `read`, `destructiveHint: true` for `money`) and in
+only for `read`, `destructiveHint` false for `read` and true for `money`) and in
 `_meta["foreverworks.com/access"]`. A `money` call, or one to a `write` marked
 `confirm` such as the printer's print and scan, is confirmed as `MCP_CONFIRM`
 says:
