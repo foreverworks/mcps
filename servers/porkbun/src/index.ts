@@ -1,5 +1,5 @@
 #!/usr/bin/env node
-import { packageIdentity, serve } from "@foreverworks/mcp-kit";
+import { packageIdentity, packageVersion, serve } from "@foreverworks/mcp-kit";
 
 import { buildDeps } from "./composition.js";
 import { instructionsFor } from "./mcp/instructions.js";
@@ -20,7 +20,7 @@ import { loadToolsets } from "./mcp/toolsets.js";
 const main = async (): Promise<void> => {
   const deps = buildDeps();
   const { loaded, policy } = loadToolsets(policyFor(deps.porkbun.catalog));
-  await serve({ name: "porkbun", version: deps.porkbun.vendorVersion, ...packageIdentity(import.meta.url), instructions: instructionsFor(loaded), policy, register: (server) => registerAll(server, deps, policy) });
+  await serve({ name: "porkbun", version: packageVersion(import.meta.url), ...packageIdentity(import.meta.url), instructions: instructionsFor(loaded), policy, register: (server) => registerAll(server, deps, policy) });
 };
 
 main().catch((error: unknown) => {

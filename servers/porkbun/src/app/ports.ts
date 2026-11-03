@@ -17,8 +17,6 @@ export type ToolSpec = {
 
 /** Porkbun, as the vendor's package reaches it. */
 export type PorkbunPort = {
-  /** The pinned `@porkbunllc/mcp-server` version the tools come from. */
-  readonly vendorVersion: string;
   /** The tools offered, in the vendor's order. */
   readonly catalog: readonly ToolSpec[];
   /** Runs one of them. A failure is thrown as this server's AppError. */

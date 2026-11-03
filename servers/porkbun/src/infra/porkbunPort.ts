@@ -1,7 +1,7 @@
 import type { PorkbunPort, ToolArgs } from "../app/ports.js";
 import { fail } from "../domain/errors.js";
 import { classifyVendorError } from "./porkbunPort/vendorErrors.js";
-import { OFFERED_TOOLS, SECRET_FIELDS, VENDOR_VERSION, type VendorConfig, withholdSecrets } from "./vendor.js";
+import { OFFERED_TOOLS, SECRET_FIELDS, type VendorConfig, withholdSecrets } from "./vendor.js";
 
 /**
  * The vendor's tools, run with the config this server built. The handler is
@@ -25,7 +25,6 @@ export const makePorkbunPort = (config: () => Promise<VendorConfig>): PorkbunPor
   };
 
   return {
-    vendorVersion: VENDOR_VERSION,
     catalog: OFFERED_TOOLS.map(({ name, description, inputSchema, annotations }) => ({ name, description, inputSchema, annotations })),
     run,
     secretFields: SECRET_FIELDS,
