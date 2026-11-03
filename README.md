@@ -113,10 +113,10 @@ to set. To run one copy that several clients share over HTTP, see
 
 ## Status
 
-The servers are used every day by the people who wrote them. The servers for
-Romania and for everyone are not on npm yet: until the first release publishes
-them (to npm, the MCP Registry, and a Claude Desktop bundle for each), build
-them from source as above. The [extras](#extras) are never published.
+The servers are used every day by the people who wrote them. The fifteen servers
+for Romania and for everyone are published on npm and listed in the official MCP
+Registry, so `npx` runs each of them without a clone. The [extras](#extras) are
+never published: build them from source as above.
 
 ## Documentation
 
