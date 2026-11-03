@@ -1,5 +1,11 @@
 # @foreverworks/mcp-home-assistant
 
+## 0.1.2
+
+### Patch Changes
+
+- ad0d6fc: No change to the server. This version is the first published by the repository's release workflow through npm's trusted publishing, with no npm token anywhere; `npm view` names GitHub Actions as its publisher.
+
 ## 0.1.1
 
 ### Patch Changes

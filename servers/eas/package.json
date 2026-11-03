@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-eas",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for Expo Application Services: builds, workflow runs with each job's log and why it failed, store submissions with the store's error text, a credentials audit, fingerprints and updates",
   "mcpName": "com.foreverworks/eas",
   "mcp": {

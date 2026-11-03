@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-trademarks",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for trademark registers: whether a name is already a registered or pending mark, by office and Nice class (USPTO, EUIPO), and a US mark's history and documents",
   "mcpName": "com.foreverworks/trademarks",
   "mcp": {

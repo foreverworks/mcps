@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-home-assistant",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for Home Assistant over its REST and WebSocket APIs: entities and their states, areas, history, the logbook, templates, and running actions, with locks, alarms, covers and valves confirmed",
   "mcpName": "com.foreverworks/home-assistant",
   "mcp": {

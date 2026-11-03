@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-app-stores",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for App Store Connect and Google Play: read and answer App Store and Play reviews, and read TestFlight feedback and crash logs",
   "mcpName": "com.foreverworks/app-stores",
   "mcp": {
