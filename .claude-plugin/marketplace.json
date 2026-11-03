@@ -1,0 +1,100 @@
+{
+  "name": "foreverworks-mcps",
+  "owner": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "description": "MCP servers for Google Workspace, Notion, Romanian e-invoicing and company registers, open banking, invoicing, domains, Expo and more, on one shared toolkit",
+  "plugins": [
+    {
+      "name": "foreverworks-anaf-efactura",
+      "source": "./plugins/anaf-efactura",
+      "description": "Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF.",
+      "version": "0.1.1"
+    },
+    {
+      "name": "foreverworks-anaf-spv",
+      "source": "./plugins/anaf-spv",
+      "description": "Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations.",
+      "version": "0.1.2"
+    },
+    {
+      "name": "foreverworks-app-stores",
+      "source": "./plugins/app-stores",
+      "description": "Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs.",
+      "version": "0.1.2"
+    },
+    {
+      "name": "foreverworks-bitwarden",
+      "source": "./plugins/bitwarden",
+      "description": "Give your assistant its own Bitwarden vault for logins, passwords, 2FA codes and passkeys.",
+      "version": "0.2.1"
+    },
+    {
+      "name": "foreverworks-bnr",
+      "source": "./plugins/bnr",
+      "description": "Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.",
+      "version": "0.1.1"
+    },
+    {
+      "name": "foreverworks-eas",
+      "source": "./plugins/eas",
+      "description": "Find out why an Expo build, workflow run or store submission failed, and roll out updates.",
+      "version": "0.1.2"
+    },
+    {
+      "name": "foreverworks-enable-banking",
+      "source": "./plugins/enable-banking",
+      "description": "Read, search and export statements and balances from banks across Europe, without moving money.",
+      "version": "0.1.1"
+    },
+    {
+      "name": "foreverworks-google",
+      "source": "./plugins/google",
+      "description": "Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts.",
+      "version": "0.2.0"
+    },
+    {
+      "name": "foreverworks-home-assistant",
+      "source": "./plugins/home-assistant",
+      "description": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
+      "version": "0.1.2"
+    },
+    {
+      "name": "foreverworks-notion",
+      "source": "./plugins/notion",
+      "description": "Search, read and write your Notion workspaces, with pages as Markdown and typed database queries.",
+      "version": "0.1.1"
+    },
+    {
+      "name": "foreverworks-oblio",
+      "source": "./plugins/oblio",
+      "description": "Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them.",
+      "version": "0.1.1"
+    },
+    {
+      "name": "foreverworks-onrc",
+      "source": "./plugins/onrc",
+      "description": "Follow your filings at Romania's trade register, with their documents, fee notes and invoices.",
+      "version": "0.1.2"
+    },
+    {
+      "name": "foreverworks-porkbun",
+      "source": "./plugins/porkbun",
+      "description": "Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.",
+      "version": "0.1.2"
+    },
+    {
+      "name": "foreverworks-trademarks",
+      "source": "./plugins/trademarks",
+      "description": "Check whether a name is already a registered or pending trademark in the US or the EU.",
+      "version": "0.1.2"
+    },
+    {
+      "name": "foreverworks-typesafe",
+      "source": "./plugins/typesafe",
+      "description": "Get calibrated yes or no answers, choices and scores from TypeSafe's Jev, for one item or 1000 rows.",
+      "version": "0.1.2"
+    }
+  ]
+}

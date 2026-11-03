@@ -1,0 +1,72 @@
+{
+  "name": "foreverworks-mcps",
+  "owner": {
+    "name": "Forever Works"
+  },
+  "metadata": {
+    "description": "MCP servers for Google Workspace, Notion, Romanian e-invoicing and company registers, open banking, invoicing, domains, Expo and more, on one shared toolkit",
+    "pluginRoot": "plugins"
+  },
+  "plugins": [
+    {
+      "name": "foreverworks-anaf-efactura",
+      "source": "anaf-efactura"
+    },
+    {
+      "name": "foreverworks-anaf-spv",
+      "source": "anaf-spv"
+    },
+    {
+      "name": "foreverworks-app-stores",
+      "source": "app-stores"
+    },
+    {
+      "name": "foreverworks-bitwarden",
+      "source": "bitwarden"
+    },
+    {
+      "name": "foreverworks-bnr",
+      "source": "bnr"
+    },
+    {
+      "name": "foreverworks-eas",
+      "source": "eas"
+    },
+    {
+      "name": "foreverworks-enable-banking",
+      "source": "enable-banking"
+    },
+    {
+      "name": "foreverworks-google",
+      "source": "google"
+    },
+    {
+      "name": "foreverworks-home-assistant",
+      "source": "home-assistant"
+    },
+    {
+      "name": "foreverworks-notion",
+      "source": "notion"
+    },
+    {
+      "name": "foreverworks-oblio",
+      "source": "oblio"
+    },
+    {
+      "name": "foreverworks-onrc",
+      "source": "onrc"
+    },
+    {
+      "name": "foreverworks-porkbun",
+      "source": "porkbun"
+    },
+    {
+      "name": "foreverworks-trademarks",
+      "source": "trademarks"
+    },
+    {
+      "name": "foreverworks-typesafe",
+      "source": "typesafe"
+    }
+  ]
+}

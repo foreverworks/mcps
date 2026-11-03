@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "app-stores": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-app-stores@0.1.2"
+      ],
+      "env": {
+        "ASC_KEY_ID": "${user_config.asc_key_id}",
+        "ASC_ISSUER_ID": "${user_config.asc_issuer_id}",
+        "ASC_PRIVATE_KEY_FILE": "${user_config.asc_private_key_file}",
+        "PLAY_SERVICE_ACCOUNT_FILE": "${user_config.play_service_account_file}",
+        "PLAY_PACKAGES": "${user_config.play_packages}"
+      }
+    }
+  }
+}

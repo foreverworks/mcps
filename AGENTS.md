@@ -25,7 +25,9 @@ looks like personal data in any file a commit would carry; typecheck (src,
 tests and scripts), every test, the build, the docs check
 (`scripts/check-docs.ts`): every server must start with an empty environment,
 list every tool it registers in its README with the right access class, and
-document every variable it reads; the pack check
+document every variable it reads; the plugins check
+(`scripts/plugins.ts`): every plugin folder under `plugins/` is what the
+package.json files make it; the pack check
 (`scripts/check-pack.ts`): what npm would publish for each workspace comes from
 tracked sources and nothing else; and the site check (`scripts/site.ts`): the
 site builds from the package.json files and READMEs, and every link in it

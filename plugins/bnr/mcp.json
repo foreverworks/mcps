@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "bnr": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-bnr@0.1.1"
+      ]
+    }
+  }
+}

@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "onrc": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-onrc@0.1.2"
+      ]
+    }
+  }
+}

@@ -1,0 +1,38 @@
+{
+  "name": "foreverworks-eas",
+  "version": "0.1.2",
+  "description": "Find out why an Expo build, workflow run or store submission failed, and roll out updates.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/eas/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "expo",
+    "eas",
+    "react-native"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/eas/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "expo_token_file": {
+      "type": "file",
+      "title": "Expo token file",
+      "description": "Path of a file holding an Expo access token.",
+      "required": true
+    },
+    "eas_project": {
+      "type": "string",
+      "title": "Default project",
+      "description": "The project a call means when it names none, as @account/slug.",
+      "required": false
+    }
+  }
+}

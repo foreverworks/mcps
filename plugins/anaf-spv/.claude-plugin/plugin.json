@@ -1,0 +1,58 @@
+{
+  "name": "foreverworks-anaf-spv",
+  "version": "0.1.2",
+  "description": "Download what ANAF posts to your SPV inbox, request documents, and validate or file declarations.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/anaf-spv/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "anaf",
+    "spv",
+    "tax"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/anaf-spv/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "anaf_spv_username": {
+      "type": "string",
+      "title": "SPV user name",
+      "description": "Your SPV user name, when the password comes from a file.",
+      "required": false
+    },
+    "anaf_spv_password_file": {
+      "type": "file",
+      "title": "SPV password file",
+      "description": "Path of a file holding your SPV password. The README also shows how to read it from a vault MCP server instead.",
+      "required": false
+    },
+    "anaf_spv_mail_mcp_url": {
+      "type": "string",
+      "title": "Mail MCP server URL",
+      "description": "A mail MCP server over Streamable HTTP that reads the mailbox SPV sends its codes to, so a sign-in reads the code by itself. Without one (or a command below), every sign-in asks you for the code.",
+      "required": false
+    },
+    "anaf_spv_mail_mcp_token_file": {
+      "type": "file",
+      "title": "Mail MCP token file",
+      "description": "Path of a file holding that mail server's bearer token, if it wants one.",
+      "required": false
+    },
+    "anaf_spv_mail_mcp_command": {
+      "type": "string",
+      "title": "Mail MCP command",
+      "description": "Instead of a URL: a mail MCP server to start over stdio, as a JSON array such as [\"npx\",\"-y\",\"some-mail-mcp\"].",
+      "required": false
+    }
+  }
+}

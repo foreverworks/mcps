@@ -37,6 +37,10 @@ does not, so on a fresh clone run `npm run kit` once before
 - `check:docs` (`scripts/check-docs.ts`) starts every built server with an empty
   environment and fails when a README's tool tables or configuration disagree
   with the code (see [Writing a server's README](#writing-a-servers-readme)).
+- `check:plugins` (`scripts/plugins.ts`) holds `plugins/`, each published
+  server as a plugin for Claude Code and Cursor, and the repository's two
+  marketplace files to what the package.json files, READMEs, icons and
+  LICENSE make them; `npx tsx scripts/plugins.ts --write` rewrites them.
 - `check:pack` (`scripts/check-pack.ts`) lists what npm would publish for each
   workspace and fails on anything that is not package.json, README, LICENSE,
   a tracked doc, or a dist file compiled from a tracked source. Every build
@@ -199,7 +203,11 @@ and the guard in more depth.
    (its page on the site), and for a server that ships its `mcpName` and its
    registry entry, `server.json`, or for an extras server `"private": true`
    and neither. The check fails while any of
-   them is stale, and on an audience or maturity it does not know.
+   them is stale, and on an audience or maturity it does not know. Once a
+   server that ships is public, `npx tsx scripts/plugins.ts --write` writes
+   its plugin from the same block.
+   An input whose value is itself a secret is typed `secret`, never `text`:
+   a plugin asks for it as a sensitive setting, kept in the system's keychain.
 8. Give it a `CHANGELOG.md` whose first entry says, for a person, what it
    does and which of its tools are `money`, and add `CHANGELOG.md` to its
    package.json `files`.

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "enable-banking": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-enable-banking@0.1.1"
+      ],
+      "env": {
+        "ENABLE_BANKING_CONFIG": "${ENABLE_BANKING_CONFIG}",
+        "ENABLE_BANKING_KEY": "${ENABLE_BANKING_KEY}"
+      }
+    }
+  }
+}

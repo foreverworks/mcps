@@ -1,0 +1,46 @@
+{
+  "name": "foreverworks-home-assistant",
+  "version": "0.1.2",
+  "description": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/home-assistant/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "home-assistant",
+    "smart-home",
+    "home-automation",
+    "iot"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "HOME_ASSISTANT_URL": {
+        "type": "string",
+        "title": "Home Assistant address",
+        "description": "The address you open Home Assistant at, such as http://homeassistant.local:8123."
+      },
+      "HOME_ASSISTANT_TOKEN_FILE": {
+        "type": "string",
+        "title": "Long-lived access token file",
+        "description": "Path of a file holding a long-lived access token made in an administrator's Home Assistant profile."
+      },
+      "HOME_ASSISTANT_CONFIRM_DOMAINS": {
+        "type": "string",
+        "title": "Domains to confirm",
+        "description": "Action domains you approve call by call, comma-separated (default lock,alarm_control_panel,cover,valve; none for none).",
+        "default": ""
+      }
+    },
+    "required": [
+      "HOME_ASSISTANT_URL",
+      "HOME_ASSISTANT_TOKEN_FILE"
+    ]
+  }
+}

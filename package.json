@@ -19,14 +19,15 @@
     "build": "npm run build --workspaces --if-present",
     "test": "npm run test --workspaces --if-present && vitest run --config scripts/vitest.config.ts",
     "typecheck": "npm run typecheck --workspaces --if-present && tsc -p tsconfig.scripts.json",
-    "check": "npm run check:personal-data && npm run typecheck && npm run test && npm run build && npm run check:docs && npm run check:pack && npm run check:site",
+    "check": "npm run check:personal-data && npm run typecheck && npm run test && npm run build && npm run check:docs && npm run check:plugins && npm run check:pack && npm run check:site",
     "postbuild": "touch .built",
     "check:personal-data": "tsx scripts/personal-data.ts",
     "check:docs": "tsx scripts/check-docs.ts",
+    "check:plugins": "tsx scripts/plugins.ts",
     "check:pack": "tsx scripts/check-pack.ts",
     "check:site": "tsx scripts/site.ts",
     "changeset": "changeset",
-    "release:version": "changeset version && npm install --package-lock-only && npm run build && tsx scripts/check-docs.ts --write",
+    "release:version": "changeset version && npm install --package-lock-only && npm run build && tsx scripts/check-docs.ts --write && tsx scripts/plugins.ts --write",
     "bundle": "tsx scripts/bundle.ts"
   },
   "devDependencies": {

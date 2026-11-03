@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "trademarks": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-trademarks@0.1.2"
+      ],
+      "env": {
+        "USPTO_TSDR_API_KEY_FILE": "${user_config.uspto_tsdr_api_key_file}",
+        "EUIPO_CLIENT_ID_FILE": "${user_config.euipo_client_id_file}",
+        "EUIPO_CLIENT_SECRET_FILE": "${user_config.euipo_client_secret_file}"
+      }
+    }
+  }
+}

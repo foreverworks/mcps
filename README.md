@@ -131,7 +131,10 @@ them from source as above. The [extras](#extras) are never published.
 - [Architecture](docs/architecture.md): how a server and the toolkit are built.
 - [Roadmap](docs/feature-plan.md): what other MCP servers do that these do not
   yet, what is done, and what is still open.
-- [Releasing](docs/releasing.md): how packages reach npm and the MCP Registry.
+- [Releasing](docs/releasing.md): how packages reach npm and the MCP Registry,
+  and the [plugins](plugins) made from them for Claude Code and Cursor.
+- [Privacy](https://foreverworks.github.io/mcps/privacy/): what the servers do
+  with your data.
 
 ## Contributing
 

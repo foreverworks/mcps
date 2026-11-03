@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "typesafe": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-typesafe@0.1.2"
+      ],
+      "env": {
+        "TYPESAFE_API_KEY_FILE": "${user_config.typesafe_api_key_file}"
+      }
+    }
+  }
+}

@@ -1,0 +1,37 @@
+{
+  "name": "foreverworks-anaf-efactura",
+  "version": "0.1.1",
+  "description": "Read, check and file a Romanian company's e-invoices and e-Transport declarations with ANAF.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/anaf-efactura/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "e-factura",
+    "anaf",
+    "efactura",
+    "e-invoicing",
+    "ubl"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "ANAF_CONFIG": {
+        "type": "string",
+        "title": "ANAF app.json",
+        "description": "Path of app.json: the OAuth app you registered with ANAF (its client id and secret, the callback URL) and the company's CIF, as the README shows. lookup_company, validate_invoice and parse_invoice work without it."
+      }
+    },
+    "required": [
+      "ANAF_CONFIG"
+    ]
+  }
+}

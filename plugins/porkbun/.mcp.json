@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "porkbun": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-porkbun@0.1.2"
+      ],
+      "env": {
+        "PORKBUN_API_KEY_FILE": "${user_config.porkbun_api_key_file}",
+        "PORKBUN_SECRET_API_KEY_FILE": "${user_config.porkbun_secret_api_key_file}",
+        "PORKBUN_OUTBOX_DIR": "${user_config.porkbun_outbox_dir}",
+        "PORKBUN_TOOLSETS": "${user_config.porkbun_toolsets}"
+      }
+    }
+  }
+}

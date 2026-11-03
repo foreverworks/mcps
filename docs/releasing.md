@@ -39,8 +39,9 @@ what ([What the workflow does](#what-the-workflow-does)).
    or the release fails.
 2. **Version.** `npm run release:version` turns the pending changesets into
    versions and changelog entries (and deletes them), updates the lockfile,
-   builds, and regenerates every `server.json` and README install block.
-   Review the diff and commit it.
+   builds, and regenerates every `server.json`, README install block and
+   [plugin](#plugins-for-claude-and-cursor), whose `npx` command pins the new
+   version. Review the diff and commit it.
 3. **Check the plan.** `npx tsx scripts/release.ts plan` lists what would go
    to npm and to the registry, and sends nothing.
 4. **Rehearse it**, if anything about the release itself changed (a package
@@ -269,6 +270,36 @@ LICENSE, checked and packed by the mcpb CLI. Its name has no version, so each
 README's link to the latest release finds it. CI builds the bundle of every
 server that ships on each push; to try one in Claude Desktop, run
 `npm run build && npm run bundle -- --out bundles oblio`.
+
+## Plugins for Claude and Cursor
+
+Each server that ships and is public also has a plugin folder,
+`plugins/<server>/`, which Claude's plugin directory
+([claude.ai/directory/manage](https://claude.ai/directory/manage)) and
+Cursor's marketplace ([cursor.com/marketplace/publish](https://cursor.com/marketplace/publish))
+take as a submission, and the repository's root holds a marketplace for each
+(`.claude-plugin/marketplace.json`, `.cursor-plugin/marketplace.json`), so
+`/plugin install foreverworks-<server> --marketplace foreverworks/mcps` works
+in Claude Code without either listing. A plugin starts the published package
+with `npx`, pinned to its exact version as Claude's directory requires, and
+asks for the server's `mcp.inputs` as its settings.
+
+`scripts/plugins.ts` writes every file of them from the package.json files,
+the READMEs' tool tables, the icons and the LICENSE, and `npm run check`
+fails while one differs from what it would write; nothing in `plugins/` is
+edited by hand. `npm run release:version` rewrites them, so the release
+commit carries the new pins. Between that commit and the publish, a plugin
+names a version npm does not have yet, so cut the release soon after.
+
+A plugin listing links to the site's [privacy page](https://foreverworks.github.io/mcps/privacy/),
+`privacyPage` in `scripts/site/pages.ts`. Read it again before a submission:
+it states what the code does, and a change to the code can make it untrue.
+
+Submitting is by hand, one plugin at a time, and nothing here does it. Before
+a submission, `claude plugin validate --profile directory plugins/<server>`
+runs the directory's own file checks; its reviewers also hold a plugin that
+runs a package from a registry (every one of these), a name that matches a
+known brand, and the policy on tools that move money.
 
 ## Between releases
 

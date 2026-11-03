@@ -1,0 +1,22 @@
+{
+  "name": "foreverworks-bnr",
+  "version": "0.1.1",
+  "description": "Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/bnr/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "bnr",
+    "exchange-rates",
+    "anaf"
+  ],
+  "logo": "assets/icon.png"
+}

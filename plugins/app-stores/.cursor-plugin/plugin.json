@@ -1,0 +1,56 @@
+{
+  "name": "foreverworks-app-stores",
+  "version": "0.1.2",
+  "description": "Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/app-stores/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "app-store-connect",
+    "google-play",
+    "testflight",
+    "reviews"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "ASC_KEY_ID": {
+        "type": "string",
+        "title": "App Store Connect key id",
+        "description": "For the App Store: the App Store Connect API key's id (10 characters).",
+        "default": ""
+      },
+      "ASC_ISSUER_ID": {
+        "type": "string",
+        "title": "App Store Connect issuer id",
+        "description": "For the App Store: the issuer id App Store Connect shows above your team keys.",
+        "default": ""
+      },
+      "ASC_PRIVATE_KEY_FILE": {
+        "type": "string",
+        "title": "App Store Connect key (.p8)",
+        "description": "For the App Store: path of the .p8 key file App Store Connect let you download.",
+        "default": ""
+      },
+      "PLAY_SERVICE_ACCOUNT_FILE": {
+        "type": "string",
+        "title": "Google Play service account key",
+        "description": "For Google Play: path of the service account's JSON key.",
+        "default": ""
+      },
+      "PLAY_PACKAGES": {
+        "type": "string",
+        "title": "Google Play package names",
+        "description": "For Google Play: the package names to answer for, comma-separated, e.g. com.example.app.",
+        "default": ""
+      }
+    }
+  }
+}

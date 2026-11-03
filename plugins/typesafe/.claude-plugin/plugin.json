@@ -1,0 +1,31 @@
+{
+  "name": "foreverworks-typesafe",
+  "version": "0.1.2",
+  "description": "Get calibrated yes or no answers, choices and scores from TypeSafe's Jev, for one item or 1000 rows.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/typesafe/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "typesafe",
+    "classification"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/typesafe/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "typesafe_api_key_file": {
+      "type": "file",
+      "title": "API key file",
+      "description": "Path of a file holding your TypeSafe API key.",
+      "required": true
+    }
+  }
+}

@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "eas": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-eas@0.1.2"
+      ],
+      "env": {
+        "EXPO_TOKEN_FILE": "${EXPO_TOKEN_FILE}",
+        "EAS_PROJECT": "${EAS_PROJECT}"
+      }
+    }
+  }
+}

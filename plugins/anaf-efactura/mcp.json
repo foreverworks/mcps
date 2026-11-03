@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "anaf-efactura": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-anaf-efactura@0.1.1"
+      ],
+      "env": {
+        "ANAF_CONFIG": "${ANAF_CONFIG}"
+      }
+    }
+  }
+}

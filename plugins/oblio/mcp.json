@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "oblio": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-oblio@0.1.1"
+      ],
+      "env": {
+        "OBLIO_CONFIG": "${OBLIO_CONFIG}"
+      }
+    }
+  }
+}

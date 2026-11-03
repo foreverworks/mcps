@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "notion": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-notion@0.1.1"
+      ],
+      "env": {
+        "NOTION_TOKENS_DIR": "${user_config.notion_tokens_dir}"
+      }
+    }
+  }
+}

@@ -1,0 +1,34 @@
+{
+  "name": "foreverworks-oblio",
+  "version": "0.1.1",
+  "description": "Issue and track a Romanian company's invoices on Oblio, with totals computed as ANAF checks them.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/oblio/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "oblio",
+    "invoicing"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "OBLIO_CONFIG": {
+        "type": "string",
+        "title": "Oblio app.json",
+        "description": "Path of app.json: your Oblio login email, API secret and the company's CIF, as the README describes it."
+      }
+    },
+    "required": [
+      "OBLIO_CONFIG"
+    ]
+  }
+}

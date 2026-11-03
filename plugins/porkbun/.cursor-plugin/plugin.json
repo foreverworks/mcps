@@ -1,0 +1,51 @@
+{
+  "name": "foreverworks-porkbun",
+  "version": "0.1.2",
+  "description": "Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/porkbun/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "porkbun",
+    "dns",
+    "domains"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "PORKBUN_API_KEY_FILE": {
+        "type": "string",
+        "title": "API key file",
+        "description": "Path of a file holding your Porkbun API key (pk1_...)."
+      },
+      "PORKBUN_SECRET_API_KEY_FILE": {
+        "type": "string",
+        "title": "Secret API key file",
+        "description": "Path of a file holding your Porkbun secret API key (sk1_...)."
+      },
+      "PORKBUN_OUTBOX_DIR": {
+        "type": "string",
+        "title": "Folder for saved files",
+        "description": "Where the tools that save a file (an SSL bundle, an invoice PDF, a DNS zone export, a new mailbox's password) write it. Without it those tools answer with a configuration error; every other tool works.",
+        "default": ""
+      },
+      "PORKBUN_TOOLSETS": {
+        "type": "string",
+        "title": "Toolsets to load",
+        "description": "The toolsets whose tools the server loads, separated by commas, e.g. dns,forwards. Empty loads every toolset.",
+        "default": ""
+      }
+    },
+    "required": [
+      "PORKBUN_API_KEY_FILE",
+      "PORKBUN_SECRET_API_KEY_FILE"
+    ]
+  }
+}

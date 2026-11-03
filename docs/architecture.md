@@ -16,8 +16,10 @@ servers/
                   README.md, CHANGELOG.md, package.json and the server.json
                   made from it
 scripts/          repository checks (check-docs, check-pack, access-changes),
-                  packaging and release (packaging, bundle, release), and
-                  the site built from the READMEs (site)
+                  packaging and release (packaging, bundle, release, plugins),
+                  and the site built from the READMEs (site)
+plugins/          each published server as a Claude Code and Cursor plugin,
+                  written by scripts/plugins.ts
 docs/             this documentation
 ```
 

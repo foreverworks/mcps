@@ -1,0 +1,31 @@
+{
+  "name": "foreverworks-notion",
+  "version": "0.1.1",
+  "description": "Search, read and write your Notion workspaces, with pages as Markdown and typed database queries.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/notion/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "notion"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "NOTION_TOKENS_DIR": {
+        "type": "string",
+        "title": "Notion tokens folder",
+        "description": "A folder holding one file per workspace, notion-<label>, each with that workspace's integration token or personal access token."
+      }
+    },
+    "required": [
+      "NOTION_TOKENS_DIR"
+    ]
+  }
+}

@@ -1,0 +1,16 @@
+{
+  "mcpServers": {
+    "home-assistant": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-home-assistant@0.1.2"
+      ],
+      "env": {
+        "HOME_ASSISTANT_URL": "${user_config.home_assistant_url}",
+        "HOME_ASSISTANT_TOKEN_FILE": "${user_config.home_assistant_token_file}",
+        "HOME_ASSISTANT_CONFIRM_DOMAINS": "${user_config.home_assistant_confirm_domains}"
+      }
+    }
+  }
+}

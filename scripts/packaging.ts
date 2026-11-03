@@ -31,9 +31,9 @@
  * file, docs/configuration.md), `text` (a plain value such as a time zone) or
  * `secret` (a value that is itself a secret, for a server with no file
  * variable for it). A secret is never put in a plain field: the registry
- * entry marks it isSecret, a bundle marks it sensitive, a VS Code link asks
- * for it as a password, and a Cursor link, whose configuration is a plain
- * file, leaves it for the person to fill in.
+ * entry marks it isSecret, a bundle and a Claude plugin mark it sensitive, a
+ * VS Code link asks for it as a password, and a Cursor link, whose
+ * configuration is a plain file, leaves it for the person to fill in.
  */
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
@@ -53,8 +53,29 @@ export const SITE = "https://foreverworks.github.io/mcps/";
 /** A server's page on the site: its package.json `homepage`, which check-docs writes. */
 export const homepageOf = (server: string): string => `${SITE}servers/${server}/`;
 
+/** The site's page on what the servers do with a person's data, which a plugin listing links to. */
+export const PRIVACY_PATH = "privacy/";
+export const privacyUrl = `${SITE}${PRIVACY_PATH}`;
+
 /** The npm scope every server is published under, as `mcp-<server>`. */
 const SCOPE = "@foreverworks/";
+
+/**
+ * A server's plugin name (scripts/plugins.ts): the scope's name before it,
+ * `foreverworks-oblio`, so a plugin named after a service (google, notion)
+ * does not read as that service's own.
+ */
+export const pluginNameOf = (server: string): string => `${SCOPE.slice(1, -1)}-${server}`;
+
+/**
+ * Who publishes the servers, as their package.json `author` says it: one
+ * name, which a marketplace and the site give for all of them.
+ */
+export const publisherOf = (manifests: readonly Pick<Manifest, "author">[]): string => {
+  const authors = [...new Set(manifests.map((m) => m.author))];
+  if (authors.length !== 1) throw new Error(`the servers name ${authors.length === 0 ? "no author" : `several authors (${authors.join(", ")})`}; a marketplace and the site name one publisher`);
+  return authors[0] as string;
+};
 
 /** The registry's limit on a description, which is the server's tagline. */
 export const TAGLINE_MAX = 100;
@@ -448,8 +469,8 @@ export const packedEntries = <T>(printed: string): readonly T[] => {
   return Array.isArray(answer) ? (answer as readonly T[]) : Object.values(answer);
 };
 
-/** A variable's id in an installer's prompt or a bundle's user_config: its name in lower case. */
-const keyOf = (input: Input): string => input.name.toLowerCase();
+/** A variable's id in an installer's prompt, a bundle's user_config or a plugin's userConfig: its name in lower case. */
+export const keyOf = (input: Input): string => input.name.toLowerCase();
 
 /** What a prompt says about an input: its sentence, and that it may stay empty. */
 const promptOf = (input: Input): string => (input.required ? input.description : `Optional. ${input.description}`);
@@ -627,9 +648,15 @@ export const installBlock = (m: Manifest): string => {
 /** The `.mcpb` manifest version these bundles follow (modelcontextprotocol/mcpb, MANIFEST.md). */
 export const MCPB_MANIFEST_VERSION = "0.3";
 
-type UserConfig = { readonly type: "file" | "directory" | "string"; readonly title: string; readonly description: string; readonly required: boolean; readonly sensitive?: true };
+/**
+ * One setting a person is asked for, as a desktop bundle's `user_config` and
+ * a Claude plugin's `userConfig` both take it: a path as a file or folder, a
+ * secret as a sensitive field (kept in the system's keychain), and a plain
+ * value as text.
+ */
+export type UserConfig = { readonly type: "file" | "directory" | "string"; readonly title: string; readonly description: string; readonly required: boolean; readonly sensitive?: true };
 
-const userConfig = (input: Input): UserConfig => ({
+export const userConfig = (input: Input): UserConfig => ({
   type: input.type === "file" || input.type === "directory" ? input.type : "string",
   title: input.title,
   description: input.description,
@@ -640,8 +667,7 @@ const userConfig = (input: Input): UserConfig => ({
 /**
  * A server's desktop bundle manifest. The bundle holds the package and its
  * dependencies under node_modules/, and the client runs its bin with its own
- * Node. A path is asked as a file or folder, a secret as a sensitive field
- * (kept in the system's keychain), and a plain value as text.
+ * Node; it asks for each input as `userConfig` says.
  */
 export const bundleManifest = (m: Manifest, tools: readonly { readonly name: string; readonly description: string }[]): Readonly<Record<string, unknown>> => {
   const entry = `node_modules/${m.name}/${m.bin}`;

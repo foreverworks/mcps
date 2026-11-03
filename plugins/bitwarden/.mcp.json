@@ -1,0 +1,17 @@
+{
+  "mcpServers": {
+    "bitwarden": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-bitwarden@0.2.1"
+      ],
+      "env": {
+        "BITWARDEN_CLIENT_ID_FILE": "${user_config.bitwarden_client_id_file}",
+        "BITWARDEN_CLIENT_SECRET_FILE": "${user_config.bitwarden_client_secret_file}",
+        "BITWARDEN_MASTER_PASSWORD_FILE": "${user_config.bitwarden_master_password_file}",
+        "BITWARDEN_SERVER": "${user_config.bitwarden_server}"
+      }
+    }
+  }
+}

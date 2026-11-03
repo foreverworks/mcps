@@ -1,0 +1,39 @@
+{
+  "name": "foreverworks-enable-banking",
+  "version": "0.1.1",
+  "description": "Read, search and export statements and balances from banks across Europe, without moving money.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/enable-banking/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "enable-banking",
+    "psd2",
+    "open-banking",
+    "banking"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/enable-banking/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "enable_banking_config": {
+      "type": "file",
+      "title": "Enable Banking app.json",
+      "description": "Path of app.json: your Enable Banking application's id, its redirect URL and the name of its private key file, as the README describes it.",
+      "required": true
+    },
+    "enable_banking_key": {
+      "type": "file",
+      "title": "Application private key",
+      "description": "Path of the application's private key (PEM), when app.json does not name it.",
+      "required": false
+    }
+  }
+}

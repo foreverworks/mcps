@@ -1,0 +1,43 @@
+{
+  "name": "foreverworks-trademarks",
+  "version": "0.1.2",
+  "description": "Check whether a name is already a registered or pending trademark in the US or the EU.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/trademarks/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "trademarks",
+    "uspto",
+    "euipo"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "USPTO_TSDR_API_KEY_FILE": {
+        "type": "string",
+        "title": "USPTO TSDR API key file",
+        "description": "For US mark histories and documents: path of a file holding a USPTO TSDR API key.",
+        "default": ""
+      },
+      "EUIPO_CLIENT_ID_FILE": {
+        "type": "string",
+        "title": "EUIPO client id file",
+        "description": "For EU marks: path of a file holding the EUIPO app's client id.",
+        "default": ""
+      },
+      "EUIPO_CLIENT_SECRET_FILE": {
+        "type": "string",
+        "title": "EUIPO client secret file",
+        "description": "For EU marks: path of a file holding the EUIPO app's client secret.",
+        "default": ""
+      }
+    }
+  }
+}

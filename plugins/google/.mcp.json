@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "google": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-google@0.2.0"
+      ],
+      "env": {
+        "CALENDAR_TIME_ZONE": "${user_config.calendar_time_zone}",
+        "GOOGLE_TOOLSETS": "${user_config.google_toolsets}"
+      }
+    }
+  }
+}

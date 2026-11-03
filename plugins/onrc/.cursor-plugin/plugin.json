@@ -1,0 +1,21 @@
+{
+  "name": "foreverworks-onrc",
+  "version": "0.1.2",
+  "description": "Follow your filings at Romania's trade register, with their documents, fee notes and invoices.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/onrc/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "onrc",
+    "trade-register"
+  ],
+  "logo": "assets/icon.png"
+}

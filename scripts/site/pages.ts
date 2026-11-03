@@ -6,7 +6,7 @@
  * themselves. No sentence here describes a server; the words around the
  * data are the site's own labels.
  */
-import { AUDIENCE, AUDIENCES, MATURITIES, MATURITY, shipsOf, type Audience, type Manifest } from "../packaging.js";
+import { AUDIENCE, AUDIENCES, MATURITIES, MATURITY, PRIVACY_PATH, shipsOf, type Audience, type Manifest } from "../packaging.js";
 import { relativeUrl } from "./links.js";
 import { escapeHtml as esc, renderInline, renderReadme, sectionsOf, type LinkResolver } from "./markdown.js";
 
@@ -97,6 +97,7 @@ ${f.body}
 <li><a href="${esc(`${f.repository.url}/blob/main/LICENSE`)}">${esc(f.repository.license)} License</a></li>
 <li><a href="${esc(`${f.repository.url}/blob/main/CONTRIBUTING.md`)}">Contributing</a></li>
 <li><a href="${esc(`${f.repository.url}/blob/main/SECURITY.md`)}">Security</a></li>
+<li><a href="${to(PRIVACY_PATH)}">Privacy</a></li>
 <li><a href="${esc(f.repository.url)}">Source on GitHub</a></li>
 </ul>
 </div>
@@ -282,6 +283,59 @@ export const serverPage = (s: Server, repository: Repository, site: string, reso
 ${html}</article>
 </div>`;
   return { path, html: frame({ path, title: `${m.title} · ${repository.name}`, description: m.tagline, body, repository, site, current: m.audience }) };
+};
+
+/**
+ * What the servers, and the plugins made from them, do with a person's data:
+ * the page a plugin listing links to as its privacy policy
+ * (scripts/plugins.ts). Each sentence is a fact of the code, checked when it
+ * was written (2026-11-03): the servers run where their user starts them;
+ * nothing in this repository sends telemetry, analytics or crash reports; a
+ * server's requests go to the services its README names, with the
+ * credentials it is given; its state is in folders on the machine it runs on
+ * (docs/configuration.md); and the site runs no script and loads nothing
+ * from another host. Change a sentence when the code changes it.
+ */
+export const privacyPage = (repository: Repository, site: string, publisher: string): Page => {
+  const path = PRIVACY_PATH;
+  const sections: readonly (readonly [string, string])[] = [
+    [
+      "The servers run on your computer",
+      `Each server is a program that your AI client starts on your own computer, from its npm package, its desktop bundle or a clone of this repository, or that you run as a service on a machine you choose. ${esc(publisher)} runs no server of its own that your data passes through.`,
+    ],
+    [
+      `${esc(publisher)} receives nothing`,
+      `The servers and their plugins send nothing to ${esc(publisher)}: no telemetry, no analytics, no crash reports and no usage counts. There is no account to create with us.`,
+    ],
+    [
+      "Your data goes only to the services you connect",
+      "A server sends requests only to the services its documentation names, with the credentials you give it. It reads those credentials from files and settings on the computer it runs on, and keeps what it saves there too: the grants you give it, its caches and the files it downloads. What a service receives is covered by that service's own privacy policy.",
+    ],
+    [
+      "Installing a server",
+      "When you install a server with npx or as a plugin, your computer downloads its package from the npm registry, and npm's privacy policy covers that download; a desktop bundle comes from this repository's releases on GitHub. A plugin directory or marketplace you install it from has its own policy too.",
+    ],
+    [
+      "This site",
+      "This site is served by GitHub Pages, whose privacy statement covers the requests your browser makes to it. The site sets no cookies of its own, runs no scripts or analytics, and loads nothing from other sites: its fonts and images are its own files.",
+    ],
+    [
+      "Questions",
+      `Ask in an <a href="${esc(`${repository.url}/issues`)}">issue on GitHub</a>. Report a security problem privately, as <a href="${esc(`${repository.url}/blob/main/SECURITY.md`)}">SECURITY.md</a> describes.`,
+    ],
+  ];
+  const lede = `What the servers in ${esc(repository.name)}, and the plugins made from them, do with your data.`;
+  const body = `<nav class="crumbs wrap" aria-label="Breadcrumb"><ol><li><a href="${relativeUrl(path.slice(0, -1), "")}">${esc(repository.name)}</a></li><li><span aria-current="page">Privacy</span></li></ol></nav>
+<header class="page-head wrap">
+<h1>Privacy</h1>
+<p class="lede">${lede}</p>
+</header>
+<div class="wrap">
+<article class="readme">
+${sections.map(([heading, text]) => `<h2>${heading}</h2>\n<p>${text}</p>`).join("\n")}
+</article>
+</div>`;
+  return { path, html: frame({ path, title: `Privacy · ${repository.name}`, description: `What the servers in ${repository.name} do with your data.`, body, repository, site }) };
 };
 
 export const notFoundPage = (repository: Repository, site: string): Page => {

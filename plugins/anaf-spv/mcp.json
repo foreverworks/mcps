@@ -1,0 +1,18 @@
+{
+  "mcpServers": {
+    "anaf-spv": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-anaf-spv@0.1.2"
+      ],
+      "env": {
+        "ANAF_SPV_USERNAME": "${ANAF_SPV_USERNAME}",
+        "ANAF_SPV_PASSWORD_FILE": "${ANAF_SPV_PASSWORD_FILE}",
+        "ANAF_SPV_MAIL_MCP_URL": "${ANAF_SPV_MAIL_MCP_URL}",
+        "ANAF_SPV_MAIL_MCP_TOKEN_FILE": "${ANAF_SPV_MAIL_MCP_TOKEN_FILE}",
+        "ANAF_SPV_MAIL_MCP_COMMAND": "${ANAF_SPV_MAIL_MCP_COMMAND}"
+      }
+    }
+  }
+}

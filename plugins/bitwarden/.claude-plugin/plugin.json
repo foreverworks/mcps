@@ -1,0 +1,50 @@
+{
+  "name": "foreverworks-bitwarden",
+  "version": "0.2.1",
+  "description": "Give your assistant its own Bitwarden vault for logins, passwords, 2FA codes and passkeys.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/bitwarden/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "bitwarden",
+    "passwords",
+    "totp"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/bitwarden/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "bitwarden_client_id_file": {
+      "type": "file",
+      "title": "API key client id file",
+      "description": "Path of a file holding the account's API key client id.",
+      "required": true
+    },
+    "bitwarden_client_secret_file": {
+      "type": "file",
+      "title": "API key client secret file",
+      "description": "Path of a file holding the API key's client secret.",
+      "required": true
+    },
+    "bitwarden_master_password_file": {
+      "type": "file",
+      "title": "Master password file",
+      "description": "Path of a file holding the master password that unlocks the vault.",
+      "required": true
+    },
+    "bitwarden_server": {
+      "type": "string",
+      "title": "Bitwarden server",
+      "description": "A self-hosted or EU server, e.g. https://vault.bitwarden.eu. Leave empty for bitwarden.com.",
+      "required": false
+    }
+  }
+}

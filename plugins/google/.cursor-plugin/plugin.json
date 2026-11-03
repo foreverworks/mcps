@@ -1,0 +1,42 @@
+{
+  "name": "foreverworks-google",
+  "version": "0.2.0",
+  "description": "Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/google/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "google-workspace",
+    "google",
+    "gmail",
+    "calendar",
+    "drive",
+    "docs",
+    "sheets",
+    "slides"
+  ],
+  "logo": "assets/icon.png",
+  "variables": {
+    "type": "object",
+    "properties": {
+      "CALENDAR_TIME_ZONE": {
+        "type": "string",
+        "title": "Calendar time zone",
+        "description": "The time zone a time without an offset is read in, e.g. Europe/Paris.",
+        "default": ""
+      },
+      "GOOGLE_TOOLSETS": {
+        "type": "string",
+        "title": "Products to load",
+        "description": "The products whose tools the server loads, separated by commas, e.g. gmail,calendar. Empty loads every product.",
+        "default": ""
+      }
+    }
+  }
+}
