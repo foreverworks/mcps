@@ -71,6 +71,8 @@ jobs:
         # first publish needs one (docs/releasing.md, The first release).
         env:
           MCP_REGISTRY_PRIVATE_KEY: ${{ secrets.MCP_REGISTRY_PRIVATE_KEY }}
+          # The second wave's first publish; out again once npm trusts the workflow.
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
       # A tag's GitHub release carries every public server's bundle, so each
       # README's link to the newest release finds one.
       - name: Attach the bundles to the release
