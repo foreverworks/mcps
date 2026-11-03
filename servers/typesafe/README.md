@@ -29,9 +29,6 @@ half a second.
 <!-- install:begin -->
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=typesafe&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22typesafe_api_key_file%22%2C%22description%22%3A%22Path%20of%20a%20file%20holding%20your%20TypeSafe%20API%20key.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-typesafe%22%5D%2C%22env%22%3A%7B%22TYPESAFE_API_KEY_FILE%22%3A%22%24%7Binput%3Atypesafe_api_key_file%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=typesafe&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLXR5cGVzYWZlIl0sImVudiI6eyJUWVBFU0FGRV9BUElfS0VZX0ZJTEUiOiIke2VudjpUWVBFU0FGRV9BUElfS0VZX0ZJTEV9In19) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-typesafe.mcpb)
 
-> [!NOTE]
-> `@foreverworks/mcp-typesafe` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
-
 With Claude Code:
 
 ```bash

@@ -1,5 +1,15 @@
 # @foreverworks/mcp-bitwarden
 
+## 0.2.0
+
+### Minor Changes
+
+- 3207f82: The vault is now a passkey authenticator for an agent's own identities, storing passkeys exactly as Bitwarden's own apps do, so either can use the other's. `list_passkeys` lists them without their keys and `assert_passkey` signs a WebAuthn sign-in with one; both are `read`. `create_passkey` registers a new passkey and `import_passkeys` imports the logins that carry passkeys from a Bitwarden JSON export; both are `write`. `delete_passkey` removes one passkey from its login and is `write`, marked destructive: it is the first tool here that removes anything. `health` and `find_logins` now count passkeys, and `NODE_EXTRA_CA_CERTS` is handed to the CLI for a self-hosted server whose certificate your own authority signed.
+
+### Patch Changes
+
+- 40c78ce: Calls that arrive together while the server holds no session key, as they do just after a restart, now share one login and one unlock. Each `bw unlock` stores the vault's key under a new session key and the one before stops opening it, so two unlocks at once left one call with a stale key: `health` answered "the vault is locked after unlocking" and other tools unlocked again in turn, each undoing the other's key. `health` also unlocks once more when the key it holds has gone stale, as every other tool already did.
+
 ## 0.1.1
 
 ### Patch Changes

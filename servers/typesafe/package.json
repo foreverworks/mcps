@@ -1,7 +1,6 @@
 {
   "name": "@foreverworks/mcp-typesafe",
   "version": "0.1.1",
-  "private": true,
   "description": "MCP server for TypeSafe's Jev: typed, calibrated judgments over text or JSON (a yes or no with its probability, one of a set, a score), one at a time or in batches",
   "mcpName": "com.foreverworks/typesafe",
   "mcp": {

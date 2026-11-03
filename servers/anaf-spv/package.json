@@ -1,7 +1,6 @@
 {
   "name": "@foreverworks/mcp-anaf-spv",
   "version": "0.1.1",
-  "private": true,
   "description": "MCP server for ANAF's Spațiul Privat Virtual (pfinternet.anaf.ro): download what ANAF posts to a taxpayer, request new documents, validate declarations and file a D212; it signs in by itself",
   "mcpName": "com.foreverworks/anaf-spv",
   "mcp": {

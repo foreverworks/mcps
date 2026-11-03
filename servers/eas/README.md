@@ -28,9 +28,6 @@ build credits on your Expo plan.
 <!-- install:begin -->
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=eas&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22expo_token_file%22%2C%22description%22%3A%22Path%20of%20a%20file%20holding%20an%20Expo%20access%20token.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22eas_project%22%2C%22description%22%3A%22Optional.%20The%20project%20a%20call%20means%20when%20it%20names%20none%2C%20as%20%40account%2Fslug.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-eas%22%5D%2C%22env%22%3A%7B%22EXPO_TOKEN_FILE%22%3A%22%24%7Binput%3Aexpo_token_file%7D%22%2C%22EAS_PROJECT%22%3A%22%24%7Binput%3Aeas_project%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=eas&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWVhcyJdLCJlbnYiOnsiRVhQT19UT0tFTl9GSUxFIjoiJHtlbnY6RVhQT19UT0tFTl9GSUxFfSIsIkVBU19QUk9KRUNUIjoiJHtlbnY6RUFTX1BST0pFQ1R9In19) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-eas.mcpb)
 
-> [!NOTE]
-> `@foreverworks/mcp-eas` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
-
 With Claude Code:
 
 ```bash

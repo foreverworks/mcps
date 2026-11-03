@@ -1,7 +1,6 @@
 {
   "name": "@foreverworks/mcp-porkbun",
   "version": "0.1.1",
-  "private": true,
   "description": "MCP server for Porkbun domains, DNS and hosting: Porkbun's official tools, served with per-client tokens, an audit line per call, purchases marked for the client to confirm, and files uploaded by path",
   "mcpName": "com.foreverworks/porkbun",
   "mcp": {
