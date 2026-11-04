@@ -74,7 +74,7 @@ claude mcp add bitwarden -e BITWARDEN_CLIENT_ID_FILE="<path to API key client id
 
 In a JSON configuration, the command is `node` and its one argument the full path of `servers/bitwarden/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
-The official CLI, `@bitwarden/cli` (pinned to 2026.10.0), is a dependency of
+The official CLI, `@bitwarden/cli` (pinned to 2026.10.1), is a dependency of
 the package: `npx` and `npm ci` install it with the server, which runs it
 under its own Node and never uses a `bw` on your PATH.
 
