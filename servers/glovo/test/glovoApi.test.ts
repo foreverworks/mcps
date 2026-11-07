@@ -41,7 +41,20 @@ describe("makeGlovoApi", () => {
     expect(f.calls.filter((c) => c.path === REFRESH)).toHaveLength(1);
     const refresh = f.calls.find((c) => c.path === REFRESH);
     expect(JSON.parse(String(refresh?.init.body))).toEqual({ refreshToken: "refresh-jwt" });
-    expect(headersOf(refresh?.init ?? {})["glovo-device-urn"]).toBe("glv:device:test");
+    const refreshHeaders = headersOf(refresh?.init ?? {});
+    expect(refreshHeaders["glovo-device-urn"]).toBe("glv:device:test");
+    // Glovo answers 403 to a refresh without any one of these (measured 2026-11-07).
+    for (const name of [
+      "glovo-app-version",
+      "glovo-client-info",
+      "glovo-language-code",
+      "glovo-perseus-client-id",
+      "glovo-perseus-session-id",
+      "glovo-perseus-session-timestamp",
+      "glovo-request-id",
+    ]) {
+      expect(refreshHeaders[name], name).toBeTruthy();
+    }
     expect(headersOf(f.calls.find((c) => c.path === LIST)?.init ?? {})).toMatchObject({
       authorization: "access-jwt",
       "glovo-app-platform": "web",

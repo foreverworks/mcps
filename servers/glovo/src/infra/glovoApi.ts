@@ -57,11 +57,33 @@ export type GlovoApiOptions = {
   readonly timeoutMs?: number;
 };
 
+/**
+ * The analytics session the web app opens on load. Since early November 2026,
+ * /oauth/refresh answers 403 without these headers, whatever the token
+ * (measured 2026-11-07 by dropping one header at a time from the app's own
+ * request: each of app version, client info, language code, the three Perseus
+ * headers and the request id is required; random UUIDs and the current time are
+ * accepted). One session per process, as one page load is one in the app.
+ */
+const makeSession = (now: () => number) => ({
+  clientId: crypto.randomUUID(),
+  sessionId: crypto.randomUUID(),
+  startedAt: String(now()),
+});
+
 /** What the web app sends on every request, refresh included. */
-const appHeaders = (deviceUrn: string) => ({
+const appHeaders = (deviceUrn: string, session: ReturnType<typeof makeSession>) => ({
   "glovo-app-platform": "web",
   "glovo-app-type": "customer",
+  "glovo-app-version": "N/A",
+  "glovo-client-info": "web-customer-web-react/N/A project:customer-web",
+  "glovo-language-code": LANGUAGE,
   "glovo-device-urn": deviceUrn,
+  "glovo-perseus-client-id": session.clientId,
+  "glovo-perseus-session-id": session.sessionId,
+  "glovo-perseus-session-timestamp": session.startedAt,
+  "glovo-perseus-consent": "essential",
+  "glovo-request-id": crypto.randomUUID(),
 });
 
 export const makeGlovoApi = (credentials: () => Promise<Credentials>, options: GlovoApiOptions = {}): GlovoPort => {
@@ -82,6 +104,7 @@ export const makeGlovoApi = (credentials: () => Promise<Credentials>, options: G
     fetch: doFetch,
   };
 
+  const session = makeSession(now);
   const refreshHttp = makeHttp({ ...policy, fail: asRefreshFailure(REFRESH_PATH) });
   const mint = async (): Promise<Minted> => {
     const { refreshToken, deviceUrn } = await credentials();
@@ -89,7 +112,7 @@ export const makeGlovoApi = (credentials: () => Promise<Credentials>, options: G
       method: "POST",
       idempotent: true,
       json: { refreshToken },
-      headers: appHeaders(deviceUrn),
+      headers: appHeaders(deviceUrn, session),
     });
     if (typeof body?.accessToken === "string" && typeof body.expiresIn === "number") {
       return { token: body.accessToken, expiresAtEpoch: Math.floor(now() / 1000) + body.expiresIn };
@@ -110,7 +133,7 @@ export const makeGlovoApi = (credentials: () => Promise<Credentials>, options: G
     const { deviceUrn } = await credentials();
     const body = await http<T | undefined>(`${BASE}${path}`, {
       ...(query ? { query } : {}),
-      headers: { ...appHeaders(deviceUrn), accept: "application/json", "glovo-api-version": API_VERSION, "glovo-language-code": LANGUAGE },
+      headers: { ...appHeaders(deviceUrn, session), accept: "application/json", "glovo-api-version": API_VERSION },
     });
     return body ?? fail(apiError(200, `${path}: HTTP 200 with no JSON body`));
   };
