@@ -65,7 +65,7 @@ export const registerAll = (server: McpServer, broker: Broker, catalog: Catalog,
         "and its release throws the server away) " +
         "or a build slot (builder:ios, builder:android). " +
         "Answers granted (with the device's address and the environment a tool reads to reach it: ANDROID_SERIAL and ANDROID_ADB_SERVER_PORT for adb, " +
-        "IOS_SIM_MAC (the Mac's ssh target) and IOS_SIM_DEVICE (the simulator's UDID) for simctl, DEVICE_SSH with DEVICE_SSH_PORT and DEVICE_SSH_JUMP where set for a device reached over ssh, " +
+        "IOS_SIM_MAC (the Mac's ssh target) and IOS_SIM_DEVICE (the simulator's UDID) for simctl, DEVICE_SSH with DEVICE_SSH_PORT, DEVICE_SSH_FALLBACK_PORT (a second port to try if that one does not answer) and DEVICE_SSH_JUMP where set for a device reached over ssh, " +
         "whose address may also carry screenshot (and DEVICE_SCREENSHOT): a command to run on it over ssh that writes a PNG of its screen to stdout), " +
         "queued (a ticket: call wait), or unavailable (with the reason, e.g. its host is asleep). " +
         "An Android emulator, a Windows VM, a Batocera box or a server is started for your lease and stopped after it: a granted lease says state booting until the device has " +

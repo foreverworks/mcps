@@ -62,8 +62,15 @@ const schema = z.object({
         variants: z.array(z.object({ profile: z.string().min(1), instance: z.string().min(1) })).optional(),
         // A watch to create and pair with the simulator: `{ name, type }`, as the simulator's own.
         simulator: z.object({ name: z.string().min(1), type: z.string().min(1), watch: z.object({ name: z.string().min(1), type: z.string().min(1) }).optional() }).optional(),
-        // Where its holder reaches a desktop or a Batocera box: an ssh destination, its port, a host to jump through.
-        ssh: z.object({ target: z.string().min(1), port: z.number().int().min(1).max(65535).optional(), jump: z.string().min(1).optional() }).optional(),
+        // Where its holder reaches a desktop or a Batocera box: an ssh destination, its port, a second port the same machine may answer on, a host to jump through.
+        ssh: z
+          .object({
+            target: z.string().min(1),
+            port: z.number().int().min(1).max(65535).optional(),
+            fallback_port: z.number().int().min(1).max(65535).optional(),
+            jump: z.string().min(1).optional(),
+          })
+          .optional(),
         // One line its holder runs on the device over ssh, writing a PNG of its screen to stdout.
         screenshot: z.string().optional(),
         // A spawn slot's own memory cost when it differs from its host's (a VM beside emulators).
@@ -129,7 +136,14 @@ export const parseCatalog = (text: string, box: string): LoadedCatalog => {
         : { simulator: { name: d.simulator.name, type: d.simulator.type, ...(d.simulator.watch === undefined ? {} : { watch: { name: d.simulator.watch.name, type: d.simulator.watch.type } }) } }),
       ...(d.ssh === undefined
         ? {}
-        : { ssh: { target: d.ssh.target, ...(d.ssh.port === undefined ? {} : { port: d.ssh.port }), ...(d.ssh.jump === undefined ? {} : { jump: d.ssh.jump }) } }),
+        : {
+            ssh: {
+              target: d.ssh.target,
+              ...(d.ssh.port === undefined ? {} : { port: d.ssh.port }),
+              ...(d.ssh.fallback_port === undefined ? {} : { fallbackPort: d.ssh.fallback_port }),
+              ...(d.ssh.jump === undefined ? {} : { jump: d.ssh.jump }),
+            },
+          }),
       ...(d.screenshot === undefined ? {} : { screenshot: d.screenshot }),
       ...(d.cost_mib === undefined ? {} : { costMiB: d.cost_mib }),
       ...(d.note === undefined ? {} : { note: d.note }),

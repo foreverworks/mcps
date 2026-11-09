@@ -194,7 +194,7 @@ A device:
 | `variants` | | A started slot only: its other system images, `[{ "profile", "instance" }]`, each started instead of `instance` for a lease that asks for its profile. Each profile declared and served once by the slot; each instance unique per host. |
 | `probe` | | A started slot only: how the broker tells it has booted, and clears it after a dirty lease. Absent: the adb server at `adb.port` on the broker's loopback. `{ "door": <port> }`: the device's own adbd, through a tunnel at that port on the broker's loopback (one device per port). `"unit"`: the control command's `status` says `active` only once it has booted, for a device whose adbd the broker cannot reach (its data is then not cleared after a dirty lease, and only its own tenant ever gets it). |
 | `simulator` | | iOS, required: `{ "name", "type", "watch"? }`, the simulator's name (unique on its Mac, a watch's included) and the device type `simctl create` takes. `watch`, on a `spawn` device only, is `{ "name", "type" }` of a watch the broker creates and pairs with the phone. |
-| `ssh` | | A device reached over ssh (`macos`, `windows`, `batocera`, `server`), required (and refused on a phone): `{ "target", "port"?, "jump"? }`, how its holder reaches it with ssh. |
+| `ssh` | | A device reached over ssh (`macos`, `windows`, `batocera`, `server`), required (and refused on a phone): `{ "target", "port"?, "fallback_port"?, "jump"? }`, how its holder reaches it with ssh. `fallback_port` is a second port the same machine may answer on, tried when `port` does not: a fresh server may still answer on its first boot's 22 until its configuration moves sshd. |
 | `screenshot` | | A device reached over ssh only: one line, a command that, run on the device over its `ssh` address, writes a PNG of its screen to stdout. Its holder gets it as `address.screenshot` and `DEVICE_SCREENSHOT`. The broker never runs it, and has no default: what grabs a screen depends on what the device runs (`ffmpeg ... -f x11grab` for an X display, in the example above). |
 | `cost_mib` | host's | A `spawn` slot that costs its host more or less memory than the host's `cost_mib` (a VM beside emulators). |
 | `tenant` | `default` | Whom it serves: `default` or `guest:<id>` ([Tenants](#tenants)). |
@@ -361,7 +361,7 @@ A granted device lease carries `address`, whose `env` its holder exports:
 |---|---|
 | Android | `DEVICE_ID`, `ANDROID_SERIAL`, `ANDROID_ADB_SERVER_PORT` (adb reads the last two itself) |
 | iOS | `DEVICE_ID`, `IOS_SIM_MAC` (the host's ssh target), `IOS_SIM_DEVICE` (the simulator's UDID, or its name before the broker has seen it), and for a phone with a paired watch `IOS_SIM_WATCH` (the watch's UDID, or its name) |
-| macOS, Windows, Batocera, server | `DEVICE_ID`, `DEVICE_SSH` (an ssh destination), and `DEVICE_SSH_PORT`, `DEVICE_SSH_JUMP` and `DEVICE_SCREENSHOT` where the catalog sets them: `ssh ${DEVICE_SSH_JUMP:+-J "$DEVICE_SSH_JUMP"} -p "${DEVICE_SSH_PORT:-22}" "$DEVICE_SSH"`, and for a screenshot `ssh ... "$DEVICE_SSH" "$DEVICE_SCREENSHOT" > screen.png` |
+| macOS, Windows, Batocera, server | `DEVICE_ID`, `DEVICE_SSH` (an ssh destination), and `DEVICE_SSH_PORT`, `DEVICE_SSH_FALLBACK_PORT` (a second port to try when that one does not answer), `DEVICE_SSH_JUMP` and `DEVICE_SCREENSHOT` where the catalog sets them: `ssh ${DEVICE_SSH_JUMP:+-J "$DEVICE_SSH_JUMP"} -p "${DEVICE_SSH_PORT:-22}" "$DEVICE_SSH"`, and for a screenshot `ssh ... "$DEVICE_SSH" "$DEVICE_SCREENSHOT" > screen.png` |
 
 ### Servers
 
@@ -387,6 +387,10 @@ ssh -i lease_key -p "$DEVICE_SSH_PORT" "$DEVICE_SSH"
 - **Fresh every time.** A server is a spawn slot, stopped after every lease,
   and its control command deletes it on that stop: the next holder starts
   from the image again.
+- **A fallback port for the first boot.** A fresh server may still answer on
+  its fallback port (its first boot's 22) until its configuration moves sshd.
+  When the catalog gives one, the lease carries `DEVICE_SSH_FALLBACK_PORT`:
+  try `DEVICE_SSH_PORT` first, and this one when nothing answers there.
 
 ## Troubleshooting
 

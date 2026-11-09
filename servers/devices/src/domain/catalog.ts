@@ -135,12 +135,14 @@ export type Probe = { readonly kind: "door"; readonly port: number } | { readonl
 
 /**
  * How a device of an SSH_PLATFORMS platform (a desktop, a Batocera box) is reached by its HOLDER: an ssh
- * destination (`user@host`), its port when not 22, and a host to jump through when the machine is only
- * reachable from there (a VM on its host's loopback).
+ * destination (`user@host`), its port when not 22, a host to jump through when the machine is only
+ * reachable from there (a VM on its host's loopback), and a second port the same machine may answer on
+ * (a fresh server's sshd listens on 22 until its configuration moves it), tried when `port` does not answer.
  */
 export type SshAddress = {
   readonly target: string;
   readonly port?: number;
+  readonly fallbackPort?: number;
   readonly jump?: string;
 };
 
@@ -346,6 +348,11 @@ export const catalogProblems = (catalog: Catalog): readonly string[] => {
     if (d.screenshot !== undefined && d.screenshot.trim() === "") problems.push(`device ${d.id} has an empty screenshot command`);
     if (d.screenshot !== undefined && /[\r\n]/.test(d.screenshot)) problems.push(`device ${d.id} has a screenshot command of more than one line`);
     if (d.ssh?.port !== undefined && (!Number.isInteger(d.ssh.port) || d.ssh.port < 1 || d.ssh.port > 65535)) problems.push(`device ${d.id} has ssh port ${d.ssh.port}`);
+    // A fallback port is the same machine on a second port: out of range, or the port it already tries first, is no fallback.
+    if (d.ssh?.fallbackPort !== undefined) {
+      if (!Number.isInteger(d.ssh.fallbackPort) || d.ssh.fallbackPort < 1 || d.ssh.fallbackPort > 65535) problems.push(`device ${d.id} has ssh fallback port ${d.ssh.fallbackPort}`);
+      else if (d.ssh.fallbackPort === (d.ssh.port ?? 22)) problems.push(`device ${d.id} has ssh fallback port ${d.ssh.fallbackPort}, the same as its ssh port`);
+    }
     // A server is started for each lease with its holder's key, and thrown away after it: one that stays would let the last holder in.
     if (d.platform === "server" && d.mode === "fixed") problems.push(`server device ${d.id} is fixed: a server is started for each lease with its holder's key and thrown away after it, so it is a spawn slot`);
     // The Mac's own desktop session is there or not: nothing starts one.

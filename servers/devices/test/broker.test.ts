@@ -2,7 +2,7 @@ import { asGuardError, idempotentWrites, inCall } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
 import { makeBroker, type Broker } from "../src/app/broker.js";
-import { DEFAULT_TENANT, emptyCatalog } from "../src/domain/catalog.js";
+import { catalogProblems, DEFAULT_TENANT, emptyCatalog, type Catalog } from "../src/domain/catalog.js";
 import { RULES } from "../src/domain/state.js";
 import { POLICY } from "../src/mcp/policy.js";
 import {
@@ -881,6 +881,40 @@ describe("a server: a VM started with its holder's ssh key, thrown away after th
     expect(await broker.release({ session: A, want: server, state: "dirty" })).toMatchObject({ status: "released", then: "stopped" });
     await settled();
     expect(world.calls).toEqual([`start ${SERVER_1} with ${KEY}`, `stop ${SERVER_1}`]);
+  });
+
+  it("hands out a fallback port beside the port when the catalog gives one, and none when it does not", async () => {
+    const withFallback = (ssh: { port?: number; fallbackPort?: number }): Catalog => ({
+      ...SERVERS,
+      devices: SERVERS.devices.map((d) => (d.id === "server-1" ? { ...d, ssh: { target: "deploy@192.0.2.20", ...ssh } } : d)),
+    });
+    const broker = brokerFor(makeWorld(SERVER_INSTANCES), withFallback({ port: 2201, fallbackPort: 22 }));
+    expect(await broker.acquire({ want: server, session: A, purpose: "a host test" })).toMatchObject({
+      status: "granted",
+      resource: "server-1",
+      address: { platform: "server", ssh: "deploy@192.0.2.20", port: 2201, fallbackPort: 22, env: { DEVICE_SSH: "deploy@192.0.2.20", DEVICE_SSH_PORT: "2201", DEVICE_SSH_FALLBACK_PORT: "22" } },
+    });
+    // The catalog this suite uses elsewhere has none, and its leases carry neither the field nor the variable.
+    const plain = await servers().broker.acquire({ want: server, session: A, purpose: "a host test" });
+    expect((plain as { address: object }).address).not.toHaveProperty("fallbackPort");
+    expect((plain as { address: { env: Record<string, string> } }).address.env).not.toHaveProperty("DEVICE_SSH_FALLBACK_PORT");
+    // A fallback port may stand alone, with the port left to ssh's own 22.
+    const alone = await brokerFor(makeWorld(SERVER_INSTANCES), withFallback({ fallbackPort: 2222 })).acquire({ want: server, session: A, purpose: "a host test" });
+    expect((alone as { address: { env: Record<string, string> } }).address.env).toMatchObject({ DEVICE_SSH_FALLBACK_PORT: "2222" });
+    expect((alone as { address: { env: Record<string, string> } }).address.env).not.toHaveProperty("DEVICE_SSH_PORT");
+  });
+
+  it("refuses a catalog whose fallback port is out of range or the same as the port", () => {
+    const problems = (ssh: { port?: number; fallbackPort?: number }): readonly string[] =>
+      catalogProblems({ ...SERVERS, devices: SERVERS.devices.map((d) => (d.id === "server-1" ? { ...d, ssh: { target: "deploy@192.0.2.20", ...ssh } } : d)) });
+    expect(problems({ port: 2201, fallbackPort: 22 })).toEqual([]);
+    expect(problems({ fallbackPort: 2222 })).toEqual([]);
+    expect(problems({ port: 2201, fallbackPort: 0 })).toEqual([expect.stringMatching(/server-1 has ssh fallback port 0/)]);
+    expect(problems({ port: 2201, fallbackPort: 65536 })).toEqual([expect.stringMatching(/server-1 has ssh fallback port 65536/)]);
+    expect(problems({ port: 2201, fallbackPort: 22.5 })).toEqual([expect.stringMatching(/server-1 has ssh fallback port 22.5/)]);
+    expect(problems({ port: 2201, fallbackPort: 2201 })).toEqual([expect.stringMatching(/server-1 has ssh fallback port 2201, the same as its ssh port/)]);
+    // With no port, ssh's own 22 is the port tried first.
+    expect(problems({ fallbackPort: 22 })).toEqual([expect.stringMatching(/server-1 has ssh fallback port 22, the same as its ssh port/)]);
   });
 
   it("gives a second session the other server, started with that session's own key", async () => {

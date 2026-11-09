@@ -680,6 +680,14 @@ describe("catalog", () => {
     expect(refused({ mode: "fixed", probe: undefined, instance: undefined })).toMatch(/server device server-1 is fixed: a server is started for each lease with its holder's key/);
     expect(refused({ probe: undefined })).toMatch(/server device server-1 is a spawn slot without probe "unit"/);
     expect(refused({ ssh: undefined })).toMatch(/server device server-1 has no ssh address for its holder/);
+    // A fallback port is a second port for the same machine: it reaches the domain as fallbackPort, and is refused when it is no port or the one already tried first.
+    const parsed = parseCatalog(JSON.stringify({ ...ok, devices: [...base.devices, { ...srv, ssh: { target: "deploy@192.0.2.20", port: 2201, fallback_port: 22 } }] }), "broker-1");
+    expect(parsed.catalog.devices[1]).toMatchObject({ ssh: { target: "deploy@192.0.2.20", port: 2201, fallbackPort: 22 } });
+    expect(catalog.devices[1]?.ssh).not.toHaveProperty("fallbackPort");
+    expect(refused({ ssh: { target: "deploy@192.0.2.20", port: 2201, fallback_port: 70000 } })).not.toBe("accepted");
+    expect(refused({ ssh: { target: "deploy@192.0.2.20", port: 2201, fallback_port: 0 } })).not.toBe("accepted");
+    expect(refused({ ssh: { target: "deploy@192.0.2.20", port: 2201, fallback_port: 2201 } })).toMatch(/server-1 has ssh fallback port 2201, the same as its ssh port/);
+    expect(refused({ ssh: { target: "deploy@192.0.2.20", fallback_port: 22 } })).toMatch(/server-1 has ssh fallback port 22, the same as its ssh port/);
   });
 
   it("parses an android host with no ssh target when it has a control command, and refuses every other without one", () => {
