@@ -216,6 +216,18 @@ and the guard in more depth.
    `icons` to its package.json `files`. Its `serve()` call spreads
    `...packageIdentity(import.meta.url)`, which announces the title, the home
    page and the icon at initialize.
+10. Write its `instructions` for `serve()`. A client hands them to the model
+    at the start of every session, before any tool, and some clients load a
+    tool's description only when the model looks for it, so the instructions
+    may be all the model knows of the server until then. Every sentence is
+    paid for in every session, so they say only what no single tool
+    description can: what the server reaches, in one sentence; the tool to
+    start with; a flow that runs across tools (`build_invoice`, then
+    `validate_invoice`, then `upload_invoice`); and what a model must know
+    before its first call, such as which tool spends money, sends,
+    publishes or acts on something physical, and what to do when a tool
+    answers `needs_login`. Everything else belongs in the tool's own
+    description. The servers here run from 250 to 800 characters.
 
 ## Writing a server's README
 

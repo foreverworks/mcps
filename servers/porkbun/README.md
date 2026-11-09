@@ -490,7 +490,10 @@ version that changes a shape stops the server rather than run on a guess.
 Results are Porkbun's JSON; a failure is
 `{ "error": { kind, message, remedy, code?, status? } }`, sorted from
 Porkbun's error text in `src/infra/porkbunPort/vendorErrors.ts`. Porkbun's
-server instructions are sent at initialize unchanged.
+server instructions are sent at initialize with one change: a client sends
+them with every session, so their paragraph on publishing a site becomes one
+sentence, and the checks it lists (hosting ACTIVE, what is already there, the
+user's OK) are in `deploy_site`'s description.
 
 ### Files instead of typed bytes
 

@@ -21,20 +21,11 @@ import { registerAll } from "./mcp/register.js";
  *   --refresh [--force]  the daily maintenance refresh (cli/refresh.ts)
  */
 const INSTRUCTIONS =
-  "ANAF's e-Factura and e-Transport for one company: the invoices it received and sent, each one's signed " +
-  "archive and PDF, ANAF's own validation of an invoice XML, the VAT registry, and filing an invoice. Start " +
-  "with health: whether the stored grant works, for which CIF, and how many days it has left. list_invoices " +
-  "(the last days, up to 60) or list_invoices_window (a date range, paginated) find messages; download_invoice " +
-  "saves one signed archive to the outbox, checked, and invoice_pdf renders it; parse_invoice reads an " +
-  "invoice (a file, or an archive in the outbox) as JSON without calling ANAF. To issue one, build_invoice " +
-  "writes the XML from fields into the outbox and answers its path; validate_invoice runs ANAF's checks on an " +
-  "XML without filing it. upload_invoice (to a company) and upload_invoice_b2c (to a person) are money: each " +
-  "takes the XML by path, goes to ANAF's test environment unless test is false, does not file the same bytes in " +
-  "production twice, and returns the uploadId upload_status follows. etransport_list reads e-Transport " +
-  "declarations; etransport_file files one from its XML (money, test unless test is false) and etransport_status " +
-  "says when its UIT is valid. lookup_company and validate_invoice need no grant. When health says the " +
-  "grant is near its end, refresh_token renews it; if that fails, begin_authorization returns ANAF's page for " +
-  "the certificate holder to open, and complete_authorization takes the address their browser lands on.";
+  "ANAF's e-Factura and e-Transport for one company: the invoices it received and sent, with their archives, PDFs and contents, " +
+  "ANAF's own validation, the VAT registry, and filing. Start with health: whether the grant works, for which CIF, and for how many" +
+  " more days. To issue an invoice: build_invoice, validate_invoice, then upload_invoice (to a company) or upload_invoice_b2c (to a" +
+  " person), and upload_status. Filing is money, and every filing tool goes to ANAF's test environment unless test is false. When " +
+  "the grant nears its end, refresh_token renews it; if that fails, begin_authorization needs the certificate holder.";
 
 const main = async (): Promise<void> => {
   const argv = process.argv.slice(2);

@@ -6,14 +6,10 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "One Home Assistant instance, over its REST and WebSocket APIs. Start with health: the version, whether it runs, its time zone. " +
-  "list_entities finds entity ids by domain, area or words; get_states reads their states and attributes; list_areas lists areas " +
-  "with their devices and entities; history and logbook look back over a window; render_template answers with a template what no " +
-  "other tool does in one call. list_actions shows the actions and their fields; call_action runs one. Actions on locks, alarms, " +
-  "covers and valves (or the domains this deployment names) go through call_action_confirmed, which the user approves each call. " +
-  "Run only what the user asks for: these act on a home. A call that fails with auth sends nothing more until the token is fixed: " +
-  "Home Assistant counts every refused token as a failed login and may ban this address. When the token's user is not an " +
-  "administrator, render_template and the actions Home Assistant keeps for administrators answer needs_admin without being sent.";
+  "One Home Assistant instance, over its REST and WebSocket APIs. Start with health. list_entities finds entity ids by domain, area" +
+  " or words, and get_states reads them. call_action runs an action; one on a lock, an alarm, a cover or a valve (or another domain" +
+  " this deployment names) goes through call_action_confirmed, which the user approves on every call. Run only what the user asks " +
+  "for: these act on a home.";
 
 /**
  * MCP server for Home Assistant. stdio by default, HTTP when MCP_HTTP_PORT

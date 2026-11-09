@@ -15,13 +15,10 @@ import { registerAll } from "./mcp/register.js";
  * stdio it IS the protocol channel, and a stray line there corrupts the session.
  */
 const INSTRUCTIONS =
-  "Bank accounts through Enable Banking (PSD2), read-only: nothing here moves money. Start with " +
-  "list_stored_sessions, which says which consents exist and when each one expires; list_accounts gives the " +
-  "account uids. Then get_transactions or get_balances. Each statement or balance read spends one of the few " +
-  "reads a bank allows per account per day (about four), so read once and narrow with get_transactions' " +
-  "filters, or export_transactions for a long period. A new or renewed consent needs the account holder: " +
-  "start_auth returns a link they open and approve in their bank, then complete_auth takes the address the " +
-  "bank sends them back to.";
+  "Bank accounts through Enable Banking (PSD2), read-only: nothing here moves money. Start with list_stored_sessions (which " +
+  "consents exist and when each expires), then list_accounts. A bank allows only about four statement or balance reads per account " +
+  "per day: read once, narrow with get_transactions' filters, or use export_transactions for a long period. A new or renewed " +
+  "consent needs the account holder: start_auth, then complete_auth.";
 
 const main = async (): Promise<void> => {
   if (process.argv.includes("--health")) {

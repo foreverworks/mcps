@@ -6,11 +6,9 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "Trademark registers: whether a name is already a registered or pending mark. search_marks checks one name across offices " +
-  "(US through USPTO's search, EM through EUIPO's API), optionally filtered by Nice classes (for example 9 software, 42 SaaS); " +
-  "get_mark reads one mark; for a US mark, mark_history gives every step of its file and mark_documents its documents, which " +
-  "download_mark_documents saves as a PDF. Each office answers for itself, and one that could not be searched says why: never read that as clear. " +
-  "health says which sources work.";
+  "Trademark registers: whether a name is already a registered or pending mark. search_marks checks one name across offices, " +
+  "optionally by Nice class; get_mark, mark_history and mark_documents read one mark in depth. Each office answers for itself, and " +
+  "one that could not be searched says why: never read that as clear. health says which sources work.";
 
 /**
  * MCP server for trademark registers. stdio by default, HTTP when

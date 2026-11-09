@@ -14,14 +14,9 @@ const SLOW =
 
 /** What the server tells a client at initialize, before any tool description. */
 export const INSTRUCTIONS =
-  "A Bolt Food account's order history as itemised receipts, read-only: nothing here orders, pays or changes the " +
-  "account. Start with health: whether the sign-in works, and how many orders the history holds. list_orders " +
-  "finds orders by date, restaurant or state; get_receipt reads one in full, and get_receipts every order in a " +
-  "date range. To explain bank statement rows, pass them to match_card_charges exactly as the bank booked them: " +
-  "each debit comes back with the order it paid for. search_items and export_items cover every product ever " +
-  "ordered, and order_stats what the orders cost per restaurant and per month; their first run on a cold store " +
-  "reads every order's details and takes minutes. Amounts are decimal " +
-  "strings, and charged.card is what the bank statement shows.";
+  "A Bolt Food account's order history as itemised receipts, read-only. Start with health: whether the sign-in works. To explain " +
+  "bank statement rows, pass them to match_card_charges exactly as the bank booked them: each debit comes back with the order it " +
+  "paid for. search_items, export_items and order_stats read the whole history; their first run takes minutes.";
 
 export const STATES: StateCopy = {
   values: FINAL_STATES,

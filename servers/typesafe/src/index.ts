@@ -6,9 +6,9 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "TypeSafe's Jev: typed, calibrated judgments (yes/no probability, one-of-a-set, a degree on levels) over a state you give, " +
-  "in about half a second and for fractions of a cent. Use it where a judgment is narrow and repeated, above all over many " +
-  "rows (ask_batch), rather than reading every row yourself; keep rules, lookups and arithmetic in code.";
+  "TypeSafe's Jev: typed, calibrated judgments (a yes/no probability, one of a set, a degree on levels) over a state you give, in " +
+  "about half a second. Use it for a narrow judgment repeated over many rows (ask_batch) instead of reading every row yourself; " +
+  "keep rules, lookups and arithmetic in code.";
 
 /**
  * MCP server for TypeSafe's System One API. stdio by default, HTTP when

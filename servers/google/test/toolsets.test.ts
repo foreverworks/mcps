@@ -29,21 +29,15 @@ const toolsOf = async (loaded: readonly Toolset[]): Promise<readonly Tool[]> => 
 /** The tool names a text mentions: snake_case words, and the batch_update_* family. */
 const toolNamesIn = (text: string): readonly string[] => [...new Set(text.match(/\b[a-z]+(?:_[a-z]+)+(?:_\*)?/g) ?? [])];
 
-/** The text every deployment saw before toolsets existed, which an unset GOOGLE_TOOLSETS must keep giving. */
-const INSTRUCTIONS_BEFORE_TOOLSETS =
+/** The text an unset GOOGLE_TOOLSETS gives: every product, and the rules no single tool description carries. */
+const INSTRUCTIONS_ALL =
   "Several Google accounts through one server: Gmail, Calendar, a Drive, Docs, Sheets and Slides, Google Tasks, " +
-  "contacts with a Workspace directory, and Meet's transcripts. Start with " +
-  "list_accounts: it names each account label (one label is one identity in every product) and which products " +
-  "reach it. The reads that make sense across accounts (search_threads, agenda, free_busy, list_tasks, find_people) read every account " +
-  "when none is given; every write names its account, because there is no default for one, and Drive tools take " +
-  "none. To address someone by name, find_people finds the address. For mail, create_draft is the default for anything addressed to someone: send_message, send_draft, " +
-  "reply or forward with send, and share_file act only on the user's explicit go for that message or file. In " +
-  "Docs, read_document comes before edit_document_section, which is pinned to the revision read; before any " +
-  "batch_update_* call, editors_api_reference says what each request takes. A meeting's transcript and notes: " +
-  "list_meetings (from an agenda event), then get_transcript. Files come back through the " +
-  "server's outbox with their SHA-256 (get_attachment, harvest_attachments, download_file) and go in by path " +
-  "(upload_file). When health or a tool says a grant is missing or lapsed, begin_consent returns the link the " +
-  "account's owner opens, and complete_consent takes the address it lands on.";
+  "contacts with a Workspace directory, and Meet's transcripts. Start with list_accounts: one account label is one identity " +
+  "in every product. search_threads, agenda, free_busy, list_tasks and find_people read every account when none is given; " +
+  "every write names its account (Drive tools take none). For mail, create_draft is the default: send_message, send_draft, " +
+  "reply or forward with send, and share_file act only on the user's explicit go for that message or file. Before any " +
+  "batch_update_* call, editors_api_reference says what each request takes. When a grant is missing or lapsed, begin_consent " +
+  "gives the account's owner a link to open, and complete_consent takes the address it lands on.";
 
 describe("GOOGLE_TOOLSETS unset or all", () => {
   it("loads every toolset", () => {
@@ -53,11 +47,11 @@ describe("GOOGLE_TOOLSETS unset or all", () => {
     expect(loadedToolsets({ GOOGLE_TOOLSETS: "gmail,all" })).toEqual(ALL_TOOLSETS);
   });
 
-  it("serves every tool of the policy, 115 of them, and the instructions it always gave", async () => {
+  it("serves every tool of the policy, 115 of them, and the instructions for all of them", async () => {
     const tools = await toolsOf(loadedToolsets({}));
     expect(tools.map((t) => t.name)).toEqual(Object.keys(POLICY).sort());
     expect(tools).toHaveLength(115);
-    expect(instructionsFor(loadedToolsets({}))).toBe(INSTRUCTIONS_BEFORE_TOOLSETS);
+    expect(instructionsFor(loadedToolsets({}))).toBe(INSTRUCTIONS_ALL);
   });
 
   it("puts every tool of the server in a toolset, or among the four always loaded", () => {
@@ -89,13 +83,11 @@ describe("GOOGLE_TOOLSETS=gmail,calendar", () => {
   it("tells the client about mail and calendars only", async () => {
     const client = await serverWith(loaded);
     expect(client.getInstructions()).toBe(
-      "Several Google accounts through one server: Gmail and Calendar. Start with list_accounts: it names each account label " +
-        "(one label is one identity in every product) and which products reach it. The reads that make sense across accounts " +
-        "(search_threads, agenda, free_busy) read every account when none is given; every write names its account, because there " +
-        "is no default for one. For mail, create_draft is the default for anything addressed to someone: send_message, send_draft, " +
-        "reply or forward with send act only on the user's explicit go for that message. Files come back through the server's " +
-        "outbox with their SHA-256 (get_attachment, harvest_attachments). When health or a tool says a grant is " +
-        "missing or lapsed, begin_consent returns the link the account's owner opens, and complete_consent takes the address it lands on.",
+      "Several Google accounts through one server: Gmail and Calendar. Start with list_accounts: one account label is one identity " +
+        "in every product. search_threads, agenda and free_busy read every account when none is given; every write names its account. " +
+        "For mail, create_draft is the default: send_message, send_draft, reply or forward with send act only on the user's explicit go " +
+        "for that message. When a grant is missing or lapsed, begin_consent gives the account's owner a link to open, and " +
+        "complete_consent takes the address it lands on.",
     );
   });
 

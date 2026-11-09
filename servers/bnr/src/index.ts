@@ -6,10 +6,9 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "The National Bank of Romania's reference exchange rates (RON per unit of a currency), read from BNR's own XML: rate gives the rate in force " +
-  "on a day with the date BNR published it; convert turns an amount (a decimal string) into or out of RON at that rate or the last one before " +
-  "the day, rounded once by a named rule; rates gives several currencies on a day, or every fixing in a window; annual_average gives the yearly " +
-  "average ANAF uses for foreign income in the D212, with the monthly values. Rates are exact text, never rounded again.";
+  "The National Bank of Romania's reference exchange rates (RON per unit of a currency), read from BNR's own XML: the rate in force" +
+  " on a day, conversions to and from RON, every fixing in a window, and the yearly average ANAF uses in the D212. Rates are exact " +
+  "text: never round them again.";
 
 /**
  * MCP server for BNR's exchange rates. stdio by default, HTTP when

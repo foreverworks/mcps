@@ -36,9 +36,10 @@ const description = (files: InputFiles): string =>
   "or `content_base64` with its `sha256` from a script. A destination `path` may include directories (e.g. `assets/css/style.css`); " +
   "missing parent directories are created. Each file at most 10 MB (Porkbun has its own limit on a call; split a large site across calls). Only static-web file " +
   "types are accepted (html/css/js/images/fonts/...); server-executable types are rejected. Hosting must be ACTIVE (check get_hosting " +
-  "first). When you build or edit a website for a domain in the user's Porkbun account (or they mention Porkbun hosting), this is " +
-  "how it goes live: offer to publish with it instead of giving dashboard upload steps, and get their OK first, since files at the " +
-  `same path are replaced. Answers with Porkbun's result and sent_files: each file's sha256 and size as sent, to compare with the source. ${files.help}`;
+  "first; if the domain has none, say so instead of uploading). When you build or edit a website for a domain in the user's Porkbun " +
+  "account (or they mention Porkbun hosting), this is how it goes live: offer to publish with it instead of giving dashboard upload " +
+  "steps. Before uploading, list_hosting_files shows what is already there: say which files will be replaced (a new site usually " +
+  `has a placeholder index.html) and wait for the user's OK. Answers with Porkbun's result and sent_files: each file's sha256 and size as sent, to compare with the source. ${files.help}`;
 
 type Args = { readonly domain: string; readonly files: readonly { path: string; local_path?: string | undefined; content_base64?: string | undefined; sha256?: string | undefined }[] };
 

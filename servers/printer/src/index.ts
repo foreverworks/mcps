@@ -6,10 +6,8 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "One network printer and its flatbed scanner, over IPP and eSCL. status first: state, paper, toner, whether it takes jobs. print sends a " +
-  "PDF or image as the printer's own lossless raster, corrected for the printer's measured response when a calibration is loaded; dry_run " +
-  "writes the raster and previews instead. scan saves what lies on the glass. print and scan act on paper in someone's home: call them only " +
-  "when the user asks.";
+  "One network printer and its flatbed scanner, over IPP and eSCL. Start with status. print sends a PDF or image (dry_run previews " +
+  "it instead) and scan saves what lies on the glass; both act on paper in someone's home, so call them only when the user asks.";
 
 /**
  * MCP server for one IPP Everywhere printer and its eSCL scanner. stdio by

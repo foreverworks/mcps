@@ -6,13 +6,10 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "A Bitwarden account an agent keeps its own logins in. Before signing up anywhere, create_login first (it generates and stores the password), " +
-  "then get_password to type it. After enabling 2FA on a site, store its key with update_login(totp_secret) and read codes with totp. " +
-  "A secret that is not a login (a key file, an API token) goes into create_note, from its file; get_field hands it out. " +
-  "check_exposed says whether a stored password is in Have I Been Pwned's breach list, sending only five characters of its hash. " +
-  "The vault is also a passkey authenticator for the agent's own identities: create_passkey registers one, assert_passkey signs a sign-in " +
-  "with it, list_passkeys shows them; the private keys never leave the server. " +
-  "Never copy a password or 2FA key into files, commits, messages or replies.";
+  "A Bitwarden vault where an agent keeps its own logins, 2FA keys, secrets and passkeys. Before signing up anywhere, create_login " +
+  "generates and stores the password, and get_password hands it out to type. A site's 2FA key goes in with update_login and its " +
+  "codes come out with totp; a secret that is not a login goes in with create_note, from its file, and out with get_field. Never " +
+  "copy a password or 2FA key into files, commits, messages or replies.";
 
 /**
  * MCP server for a Bitwarden account an agent keeps its own logins in,

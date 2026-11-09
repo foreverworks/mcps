@@ -15,12 +15,10 @@ export const agree = (catalog: Catalog, plural: string, singular: string): strin
 export const instructionsFor = (catalog: Catalog): string => {
   const wrappers = wrappersOf(catalog);
   return [
-    "A device broker: the one way to get a phone (an iOS simulator or an Android emulator on the hosts in its catalog) or a mobile build slot.",
-    "acquire gives you a lease (or a queue ticket, or the reason nothing can serve you); an emulator the broker starts boots for your lease and stops after it.",
-    "You see and lease only your tenant's devices, decided by your token, never by an argument.",
+    "A device broker: the one way to get a phone (an iOS simulator or an Android emulator) or a mobile build slot.",
+    "acquire gives you a lease, a place in the queue, or the reason nothing can serve you; your token decides which devices you see.",
     wrappers === "" ? "" : `${wrappers} ${agree(catalog, "use", "uses")} your lease and ${agree(catalog, "acquire", "acquires")} one for you when you hold none.`,
-    "When a person has to take the device over (a sign-in, a code), pause the lease and resume it after, so it is not lost meanwhile.",
-    "Release when you are done, and never drive a device you do not hold.",
+    "Pause the lease while a person takes the device over (a sign-in, a code) and resume it after; release it when you are done, and never drive a device you do not hold.",
   ]
     .filter((line) => line !== "")
     .join(" ");

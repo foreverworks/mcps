@@ -6,11 +6,9 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "App Store Connect and Google Play for the apps these credentials reach: App Store and Play reviews with their replies, and what " +
-  "testers sent from TestFlight. Start with health: which stores work and which apps and packages they reach. list_app_store_reviews " +
-  "and list_play_reviews read reviews (Play's API only has the last 7 days); list_testflight_feedback reads screenshot and crash feedback, " +
-  "and get_testflight_crash_log saves a crash log. reply_app_store_review and reply_play_review publish a reply in the developer's name, " +
-  "visible to everyone: send only text the user approved.";
+  "App Store Connect and Google Play for the apps these credentials reach: reviews and their replies, and TestFlight feedback with " +
+  "crash logs. Start with health: which stores work and which apps they reach. reply_app_store_review and reply_play_review publish" +
+  " in the developer's name, for everyone to see: send only text the user approved.";
 
 /**
  * MCP server for App Store Connect and Google Play. stdio by default, HTTP

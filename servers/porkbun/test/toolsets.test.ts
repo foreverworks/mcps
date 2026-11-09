@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { buildDeps } from "../src/composition.js";
 import { VENDOR_INSTRUCTION_PARTS, VENDOR_INSTRUCTIONS } from "../src/infra/vendor.js";
-import { instructionsFor } from "../src/mcp/instructions.js";
+import { instructionsFor, WEBSITE_LINE } from "../src/mcp/instructions.js";
 import { policyFor } from "../src/mcp/policy.js";
 import { registerAll } from "../src/mcp/register.js";
 import { ALWAYS, loadToolsets, TOOLSET_NAMES, TOOLSET_OF, toolsetGaps, toolsOf } from "../src/mcp/toolsets.js";
@@ -75,12 +75,12 @@ describe("PORKBUN_TOOLSETS unset or all", () => {
     }
   });
 
-  it("serves every tool with the rule it always had, and the vendor's instructions word for word", async () => {
+  it("serves every tool with the rule it always had, the vendor's rule for every tool, and where a site ends", async () => {
     const { names, policy, loaded } = await serverWith(undefined);
     expect(names).toEqual(sorted(OFFERED));
     expect(sorted(Object.keys(policy))).toEqual(sorted(OFFERED));
     for (const tool of OFFERED) expect(policy[tool], tool).toBe(FULL[tool]);
-    expect(instructionsFor(loaded)).toBe(VENDOR_INSTRUCTIONS);
+    expect(instructionsFor(loaded)).toBe(`${VENDOR_INSTRUCTION_PARTS.general} ${WEBSITE_LINE}`);
   });
 });
 
@@ -119,7 +119,7 @@ describe("PORKBUN_TOOLSETS=dns,forwards", () => {
     const { client, names } = await serverWith("dns,forwards");
     const instructions = client.getInstructions() ?? "";
     expect(instructions.startsWith(VENDOR_INSTRUCTION_PARTS.general)).toBe(true);
-    expect(instructions).not.toContain("Building a website");
+    expect(instructions).not.toContain(WEBSITE_LINE);
     expect(instructions).toContain("only the Porkbun toolsets dns, forwards (PORKBUN_TOOLSETS), with ping, get_balance, get_api_settings always there");
     expect(instructions).toContain("The tools of domains, dnssec, glue, hosting, mailboxes, cloudflare, transfers, marketplace, webhooks, account, docs are not on this server");
     expect(toolNamesIn(instructions).filter((tool) => !names.includes(tool))).toEqual([]);
@@ -127,10 +127,15 @@ describe("PORKBUN_TOOLSETS=dns,forwards", () => {
 });
 
 describe("PORKBUN_TOOLSETS=hosting", () => {
-  it("keeps the vendor's paragraph on publishing a site", async () => {
+  it("says a site ends with deploy_site, whose description carries the vendor's checks before it", async () => {
     const { client, names } = await serverWith("hosting");
     const instructions = client.getInstructions() ?? "";
-    expect(instructions).toContain(VENDOR_INSTRUCTION_PARTS.website);
+    expect(instructions).toContain(WEBSITE_LINE);
+    const deploy = (await client.listTools()).tools.find((tool) => tool.name === "deploy_site")?.description ?? "";
+    // The vendor's paragraph on publishing a site, said where it applies: hosting ACTIVE, what is already there, the user's OK.
+    for (const check of ["get_hosting", "ACTIVE", "list_hosting_files", "placeholder index.html", "the user's OK", "instead of giving dashboard upload steps"]) {
+      expect(deploy, check).toContain(check);
+    }
     expect(toolNamesIn(instructions).filter((tool) => !names.includes(tool))).toEqual([]);
   });
 });

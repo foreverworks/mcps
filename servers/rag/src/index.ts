@@ -6,10 +6,9 @@ import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
 
 const INSTRUCTIONS =
-  "Retrieval over your own documents, all on your machine: Postgres with pgvector for the index, an embedding and a rerank server you run. " +
-  "create_collection, then index_path a file or folder (PDF with OCR for scanned pages, images, docx, odt, html, epub, Markdown, text); " +
-  "search answers a question with the passages that answer it, with their source and page or heading; expand and read_document give " +
-  "the context. Indexing again only redoes what changed. Start with health when anything fails.";
+  "Retrieval over your own documents, all on your machine. create_collection, then index_path a file or folder; search answers a " +
+  "question with passages and their sources, and expand and read_document give the context around them. Indexing again redoes only " +
+  "what changed. Start with health when anything fails.";
 
 /**
  * MCP server for retrieval-augmented generation over local files: an index in
