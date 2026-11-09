@@ -29,6 +29,9 @@ import {
   POOL_VARIANTS,
   rawBrokerFor,
   SCREENSHOT,
+  SERVER_1,
+  SERVER_INSTANCES,
+  SERVERS,
   settled,
   VARIANT_INSTANCES,
   VARIANTS,
@@ -853,6 +856,73 @@ describe("desktops: a Mac's desktop session and a Windows VM", () => {
     // The emulator granted since the probe counts at its own cost against the next spawn.
     const third = await broker.acquire({ want: android, session: C, purpose: "another phone" });
     expect((third as { reason: string }).reason).toMatch(/has 16 GiB available \(counting 1 device\(s\) starting\); emulator-5556 costs 6 GiB/);
+  });
+});
+
+describe("a server: a VM started with its holder's ssh key, thrown away after the lease", () => {
+  const KEY = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+  const OTHER = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIBbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb";
+  const server = { kind: "device", platform: "server", key: `${KEY} hosttest@example` } as const;
+  const servers = () => {
+    const world = makeWorld(SERVER_INSTANCES);
+    return { world, broker: brokerFor(world, SERVERS) };
+  };
+  const address = { platform: "server", ssh: "deploy@192.0.2.20", port: 2201, env: { DEVICE_ID: "server-1", DEVICE_SSH: "deploy@192.0.2.20", DEVICE_SSH_PORT: "2201" } };
+
+  it("starts the server with the holder's key (its comment dropped), booting until its unit is active, and throws it away after", async () => {
+    const { world, broker } = servers();
+    const r = await broker.acquire({ want: server, session: A, purpose: "a host test" });
+    expect(r).toMatchObject({ status: "granted", resource: "server-1", profile: "debian-13", state: "booting", address });
+    expect(world.calls).toEqual([`start ${SERVER_1} with ${KEY}`]);
+    bootAll(world);
+    world.clock += 61_000;
+    await broker.tick();
+    expect(await broker.acquire({ want: server, session: A, purpose: "a host test" })).toMatchObject({ status: "held", state: "ready", address });
+    expect(await broker.release({ session: A, want: server, state: "dirty" })).toMatchObject({ status: "released", then: "stopped" });
+    await settled();
+    expect(world.calls).toEqual([`start ${SERVER_1} with ${KEY}`, `stop ${SERVER_1}`]);
+  });
+
+  it("gives a second session the other server, started with that session's own key", async () => {
+    const { world, broker } = servers();
+    await broker.acquire({ want: server, session: A, purpose: "a host test" });
+    expect(await broker.acquire({ want: { ...server, key: OTHER }, session: B, purpose: "another" })).toMatchObject({ status: "granted", resource: "server-2" });
+    expect(world.calls).toEqual([`start ${SERVER_1} with ${KEY}`, `start srv2 with ${OTHER}`]);
+  });
+
+  it("refuses a server lease without a key, a key that is not one, and a key on any other platform", async () => {
+    const { world, broker } = servers();
+    const { key: _no, ...bare } = server;
+    await expect(broker.acquire({ want: bare, session: A, purpose: "a host test" })).rejects.toMatchObject({ error: { kind: "input", message: expect.stringMatching(/a server lease needs ssh_key/) } });
+    await expect(broker.acquire({ want: { ...server, key: "ssh-ed25519 AAAA; reboot" }, session: A, purpose: "a host test" })).rejects.toMatchObject({
+      error: { kind: "input", message: expect.stringMatching(/not an OpenSSH public key/) },
+    });
+    await expect(broker.acquire({ want: { ...android, key: KEY }, session: A, purpose: "a phone" })).rejects.toMatchObject({ error: { kind: "input", message: expect.stringMatching(/ssh_key is for a server lease only/) } });
+    expect(world.calls).toEqual([]);
+  });
+
+  it("refuses another key for a server the session holds, and returns it for the same key", async () => {
+    const { broker } = servers();
+    await broker.acquire({ want: server, session: A, purpose: "a host test" });
+    await expect(broker.acquire({ want: { ...server, key: OTHER }, session: A, purpose: "a host test" })).rejects.toMatchObject({
+      error: { kind: "input", message: expect.stringMatching(/started with another ssh key: release it/) },
+    });
+    expect(await broker.acquire({ want: { ...server, key: KEY }, session: A, purpose: "a host test" })).toMatchObject({ status: "held", resource: "server-1" });
+  });
+
+  it("starts a queued request's server with the key of its latest ask", async () => {
+    const { world, broker } = servers();
+    await broker.acquire({ want: server, session: A, purpose: "one" });
+    await broker.acquire({ want: { ...server, key: OTHER }, session: B, purpose: "two" });
+    const q = (await broker.acquire({ want: server, session: C, purpose: "three" })) as { status: string; ticket: string };
+    expect(q.status).toBe("queued");
+    const NEW = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAICccccccccccccccccccccccccccccccccccccccccccc";
+    expect(await broker.acquire({ want: { ...server, key: NEW }, session: C, purpose: "three" })).toMatchObject({ status: "queued" });
+    await broker.release({ session: A, want: server, state: "dirty" });
+    await settled();
+    await broker.tick();
+    await broker.wait({ ticket: q.ticket, session: C, seconds: 0 });
+    expect(world.calls).toContain(`start ${SERVER_1} with ${NEW}`);
   });
 });
 

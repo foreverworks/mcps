@@ -16,10 +16,10 @@ const purpose = z.string().trim().min(1).max(200).describe("What you are doing, 
 const leaseId = z.string().trim().regex(/^ls-[1-9][0-9]{0,9}$/, "a lease id from acquire or status: ls-<number>").describe("A lease id from acquire or status (ls-<number>).");
 const ticketId = z.string().trim().regex(/^tk-[1-9][0-9]{0,9}$/, "a ticket id from acquire: tk-<number>").describe("The ticket id from acquire (tk-<number>).");
 
-const toWant = (want: z.infer<typeof wantName>, profile?: string, maestro?: boolean): Want => {
+const toWant = (want: z.infer<typeof wantName>, profile?: string, maestro?: boolean, key?: string): Want => {
   if (want === "builder:ios") return { kind: "builder", platform: "ios" };
   if (want === "builder:android") return { kind: "builder", platform: "android" };
-  return { kind: "device", platform: want, ...(profile === undefined ? {} : { profile }), ...(maestro === undefined ? {} : { maestro }) };
+  return { kind: "device", platform: want, ...(profile === undefined ? {} : { profile }), ...(maestro === undefined ? {} : { maestro }), ...(key === undefined ? {} : { key }) };
 };
 
 /** The caller's tenant, from the client label of the token this request came with (never an argument). */
@@ -60,13 +60,15 @@ export const registerAll = (server: McpServer, broker: Broker, catalog: Catalog,
       title: "Lease a device or a build slot",
       description:
         "Ask for a device (ios: a simulator on a Mac; android: an emulator; macos: a Mac's desktop session; windows: a Windows machine; " +
-        "batocera: a fresh Batocera retro-gaming box (a VM) reached over ssh as root, every lease starting from the stock image and its release throwing the box away) " +
+        "batocera: a fresh Batocera retro-gaming box (a VM) reached over ssh as root, every lease starting from the stock image and its release throwing the box away; " +
+        "server: a fresh Linux server (a VM) for testing what configures a machine, reached over ssh with the key pair you made for it: pass its public half as ssh_key, " +
+        "and its release throws the server away) " +
         "or a build slot (builder:ios, builder:android). " +
         "Answers granted (with the device's address and the environment a tool reads to reach it: ANDROID_SERIAL and ANDROID_ADB_SERVER_PORT for adb, " +
         "IOS_SIM_MAC (the Mac's ssh target) and IOS_SIM_DEVICE (the simulator's UDID) for simctl, DEVICE_SSH with DEVICE_SSH_PORT and DEVICE_SSH_JUMP where set for a device reached over ssh, " +
         "whose address may also carry screenshot (and DEVICE_SCREENSHOT): a command to run on it over ssh that writes a PNG of its screen to stdout), " +
         "queued (a ticket: call wait), or unavailable (with the reason, e.g. its host is asleep). " +
-        "An Android emulator, a Windows VM or a Batocera box is started for your lease and stopped after it: a granted lease says state booting until the device has " +
+        "An Android emulator, a Windows VM, a Batocera box or a server is started for your lease and stopped after it: a granted lease says state booting until the device has " +
         "booted (about a minute for an emulator), and asking again returns the same lease with its state; with until_booted, acquire waits for the boot " +
         "itself and reports progress meanwhile. If the device fails to start instead (its host's unit for it failed: a start timeout, an out-of-memory kill), " +
         "the lease ends at once and your next acquire for that platform answers failed, once, with the device (resource) and the unit's reason: acquire again to get a fresh device. " +
@@ -79,6 +81,13 @@ export const registerAll = (server: McpServer, broker: Broker, catalog: Catalog,
         purpose,
         profile: z.string().trim().min(1).max(50).optional().describe(profilesFor(catalog)),
         maestro: z.boolean().optional().describe("Only devices the catalog marks as drivable by a Maestro flow."),
+        ssh_key: z
+          .string()
+          .trim()
+          .min(1)
+          .max(3000)
+          .optional()
+          .describe("server only, and required there: the public half of a key pair you made for this lease (`<type> <base64>`, as in a .pub file), which the server's start authorises. Keep the private half to yourself: nothing else gets in."),
         minutes: z.number().int().min(1).max(240).optional().describe("How long you expect to need it (default 45; builders 30)."),
         priority: z.enum(["interactive", "background"]).default("interactive").describe("background for a loop or a timer: it waits behind interactive sessions."),
         until_booted: z
@@ -93,7 +102,7 @@ export const registerAll = (server: McpServer, broker: Broker, catalog: Catalog,
     handled((a) =>
       broker.acquire({
         tenant: tenantOf(),
-        want: toWant(a.want, a.profile, a.maestro),
+        want: toWant(a.want, a.profile, a.maestro, a.ssh_key),
         session: a.session,
         purpose: a.purpose,
         priority: a.priority,

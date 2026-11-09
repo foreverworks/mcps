@@ -253,6 +253,18 @@ describe("a host with no ssh target: its control command runs on the broker's ma
     expect(ran).toHaveLength(3);
   });
 
+  it("passes a server's key to its start as one argument: as is to the local runner, quoted for a remote shell", async () => {
+    const key = "ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIOMqqnkVzrm0SdG6UOoqKLsabgH5C9okWi0dh2l9GKJl";
+    const { sshed, ran, hosts } = wired({});
+    await hosts.startEmulator(cloud, "srv1", `${key} someone@example`);
+    await hosts.startEmulator(viaSsh, "srv1", key);
+    expect(ran).toEqual([{ argv: ["/usr/local/bin/cloud-ctl", "start", "srv1", key], timeoutMs: 90_000 }]);
+    expect(sshed).toEqual([`builder@emu-1.example.com /usr/local/bin/emulator-ctl start srv1 '${key}'`]);
+    // Anything that is not a public key is refused before it reaches either.
+    await expect(hosts.startEmulator(viaSsh, "srv1", "ssh-ed25519 AAAA'; reboot; '")).rejects.toMatchObject({ error: { message: expect.stringMatching(/not an ssh public key/) } });
+    expect(sshed).toHaveLength(1);
+  });
+
   it("goes on over ssh for a host that has a target, with the same command lines as before", async () => {
     const { sshed, ran, hosts } = wired({ status: "phone1 active\n" });
     await hosts.startEmulator(viaSsh, "phone1");
@@ -650,6 +662,26 @@ describe("catalog", () => {
     );
   });
 
+  it("parses a server like a Batocera box, at a door of its own, and refuses one that is fixed", () => {
+    const emu = { id: "emu-1", label: "emu-1", platform: "android", ssh: "builder@emu-1.example.com", spawn_max: 5, cost_mib: 6144, reserve_mib: 12288, control: "/usr/local/bin/emulator-ctl" };
+    const srv = { id: "server-1", platform: "server", host: "emu-1", profile: "debian-13", mode: "spawn", probe: "unit", instance: "srv1", ssh: { target: "deploy@192.0.2.20", port: 2201 }, cost_mib: 8192 };
+    const ok = { ...base, profiles: { ...base.profiles, "debian-13": "Debian 13" }, wrappers: { server: ["host-test"] }, hosts: [...base.hosts, emu], devices: [...base.devices, srv] };
+    const { catalog } = parseCatalog(JSON.stringify(ok), "broker-1");
+    expect(catalog.devices[1]).toMatchObject({ id: "server-1", platform: "server", mode: "spawn", probe: { kind: "unit" }, instance: "srv1", ssh: { target: "deploy@192.0.2.20", port: 2201 }, costMiB: 8192 });
+    expect(catalog.clients.wrappers.server).toEqual(["host-test"]);
+    const refused = (change: object): string => {
+      try {
+        parseCatalog(JSON.stringify({ ...ok, devices: [...base.devices, { ...srv, ...change }] }), "broker-1");
+      } catch (e) {
+        return (e as { error: { message: string } }).error.message;
+      }
+      return "accepted";
+    };
+    expect(refused({ mode: "fixed", probe: undefined, instance: undefined })).toMatch(/server device server-1 is fixed: a server is started for each lease with its holder's key/);
+    expect(refused({ probe: undefined })).toMatch(/server device server-1 is a spawn slot without probe "unit"/);
+    expect(refused({ ssh: undefined })).toMatch(/server device server-1 has no ssh address for its holder/);
+  });
+
   it("parses an android host with no ssh target when it has a control command, and refuses every other without one", () => {
     const cloud = { id: "cloud-1", label: "cloud-1", platform: "android", spawn_max: 2, control: "/usr/local/bin/cloud-ctl" };
     const slot = { id: "192.0.2.11:5555", platform: "android", host: "cloud-1", profile: "android-phone", mode: "spawn", maestro: true, adb: { port: 5037, serial: "192.0.2.11:5555" }, instance: "cloud1" };
@@ -678,8 +710,8 @@ describe("catalog", () => {
   it("names the box from the caller when the catalog does not, and reads the deployment's clients", () => {
     const { catalog } = parseCatalog(JSON.stringify({ ...base, box: undefined, session_hint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"] } }), "broker-9");
     expect(catalog.box).toBe("broker-9");
-    expect(catalog.clients).toEqual({ sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: [], macos: [], windows: [], batocera: [] } });
-    expect(parseCatalog(JSON.stringify(base), "broker-9").catalog.clients).toEqual({ wrappers: { ios: [], android: [], macos: [], windows: [], batocera: [] } });
+    expect(catalog.clients).toEqual({ sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: [], macos: [], windows: [], batocera: [], server: [] } });
+    expect(parseCatalog(JSON.stringify(base), "broker-9").catalog.clients).toEqual({ wrappers: { ios: [], android: [], macos: [], windows: [], batocera: [], server: [] } });
   });
 
   it("refuses a tenant name it does not know", () => {

@@ -1,0 +1,5 @@
+---
+"@foreverworks/mcp-devices": minor
+---
+
+A new platform, `server`: a throwaway Linux VM for testing what configures a machine (an Ansible play, cloud-init, an installer), started for each lease and thrown away after it, like a Batocera box. Its holder makes a key pair for the lease and passes the public half to `acquire` as `ssh_key`; the broker hands it to the host's control command as a third argument, `<control> start <instance> <key>` (`<type> <base64>`, its comment dropped), and the command authorises it on the server it starts, so only the holder gets in and the key opens nothing once the server is gone. A server lease without a key is refused, and so is a key on any other platform; a session that holds a server and asks again with another key is told to release it first. The lease's address is the server's ssh destination and port (`DEVICE_SSH`, `DEVICE_SSH_PORT`), as for the other devices reached over ssh. A server is always a spawn slot with probe `"unit"`: its control command reports it `active` once it can be reached. Catalogs without one behave as before.

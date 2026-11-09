@@ -5,7 +5,7 @@
  */
 import { pause, reportProgress } from "@foreverworks/mcp-kit";
 
-import { DEFAULT_TENANT, deviceOf, formOf, hostOf, instancesOf, isNetworkSerial, isStartedSlot, type Device, type Platform, type Tenant } from "../domain/catalog.js";
+import { DEFAULT_TENANT, deviceOf, formOf, hostOf, instancesOf, isNetworkSerial, isStartedSlot, publicKey, takesKey, type Device, type Platform, type Tenant } from "../domain/catalog.js";
 import { configError, fail, inputError } from "../domain/errors.js";
 import { answersWant, place, unknownHealth, type HostHealth } from "../domain/place.js";
 import {
@@ -272,7 +272,7 @@ export const makeBroker = (deps: Deps) => {
       starting.get(device.id) ??
       (async () => {
         for (const other of instancesRunning(await current(), health, device).filter((i) => i !== instance)) await deps.hosts.stopEmulator(host, other);
-        await deps.hosts.startEmulator(host, instance);
+        await deps.hosts.startEmulator(host, instance, lease.key);
         const now = deps.now();
         const which = instancesOf(device).length > 1 ? ` as ${variant.profile}` : "";
         await transact((s) => {
@@ -503,8 +503,21 @@ export const makeBroker = (deps: Deps) => {
     if (deps.catalogProblem !== undefined) fail(configError(deps.catalogProblem));
   };
 
-  const acquire = async (input: AcquireInput) => {
+  /**
+   * A request's ssh key, as its start passes it: a server's lease must bring one (the start authorises it, and
+   * nothing else gets in), any other lease none. Its comment is dropped.
+   */
+  const keyed = (want: Want): Want => {
+    if (want.kind !== "device") return want;
+    if (want.key === undefined) return takesKey(want.platform) ? fail(inputError(`a ${want.platform} lease needs ssh_key: the public half of a key pair you made for it, which its start authorises`)) : want;
+    if (!takesKey(want.platform)) return fail(inputError(`ssh_key is for a server lease only; a ${want.platform} device is reached without one`));
+    const key = publicKey(want.key);
+    return key === undefined ? fail(inputError("ssh_key is not an OpenSSH public key (<type> <base64> [comment], one line)")) : { ...want, key };
+  };
+
+  const acquire = async (asked: AcquireInput) => {
     configured();
+    const input: AcquireInput = { ...asked, want: keyed(asked.want) };
     if (catalog.hosts.length === 0) return unavailableEmpty();
     await refresh(hostsFor(input.want.platform), HEALTH_MAX_AGE_MS);
     const now = deps.now();
@@ -521,13 +534,19 @@ export const makeBroker = (deps: Deps) => {
       if (waiting !== undefined && waiting.granted === undefined) {
         const profile = input.want.kind === "device" ? input.want.profile : undefined;
         const switched = profile !== undefined && waiting.want.kind === "device" && waiting.want.profile !== profile;
-        const t: Ticket = { ...waiting, ...(switched ? { want: input.want } : {}), polledAt: now };
+        // A server's grant starts it with the key of the latest ask: the one its holder now has.
+        const rekeyed = input.want.kind === "device" && waiting.want.kind === "device" && input.want.key !== waiting.want.key;
+        const t: Ticket = { ...waiting, ...(switched || rekeyed ? { want: input.want } : {}), polledAt: now };
         const next = { ...s, tickets: s.tickets.map((x) => (x.id === t.id ? t : x)) };
         return { state: next, value: { ended, result: { kind: "queued" as const, ticket: t, reason: switched ? `already queued; now for ${profile}` : "already queued" } } };
       }
       const p = place(catalog, health, s, input.want, input.tenant, input.session);
       switch (p.type) {
         case "held": {
+          // A server holds the key it was started with: another key would not get in, so it is refused, as another profile is.
+          const key = input.want.kind === "device" ? input.want.key : undefined;
+          if (p.lease.key !== undefined && key !== undefined && p.lease.key !== key)
+            return { state: s, value: { ended, result: { kind: "conflict" as const, reason: `you hold ${p.lease.resource} (lease ${p.lease.id}), started with another ssh key: release it, then acquire again with this one` } } };
           const lease = touch(p.lease, now, minutes);
           const next = { ...replaceLease(s, lease), tickets: s.tickets.filter((t) => t.granted !== lease.id) };
           return { state: next, value: { ended, result: { kind: "held" as const, lease } } };

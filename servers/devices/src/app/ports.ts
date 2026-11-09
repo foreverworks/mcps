@@ -49,8 +49,11 @@ export type HostsPort = {
   /** Uninstalls the apps a holder installed and resets privacy grants; a no-op on a shut-down simulator. */
   readonly resetSimulator: (host: Host, udid: string) => Promise<void>;
   readonly deleteSimulator: (host: Host, udid: string) => Promise<void>;
-  /** Asks the host's control command to start an emulator instance; returns once the start is queued. */
-  readonly startEmulator: (host: Host, instance: string) => Promise<void>;
+  /**
+   * Asks the host's control command to start an emulator instance; returns once the start is queued. A
+   * server's start carries its holder's public ssh key (`<type> <base64>`), which the command authorises on it.
+   */
+  readonly startEmulator: (host: Host, instance: string, key?: string) => Promise<void>;
   /** Asks the host's control command to stop an emulator instance; returns once it has stopped. */
   readonly stopEmulator: (host: Host, instance: string) => Promise<void>;
   /** Every emulator instance's unit state on the host (`<control> status`). */

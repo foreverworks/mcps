@@ -30,7 +30,7 @@ export const CATALOG: Catalog = {
   profiles: { "android-phone": "API 34, 1080x2400", "ios-phone": "iPhone 17 Pro" },
   defaultProfiles: {},
   forms: {},
-  clients: { sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: ["apk-run", "flow-run"], macos: [], windows: [], batocera: [] } },
+  clients: { sessionHint: "the output of `show-session-id`", wrappers: { ios: ["sim-run"], android: ["apk-run", "flow-run"], macos: [], windows: [], batocera: [], server: [] } },
   hosts: [
     {
       id: "emu-1",
@@ -168,6 +168,32 @@ export const BATOCERA: Catalog = {
 };
 export const BATOCERA_INSTANCES = [...EMULATORS, BOX, BOX_EPHEMERAL] as const;
 
+/** Throwaway servers for testing what configures a machine: VMs started with their holder's key, reached at a door of their own. */
+export const SERVER_1 = "srv1";
+export const SERVER_2 = "srv2";
+export const SERVERS: Catalog = {
+  ...CATALOG,
+  profiles: { ...CATALOG.profiles, "debian-13": "Debian 13 as a provider hands it over" },
+  hosts: CATALOG.hosts.map((h) => (h.id === "emu-1" ? { ...h, spawnMax: 4 } : h)),
+  devices: [
+    ...CATALOG.devices,
+    ...[SERVER_1, SERVER_2].map((instance, i) => ({
+      id: `server-${i + 1}`,
+      platform: "server" as const,
+      host: "emu-1",
+      profile: "debian-13",
+      mode: "spawn" as const,
+      maestro: false,
+      probe: { kind: "unit" as const },
+      tenant: DEFAULT_TENANT,
+      instance,
+      ssh: { target: "deploy@192.0.2.20", port: 2201 + i },
+      costMiB: 4096,
+    })),
+  ],
+};
+export const SERVER_INSTANCES = [...EMULATORS, SERVER_1, SERVER_2] as const;
+
 /**
  * The Mac's other spares: a tablet and a phone with a paired watch, each on a profile of its own that a
  * request must name, since `ios-phone` is what a request that names none gets. `spawnMax` is the Mac's.
@@ -296,9 +322,9 @@ export const depsFor = (world: World, catalog: Catalog = CATALOG): Deps => ({
     shutdownSimulator: async (_host, udid) => void world.calls.push(`shutdown ${udid}`),
     resetSimulator: async (_host, udid) => void world.calls.push(`reset ${udid}`),
     deleteSimulator: async (_host, udid) => void world.calls.push(`delete ${udid}`),
-    startEmulator: async (_host, instance) => {
+    startEmulator: async (_host, instance, key) => {
       if (world.startFails) return fail(hostError("emu-1", "emulator-ctl: no answer from its service"));
-      world.calls.push(`start ${instance}`);
+      world.calls.push(key === undefined ? `start ${instance}` : `start ${instance} with ${key}`);
       // As the host's side does: a failed unit is reset before it starts, so status no longer says failed.
       if (world.emulators[instance] === "stopped" || world.emulators[instance] === "failed") world.emulators[instance] = "booting";
       delete world.results[instance];

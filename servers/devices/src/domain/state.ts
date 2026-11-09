@@ -5,9 +5,12 @@
  */
 import { DEFAULT_TENANT, variantsOf, type Device, type Platform, type Tenant, type Variant } from "./catalog.js";
 
-/** What an agent asks for. A device by platform (and optionally a profile), or a host's build slot. */
+/**
+ * What an agent asks for. A device by platform (and optionally a profile), or a host's build slot. A
+ * server brings its holder's public ssh key (`<type> <base64>`, catalog.ts publicKey), which its start authorises.
+ */
 export type Want =
-  | { readonly kind: "device"; readonly platform: Platform; readonly profile?: string; readonly maestro?: boolean }
+  | { readonly kind: "device"; readonly platform: Platform; readonly profile?: string; readonly maestro?: boolean; readonly key?: string }
   | { readonly kind: "builder"; readonly platform: Platform };
 
 export type Priority = "interactive" | "background";
@@ -36,6 +39,8 @@ export type Lease = {
   readonly profile?: string;
   /** An emulator slot's lease: the instance its grant starts and its end stops. Absent as `profile` is. */
   readonly instance?: string;
+  /** A server's lease: its holder's public ssh key (`<type> <base64>`), which the start authorises on it. */
+  readonly key?: string;
   /**
    * A person has the device (pause): the lease holds without its holder's calls until `until`, then
    * ends as a silent holder's does. `at` is when the pause began; `note` says who and why.
@@ -222,6 +227,7 @@ export const grant = (
     ...(input.claim ? { claimBy: input.now + RULES.claimMs } : {}),
     ...(input.spawned ? { spawned: true } : {}),
     ...(input.variant === undefined ? {} : { profile: input.variant.profile, ...(input.variant.instance === undefined ? {} : { instance: input.variant.instance }) }),
+    ...(input.want.kind === "device" && input.want.key !== undefined ? { key: input.want.key } : {}),
   };
   return { lease, state: withEvent({ ...next, leases: [...next.leases, lease] }, input.now, `${input.resource} to ${short(input.session)} (${input.purpose})`, input.tenant) };
 };

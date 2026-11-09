@@ -6,19 +6,39 @@
 
 /**
  * What a device is: a phone (an iOS simulator, an Android emulator), a desktop (a Mac's desktop
- * session, a Windows machine) or a console (a Batocera retro-gaming box). A phone is reached through
- * its host's tooling; every other device over ssh, at an address of its own.
+ * session, a Windows machine), a console (a Batocera retro-gaming box) or a server (a throwaway Linux
+ * VM, for testing what configures a machine). A phone is reached through its host's tooling; every
+ * other device over ssh, at an address of its own.
  */
-export type Platform = "ios" | "android" | "macos" | "windows" | "batocera";
+export type Platform = "ios" | "android" | "macos" | "windows" | "batocera" | "server";
 
-export const PLATFORMS: readonly Platform[] = ["ios", "android", "macos", "windows", "batocera"];
+export const PLATFORMS: readonly Platform[] = ["ios", "android", "macos", "windows", "batocera", "server"];
 
 /** The platforms whose devices their holder reaches over ssh, each at its own address, on whatever host carries it. */
-export type SshPlatform = "macos" | "windows" | "batocera";
+export type SshPlatform = "macos" | "windows" | "batocera" | "server";
 
-export const SSH_PLATFORMS: readonly SshPlatform[] = ["macos", "windows", "batocera"];
+export const SSH_PLATFORMS: readonly SshPlatform[] = ["macos", "windows", "batocera", "server"];
 
 export const reachedOverSsh = (p: Platform): p is SshPlatform => (SSH_PLATFORMS as readonly Platform[]).includes(p);
+
+/**
+ * Whether a lease on this platform brings its holder's own ssh key: a server is started with the
+ * public half authorised on it (the control command's `start <instance> <key>`), so only the holder
+ * of the private half gets in, and the key opens nothing once the server is gone.
+ */
+export const takesKey = (p: Platform): boolean => p === "server";
+
+/**
+ * An OpenSSH public key as a holder passes it, `<type> <base64>` and an optional comment, which the broker
+ * drops: only the two fields reach a control command, so nothing in it can be read twice by a shell.
+ */
+export const SSH_PUBLIC_KEY = /^(ssh-ed25519|ecdsa-sha2-nistp(?:256|384|521)|sk-ssh-ed25519@openssh\.com|sk-ecdsa-sha2-nistp256@openssh\.com|ssh-rsa) ([A-Za-z0-9+/]{40,2000}={0,3})(?: [^\r\n]{0,200})?$/;
+
+/** The key's type and base64, its comment dropped; undefined when it is not a public key. */
+export const publicKey = (text: string): string | undefined => {
+  const m = SSH_PUBLIC_KEY.exec(text.trim());
+  return m === null ? undefined : `${m[1]} ${m[2]}`;
+};
 
 /**
  * Whom a device serves: `default` (the deployment's own agents) or `guest:<id>` (another workspace). A
@@ -227,7 +247,7 @@ export type Catalog = {
   readonly clients: Clients;
 };
 
-export const NO_CLIENTS: Clients = { wrappers: { ios: [], android: [], macos: [], windows: [], batocera: [] } };
+export const NO_CLIENTS: Clients = { wrappers: { ios: [], android: [], macos: [], windows: [], batocera: [], server: [] } };
 
 /** A catalog with nothing in it: the broker answers, and every request is unavailable with this reason. */
 export const emptyCatalog = (box: string): Catalog => ({ box, hosts: [], devices: [], profiles: {}, defaultProfiles: {}, forms: {}, clients: NO_CLIENTS });
@@ -250,17 +270,18 @@ export const hostOf = (catalog: Catalog, id: string): Host | undefined => catalo
 export const deviceOf = (catalog: Catalog, id: string): Device | undefined => catalog.devices.find((d) => d.id === id);
 
 /** The platforms whose spawn slots the host's control command starts and stops: emulators and VMs. */
-const STARTED: readonly Platform[] = ["android", "windows", "batocera"];
+const STARTED: readonly Platform[] = ["android", "windows", "batocera", "server"];
 
 /**
  * The platforms whose spawn slots are VMs: no adb, so a boot is read from the unit, through a host whose
- * probe reads the control command. A Batocera box is one whose stop throws it away (the README's contract).
+ * probe reads the control command. A Batocera box and a server are ones whose stop throws them away (the
+ * README's contract).
  */
-const VMS: readonly Platform[] = ["windows", "batocera"];
+const VMS: readonly Platform[] = ["windows", "batocera", "server"];
 
 /**
  * A slot the broker starts through its host's control command for a lease and stops after it: a spawned
- * Android emulator, Windows VM or Batocera box with an instance.
+ * Android emulator, Windows VM, Batocera box or server with an instance.
  */
 export const isStartedSlot = (d: Device): boolean => STARTED.includes(d.platform) && d.mode === "spawn" && d.instance !== undefined;
 
@@ -325,6 +346,8 @@ export const catalogProblems = (catalog: Catalog): readonly string[] => {
     if (d.screenshot !== undefined && d.screenshot.trim() === "") problems.push(`device ${d.id} has an empty screenshot command`);
     if (d.screenshot !== undefined && /[\r\n]/.test(d.screenshot)) problems.push(`device ${d.id} has a screenshot command of more than one line`);
     if (d.ssh?.port !== undefined && (!Number.isInteger(d.ssh.port) || d.ssh.port < 1 || d.ssh.port > 65535)) problems.push(`device ${d.id} has ssh port ${d.ssh.port}`);
+    // A server is started for each lease with its holder's key, and thrown away after it: one that stays would let the last holder in.
+    if (d.platform === "server" && d.mode === "fixed") problems.push(`server device ${d.id} is fixed: a server is started for each lease with its holder's key and thrown away after it, so it is a spawn slot`);
     // The Mac's own desktop session is there or not: nothing starts one.
     if (d.platform === "macos" && d.mode === "spawn") problems.push(`macos device ${d.id} is a spawn slot: a Mac's desktop session is fixed, there or not`);
     if (d.platform === "macos" && host !== undefined && host.platform !== "ios") problems.push(`macos device ${d.id} is on ${host.id}, which is not a Mac (an ios host), so nothing probes its desktop session`);

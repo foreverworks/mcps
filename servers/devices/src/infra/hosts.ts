@@ -1,5 +1,5 @@
 import type { AndroidHostProbe, HostsPort, MacProbe, SimulatorSeen } from "../app/ports.js";
-import { INSTANCE, type Host, type WatchSpec } from "../domain/catalog.js";
+import { INSTANCE, publicKey, type Host, type WatchSpec } from "../domain/catalog.js";
 import { fail, hostError } from "../domain/errors.js";
 import { makeLocal, type Local } from "./local.js";
 import { sq, type Ssh } from "./ssh.js";
@@ -171,7 +171,13 @@ const pair = async (ssh: Ssh, host: Host, spec: WatchSpec, watch: string, phone:
  * goes through `local`, on the broker's own machine, as an argv with no shell. Both read the same call.
  */
 const controlCall = (ssh: Ssh, local: Local, host: Host, args: readonly string[], timeoutMs: number): Promise<string> =>
-  host.ssh === undefined ? local([control(host), ...args], timeoutMs) : ssh(host.ssh, [control(host), ...args].join(" "), timeoutMs);
+  host.ssh === undefined ? local([control(host), ...args], timeoutMs) : ssh(host.ssh, [control(host), ...args].map(word).join(" "), timeoutMs);
+
+/** One argument for the remote shell: as it is when nothing in it is special to a shell (every call but a key), else quoted. */
+const word = (arg: string): string => (/^[A-Za-z0-9_./:@=+-]+$/.test(arg) ? arg : sq(arg));
+
+/** A holder's key as the control command gets it: the type and the base64, checked again here, at the edge. */
+const checkKey = (host: Host, key: string): string => publicKey(key) ?? fail(hostError(host.id, "not an ssh public key (<type> <base64>)"));
 
 export const makeHosts = (ssh: Ssh, local: Local = makeLocal()): HostsPort => ({
   probeAndroid: async (host: Host) =>
@@ -250,7 +256,8 @@ export const makeHosts = (ssh: Ssh, local: Local = makeLocal()): HostsPort => ({
 
   // The host's control command (the README's contract): `start` returns once the start is under way,
   // `stop` once the emulator has stopped (it may save a snapshot on the way down, so a stop can take a minute).
-  startEmulator: async (host, instance) => void (await controlCall(ssh, local, host, ["start", checkInstance(host, instance)], 90_000)),
+  startEmulator: async (host, instance, key) =>
+    void (await controlCall(ssh, local, host, ["start", checkInstance(host, instance), ...(key === undefined ? [] : [checkKey(host, key)])], 90_000)),
   stopEmulator: async (host, instance) => void (await controlCall(ssh, local, host, ["stop", checkInstance(host, instance)], 240_000)),
   emulatorStates: async (host) => parseEmulatorStates(await controlCall(ssh, local, host, ["status"], 20_000)),
 });

@@ -19,8 +19,8 @@ const schema = z.object({
   note: z.string().optional(),
   session_hint: z.string().trim().min(1).max(300).optional(),
   wrappers: z
-    .object({ ios: commands, android: commands, macos: commands, windows: commands, batocera: commands })
-    .default({ ios: [], android: [], macos: [], windows: [], batocera: [] }),
+    .object({ ios: commands, android: commands, macos: commands, windows: commands, batocera: commands, server: commands })
+    .default({ ios: [], android: [], macos: [], windows: [], batocera: [], server: [] }),
   profiles: z.record(z.string(), z.string()).default({}),
   // The profile a request that names none gets, per platform; a device on another profile is then leased only by name.
   default_profiles: z.partialRecord(platform, z.string().min(1)).default({}),
