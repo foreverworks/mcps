@@ -45,8 +45,12 @@ export type Host = {
    * A device reached over ssh may sit on either.
    */
   readonly platform: Platform;
-  /** The ssh target the broker reaches it at (`user@host`), with no password prompt. */
-  readonly ssh: string;
+  /**
+   * The ssh target the broker reaches it at (`user@host`), with no password prompt. Absent on an android
+   * host with a `control` command that the broker runs on its own machine instead (the command drives a
+   * host the broker cannot ssh into, through whatever API that host offers). Every other host has one.
+   */
+  readonly ssh?: string;
   /** A laptop: nothing is spawned and nothing is built on it while it runs on battery. */
   readonly requiresAc: boolean;
   /** How many spawned devices may run on it at once. */
@@ -58,9 +62,11 @@ export type Host = {
   /** Build slots; 0 means the host builds nothing through the broker. */
   readonly builders: number;
   /**
-   * The command on the host that starts and stops its emulators, run over ssh as
-   * `<control> start|stop <instance>`, and as `<control> status` (one `<instance> <state>` line each,
-   * a failed unit's followed by systemd's Result) by every probe. The README states the contract; the broker's ssh account needs no other privilege.
+   * The command that starts and stops the host's emulators, run over ssh as `<control> start|stop <instance>`,
+   * and as `<control> status` (one `<instance> <state>` line each, a failed unit's followed by systemd's
+   * Result) by every probe. On a host with no `ssh` it runs on the broker's own machine, as an argv, and its
+   * `probe` call answers for the whole probe (memory, load, status). The README states the contract; the broker's
+   * account needs no other privilege.
    */
   readonly control?: string;
   /**
@@ -81,13 +87,29 @@ export type AdbAddress = {
   readonly serial: string;
 };
 
+/** An Android serial that is `<IPv4>:<port>`. */
+const NETWORK_SERIAL = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3}):(\d{1,5})$/;
+
+/**
+ * Whether a serial names a device on the network (`192.0.2.7:5555`), which the adb server only sees once
+ * `adb connect` has attached it, rather than an emulator that registers itself (`emulator-5554`).
+ */
+export const isNetworkSerial = (serial: string): boolean => {
+  const m = NETWORK_SERIAL.exec(serial);
+  if (m === null) return false;
+  const port = Number(m[5]);
+  return m.slice(1, 5).every((octet) => Number(octet) <= 255) && port >= 1 && port <= 65535;
+};
+
 /**
  * How the BROKER tells that an emulator it started has booted, and resets one after a dirty lease:
  *   - `door`: the slot's own adbd, on this port of the broker's loopback (a tunnel to that one device):
  *     `sys.boot_completed` through the same path its holder uses, and `pm clear` through it.
  *   - `unit`: the host's control command reports the instance `active`, which it must do only once the
  *     device has booted. For a slot whose door the broker cannot reach.
- *   - absent: the adb server on the broker's loopback at `adb.port` (emulators on a shared adb server).
+ *   - absent: the adb server on the broker's loopback at `adb.port` (emulators on a shared adb server). A serial
+ *     that is a network address is connected to that server by the broker while it waits for the boot, and
+ *     disconnected after the stop (`isNetworkSerial`).
  */
 export type Probe = { readonly kind: "door"; readonly port: number } | { readonly kind: "unit" };
 
@@ -273,6 +295,11 @@ export const catalogProblems = (catalog: Catalog): readonly string[] => {
   // One name space per host: the control command knows a variant's instance as it knows any other.
   for (const key of twice(catalog.devices.flatMap((d) => instancesOf(d).map((i) => `${d.host}/${i}`)))) problems.push(`instance ${key} is declared twice`);
   for (const h of catalog.hosts) if (h.control !== undefined && !CONTROL.test(h.control)) problems.push(`host ${h.id} has control ${JSON.stringify(h.control)}, not an absolute path`);
+  // With no ssh target the broker runs the control command on its own machine: only an android host's probe and
+  // starts go through that command. An ios host, and any host the broker would reach without one, is reached over ssh.
+  for (const h of catalog.hosts)
+    if (h.ssh === undefined && (h.platform !== "android" || h.control === undefined))
+      problems.push(`host ${h.id} has no ssh target: only an android host with a control command can go without one (the broker then runs that command on its own machine), so give it an ssh target`);
   for (const port of twice(catalog.devices.flatMap((d) => (d.probe?.kind === "door" ? [String(d.probe.port)] : [])))) problems.push(`door port ${port} is declared twice`);
   // Simulators are found by name on their Mac, a paired watch as much as its phone: one name, one simulator.
   const simulatorNames = catalog.devices.flatMap((d) => (d.simulator === undefined ? [] : [d.simulator.name, ...(d.simulator.watch === undefined ? [] : [d.simulator.watch.name])].map((n) => `${d.host}/${n}`)));

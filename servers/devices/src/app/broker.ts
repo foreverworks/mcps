@@ -5,7 +5,7 @@
  */
 import { pause, reportProgress } from "@foreverworks/mcp-kit";
 
-import { DEFAULT_TENANT, deviceOf, formOf, hostOf, instancesOf, isStartedSlot, type Device, type Platform, type Tenant } from "../domain/catalog.js";
+import { DEFAULT_TENANT, deviceOf, formOf, hostOf, instancesOf, isNetworkSerial, isStartedSlot, type Device, type Platform, type Tenant } from "../domain/catalog.js";
 import { configError, fail, inputError } from "../domain/errors.js";
 import { answersWant, place, unknownHealth, type HostHealth } from "../domain/place.js";
 import {
@@ -146,6 +146,16 @@ export const makeBroker = (deps: Deps) => {
   const udidOf = (s: BrokerState, d: Device): string | undefined =>
     s.marks[d.id]?.udid ?? (d.simulator === undefined ? undefined : health[d.host]?.udids[d.simulator.name]);
 
+  /**
+   * After a stop, a network serial the broker attached to its adb server is detached: nothing is left listed
+   * as `offline`. Best effort, and only for a slot the broker reads through that server (one with a probe is
+   * read another way, and its serial names its holder's side): a failure must not fail the stop.
+   */
+  const detach = (device: Device): readonly (() => Promise<unknown>)[] => {
+    const adb = device.adb;
+    return adb === undefined || device.probe !== undefined || !isNetworkSerial(adb.serial) ? [] : [() => deps.adb.disconnect(adb.port, adb.serial).catch(() => undefined)];
+  };
+
   type Work = { readonly what: "stopping" | "resetting"; readonly steps: readonly (() => Promise<unknown>)[]; readonly stops: boolean };
 
   /** What a device needs after a lease ends, if anything: one rule for the busy mark and for the work. */
@@ -171,7 +181,7 @@ export const makeBroker = (deps: Deps) => {
       const wipe =
         adb === undefined ? undefined : probe === undefined ? () => deps.adb.clearUserApps(adb.port, adb.serial) : probe.kind === "door" ? () => deps.door.clearUserApps(probe.port) : undefined;
       const clear = ended.state === "dirty" && s.marks[device.id]?.readyAt !== undefined && wipe !== undefined ? [wipe] : [];
-      return { what: clear.length > 0 ? "resetting" : "stopping", steps: [...clear, () => deps.hosts.stopEmulator(host, instance)], stops: true };
+      return { what: clear.length > 0 ? "resetting" : "stopping", steps: [...clear, () => deps.hosts.stopEmulator(host, instance), ...detach(device)], stops: true };
     }
     if (device.platform === "android" && device.mode === "fixed" && device.adb !== undefined && ended.state !== "clean") {
       const { port, serial } = device.adb;
@@ -278,6 +288,8 @@ export const makeBroker = (deps: Deps) => {
    * Whether a booting emulator has booted, by its probe: through its door (`sys.boot_completed` over the
    * path its holder uses), by the lease's instance being `active` on its host (a pool slot's unit is active
    * only once booted), or, for an emulator on a shared adb server, adb listing it as a `device` with its boot completed.
+   * A network serial (`<IPv4>:<port>`) is not listed until the server has connected it: one not listed as a `device`
+   * is disconnected (clearing a stale `offline` entry) and connected, and the next pass looks again.
    */
   const booted = async (device: Device, instance: string | undefined): Promise<boolean> => {
     const probe = device.probe;
@@ -290,7 +302,12 @@ export const makeBroker = (deps: Deps) => {
     if (device.adb === undefined) return false;
     const { port, serial } = device.adb;
     const seen = await deps.adb.devices(port).catch(() => []);
-    return seen.some((d) => d.serial === serial && d.state === "device") && (await deps.adb.bootCompleted(port, serial));
+    if (seen.some((d) => d.serial === serial && d.state === "device")) return deps.adb.bootCompleted(port, serial);
+    if (isNetworkSerial(serial)) {
+      await deps.adb.disconnect(port, serial).catch(() => undefined);
+      await deps.adb.connect(port, serial).catch(() => undefined);
+    }
+    return false;
   };
 
   /** A lease's booting emulator is ready once its probe says it has booted. */
@@ -339,7 +356,7 @@ export const makeBroker = (deps: Deps) => {
         return { state: withEvent({ ...st, marks: { ...st.marks, [d.id]: { ...mk, busy: { since: now, what: "stopping" } } } }, now, `${d.id} was running with no lease: stopping it`, d.tenant), value: true };
       });
       if (!claimed) continue;
-      void runWork(d.id, { what: "stopping", steps: instances.map((i) => () => deps.hosts.stopEmulator(host, i)), stops: true }, "stop failed; the broker tries again within a minute (status)");
+      void runWork(d.id, { what: "stopping", steps: [...instances.map((i) => () => deps.hosts.stopEmulator(host, i)), ...detach(d)], stops: true }, "stop failed; the broker tries again within a minute (status)");
     }
   };
 

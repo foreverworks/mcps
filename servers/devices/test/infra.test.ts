@@ -5,6 +5,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import { makeAdb, parseDevices, parsePackages } from "../src/infra/adb.js";
 import { loadCatalog, parseCatalog } from "../src/infra/catalog.js";
 import { doorShell, makeDoor, message, readMessages } from "../src/infra/door.js";
+import { makeLocal } from "../src/infra/local.js";
 import { makeHosts, newestIosRuntime, newestRuntime, parseAndroidProbe, parseEmulatorResults, parseEmulatorStates, parseMacProbe, parsePairs, userApps, watchesOf } from "../src/infra/hosts.js";
 import type { Host } from "../src/domain/catalog.js";
 
@@ -210,6 +211,82 @@ describe("simulators on a Mac, over ssh", () => {
   });
 });
 
+describe("a host with no ssh target: its control command runs on the broker's machine", () => {
+  const cloud: Host = { id: "cloud-1", label: "cloud-1", platform: "android", requiresAc: false, spawnMax: 2, costMiB: 0, reserveMiB: 0, builders: 0, control: "/usr/local/bin/cloud-ctl", isolates: false };
+  const viaSsh: Host = { ...cloud, id: "emu-1", ssh: "builder@emu-1.example.com", control: "/usr/local/bin/emulator-ctl" };
+
+  /** Every command either way, the answer to each from a table keyed by its last word (the control command's call). */
+  const wired = (answers: Readonly<Record<string, string>>) => {
+    const sshed: string[] = [];
+    const ran: { argv: readonly string[]; timeoutMs: number | undefined }[] = [];
+    const ssh = async (target: string, command: string): Promise<string> => {
+      sshed.push(`${target} ${command}`);
+      return answers[command.split(" ")[1] ?? ""] ?? "";
+    };
+    const local = async (argv: readonly [string, ...string[]], timeoutMs?: number): Promise<string> => {
+      ran.push({ argv, timeoutMs });
+      return answers[argv[1] ?? ""] ?? "";
+    };
+    return { sshed, ran, hosts: makeHosts(ssh, local) };
+  };
+
+  it("probes with `<control> probe`, which prints what the ssh probe prints, and reads it as the ssh probe's", async () => {
+    const { sshed, ran, hosts } = wired({ probe: "43210000\n@@devices@@\n0.5\n@@devices@@\ncloud1 active\ncloud2 failed timeout\n" });
+    expect(await hosts.probeAndroid(cloud)).toEqual({ memAvailableMiB: 42197, load: 0.5, emulators: { cloud1: "active", cloud2: "failed" }, results: { cloud2: "timeout" } });
+    expect(ran).toEqual([{ argv: ["/usr/local/bin/cloud-ctl", "probe"], timeoutMs: 20_000 }]);
+    expect(sshed).toEqual([]);
+  });
+
+  it("starts, stops and reads status as an argv on the local runner, with the deadlines the ssh calls have", async () => {
+    const { sshed, ran, hosts } = wired({ status: "cloud1 active\ncloud2 inactive\n" });
+    await hosts.startEmulator(cloud, "cloud1");
+    await hosts.stopEmulator(cloud, "cloud1");
+    expect(await hosts.emulatorStates(cloud)).toEqual({ cloud1: "active", cloud2: "inactive" });
+    expect(ran).toEqual([
+      { argv: ["/usr/local/bin/cloud-ctl", "start", "cloud1"], timeoutMs: 90_000 },
+      { argv: ["/usr/local/bin/cloud-ctl", "stop", "cloud1"], timeoutMs: 240_000 },
+      { argv: ["/usr/local/bin/cloud-ctl", "status"], timeoutMs: 20_000 },
+    ]);
+    expect(sshed).toEqual([]);
+    // An instance name is checked before anything runs, as it is over ssh.
+    await expect(hosts.startEmulator(cloud, "cloud1; reboot")).rejects.toMatchObject({ error: { message: expect.stringMatching(/not an emulator instance/) } });
+    expect(ran).toHaveLength(3);
+  });
+
+  it("goes on over ssh for a host that has a target, with the same command lines as before", async () => {
+    const { sshed, ran, hosts } = wired({ status: "phone1 active\n" });
+    await hosts.startEmulator(viaSsh, "phone1");
+    await hosts.stopEmulator(viaSsh, "phone1");
+    await hosts.emulatorStates(viaSsh);
+    await hosts.probeAndroid(viaSsh).catch(() => undefined);
+    expect(sshed).toEqual([
+      "builder@emu-1.example.com /usr/local/bin/emulator-ctl start phone1",
+      "builder@emu-1.example.com /usr/local/bin/emulator-ctl stop phone1",
+      "builder@emu-1.example.com /usr/local/bin/emulator-ctl status",
+      "builder@emu-1.example.com awk '/^MemAvailable:/{print $2}' /proc/meminfo; echo @@devices@@; cut -d' ' -f1 /proc/loadavg; echo @@devices@@; /usr/local/bin/emulator-ctl status",
+    ]);
+    expect(ran).toEqual([]);
+  });
+
+  it("refuses a host that has neither an ssh target nor a control command, naming the host", async () => {
+    const { hosts } = wired({});
+    const { control: _no, ...bare } = cloud;
+    await expect(hosts.probeAndroid(bare)).rejects.toMatchObject({ error: { kind: "host", host: "cloud-1" } });
+    await expect(hosts.startEmulator(bare, "cloud1")).rejects.toMatchObject({ error: { host: "cloud-1" } });
+  });
+
+  it("runs a command with no shell and fails on a non-zero exit with the last of what it said, as ssh does", async () => {
+    const local = makeLocal();
+    expect(await local([process.execPath, "-e", "process.stdout.write('cloud1 active\\n')"], 10_000)).toBe("cloud1 active\n");
+    await expect(local([process.execPath, "-e", "console.error('no answer from its service'); process.exit(3)"], 10_000)).rejects.toMatchObject({
+      error: { kind: "host", host: process.execPath, message: "exit 3: no answer from its service" },
+    });
+    // No shell reads the arguments: a metacharacter is just text.
+    expect(await local([process.execPath, "-e", "process.stdout.write(process.argv[1])", "a; echo b"], 10_000)).toBe("a; echo b");
+    await expect(local(["/nonexistent/cloud-ctl", "status"], 10_000)).rejects.toMatchObject({ error: { message: expect.stringMatching(/^exit 127:/) } });
+  });
+});
+
 describe("adb host protocol", () => {
   let server: Server | undefined;
   afterEach(() => new Promise<void>((r) => (server === undefined ? r() : server.close(() => r()))));
@@ -253,6 +330,62 @@ describe("adb host protocol", () => {
     await new Promise<void>((r) => server?.close(() => r()));
     server = undefined;
     await expect(makeAdb().devices(port)).rejects.toThrow();
+  });
+});
+
+describe("adb host protocol: connecting network devices", () => {
+  let server: Server | undefined;
+  afterEach(() => new Promise<void>((r) => (server === undefined ? r() : server.close(() => r()))));
+
+  /** An adb server that answers every request with OKAY and the message, or FAIL and it, and remembers what it was asked. */
+  const answering = async (reply: string, verdict: "OKAY" | "FAIL" = "OKAY") => {
+    const seen: string[] = [];
+    server = createServer((socket) => {
+      socket.on("data", (d) => {
+        seen.push(d.toString());
+        socket.end(`${verdict}${reply.length.toString(16).padStart(4, "0")}${reply}`);
+      });
+    });
+    await new Promise<void>((r) => server?.listen(0, "127.0.0.1", () => r()));
+    return { seen, port: (server.address() as { port: number }).port };
+  };
+
+  it("asks host:connect and host:disconnect with the serial, and takes connected, already connected and disconnected as done", async () => {
+    const connected = await answering("connected to 192.0.2.7:5555");
+    await expect(makeAdb().connect(connected.port, "192.0.2.7:5555")).resolves.toBeUndefined();
+    expect(connected.seen).toEqual(["001bhost:connect:192.0.2.7:5555"]);
+    await new Promise<void>((r) => server?.close(() => r()));
+    const already = await answering("already connected to 192.0.2.7:5555");
+    await expect(makeAdb().connect(already.port, "192.0.2.7:5555")).resolves.toBeUndefined();
+    await new Promise<void>((r) => server?.close(() => r()));
+    const gone = await answering("disconnected 192.0.2.7:5555");
+    await expect(makeAdb().disconnect(gone.port, "192.0.2.7:5555")).resolves.toBeUndefined();
+    expect(gone.seen).toEqual(["001ehost:disconnect:192.0.2.7:5555"]);
+  });
+
+  it("fails on the server's own words when it could not connect, or knows no such device", async () => {
+    const refused = await answering("failed to connect to '192.0.2.7:5555': Connection refused");
+    await expect(makeAdb().connect(refused.port, "192.0.2.7:5555")).rejects.toMatchObject({ error: { kind: "host", message: expect.stringMatching(/failed to connect to '192.0.2.7:5555': Connection refused/) } });
+    await new Promise<void>((r) => server?.close(() => r()));
+    const cannot = await answering("cannot connect to 192.0.2.7:5555: Connection timed out (110)");
+    await expect(makeAdb().connect(cannot.port, "192.0.2.7:5555")).rejects.toMatchObject({ error: { message: expect.stringMatching(/cannot connect to/) } });
+    await new Promise<void>((r) => server?.close(() => r()));
+    const unknown = await answering("error: no such device '192.0.2.7:5555'");
+    await expect(makeAdb().disconnect(unknown.port, "192.0.2.7:5555")).rejects.toMatchObject({ error: { message: expect.stringMatching(/no such device/) } });
+    await new Promise<void>((r) => server?.close(() => r()));
+    const failed = await answering("unknown host service", "FAIL");
+    await expect(makeAdb().connect(failed.port, "192.0.2.7:5555")).rejects.toMatchObject({ error: { message: expect.stringMatching(/unknown host service/) } });
+  });
+
+  it("sends nothing for a serial that is not an address, and fails when no server answers", async () => {
+    const quiet = await answering("connected to emulator-5554");
+    await expect(makeAdb().connect(quiet.port, "emulator-5554")).rejects.toMatchObject({ error: { message: expect.stringMatching(/not a network serial/) } });
+    await expect(makeAdb().disconnect(quiet.port, "192.0.2.7:5555; reboot")).rejects.toMatchObject({ error: { message: expect.stringMatching(/not a network serial/) } });
+    await expect(makeAdb().connect(quiet.port, "192.0.2.256:5555")).rejects.toThrow();
+    expect(quiet.seen).toEqual([]);
+    await new Promise<void>((r) => server?.close(() => r()));
+    server = undefined;
+    await expect(makeAdb().connect(quiet.port, "192.0.2.7:5555")).rejects.toThrow();
   });
 });
 
@@ -515,6 +648,31 @@ describe("catalog", () => {
     expect(refused([...base.devices, { id: "emulator-5554", platform: "android", host: "emu-1", profile: "ios-phone", mode: "fixed", adb: { port: 5037, serial: "emulator-5554" }, screenshot: "screencap -p" }])).toMatch(
       /emulator-5554 has a screenshot command but is not reached over ssh/,
     );
+  });
+
+  it("parses an android host with no ssh target when it has a control command, and refuses every other without one", () => {
+    const cloud = { id: "cloud-1", label: "cloud-1", platform: "android", spawn_max: 2, control: "/usr/local/bin/cloud-ctl" };
+    const slot = { id: "192.0.2.11:5555", platform: "android", host: "cloud-1", profile: "android-phone", mode: "spawn", maestro: true, adb: { port: 5037, serial: "192.0.2.11:5555" }, instance: "cloud1" };
+    const profiles = { ...base.profiles, "android-phone": "API 34" };
+    const ok = { ...base, profiles, hosts: [...base.hosts, cloud], devices: [...base.devices, slot] };
+    const { catalog } = parseCatalog(JSON.stringify(ok), "broker-1");
+    expect(catalog.hosts[1]).toMatchObject({ id: "cloud-1", control: "/usr/local/bin/cloud-ctl" });
+    expect(catalog.hosts[1]).not.toHaveProperty("ssh");
+    expect(catalog.hosts[0]).toMatchObject({ ssh: "runner@mac-1.example.com" });
+    expect(catalog.devices[1]).toMatchObject({ id: "192.0.2.11:5555", adb: { port: 5037, serial: "192.0.2.11:5555" } });
+    const refused = (c: unknown): string => {
+      try {
+        parseCatalog(JSON.stringify(c), "broker-1");
+      } catch (e) {
+        return (e as { error: { message: string } }).error.message;
+      }
+      return "accepted";
+    };
+    const { control: _no, ...noControl } = cloud;
+    expect(refused({ ...ok, hosts: [...base.hosts, noControl], devices: [base.devices[0]] })).toMatch(/host cloud-1 has no ssh target: only an android host with a control command can go without one/);
+    const { ssh: _mac, ...macNoSsh } = base.hosts[0] ?? {};
+    expect(refused({ ...ok, hosts: [{ ...macNoSsh, control: "/usr/local/bin/cloud-ctl" }, cloud], devices: [base.devices[0]] })).toMatch(/host mac-1 has no ssh target: only an android host with a control command can go without one/);
+    expect(refused({ ...ok, hosts: [...base.hosts, { ...cloud, ssh: "" }] })).toMatch(/does not validate/);
   });
 
   it("names the box from the caller when the catalog does not, and reads the deployment's clients", () => {

@@ -5,7 +5,7 @@
 import type { Catalog, Host, SimulatorSpec } from "../domain/catalog.js";
 import type { BrokerState } from "../domain/state.js";
 
-/** An Android build-and-emulator host (Linux), read over ssh. */
+/** An Android build-and-emulator host (Linux), read over ssh, or through its control command's `probe` where it has no ssh target. */
 export type AndroidHostProbe = {
   readonly memAvailableMiB: number;
   readonly load: number;
@@ -62,6 +62,13 @@ export type AdbDevice = { readonly serial: string; readonly state: string };
 /** An adb server on the broker's own loopback: a local one, or a forward of a host's. */
 export type AdbPort = {
   readonly devices: (port: number) => Promise<readonly AdbDevice[]>;
+  /**
+   * Attaches a network device (`<IPv4>:<port>`, what `adb connect` takes) to the server on `port`. Fails when the
+   * server answers that it could not connect: an adbd that is not up yet, an address that does not answer.
+   */
+  readonly connect: (port: number, serial: string) => Promise<void>;
+  /** Detaches a network device from the server on `port`; fails when the server refuses, or knows no such device. */
+  readonly disconnect: (port: number, serial: string) => Promise<void>;
   /** Whether a device in `device` state has finished booting (sys.boot_completed); false on any doubt. */
   readonly bootCompleted: (port: number, serial: string) => Promise<boolean>;
   /** `pm clear` of every third-party package; the count cleared. */

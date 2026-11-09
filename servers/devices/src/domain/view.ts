@@ -46,7 +46,8 @@ export const addressOf = (catalog: Catalog, state: BrokerState, health: Readonly
     };
     return { platform: "android", adbPort: device.adb.port, serial: device.adb.serial, env };
   }
-  if (device.platform === "ios" && device.simulator !== undefined) {
+  // A Mac is reached over ssh, so it has a target; the catalog refuses one that has none.
+  if (device.platform === "ios" && device.simulator !== undefined && host.ssh !== undefined) {
     const udid = state.marks[device.id]?.udid ?? health[host.id]?.udids[device.simulator.name];
     const watch = device.simulator.watch;
     const watchUdid = watch === undefined ? undefined : (state.marks[device.id]?.watchUdid ?? health[host.id]?.udids[watch.name]);

@@ -1,6 +1,7 @@
 import type { AndroidHostProbe, HostsPort, MacProbe, SimulatorSeen } from "../app/ports.js";
 import { INSTANCE, type Host, type WatchSpec } from "../domain/catalog.js";
 import { fail, hostError } from "../domain/errors.js";
+import { makeLocal, type Local } from "./local.js";
 import { sq, type Ssh } from "./ssh.js";
 
 // A GitHub Actions runner's job process. `[R]unner.Worker`, not `Runner.Worker`: the remote shell's own
@@ -129,6 +130,9 @@ export const userApps = (plist: string): readonly string[] =>
 const control = (host: Host): string => host.control ?? fail(hostError(host.id, "no control command in the catalog to start or stop its emulators"));
 const checkInstance = (host: Host, instance: string): string => (INSTANCE.test(instance) ? instance : fail(hostError(host.id, `not an emulator instance: ${instance}`)));
 
+/** The ssh target of a host the broker reaches over ssh. The catalog gives every host but an android one with a control command a target. */
+const sshOf = (host: Host): string => host.ssh ?? fail(hostError(host.id, "no ssh target in the catalog"));
+
 const UDID = /^[0-9A-F-]{36}$/i;
 const checkUdid = (udid: string): string => (UDID.test(udid) ? udid : fail(hostError("simulator", `not a UDID: ${udid}`)));
 
@@ -154,28 +158,39 @@ const resetSteps = (udid: string, plist: string, companion: boolean): readonly s
  * than taken from it: that pair is someone's, and simctl gives a watch one phone.
  */
 const pair = async (ssh: Ssh, host: Host, spec: WatchSpec, watch: string, phone: string): Promise<void> => {
-  const pairs = parsePairs(await ssh(host.ssh, LIST_PAIRS, 30_000));
+  const pairs = parsePairs(await ssh(sshOf(host), LIST_PAIRS, 30_000));
   if (pairs.some((p) => p.watch === watch && p.phone === phone)) return;
   const other = pairs.find((p) => p.watch === watch);
   if (other !== undefined) return fail(hostError(host.id, `${spec.name} (${watch}) is paired with another phone (${other.phone}); unpair it so the broker can pair it with ${phone}`));
-  await ssh(host.ssh, `xcrun simctl pair ${watch} ${phone}`, 60_000);
+  await ssh(sshOf(host), `xcrun simctl pair ${watch} ${phone}`, 60_000);
 };
 
-export const makeHosts = (ssh: Ssh): HostsPort => ({
+/**
+ * One call of the host's control command (`start`, `stop`, `status`, `probe`, with an instance the catalog's pattern
+ * has checked). A host with an ssh target goes through `ssh`, as one command line for the remote shell; one without
+ * goes through `local`, on the broker's own machine, as an argv with no shell. Both read the same call.
+ */
+const controlCall = (ssh: Ssh, local: Local, host: Host, args: readonly string[], timeoutMs: number): Promise<string> =>
+  host.ssh === undefined ? local([control(host), ...args], timeoutMs) : ssh(host.ssh, [control(host), ...args].join(" "), timeoutMs);
+
+export const makeHosts = (ssh: Ssh, local: Local = makeLocal()): HostsPort => ({
   probeAndroid: async (host: Host) =>
     parseAndroidProbe(
-      await ssh(
-        host.ssh,
-        `awk '/^MemAvailable:/{print $2}' /proc/meminfo; echo ${SEP}; cut -d' ' -f1 /proc/loadavg` +
-          (host.control === undefined ? "" : `; echo ${SEP}; ${control(host)} status`),
-        20_000,
-      ),
+      // A host with no ssh target answers all three sections itself, through its control command's `probe`.
+      host.ssh === undefined
+        ? await controlCall(ssh, local, host, ["probe"], 20_000)
+        : await ssh(
+            host.ssh,
+            `awk '/^MemAvailable:/{print $2}' /proc/meminfo; echo ${SEP}; cut -d' ' -f1 /proc/loadavg` +
+              (host.control === undefined ? "" : `; echo ${SEP}; ${control(host)} status`),
+            20_000,
+          ),
     ),
 
   probeMac: async (host: Host) =>
     parseMacProbe(
       await ssh(
-        host.ssh,
+        sshOf(host),
         // `gui/<uid>` exists only while the account has a desktop (Aqua) session: what an app it opens needs.
         `pmset -g batt | head -1; echo ${SEP}; sysctl -n vm.loadavg; echo ${SEP}; if pgrep -f ${CI_JOB} >/dev/null; then echo busy; else echo idle; fi; echo ${SEP}; ` +
           `if launchctl print gui/$(id -u) >/dev/null 2>&1; then echo desktop; else echo none; fi; echo ${SEP}; xcrun simctl list devices --json`,
@@ -184,7 +199,7 @@ export const makeHosts = (ssh: Ssh): HostsPort => ({
     ),
 
   createSimulator: async (host, spec) => {
-    const seen = parseSimulators(await ssh(host.ssh, "xcrun simctl list devices --json", 30_000));
+    const seen = parseSimulators(await ssh(sshOf(host), "xcrun simctl list devices --json", 30_000));
     // Found by name, exactly one, as the probe finds them: two of one name and a holder may drive the wrong one.
     const named = (name: string): string | undefined => {
       const hits = seen.filter((s) => s.name === name);
@@ -196,10 +211,10 @@ export const makeHosts = (ssh: Ssh): HostsPort => ({
     if (phone !== undefined && spec.watch === undefined) return { udid: phone };
     let runtimes: string | undefined;
     const make = async (made: { readonly name: string; readonly type: string }, os: SimOs): Promise<string> => {
-      runtimes ??= await ssh(host.ssh, "xcrun simctl list runtimes --json", 30_000);
+      runtimes ??= await ssh(sshOf(host), "xcrun simctl list runtimes --json", 30_000);
       const runtime = newestRuntime(runtimes, os);
       if (runtime === undefined) return fail(hostError(host.id, `no available ${os} runtime`));
-      const out = (await ssh(host.ssh, `xcrun simctl create ${sq(made.name)} ${sq(made.type)} ${sq(runtime)}`, 120_000)).trim();
+      const out = (await ssh(sshOf(host), `xcrun simctl create ${sq(made.name)} ${sq(made.type)} ${sq(runtime)}`, 120_000)).trim();
       return checkUdid(out.split("\n").at(-1)?.trim() ?? "");
     };
     const udid = phone ?? (await make(spec, "iOS"));
@@ -213,29 +228,29 @@ export const makeHosts = (ssh: Ssh): HostsPort => ({
     const u = checkUdid(udid);
     // "Unable to shutdown device in current state: Shutdown" is the success we want, so the exit is ignored.
     // The pairs come back in the same call, so a phone with no watch costs no second one.
-    const watches = watchesOf(parsePairs(await ssh(host.ssh, `xcrun simctl shutdown ${u} >/dev/null 2>&1; ${LIST_PAIRS}`, 120_000)), u).map(checkUdid);
-    if (watches.length > 0) await ssh(host.ssh, `${watches.map((w) => `xcrun simctl shutdown ${w} >/dev/null 2>&1`).join("; ")}; true`, 120_000);
+    const watches = watchesOf(parsePairs(await ssh(sshOf(host), `xcrun simctl shutdown ${u} >/dev/null 2>&1; ${LIST_PAIRS}`, 120_000)), u).map(checkUdid);
+    if (watches.length > 0) await ssh(sshOf(host), `${watches.map((w) => `xcrun simctl shutdown ${w} >/dev/null 2>&1`).join("; ")}; true`, 120_000);
   },
 
   resetSimulator: async (host, udid) => {
     const u = checkUdid(udid);
     // listapps answers only for a booted device; a shut-down one has nothing running to reset.
-    const [plist, pairs] = sections(await ssh(host.ssh, `xcrun simctl listapps ${u} 2>/dev/null || true; echo ${SEP}; ${LIST_PAIRS}`, 60_000), 2);
+    const [plist, pairs] = sections(await ssh(sshOf(host), `xcrun simctl listapps ${u} 2>/dev/null || true; echo ${SEP}; ${LIST_PAIRS}`, 60_000), 2);
     const watches = watchesOf(parsePairs(pairs ?? "{}"), u).map(checkUdid);
-    const companions = await Promise.all(watches.map(async (w) => resetSteps(w, await ssh(host.ssh, `xcrun simctl listapps ${w} 2>/dev/null || true`, 60_000), true)));
+    const companions = await Promise.all(watches.map(async (w) => resetSteps(w, await ssh(sshOf(host), `xcrun simctl listapps ${w} 2>/dev/null || true`, 60_000), true)));
     const steps = [...resetSteps(u, plist ?? "", false), ...companions.flat()];
-    if (steps.length > 0) await ssh(host.ssh, steps.join("; "), 180_000);
+    if (steps.length > 0) await ssh(sshOf(host), steps.join("; "), 180_000);
   },
 
   deleteSimulator: async (host, udid) => {
     const u = checkUdid(udid);
-    const all = [u, ...watchesOf(parsePairs(await ssh(host.ssh, LIST_PAIRS, 30_000)), u).map(checkUdid)];
-    await ssh(host.ssh, `${all.map((x) => `xcrun simctl shutdown ${x} >/dev/null 2>&1`).join("; ")}; xcrun simctl delete ${all.join(" ")}`, 120_000);
+    const all = [u, ...watchesOf(parsePairs(await ssh(sshOf(host), LIST_PAIRS, 30_000)), u).map(checkUdid)];
+    await ssh(sshOf(host), `${all.map((x) => `xcrun simctl shutdown ${x} >/dev/null 2>&1`).join("; ")}; xcrun simctl delete ${all.join(" ")}`, 120_000);
   },
 
   // The host's control command (the README's contract): `start` returns once the start is under way,
   // `stop` once the emulator has stopped (it may save a snapshot on the way down, so a stop can take a minute).
-  startEmulator: async (host, instance) => void (await ssh(host.ssh, `${control(host)} start ${checkInstance(host, instance)}`, 90_000)),
-  stopEmulator: async (host, instance) => void (await ssh(host.ssh, `${control(host)} stop ${checkInstance(host, instance)}`, 240_000)),
-  emulatorStates: async (host) => parseEmulatorStates(await ssh(host.ssh, `${control(host)} status`, 20_000)),
+  startEmulator: async (host, instance) => void (await controlCall(ssh, local, host, ["start", checkInstance(host, instance)], 90_000)),
+  stopEmulator: async (host, instance) => void (await controlCall(ssh, local, host, ["stop", checkInstance(host, instance)], 240_000)),
+  emulatorStates: async (host) => parseEmulatorStates(await controlCall(ssh, local, host, ["status"], 20_000)),
 });

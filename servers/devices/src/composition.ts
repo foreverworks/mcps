@@ -8,6 +8,7 @@ import { makeAdb } from "./infra/adb.js";
 import { loadCatalog } from "./infra/catalog.js";
 import { makeDoor } from "./infra/door.js";
 import { makeHosts } from "./infra/hosts.js";
+import { makeLocal } from "./infra/local.js";
 import { makeSsh } from "./infra/ssh.js";
 import { makeStore } from "./infra/store.js";
 
@@ -25,7 +26,7 @@ export const buildDeps = async (env: NodeJS.ProcessEnv = process.env): Promise<D
     catalog,
     ...(note === undefined ? {} : { catalogNote: note }),
     ...(problem === undefined ? {} : { catalogProblem: problem }),
-    hosts: makeHosts(makeSsh(stateDir)),
+    hosts: makeHosts(makeSsh(stateDir), makeLocal()),
     adb: makeAdb(),
     door: makeDoor(),
     store: makeStore(stateDir),

@@ -1,6 +1,7 @@
 import { connect } from "node:net";
 
 import type { AdbDevice, AdbPort } from "../app/ports.js";
+import { isNetworkSerial } from "../domain/catalog.js";
 import { fail, hostError } from "../domain/errors.js";
 
 /**
@@ -100,10 +101,27 @@ export const adbShell = (port: number, serial: string, command: string, timeoutM
     fail(hostError(`adb ${port}/${serial}`, String((e as Error).message ?? e))),
   );
 
+/**
+ * What the server says of a `host:connect` or `host:disconnect` that did not do it: "failed to connect to ...",
+ * "cannot connect to ...", "unable to connect to ...", "error: no such device ..." and the like. Success is
+ * "connected to ...", "already connected to ..." or "disconnected ...".
+ */
+const REFUSED = /\b(failed|cannot|unable|error|bad)\b/i;
+
+/** `host:connect:<serial>` or `host:disconnect:<serial>`: the server answers OKAY and a one-line message, which says whether it worked. */
+const attach = async (port: number, verb: "connect" | "disconnect", serial: string, timeoutMs: number): Promise<void> => {
+  const where = `adb ${port}/${serial}`;
+  if (!isNetworkSerial(serial)) return fail(hostError(where, `${serial} is not a network serial (<IPv4>:<port>): ${verb} takes only those`));
+  const said = (await talk(port, { steps: [`host:${verb}:${serial}`], read: "length" }, timeoutMs).catch((e: unknown) => fail(hostError(where, String((e as Error).message ?? e))))).trim();
+  if (REFUSED.test(said)) return fail(hostError(where, said));
+};
+
 export const makeAdb = (timeoutMs = 15_000): AdbPort => {
   const shell = (port: number, serial: string, command: string) => adbShell(port, serial, command, timeoutMs);
   return {
     devices: async (port) => parseDevices(await talk(port, { steps: ["host:devices"], read: "length" }, 5_000)),
+    connect: (port, serial) => attach(port, "connect", serial, timeoutMs),
+    disconnect: (port, serial) => attach(port, "disconnect", serial, timeoutMs),
     bootCompleted: async (port, serial) => (await shell(port, serial, "getprop sys.boot_completed").catch(() => "")).trim() === "1",
     clearUserApps: async (port, serial) => {
       const packages = parsePackages(await shell(port, serial, "pm list packages -3"));

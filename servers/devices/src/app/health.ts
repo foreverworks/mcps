@@ -50,7 +50,7 @@ const probeAndroidHost = async (deps: Deps, catalog: Catalog, host: Host, now: n
   ].map((d) => d.id);
   const deadPorts = adbPorts.filter((a) => a.seen === undefined).map((a) => a.port);
   if (!probe.ok) {
-    return { state: "down", reason: `no answer over ssh (${probe.reason})`, checkedAt: now, present, runningInstances: [], failedInstances: {}, booted: [], udids: {} };
+    return { state: "down", reason: host.ssh === undefined ? `its control command's probe failed (${probe.reason})` : `no answer over ssh (${probe.reason})`, checkedAt: now, present, runningInstances: [], failedInstances: {}, booted: [], udids: {} };
   }
   const reasons = [
     deadPorts.length > 0 ? `the adb server on 127.0.0.1:${deadPorts.join(", ")} does not answer` : undefined,
@@ -108,7 +108,7 @@ const probeMacHost = async (deps: Deps, catalog: Catalog, host: Host, now: numbe
   const why: Record<string, string> = {};
   for (const d of desktops) {
     if (probe.desktop) present.push(d.id);
-    else why[d.id] = `nobody is logged in to a desktop session as ${host.ssh.split("@")[0] ?? host.ssh} on ${host.label}: someone must log in to that account on the Mac (Fast User Switching keeps any other session)`;
+    else why[d.id] = `nobody is logged in to a desktop session as ${host.ssh?.split("@")[0] ?? host.label} on ${host.label}: someone must log in to that account on the Mac (Fast User Switching keeps any other session)`;
   }
   const reasons = [
     probe.onAc ? undefined : "on battery: it sleeps a minute after it goes idle",

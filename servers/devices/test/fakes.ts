@@ -5,7 +5,7 @@
  */
 import type { AndroidHostProbe, Deps, MacProbe, SimulatorSeen } from "../src/app/ports.js";
 import { makeBroker, type AcquireInput, type Broker } from "../src/app/broker.js";
-import { DEFAULT_TENANT, instancesOf, type Catalog, type Device, type Tenant } from "../src/domain/catalog.js";
+import { DEFAULT_TENANT, instancesOf, isNetworkSerial, type Catalog, type Device, type Tenant } from "../src/domain/catalog.js";
 import { fail, hostError } from "../src/domain/errors.js";
 import type { BrokerState } from "../src/domain/state.js";
 
@@ -194,6 +194,24 @@ export const GEAR = (spawnMax = 1): Catalog => ({
   ],
 });
 
+/**
+ * Emulators that are containers on a host the broker cannot ssh into: its control command runs on the broker's own
+ * machine (no `ssh` on the host), and each slot is a network device, `<IPv4>:<port>`, that the broker's adb server sees
+ * only once the broker has connected it.
+ */
+export const NETWORK_INSTANCES = ["cloud1", "cloud2"] as const;
+export const NETWORK_SERIALS = ["192.0.2.11:5555", "192.0.2.12:5555"] as const;
+export const NETWORK: Catalog = {
+  ...CATALOG,
+  hosts: [{ id: "cloud-1", label: "cloud-1", platform: "android", requiresAc: false, spawnMax: 2, costMiB: 0, reserveMiB: 0, builders: 1, control: "/usr/local/bin/cloud-ctl", isolates: false }],
+  devices: NETWORK_INSTANCES.map((instance, i) => ({
+    ...emulator(instance),
+    id: NETWORK_SERIALS[i] ?? "",
+    host: "cloud-1",
+    adb: { port: 5037, serial: NETWORK_SERIALS[i] ?? "" },
+  })),
+};
+
 /** What an emulator instance is doing: stopped, booting (adb lists it offline), a booted device, or failed (systemd gave up on its unit). */
 export type EmulatorState = "stopped" | "booting" | "device" | "failed";
 
@@ -208,6 +226,11 @@ export type World = {
   results: Record<string, string>;
   /** A start the control command refuses, e.g. the service behind it missing. */
   startFails: boolean;
+  /** The network devices the adb server has connected, stale ones included: a connected serial is listed once its emulator runs. */
+  connected: Set<string>;
+  /** The adb server refuses to connect or to disconnect a network device. */
+  connectFails: boolean;
+  disconnectFails: boolean;
   /** Holds every stop until it resolves: a stop takes a while (the snapshot is saved). */
   stopGate: Promise<void> | undefined;
   calls: string[];
@@ -223,6 +246,9 @@ export const makeWorld = (instances: readonly string[] = EMULATORS): World => ({
   emulators: Object.fromEntries(instances.map((i) => [i, "stopped"])),
   results: {},
   startFails: false,
+  connected: new Set(),
+  connectFails: false,
+  disconnectFails: false,
   stopGate: undefined,
   calls: [],
   saved: undefined,
@@ -298,10 +324,23 @@ export const depsFor = (world: World, catalog: Catalog = CATALOG): Deps => ({
     },
   },
   adb: {
+    // An emulator registers itself with the server; a network device is listed only while the server has it connected.
     devices: async () =>
       Object.entries(world.emulators)
         .filter(([, st]) => st === "booting" || st === "device")
-        .map(([i, st]) => ({ serial: serialIn(catalog, i), state: st === "device" ? "device" : "offline" })),
+        .map(([i, st]) => ({ serial: serialIn(catalog, i), state: st === "device" ? "device" : "offline" }))
+        .filter((d) => !isNetworkSerial(d.serial) || world.connected.has(d.serial)),
+    connect: async (_port, serial) => {
+      world.calls.push(`connect ${serial}`);
+      const up = Object.entries(world.emulators).some(([i, st]) => serialIn(catalog, i) === serial && (st === "booting" || st === "device"));
+      if (world.connectFails || !up) return fail(hostError(`adb 5037/${serial}`, `failed to connect to '${serial}': Connection refused`));
+      world.connected.add(serial);
+    },
+    disconnect: async (_port, serial) => {
+      world.calls.push(`disconnect ${serial}`);
+      if (world.disconnectFails) return fail(hostError(`adb 5037/${serial}`, `error: no such device '${serial}'`));
+      world.connected.delete(serial);
+    },
     bootCompleted: async (_port, serial) => Object.entries(world.emulators).some(([i, st]) => serialIn(catalog, i) === serial && st === "device"),
     clearUserApps: async (_port, serial) => {
       world.calls.push(`clear ${serial}`);

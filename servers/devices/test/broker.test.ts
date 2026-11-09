@@ -20,6 +20,11 @@ import {
   GEAR,
   GUEST,
   makeWorld,
+  NETWORK,
+  NETWORK_INSTANCES,
+  NETWORK_SERIALS,
+  POOL,
+  POOL_SLOTS,
   POOL_VARIANT_SLOTS,
   POOL_VARIANTS,
   rawBrokerFor,
@@ -349,6 +354,97 @@ describe("emulators run only while leased", () => {
     const s = (await restarted.status({})) as { devices: { id: string; status: string }[]; recent: string[] };
     expect(s.devices.find((d) => d.id === "emulator-5554")?.status).not.toBe("stopping");
     expect(s.recent.join("\n")).toMatch(/restarted during after-lease work on emulator-5554/);
+  });
+});
+
+describe("network devices: emulators whose serial is an address, which the adb server lists only once the broker has connected them", () => {
+  const serial = NETWORK_SERIALS[0];
+  const attach = [`disconnect ${serial}`, `connect ${serial}`];
+  const network = () => {
+    const world = makeWorld(NETWORK_INSTANCES);
+    return { world, broker: brokerFor(world, NETWORK) };
+  };
+
+  it("clears a stale entry and connects a started emulator's serial that adb does not list as a device, on every pass until it does", async () => {
+    const { world, broker } = network();
+    expect(await broker.acquire({ want: android, session: A, purpose: "flows" })).toMatchObject({ status: "granted", resource: serial, state: "booting", address: { env: { ANDROID_SERIAL: serial, ANDROID_ADB_SERVER_PORT: "5037" } } });
+    expect(world.calls).toEqual(["start cloud1", ...attach]);
+    // Connected, adb lists it offline while it boots: not a device yet, so the next pass tries again.
+    await broker.tick();
+    expect(world.calls).toEqual(["start cloud1", ...attach, ...attach]);
+    expect(await broker.acquire({ want: android, session: A, purpose: "flows" })).toMatchObject({ status: "held", state: "booting" });
+    // Listed as a device and booted: ready, and nothing is connected or disconnected on the way.
+    bootAll(world);
+    const before = world.calls.length;
+    expect(await broker.acquire({ want: android, session: A, purpose: "flows" })).toMatchObject({ status: "held", state: "ready" });
+    await broker.tick();
+    expect(world.calls).toHaveLength(before);
+  });
+
+  it("goes on when the adb server will not connect it, and is ready on the pass after one connect works", async () => {
+    const { world, broker } = network();
+    world.connectFails = true;
+    expect(await broker.acquire({ want: android, session: A, purpose: "flows" })).toMatchObject({ status: "granted", state: "booting" });
+    bootAll(world);
+    // The emulator is up but adb never listed it: still booting, and each look tries again.
+    expect(await broker.acquire({ want: android, session: A, purpose: "flows" })).toMatchObject({ status: "held", state: "booting" });
+    world.connectFails = false;
+    expect(await broker.acquire({ want: android, session: A, purpose: "flows" })).toMatchObject({ status: "held", state: "booting" });
+    expect(world.connected.has(serial)).toBe(true);
+    expect(await broker.acquire({ want: android, session: A, purpose: "flows" })).toMatchObject({ status: "held", state: "ready" });
+  });
+
+  it("disconnects it after it stops, whether the holder released it clean or dirty", async () => {
+    const { world, broker } = network();
+    await broker.acquire({ want: android, session: A, purpose: "a" });
+    bootAll(world);
+    await broker.acquire({ want: android, session: A, purpose: "a" });
+    await broker.release({ session: A, want: android, state: "clean" });
+    await settled();
+    expect(world.calls.slice(-2)).toEqual(["stop cloud1", `disconnect ${serial}`]);
+    expect(world.connected.has(serial)).toBe(false);
+    // The next lease starts it again and connects it again; a dirty release clears its data first, through the server.
+    await broker.acquire({ want: android, session: B, purpose: "b" });
+    bootAll(world);
+    await broker.acquire({ want: android, session: B, purpose: "b" });
+    await broker.release({ session: B, want: android, state: "dirty" });
+    await settled();
+    expect(world.calls.slice(-3)).toEqual([`clear ${serial}`, "stop cloud1", `disconnect ${serial}`]);
+  });
+
+  it("stops it all the same when the disconnect fails", async () => {
+    const { world, broker } = network();
+    await broker.acquire({ want: android, session: A, purpose: "a" });
+    bootAll(world);
+    await broker.acquire({ want: android, session: A, purpose: "a" });
+    world.disconnectFails = true;
+    await broker.release({ session: A, want: android, state: "clean" });
+    await settled();
+    expect(world.emulators["cloud1"]).toBe("stopped");
+    const s = (await broker.status({})) as { devices: { id: string; status: string }[]; recent: string[] };
+    expect(s.devices.find((d) => d.id === serial)?.status).toBe("stopped");
+    expect(s.recent.join("\n")).toMatch(new RegExp(`${serial} stopped`));
+    expect(s.recent.join("\n")).not.toMatch(/stop failed/);
+  });
+
+  it("disconnects an emulator it stops for having no lease, as it does one whose lease ended", async () => {
+    const { world, broker } = network();
+    world.emulators = { cloud1: "device", cloud2: "stopped" };
+    world.connected.add(serial ?? "");
+    await broker.tick();
+    await settled();
+    expect(world.calls).toEqual(["stop cloud1", `disconnect ${serial}`]);
+  });
+
+  it("leaves a slot read through its door alone: its serial names its holder's side, and the broker never dials it", async () => {
+    const world = makeWorld(POOL_SLOTS);
+    const broker = brokerFor(world, POOL);
+    await broker.acquire({ want: android, session: A, purpose: "a" });
+    bootAll(world);
+    expect(await broker.acquire({ want: android, session: A, purpose: "a" })).toMatchObject({ resource: "pool1", state: "ready" });
+    await broker.release({ session: A, want: android, state: "clean" });
+    await settled();
+    expect(world.calls).toEqual(["start pool1", "stop pool1"]);
   });
 });
 

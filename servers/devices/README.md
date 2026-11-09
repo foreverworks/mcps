@@ -10,10 +10,11 @@ device after its lease, but drives none. Its `write` tools change who holds a
 device; nothing moves money, and nothing asks for a confirmation.
 
 **You need** your own device hosts (Linux machines with the Android emulator,
-Macs with Xcode), reachable over ssh from the broker without a prompt; a
-catalog file naming them and their devices; and, for emulators the broker
-starts, a small control command on each Android host. There is no account and
-no key.
+Macs with Xcode), reachable over ssh from the broker without a prompt, or an
+Android host you drive through an API, with a command on the broker's own
+machine standing in for ssh; a catalog file naming them and their devices;
+and, for emulators the broker starts, a small control command for each Android
+host. There is no account and no key.
 
 ## What you can ask
 
@@ -89,6 +90,15 @@ Host keys are accepted on first contact and pinned in the state directory.
 - **An iOS host** is a Mac with Xcode (`xcrun simctl`). The broker reads its
   power (`pmset`), load (`sysctl vm.loadavg`) and simulators, and whether a
   CI job runs or a desktop session is open ([How it works](#how-it-works)).
+- **An Android host you cannot ssh into**, because its emulators run as
+  containers behind an API, say: leave out its `ssh` target, and the broker
+  runs the host's control command on its own machine instead, as its own user
+  and with no shell. The command is the bridge: it asks that API to start,
+  stop and report on the emulators, and answers a `probe` call in place of the
+  memory and load the broker would read over ssh
+  ([The control command](#the-control-command)). Only an `android` host with
+  a `control` command can go without `ssh`; every other host is reached over
+  it.
 
 ### The catalog
 
@@ -158,7 +168,7 @@ A host:
 |---|---|---|
 | `id`, `label` | | A stable id (in build slot names: `builder:ios@mac-1`), and the name reasons use. |
 | `platform` | | `android` or `ios`: what its phones and builds are, and how it is probed. A device reached over ssh may sit on either. |
-| `ssh` | | The ssh target, `user@host`. Also handed to an iOS lease's holder as `IOS_SIM_MAC`. |
+| `ssh` | | The ssh target, `user@host`. Also handed to an iOS lease's holder as `IOS_SIM_MAC`. Required, except on an `android` host with a `control` command: without it, the broker runs that command on its own machine ([The control command](#the-control-command)). |
 | `requires_ac` | `false` | A Mac laptop: nothing is built on it on battery. (Nothing is ever started on a Mac on battery, whatever this says: it sleeps a minute after it goes idle, so the broker reports it degraded.) |
 | `spawn_max` | `0` | How many devices the broker may have started on it at once. |
 | `cost_mib`, `reserve_mib` | `0` | Android hosts: what one started device costs, and the `MemAvailable` that must remain after it. `reserve_mib: 0` skips the memory check. |
@@ -174,7 +184,7 @@ A device:
 | `platform`, `host`, `profile` | | `ios`, `android`, `macos`, `windows` or `batocera`; a declared host of the same platform (devices reached over ssh aside, below); a declared profile. |
 | `mode` | | `fixed`: exists and stays, leased as it is. `spawn`: started (an emulator, a VM) or created (a simulator) for a lease, stopped after it. `reserved`: shown, never leased. |
 | `maestro` | `false` | Whether a Maestro flow can drive it (`acquire` can ask for one). |
-| `adb` | | Android, required: `{ "port", "serial" }`, how its holder reaches it with adb. |
+| `adb` | | Android, required: `{ "port", "serial" }`, how its holder reaches it with adb. A serial of the form `<IPv4>:<port>` (`192.0.2.7:5555`) is a network device, which the broker connects ([Network devices](#network-devices)). |
 | `instance` | | A started slot (Android, Windows or Batocera, `spawn`), required: the name the host's control command starts and stops, `^[a-z][a-z0-9]{0,15}$`, unique per host. |
 | `variants` | | A started slot only: its other system images, `[{ "profile", "instance" }]`, each started instead of `instance` for a lease that asks for its profile. Each profile declared and served once by the slot; each instance unique per host. |
 | `probe` | | A started slot only: how the broker tells it has booted, and clears it after a dirty lease. Absent: the adb server at `adb.port` on the broker's loopback. `{ "door": <port> }`: the device's own adbd, through a tunnel at that port on the broker's loopback (one device per port). `"unit"`: the control command's `status` says `active` only once it has booted, for a device whose adbd the broker cannot reach (its data is then not cleared after a dirty lease, and only its own tenant ever gets it). |
@@ -191,18 +201,45 @@ A `macos` device is a Mac's desktop session: `fixed`, on an `ios` host. A
 reads the control command. The catalog is checked at start against every rule
 above; if it breaks one, every tool says which.
 
+#### Network devices
+
+An emulator that runs beside its adb server registers itself with it
+(`emulator-5554`). One that is reachable only at an address, a container on
+another machine for example, does not: the server lists `192.0.2.7:5555` only
+once someone has run `adb connect 192.0.2.7:5555`. When a slot's `adb.serial`
+has that shape and the slot has no `probe` (the broker reads its boot through
+the adb server at `adb.port`), the broker does the connecting:
+
+- While it waits for a started emulator to boot, every pass that finds the
+  serial missing from the server's list, or listed in any state but `device`,
+  sends the server `disconnect` (which clears a stale `offline` entry), then
+  `connect`, and looks again on the next pass. A failure of either is not an
+  error: the emulator may not be listening yet.
+- After it stops that emulator at the end of a lease, it sends `disconnect`, so
+  nothing is left listed. A failure there never fails the stop.
+
+Both go over adb's host protocol, as the rest of the broker's adb does, so no
+`adb` binary is needed. A slot with a `probe` is not read through the server,
+so its serial is never connected or disconnected by the broker: it names the
+address its holder uses.
+
 ### The control command
 
 The broker starts and stops emulators and VMs only through the host's
 `control` command, over ssh, so its ssh account needs no other privilege: the
 command may hand the request to a privileged service that starts nothing but
-its own emulators. It must answer three calls:
+its own emulators. On a host with no `ssh` target the broker runs the command
+on its own machine instead, with the same arguments and the same deadlines, as
+a program and its arguments with no shell around them, and the command may
+call whatever API drives that host. It must answer three calls, and a fourth
+on a host with no `ssh` target:
 
 | Call | Must answer | Deadline |
 |---|---|---|
 | `<control> start <instance>` | Exit 0 once the start is under way; it need not wait for the boot (the broker polls for it). Starting a running instance succeeds. A failed instance is reset first (`systemctl reset-failed`), so `status` never reports a failure from before the start. | 90 s |
 | `<control> stop <instance>` | Exit 0 once the emulator has stopped (saving a snapshot on the way is fine). Stopping a stopped instance succeeds. | 240 s |
 | `<control> status` | Exit 0 and one line per instance, `<instance> <state>`, or `<instance> <state> <result>` where `<result>` is systemd's `Result` for a `failed` unit (`timeout`, `oom-kill`, `exit-code`, `signal`). `active`, `activating`, `deactivating` and `reloading` count as running (and for a `"unit"` probe, `active` must mean booted); anything else (`inactive`, `failed`) is stopped, and `failed` ends a lease still waiting for that instance to boot, with the result as its reason. Lines that do not parse are ignored; a command that prints two columns only gives no result. Run on every probe, once a minute: keep it cheap. | 20 s |
+| `<control> probe` | Only on a host with no `ssh` target; over ssh the broker reads these itself. Exit 0 and three sections, separated by a line that holds only `@@devices@@`: the host's available memory in KiB (what `MemAvailable:` says in `/proc/meminfo`), its 1-minute load average, and exactly what `status` prints. Run on every probe, once a minute: keep it cheap. | 20 s |
 
 A `batocera` instance is a fresh box on every start: `start` boots it from the
 stock image on a new disk (an overlay over the image, say) and `stop` throws
@@ -213,7 +250,20 @@ A slot's variants are instances like any other; `status` lists a slot's
 `profiles` and the one it `runs`. Only one runs at a time (they share the
 slot's serial and ports), so the broker stops any other it saw running before
 starting one. A non-zero exit is a failure, and the last lines of stderr are
-the reason the broker gives. With one systemd unit per emulator, for example:
+the reason the broker gives. `probe` on a host that has memory, a load and two
+emulators answers:
+
+```
+43210000
+@@devices@@
+0.52
+@@devices@@
+phone1 active
+phone2 inactive
+```
+
+With one systemd unit per emulator on a host reached over ssh, the rest of the
+command is, for example:
 
 ```sh
 #!/bin/sh
@@ -337,7 +387,8 @@ lease that ended, a dropped ticket, another session's lease), or a profile
 your lease does not run. `status` with your `session` lists what you hold.
 
 **`host`.** A host refused or failed a command the broker sent (ssh, simctl,
-adb, the control command). `status` shows its health; a second try after a
+adb, the control command, which on a host with no `ssh` target runs on the
+broker's own machine). `status` shows its health; a second try after a
 minute usually tells a blip from a fault. A stop that failed after a lease is
 retried within a minute; a failed reset shows in `status`'s events, to check
 by hand.

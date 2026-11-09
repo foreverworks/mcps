@@ -32,7 +32,8 @@ const schema = z.object({
         id: z.string().min(1),
         label: z.string().min(1),
         platform,
-        ssh: z.string().min(1),
+        // Absent on an android host with a control command: the broker then runs that command on its own machine.
+        ssh: z.string().min(1).optional(),
         requires_ac: z.boolean().default(false),
         spawn_max: z.number().int().min(0).default(0),
         cost_mib: z.number().int().min(0).default(0),
@@ -102,7 +103,7 @@ export const parseCatalog = (text: string, box: string): LoadedCatalog => {
       id: h.id,
       label: h.label,
       platform: h.platform,
-      ssh: h.ssh,
+      ...(h.ssh === undefined ? {} : { ssh: h.ssh }),
       requiresAc: h.requires_ac,
       spawnMax: h.spawn_max,
       costMiB: h.cost_mib,
