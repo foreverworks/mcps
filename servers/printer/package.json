@@ -69,7 +69,7 @@
   },
   "dependencies": {
     "@foreverworks/mcp-kit": "^0.2.0",
-    "fast-xml-parser": "^5.11.2",
+    "fast-xml-parser": "^5.12.0",
     "jpeg-js": "^0.4.4",
     "pngjs": "^7.0.0",
     "undici": "^8.12.2",
