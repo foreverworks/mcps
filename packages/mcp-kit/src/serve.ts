@@ -10,6 +10,8 @@ import { serveStdio as serveStdioEntry } from "@modelcontextprotocol/server/stdi
 
 import { describeSettings, type GuardSettings, guardSettingsFrom } from "./serve/confirm.js";
 import { installEgress, installKeepAlive } from "./serve/egress.js";
+import { describeFiles, type FileEndpoints, fileRouteOf, FILES_VARIABLES, filesFrom } from "./serve/files.js";
+import { serveFile } from "./serve/filesServe.js";
 import { guard, registeredNames, requestContext, type ServerVocabulary } from "./serve/guard.js";
 import { toolIconsOf, type Product } from "./serve/icons.js";
 import { admit, egressFrom, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
@@ -44,9 +46,12 @@ export type ClientTokenFiles =
  */
 export type Where = { readonly host?: string; readonly allowedHosts?: readonly AllowedHost[] };
 
+/** The file endpoints a server turns on, from MCP_HTTP_FILES_OUTBOX and MCP_HTTP_FILES_INBOX (serve/files.ts). The key is absent when neither is set. */
+export type Files = { readonly files?: FileEndpoints };
+
 export type Listen =
   | { readonly kind: "stdio" }
-  | ({ readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles } & Where)
+  | ({ readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles } & Where & Files)
   /** Anyone may call, with no sign-in, through a proxy that forwards these hosts; callers told apart by `clientIpHeader`, else the connection. */
   | ({ readonly kind: "public"; readonly port: number; readonly hosts: readonly PublicHost[]; readonly clientIpHeader?: string } & Where);
 
@@ -60,7 +65,9 @@ export type Listen =
  * (serve/public.ts), with MCP_HTTP_CLIENT_IP_HEADER naming the header that
  * carries each caller's address. Tokens and public hosts together are a
  * contradiction, and so are public hosts and file roots: with no sign-in,
- * anyone could read the files there through a tool that takes a path.
+ * anyone could read the files there through a tool that takes a path. The same
+ * goes for the file endpoints (MCP_HTTP_FILES_OUTBOX, MCP_HTTP_FILES_INBOX),
+ * which exist only behind tokens.
  *
  * The listener binds 127.0.0.1 and answers the loopback Host names only, until
  * MCP_HTTP_HOST names another address to bind and MCP_HTTP_ALLOWED_HOSTS the
@@ -76,7 +83,7 @@ export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
   const publicHosts = env["MCP_HTTP_PUBLIC_HOSTS"]?.trim();
   if (!port) {
     if (publicHosts) throw new Error("MCP_HTTP_PUBLIC_HOSTS is set without MCP_HTTP_PORT: there is no HTTP listener to make public");
-    for (const name of ["MCP_HTTP_HOST", "MCP_HTTP_ALLOWED_HOSTS"]) {
+    for (const name of ["MCP_HTTP_HOST", "MCP_HTTP_ALLOWED_HOSTS", ...FILES_VARIABLES]) {
       if (env[name]?.trim()) throw new Error(`${name} is set without MCP_HTTP_PORT: there is no HTTP listener for it to configure`);
     }
     return { kind: "stdio" };
@@ -95,13 +102,20 @@ export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
     if (env["MCP_FILE_ROOTS"]?.trim()) {
       throw new Error("MCP_HTTP_PUBLIC_HOSTS and MCP_FILE_ROOTS are both set: with no sign-in, anyone could read the files there through a tool that takes a path");
     }
+    const fileSettings = FILES_VARIABLES.filter((name) => env[name]?.trim());
+    if (fileSettings.length > 0) {
+      throw new Error(`MCP_HTTP_PUBLIC_HOSTS and ${fileSettings.join(" and ")} are both set: with no sign-in, anyone could read and write the files there`);
+    }
     return { kind: "public", port: parsed, hosts: publicHostsFrom(publicHosts), ...(ipHeader ? { clientIpHeader: clientIpHeaderFrom(ipHeader) } : {}), ...where };
   }
   if (ipHeader) throw new Error("MCP_HTTP_CLIENT_IP_HEADER is set without MCP_HTTP_PUBLIC_HOSTS: a caller with a token is told apart by its token");
+  const files = filesFrom(env);
   const dir = env["MCP_HTTP_TOKENS_DIR"]?.trim();
-  if (dir) return { kind: "http", port: parsed, tokens: { kind: "dir", dir }, ...where };
+  if (dir) return { kind: "http", port: parsed, tokens: { kind: "dir", dir }, ...where, ...(files === undefined ? {} : { files }) };
   const file = env["MCP_HTTP_TOKEN_FILE"]?.trim();
-  if (file) return { kind: "http", port: parsed, tokens: { kind: "file", file, client: env["MCP_HTTP_TOKEN_CLIENT"]?.trim() || "default" }, ...where };
+  if (file) {
+    return { kind: "http", port: parsed, tokens: { kind: "file", file, client: env["MCP_HTTP_TOKEN_CLIENT"]?.trim() || "default" }, ...where, ...(files === undefined ? {} : { files }) };
+  }
   throw new Error(
     "MCP_HTTP_PORT is set without MCP_HTTP_TOKENS_DIR or MCP_HTTP_TOKEN_FILE: the server would answer anyone on this machine " +
       "(MCP_HTTP_PUBLIC_HOSTS serves one whose tools only read, to anyone, on purpose)",
@@ -219,7 +233,8 @@ export const checkPolicy = (name: string, register: (server: McpServer) => void,
   if (stale.length > 0) throw new Error(`${name}: the policy names tools nobody registers: ${stale.join(", ")}`);
 };
 
-const reply = (res: ServerResponse, status: number, message: string, headers: Readonly<Record<string, string>> = {}): void => {
+/** A plain-text answer, which is how this server (and a relay in front of one) refuses and fails. */
+export const reply = (res: ServerResponse, status: number, message: string, headers: Readonly<Record<string, string>> = {}): void => {
   res.writeHead(status, { "content-type": "text/plain; charset=utf-8", ...headers }).end(`${message}\n`);
 };
 
@@ -386,7 +401,7 @@ const publicDoor = (hosts: readonly PublicHost[], clientIpHeader: string | undef
  * responses, or a stream for a call that asks for progress (asksProgress).
  * Kept so because plain clients (a script with curl) read one JSON answer.
  */
-const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits, where: Where): Promise<Served> => {
+const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits, where: Where, files?: FileEndpoints): Promise<Served> => {
   const { options } = runtime;
   const bindAddress = where.host ?? LOOPBACK_ADDRESS;
   const allowedHosts = where.allowedHosts ?? [];
@@ -402,6 +417,13 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
     const { client } = caller;
     // A DNS-rebinding page cannot present a token anyway; this refuses a stray Host too, and on a public server it is the only check.
     if (!hostAccepted(req.headers.host, state.bound, door.publicHosts, allowedHosts)) return reply(res, 421, "wrong host");
+    // The file endpoints, when switched on, are checked before the one route; with none on this is never reached.
+    const fileRoute = files === undefined ? undefined : fileRouteOf(req.url, files);
+    if (files !== undefined && fileRoute !== undefined) {
+      const turn = admit(buckets, caller.bucket, Date.now(), limits);
+      if (!turn.allowed) return reply(res, 429, "too many requests", { "retry-after": String(turn.retryAfterSec) });
+      return serveFile({ files, service: options.name, client, log: runtime.log, reply }, fileRoute, req, res);
+    }
     if (new URL(req.url ?? "/", "http://localhost").pathname !== MCP_PATH) return reply(res, 404, "not found");
     // Also a CORS preflight, answered with no CORS headers: ChatGPT and Claude call from their servers, never from a page.
     if (req.method !== "POST") return reply(res, 405, "stateless server: POST only");
@@ -440,7 +462,9 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
 
   const http = createServer((req, res) => void answer(req, res));
   // A client that trickles its REQUEST cannot hold a socket either; the handler's own limit is above.
-  http.requestTimeout = 30_000;
+  // An inbox takes files, which take longer than a JSON-RPC message to arrive: the request may then
+  // take as long as a call may (every request is signed in by then, and the inbox has its own size cap).
+  http.requestTimeout = files?.inbox === undefined ? 30_000 : limits.timeoutMs;
   http.headersTimeout = 10_000;
   await new Promise<void>((resolve, reject) => {
     http.once("error", reject);
@@ -450,7 +474,8 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
   state.bound = bound;
   // stderr, never stdout: the rule every server here keeps, whatever the transport.
   const alsoHosts = allowedHosts.length === 0 ? "" : `, and Host ${allowedHosts.map(allowedHostText).join(", ")}`;
-  console.error(`${options.name}: listening on http://${urlHost(bindAddress)}:${bound}${MCP_PATH} ${door.describe}${alsoHosts}; ${describeSettings(runtime.settings)}`);
+  const alsoFiles = files === undefined ? "" : `; ${describeFiles(files)}`;
+  console.error(`${options.name}: listening on http://${urlHost(bindAddress)}:${bound}${MCP_PATH} ${door.describe}${alsoHosts}${alsoFiles}; ${describeSettings(runtime.settings)}`);
   return {
     port: bound,
     address: (http.address() as AddressInfo).address,
@@ -480,7 +505,7 @@ export const serve = async (options: ServeOptions): Promise<Served> => {
     case "stdio":
       return serveStdio(runtime);
     case "http":
-      return serveHttp(runtime, listen.port, tokenDoor(await loadTokens(listen.tokens)), limitsFrom(env), listen);
+      return serveHttp(runtime, listen.port, tokenDoor(await loadTokens(listen.tokens)), limitsFrom(env), listen, listen.files);
     case "public":
       return serveHttp(runtime, listen.port, publicDoor(listen.hosts, listen.clientIpHeader), limitsFrom(env), listen);
   }

@@ -128,6 +128,48 @@ MCP_HTTP_CLIENT_IP_HEADER=cf-connecting-ip npx -y @foreverworks/mcp-bnr
   could read the files in a root through a tool that takes a path. The server
   refuses to start with either.
 
+### Files to and from another machine
+
+A server that runs on another machine than its clients no longer shares their
+disk, so a file a tool saves is on the wrong disk to be read, and a file a tool
+takes by path is not on its disk. The server's HTTP listener can carry those
+files, and [`mcp-relay`](../packages/mcp-relay) puts them where the client
+expects: it listens on the client's machine like the server, and moves the
+files with each call. Both parts are off unless you set a variable.
+
+On the server (`MCP_HTTP_PORT` and tokens needed; not with
+`MCP_HTTP_PUBLIC_HOSTS`):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MCP_HTTP_FILES_OUTBOX` | unset: off | An absolute folder. Switches on `GET /files/outbox/<path>`, which streams a file below it with `Content-Length`, `Content-Type` and `X-Content-SHA256`. Set it to the folder the server's tools save to. |
+| `MCP_HTTP_FILES_INBOX` | unset: off | An absolute folder. Switches on `PUT /files/inbox/<path>`, which writes a file below it, whole or not at all, with mode 0640, making the folders on the way, and answers `{ "path", "size", "sha256" }`. A request that carries `X-Content-SHA256` is refused (422) when the bytes differ, and nothing is kept. Set it to a folder in `MCP_FILE_ROOTS`. |
+| `MCP_HTTP_FILES_MAX_BYTES` | `268435456` (256 MiB) | The largest file the inbox takes; a larger one gets a 413. Needs `MCP_HTTP_FILES_INBOX`. |
+
+With neither folder set these routes do not exist: a request for one gets the
+404 any unknown route gets. With either set, a request needs the same bearer
+token and `Host` as `/mcp`, counts against the same rate limit, and may only
+name a regular file whose real path is inside the folder; anything else is a
+404 that says nothing about why. Setting the inbox lets a request take as long
+as a call may (`MCP_HTTP_TIMEOUT_MS`) to arrive, so a large file on a slow
+link gets through. Every transfer leaves a `files {...}` line on stderr (the
+direction, the outcome, and for a file that moved its path, size and the start
+of its SHA-256). [Deploying](deploying.md#a-server-on-another-machine) shows it
+in use; [security](security.md#files-to-and-from-another-machine) has what it
+guarantees.
+
+On the relay (it also reads the listener variables above: `MCP_HTTP_PORT`,
+`MCP_HTTP_HOST`, `MCP_HTTP_ALLOWED_HOSTS`, `MCP_HTTP_TOKENS_DIR` or
+`MCP_HTTP_TOKEN_FILE`, and the [limits](#limits-http)):
+
+| Variable | Default | Meaning |
+|---|---|---|
+| `MCP_RELAY_UPSTREAM` | required | The base URL of the server (`https://mcp.example.com`), without `/mcp`. |
+| `MCP_RELAY_UPSTREAM_TOKEN_FILE` | required | The file holding the bearer token the server accepts from the relay. |
+| `MCP_RELAY_INBOX` | unset: no file goes up | An absolute folder, the same path as the server's inbox. A file in it that a call's arguments name by absolute path is uploaded before the call. |
+| `MCP_RELAY_OUTBOX` | unset: no file comes down | An absolute folder, the same path as the server's outbox. A file a result links there with a `file:` URI is fetched before the result is passed on. |
+| `MCP_RELAY_MAX_FILE_BYTES` | `268435456` (256 MiB) | The largest file the relay moves, up or down. |
+
 ### Limits (HTTP)
 
 | Variable | Default | Meaning |

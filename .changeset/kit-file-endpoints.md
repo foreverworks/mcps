@@ -1,0 +1,7 @@
+---
+"@foreverworks/mcp-kit": minor
+---
+
+A server that runs on another machine than its clients can now carry the files its tools take and hand back, through two routes of its HTTP listener. `MCP_HTTP_FILES_OUTBOX` (a folder) switches on `GET /files/outbox/<path>`, which streams a regular file below it with its `Content-Length`, `Content-Type` and `X-Content-SHA256`; `MCP_HTTP_FILES_INBOX` switches on `PUT /files/inbox/<path>`, which writes a file below it, whole or not at all, refuses bytes that do not match an `X-Content-SHA256` it was sent, and answers with the file's path, size and SHA-256. `MCP_HTTP_FILES_MAX_BYTES` (256 MiB by default) caps an upload.
+
+Both are off unless set, each for its own direction: a server with neither answers `/files/...` as it answers any route it does not have, and everything else about it is unchanged. When set, a request needs the same bearer token and `Host` as `/mcp`, and may only name a regular file whose real path is inside the folder; any other path gets the same bare 404. A server open to anyone (`MCP_HTTP_PUBLIC_HOSTS`) refuses to start with either set, and so does a server without `MCP_HTTP_PORT`. The kit also exports what a relay needs to use them (`FILES_OUTBOX_PATH`, `FILES_INBOX_PATH`, `SHA256_HEADER`, `filesUrlPath`, `storeStream`, `sha256OfHandle`, `openFileInside`, `folderInside`, `plainReply`, `hostAccepted`). See docs/configuration.md, "Files to and from another machine".

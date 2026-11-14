@@ -186,6 +186,37 @@ in (an invoice read by path), and nothing for a failed call. There is no
 `resources/read`, since the link names a file on the server's own machine, as
 the path does.
 
+## Files to and from another machine
+
+A server on another machine can carry the files its tools take and hand back
+through two routes of its HTTP listener, `GET /files/outbox/<path>` and
+`PUT /files/inbox/<path>`, which a relay on the client's machine
+([`mcp-relay`](../packages/mcp-relay)) uses. What they guarantee:
+
+- **Off unless asked for**, each direction by its own variable
+  ([`MCP_HTTP_FILES_OUTBOX`, `MCP_HTTP_FILES_INBOX`](configuration.md#files-to-and-from-another-machine)).
+  Unset, the routes do not exist and answer as any unknown route does. A
+  server that is open to anyone (`MCP_HTTP_PUBLIC_HOSTS`) refuses to start
+  with either set.
+- **No new way in.** The same bearer token and `Host` check as `/mcp`, and the
+  same per-client rate limit.
+- **A path stays inside its folder.** It is percent-decoded once, must hold no
+  empty name, `.`, `..`, NUL or backslash, and is resolved with its links
+  followed; only a regular file whose real path is inside the folder is served
+  or written. The file actually opened is read back from the kernel and held
+  to the same rule, as for a tool's input file. Every refusal is the same 404.
+- **Whole or not at all.** An upload goes to a temporary file in the target's
+  folder and is renamed into place once the size cap and the SHA-256 the
+  sender gave (if it did) hold; a refused or broken upload leaves nothing. The
+  folders it makes are mode 0750 and the file 0640 (before the umask).
+- **A bounded cost.** An upload over `MCP_HTTP_FILES_MAX_BYTES` is refused, and
+  the relay moves nothing over `MCP_RELAY_MAX_FILE_BYTES`.
+- **The relay holds one secret, and only the server's token.** Its clients
+  present their own tokens to it; the log has a line per file (direction,
+  path, size, the start of the hash) and never bytes, tokens or arguments.
+  Plain `http://` to an upstream that is not on loopback carries the token and
+  the files in the clear: the relay says so at start.
+
 ## The network
 
 - **HTTP listens on loopback only** (`127.0.0.1`), on one route, `POST /mcp`,

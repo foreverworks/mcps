@@ -61,7 +61,9 @@ export {
   listenFrom,
   loadTokens,
   MCP_PATH,
+  reply as plainReply,
   serve,
+  type Files,
   type Listen,
   type Served,
   type ServeOptions,
@@ -70,7 +72,20 @@ export {
   type ClientTokens,
 } from "./serve.js";
 export type { Product } from "./serve/icons.js";
-export { PUBLIC_CLIENT, type AllowedHost, type PublicHost } from "./serve/public.js";
+export { hostAccepted, PUBLIC_CLIENT, type AllowedHost, type PublicHost } from "./serve/public.js";
+export { allowedHostText, isLoopbackAddress, LOOPBACK_ADDRESS, urlHost } from "./serve/bind.js";
+export {
+  DEFAULT_FILES_MAX_BYTES,
+  FILES_INBOX_PATH,
+  FILES_OUTBOX_PATH,
+  filesFrom,
+  FILES_VARIABLES,
+  filesUrlPath,
+  SHA256_HEADER,
+  type FileEndpoints,
+} from "./serve/files.js";
+export { folderInside, openInside as openFileInside } from "./serve/filesServe.js";
+export { sha256OfHandle, storeStream, type Stored, type StoreOptions } from "./fileStream.js";
 export { idempotentWrites, isIdempotent, mergePolicies, needsPerson, summaryFrom, unclassified, type Access, type Confirmation, type ConfirmedRule, type ToolArgs, type ToolPolicy, type ToolRule } from "./policy.js";
 export { ALL_TOOLSETS, toolsetPolicy, toolsetsFrom, type Toolsets } from "./toolsets.js";
 export { ACCESS_META, annotationsFor, auditText, guard, registeredNames, REQUIRES_USER_META, requestContext, type AuditLine, type GuardOptions, type ServerVocabulary } from "./serve/guard.js";
@@ -143,6 +158,7 @@ export {
   type InputFiles,
   type InputFilesOptions,
 } from "./inputFile.js";
+export { isInside } from "./inputFile/roots.js";
 export { asInputFileError, failInputFile, inputFileRemedy, type InputFileCode, type InputFileError } from "./inputFileErrors.js";
 export { clientRoots, pathsOfRoots, shareClientRoots, shareRootsOf } from "./clientRoots.js";
 export {

@@ -74,7 +74,10 @@ their icons. `servers/oblio` is a complete example.
   data can instead be open to anyone behind a reverse proxy
   (`MCP_HTTP_PUBLIC_HOSTS`), with a rate limit per caller's address. Protocols 2025-11-25 and 2026-07-28 are
   served alike on both; `MCP_EGRESS_ALLOW` can narrow the hosts the process
-  may reach.
+  may reach. For a server that runs on another machine than its clients,
+  `MCP_HTTP_FILES_OUTBOX` and `MCP_HTTP_FILES_INBOX` switch on routes that
+  carry the files its tools hand back and take by path, for
+  [`mcp-relay`](../mcp-relay) to use (off unless set).
 - **The guard.** Every registered tool is checked against the policy at
   start. Inputs are strict; annotations and `_meta` come from the class; a
   ceiling (`MCP_MAX_ACCESS`, and `MCP_CLIENT_MAX_ACCESS` per client) refuses
