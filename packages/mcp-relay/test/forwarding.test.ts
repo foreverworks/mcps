@@ -6,9 +6,8 @@ import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { fakeUpstream, relayTo, relayToken, sha256, startWorld, upstreamToken, type Seen, type World } from "./harness.js";
 
-/** The files below a folder, relative to it; folders that hold none do not count. */
-const entries = async (dir: string): Promise<string[]> =>
-  (await readdir(dir, { recursive: true, withFileTypes: true })).filter((entry) => entry.isFile()).map((entry) => join(entry.parentPath, entry.name).slice(dir.length + 1)).sort();
+/** Everything below a folder, files and folders, relative to it. */
+const entries = async (dir: string): Promise<string[]> => (await readdir(dir, { recursive: true })).sort();
 
 const headers = { authorization: `Bearer ${relayToken}`, "content-type": "application/json", accept: "application/json, text/event-stream" };
 const post = (url: string, body: unknown, extra: Record<string, string> = {}): Promise<Response> =>

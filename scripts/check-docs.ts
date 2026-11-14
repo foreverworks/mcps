@@ -443,9 +443,13 @@ const checkServer = async (name: string, shared: ReadonlySet<string>, write: boo
 const SERVERS_BEGIN = "<!-- servers:begin -->";
 const SERVERS_END = "<!-- servers:end -->";
 
-type Described = { readonly description: string };
+type Described = { readonly description: string; readonly bin?: unknown };
 
 const describedOf = (dir: string): Described => JSON.parse(readFileSync(join(ROOT, dir, "package.json"), "utf8")) as Described;
+
+/** Why a package that ships nowhere is not published: a program (it has a `bin`) runs from a clone or the container image; a library is one only the extras use. */
+const unpublishedNote = (pkg: Described): string =>
+  pkg.bin === undefined ? "Not published: only extras use it" : "Not published: a program to run from a clone or the container image";
 
 /** A package description's details, after its head: what it is, since the row's link already names it. */
 const detailsOf = (description: string): string => {
@@ -488,7 +492,7 @@ const serversTable = (): { readonly table: string; readonly problems: readonly s
   const { workspaces } = readWorkspaces(ROOT);
   const packages = workspaces
     .filter((w) => w.dir.startsWith("packages/"))
-    .map((w) => `| [${w.dir.split("/")[1]}](${w.dir})${w.ships ? "" : "<br><sub>Not published: only extras use it</sub>"} | ${detailsOf(describedOf(w.dir).description)} |`);
+    .map((w) => `| [${w.dir.split("/")[1]}](${w.dir})${w.ships ? "" : `<br><sub>${unpublishedNote(describedOf(w.dir))}</sub>`} | ${detailsOf(describedOf(w.dir).description)} |`);
   return { table: [site, "", legend, "", ...sections, "## Shared packages", "", "| Package | What it is |", "|---|---|", ...packages].join("\n"), problems: [] };
 };
 

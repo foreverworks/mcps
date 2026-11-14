@@ -34,7 +34,19 @@ describe("settingsFrom", () => {
 
   it("keeps the path an upstream lives under, and drops a trailing slash", () => {
     expect(settingsFrom({ ...base, MCP_RELAY_UPSTREAM: "https://example.com/mcp-servers/oblio/" }).upstream).toBe("https://example.com/mcp-servers/oblio");
-    expect(settingsFrom({ ...base, MCP_RELAY_UPSTREAM: "http://192.0.2.10:8080/" }).upstream).toBe("http://192.0.2.10:8080");
+    expect(settingsFrom({ ...base, MCP_RELAY_UPSTREAM: "https://192.0.2.10:8080/" }).upstream).toBe("https://192.0.2.10:8080");
+  });
+
+  it("takes plain http to this machine, and refuses it to any other unless told it is an encrypted network", () => {
+    for (const local of ["http://127.0.0.1:8080", "http://localhost:8080", "http://[::1]:8080", "http://127.0.0.2"]) {
+      expect(settingsFrom({ ...base, MCP_RELAY_UPSTREAM: local })).toMatchObject({ plainHttp: false });
+    }
+    for (const remote of ["http://192.0.2.10:8080", "http://mcp.example.com", "http://[2001:db8::1]:8080"]) {
+      expect(() => settingsFrom({ ...base, MCP_RELAY_UPSTREAM: remote })).toThrow(/plain http to a host that is not this machine.*MCP_RELAY_ALLOW_PLAIN_HTTP=1/);
+      expect(() => settingsFrom({ ...base, MCP_RELAY_UPSTREAM: remote, MCP_RELAY_ALLOW_PLAIN_HTTP: "yes" })).toThrow(/MCP_RELAY_ALLOW_PLAIN_HTTP=1/);
+      expect(settingsFrom({ ...base, MCP_RELAY_UPSTREAM: remote, MCP_RELAY_ALLOW_PLAIN_HTTP: "1" })).toMatchObject({ plainHttp: true });
+    }
+    expect(settingsFrom({ ...base, MCP_RELAY_ALLOW_PLAIN_HTTP: "1" })).toMatchObject({ plainHttp: false });
   });
 
   it("takes a size limit of its own", () => {

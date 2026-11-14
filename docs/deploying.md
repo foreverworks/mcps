@@ -360,15 +360,19 @@ server or how a client uses it:
   token, its folders and the paths in its calls.
 
 ```bash
-# on the server's machine: the server, with both directions switched on
+# on the server's machine: the server, with both directions switched on.
+# The image runs as user 10001, so the folders belong to it (a fresh named volume would be root's).
+sudo install -d -o 10001 -g 10001 -m 0750 /srv/mcp/inbox /srv/mcp/outbox
 docker run -d -e MCP_SERVER=notion -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
   -e MCP_HTTP_ALLOWED_HOSTS=mcp.example.com -e MCP_HTTP_TOKENS_DIR=/run/tokens \
   -e MCP_FILE_ROOTS=/srv/mcp/inbox -e NOTION_OUTBOX_DIR=/srv/mcp/outbox \
   -e MCP_HTTP_FILES_INBOX=/srv/mcp/inbox -e MCP_HTTP_FILES_OUTBOX=/srv/mcp/outbox \
-  -v "$PWD/tokens:/run/tokens:ro" -v mcp-files:/srv/mcp \
+  -v "$PWD/tokens:/run/tokens:ro" -v /srv/mcp:/srv/mcp \
   -p 127.0.0.1:8080:8080 ghcr.io/foreverworks/mcps:main
 
-# on the client's machine: the relay, in front of it
+# on the client's machine: the relay, in front of it. It writes the files it fetches with mode 0640,
+# so the outbox takes a group the client's user is in, with the setgid bit.
+sudo install -d -o 10001 -g "$(id -g)" -m 2770 /srv/mcp/outbox   # 10001 is the image's user; from a clone, your own
 MCP_HTTP_PORT=8750 MCP_HTTP_TOKEN_FILE=relay-client-token \
 MCP_RELAY_UPSTREAM=https://mcp.example.com MCP_RELAY_UPSTREAM_TOKEN_FILE=upstream-token \
 MCP_RELAY_INBOX=/srv/mcp/inbox MCP_RELAY_OUTBOX=/srv/mcp/outbox \
@@ -378,7 +382,9 @@ node packages/mcp-relay/dist/index.js     # or the image, with MCP_SERVER=relay
 The relay's two folders must be at the same absolute paths as the server's,
 because the server's tools name their files with their own paths and the relay
 uses those names as they are. The relay's README has the whole setup, what goes
-wrong and what a client then sees.
+wrong and what a client then sees. Use `https://` between the two; the relay
+refuses a plain `http://` upstream on another host unless
+`MCP_RELAY_ALLOW_PLAIN_HTTP=1` says the network is encrypted already.
 
 ## Checking it
 

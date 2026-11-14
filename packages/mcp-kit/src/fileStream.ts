@@ -1,6 +1,8 @@
 import { createHash, randomUUID } from "node:crypto";
-import { type FileHandle, open, rename, rm } from "node:fs/promises";
+import { type FileHandle, open, readlink, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
+
+import { isInside } from "./inputFile/roots.js";
 
 /**
  * Files moved as streams, never held whole in memory: the half of a file
@@ -22,6 +24,12 @@ export type StoreOptions = {
   readonly maxBytes: number;
   /** Hex SHA-256 the bytes must have, or nothing is stored. */
   readonly sha256?: string | undefined;
+  /**
+   * A folder (its real path) the temp file must turn out to be inside: read back from
+   * the kernel after it is created, so a folder swapped for a link since it was
+   * checked cannot lead the write out of it.
+   */
+  readonly within?: string | undefined;
 };
 
 /** What became of a stream: stored whole, or why nothing was (and then nothing is left behind). */
@@ -29,6 +37,8 @@ export type Stored =
   | { readonly ok: true; readonly size: number; readonly sha256: string }
   | { readonly ok: false; readonly reason: "too_large" }
   | { readonly ok: false; readonly reason: "checksum_mismatch"; readonly size: number; readonly sha256: string }
+  /** The temp file was created somewhere but inside `within`. */
+  | { readonly ok: false; readonly reason: "outside" }
   /** The source failed or hung up before its end, or the disk refused the bytes. */
   | { readonly ok: false; readonly reason: "interrupted" };
 
@@ -49,7 +59,7 @@ const writeAll = async (handle: FileHandle, chunk: Uint8Array): Promise<void> =>
  * closed or destroyed here, so a caller can still answer on the connection
  * that carried it. The temp file is removed on every outcome but success.
  */
-export const storeStream = async (source: AsyncIterable<Uint8Array>, target: string, { mode = 0o640, maxBytes, sha256 }: StoreOptions): Promise<Stored> => {
+export const storeStream = async (source: AsyncIterable<Uint8Array>, target: string, { mode = 0o640, maxBytes, sha256, within }: StoreOptions): Promise<Stored> => {
   // A short name of its own, so that a target whose name nearly fills a file system's limit still has a temp file.
   const tmp = join(dirname(target), `.${process.pid}.${randomUUID()}.tmp`);
   const handle = await open(tmp, "wx", mode);
@@ -57,6 +67,10 @@ export const storeStream = async (source: AsyncIterable<Uint8Array>, target: str
   let size = 0;
   let renamed = false;
   try {
+    if (within !== undefined) {
+      const actual = await readlink(`/proc/self/fd/${handle.fd}`).catch(() => undefined);
+      if (actual !== undefined && !isInside(within, actual)) return { ok: false, reason: "outside" };
+    }
     for await (const chunk of source) {
       size += chunk.length;
       if (size > maxBytes) return { ok: false, reason: "too_large" };

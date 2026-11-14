@@ -96,9 +96,10 @@ A program, not a library: it listens on the client's machine as a server does
 runs elsewhere, and moves the files that server's tools take and hand back
 through the file endpoints above. `forward.ts` carries a request and its
 answer (a stream stays a stream), `transfer.ts` moves one file in either
-direction, `calls.ts` and `sse.ts` are the pure parts that read a JSON-RPC
-message and cut an event stream, and `upstream.ts` is its one place that talks
-to the network. Its README is the guide for a person running one.
+direction, `calls.ts`, `json.ts` and `sse.ts` are the pure parts that read a
+JSON-RPC message, find places in its text (so that a message is never printed
+again: `12.50` stays `12.50`) and cut an event stream, and `upstream.ts` is its
+one place that talks to the network. Its README is the guide for a person running one.
 
 ### The networking stack
 

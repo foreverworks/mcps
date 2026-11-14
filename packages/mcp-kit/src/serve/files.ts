@@ -37,7 +37,13 @@ export type FileEndpoints = {
   readonly maxBytes: number;
 };
 
-const folderFrom = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
+/**
+ * A folder named by a variable, as an absolute path; undefined when the
+ * variable is unset or blank. A relay maps a file to the same path on both
+ * machines, so a folder written relative to nothing is a mistake worth
+ * stopping for.
+ */
+export const folderFrom = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
   const value = env[name]?.trim();
   if (!value) return undefined;
   if (!isAbsolute(value)) {

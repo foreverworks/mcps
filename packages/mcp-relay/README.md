@@ -67,16 +67,19 @@ own HTTP listener. They are off unless you set them, each for one direction.
 Here the Notion server runs in a container, behind HTTPS at
 `mcp.example.com`, with its inbox and outbox at `/srv/mcp/inbox` and
 `/srv/mcp/outbox` (any server of this repository that takes a file by path or
-saves one works the same; its credentials, left out here, are its own):
+saves one works the same; its credentials, left out here, are its own).
+The image runs as user `10001`, so the two folders must belong to it; a fresh
+Docker named volume belongs to root, and the server could not write there:
 
 ```bash
+sudo install -d -o 10001 -g 10001 -m 0750 /srv/mcp/inbox /srv/mcp/outbox
 docker run -d --name notion \
   -e MCP_SERVER=notion -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
   -e MCP_HTTP_ALLOWED_HOSTS=mcp.example.com \
   -e MCP_HTTP_TOKENS_DIR=/run/tokens -v "$PWD/tokens:/run/tokens:ro" \
   -e MCP_FILE_ROOTS=/srv/mcp/inbox -e NOTION_OUTBOX_DIR=/srv/mcp/outbox \
   -e MCP_HTTP_FILES_INBOX=/srv/mcp/inbox -e MCP_HTTP_FILES_OUTBOX=/srv/mcp/outbox \
-  -v mcp-files:/srv/mcp \
+  -v /srv/mcp:/srv/mcp \
   -p 127.0.0.1:8080:8080 ghcr.io/foreverworks/mcps:main
 ```
 
@@ -88,11 +91,17 @@ by path, a `<SERVER>_OUTBOX_DIR` for what it saves; its README says which)
 name the same two folders you gave the endpoints.
 
 **2. On your machine,** put the same two folders in place, give the relay the
-token, and start it. From the image:
+token, and start it. The relay (in the image, user `10001`) writes the files it
+fetches into the outbox with mode 0640 and reads the files you put in the
+inbox, so the outbox takes a group you are in, with the setgid bit: what the
+relay writes there is then group-readable by you. The inbox is yours to write
+and must stay readable by the relay (the usual mode 0644 is; a file you made
+with `umask 077` is not, and a call naming it fails with a message that says
+the relay cannot read it). From the image:
 
 ```bash
-mkdir -p /srv/mcp/inbox /srv/mcp/outbox
-sudo chown 10001:10001 /srv/mcp/outbox               # the image runs as user 10001, which writes here
+sudo install -d -o 10001 -g "$(id -g)" -m 2770 /srv/mcp/outbox   # the relay writes here; your group reads
+install -d -m 0755 /srv/mcp/inbox                                # you write here; the relay only reads
 umask 077; openssl rand -base64 32 > relay-client-token      # what your client will present
 echo "paste the server's token-relay here" > upstream-token  # what the relay presents
 sudo chgrp 10001 relay-client-token upstream-token && chmod 0640 relay-client-token upstream-token   # you and the container's user read them
@@ -148,6 +157,7 @@ The relay listens as a server does, so the kit's HTTP variables apply to it
 | `MCP_RELAY_INBOX` | unset: no file goes up | The folder your clients put files in, as an absolute path. It must be the same path as the server's inbox. |
 | `MCP_RELAY_OUTBOX` | unset: no file comes down | The folder the server's saved files are brought to, as an absolute path. It must be the same path as the server's outbox. |
 | `MCP_RELAY_MAX_FILE_BYTES` | `268435456` (256 MiB) | The largest file the relay moves, either way. |
+| `MCP_RELAY_ALLOW_PLAIN_HTTP` | unset: refused | Set to `1` to allow an `http://` upstream on a host that is not this machine. The relay's token and the files then cross the network as they are written, so use it only on a network that is encrypted already (a VPN or an overlay). An `https://` upstream, or `http://` to this machine, needs nothing. |
 
 On the server, the kit's file endpoints take three variables
 ([configuration](../../docs/configuration.md#files-to-and-from-another-machine)):
@@ -176,7 +186,10 @@ On the server, the kit's file endpoints take three variables
 - **Whole or not at all, and checked.** Every file crosses with its SHA-256.
   A write goes to a temporary file in the target's folder and is renamed into
   place only when the bytes match; a file that arrives damaged, or is cut
-  short, leaves nothing behind. Files are written with mode 0640 (less what the process's umask takes away).
+  short, leaves nothing behind, and the folders made for it are taken away
+  again. Files are written with mode 0640 (less what the process's umask takes
+  away), so give the folder the group that must read them, with the setgid
+  bit, as in the setup above.
 - **Only what a call names.** The relay uploads a file only when a string in
   a `tools/call`'s arguments is the absolute path of a regular file in its
   inbox, and fetches a file only when a result links it in its outbox.
@@ -186,9 +199,11 @@ On the server, the kit's file endpoints take three variables
   never a file's bytes, a token or the value of an argument. An error names
   the file and the reason, and the upstream's token is taken out of anything
   the upstream wrote.
-- **Use HTTPS to a server on a network you do not own.** The token and the
-  files travel in whatever the upstream URL says. The relay starts with plain
-  `http://` to a host that is not loopback, and prints a warning saying so.
+- **HTTPS to a server on a network you do not own.** The token and the files
+  travel as the upstream URL says. The relay refuses to start with a plain
+  `http://` upstream on a host that is not this machine, unless
+  `MCP_RELAY_ALLOW_PLAIN_HTTP=1` says the network is encrypted already (a VPN,
+  an overlay); it then prints a warning at start.
 
 ## When something goes wrong
 
@@ -218,7 +233,12 @@ On the server, the kit's file endpoints take three variables
   inbox is a different folder), the relay writes a `relay-warning` line saying
   so, and the call goes on; the tool then cannot find the file. Make the
   folders the same path.
-- **Answers are held whole only to look for links.** A JSON answer over 64 MiB
-  is refused with a 502. A file is never held in memory; it streams.
+- **Answers are passed on as they were written.** The relay reads a JSON
+  answer or an event only to look for links, and sends the original text on:
+  `12.50` stays `12.50`, and a big integer keeps every digit. When it must add
+  a note to a result, or a call's error to a batch's answers, it adds just
+  that to the text. Only an answer or an event over 64 MiB is refused (a 502
+  for an answer; a stream is ended after its last whole event). A file is
+  never held in memory; it streams.
 - **A request is as long as a call may be.** `MCP_HTTP_TIMEOUT_MS` (15 minutes
   by default) bounds a call including its uploads and fetches.

@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, stat, symlink, writeFile } from "node:fs/promises";
 import { request } from "node:http";
+import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -8,6 +9,7 @@ import type { McpServer } from "@modelcontextprotocol/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
 import { DEFAULT_FILES_MAX_BYTES, fileRouteOf, filesFrom, filesUrlPath, segmentsOf } from "../src/serve/files.js";
+import { storeStream } from "../src/fileStream.js";
 import { listenFrom, MCP_PATH, serve, type Served } from "../src/serve.js";
 
 const sha256 = (data: string | Buffer): string => createHash("sha256").update(data).digest("hex");
@@ -209,6 +211,23 @@ describe("a server with none of the file variables set", () => {
     expect(otherHost.body.toString()).toBe("wrong host\n");
     await sameAsUnknown(method, target, {});
     await sameAsUnknown(method, target, { ...auth, host: "evil.example" });
+  });
+
+  it("answers a request target no URL parser takes with a 404, and goes on serving", async () => {
+    for (const target of ["//", "///", "//?x", "http://["]) {
+      const answer = await raw(served, "GET", target, { headers: auth });
+      expect(answer.status).toBe(404);
+      expect(answer.body.toString()).toBe("not found\n");
+    }
+    expect((await raw(served, "POST", "//", { headers: auth, body: "{}" })).status).toBe(404);
+    expect((await raw(served, "GET", MCP_PATH, { headers: auth })).status).toBe(405);
+  });
+
+  it("closes no connection on a refusal, as before", async () => {
+    for (const [method, target, headers] of [["POST", "/mcp", {}], ["GET", "/other", auth], ["GET", "/mcp", auth]] as const) {
+      const answer = await raw(served, method, target, { headers });
+      expect(answer.headers["connection"]).toBe("keep-alive");
+    }
   });
 
   it("starts as it always did: the same line on stderr, nothing about files", async () => {
@@ -538,5 +557,150 @@ describe("a file moved from one server to another", () => {
     } finally {
       await served.close();
     }
+  });
+});
+
+describe("a server with an inbox, and the requests that have not signed in", () => {
+  let served: Served;
+  let inbox: string;
+  const entries = async (dir: string): Promise<string[]> => (await readdir(dir, { recursive: true })).sort();
+
+  beforeAll(async () => {
+    inbox = join(await mkdtemp(join(tmpdir(), "mcp-kit-bounds-")), "in");
+    await mkdir(inbox);
+    served = (await start("bounds", { MCP_HTTP_FILES_INBOX: inbox, MCP_HTTP_TIMEOUT_MS: "800" })).served;
+  });
+  afterAll(() => served.close());
+
+  /** What a socket does when it sends `head` and then goes quiet: the first line of the answer, and whether the server closed the connection. */
+  const quiet = (head: string, waitMs: number): Promise<{ readonly first: string; readonly closed: boolean; readonly after: number }> =>
+    new Promise((resolve) => {
+      const started = Date.now();
+      const socket = connect(served.port as number, "127.0.0.1");
+      let text = "";
+      let closed = false;
+      socket.on("data", (chunk) => (text += chunk.toString()));
+      socket.on("close", () => (closed = true));
+      socket.on("error", () => (closed = true));
+      socket.write(head);
+      setTimeout(() => {
+        socket.destroy();
+        resolve({ first: text.split("\r\n")[0] ?? "", closed, after: Date.now() - started });
+      }, waitMs);
+    });
+
+  it("closes the connection on every refusal made before a body is read, so a body that never comes holds nothing", async () => {
+    const heads = [
+      `POST /mcp HTTP/1.1\r\nhost: 127.0.0.1:${served.port}\r\ncontent-length: 1000\r\n\r\npartial`,
+      `PUT /files/inbox/x HTTP/1.1\r\nhost: 127.0.0.1:${served.port}\r\ncontent-length: 1000\r\n\r\npartial`,
+      `POST /other HTTP/1.1\r\nhost: 127.0.0.1:${served.port}\r\nauthorization: Bearer ${token}\r\ncontent-length: 1000\r\n\r\npartial`,
+      `GET /mcp HTTP/1.1\r\nhost: 127.0.0.1:${served.port}\r\nauthorization: Bearer ${token}\r\ncontent-length: 1000\r\n\r\npartial`,
+      `POST /mcp HTTP/1.1\r\nhost: evil.example\r\nauthorization: Bearer ${token}\r\ncontent-length: 1000\r\n\r\npartial`,
+    ];
+    for (const head of heads) {
+      const seen = await quiet(head, 300);
+      expect(seen.first).toMatch(/^HTTP\/1\.1 (401|404|405|421)/);
+      expect(seen.closed).toBe(true);
+    }
+    const answer = await raw(served, "POST", "/mcp", { body: "{}" });
+    expect(answer.status).toBe(401);
+    expect(answer.headers["connection"]).toBe("close");
+  });
+
+  it("gives a signed-in request one route's worth of time for its body, and then an answer", async () => {
+    const seen = await quiet(`POST /mcp HTTP/1.1\r\nhost: 127.0.0.1:${served.port}\r\nauthorization: Bearer ${token}\r\ncontent-type: application/json\r\ncontent-length: 1000\r\n\r\n{"jsonrpc"`, 1500);
+    expect(seen.first).toBe("HTTP/1.1 408 Request Timeout");
+    expect(seen.closed).toBe(true);
+  });
+
+  it("drops an upload that stops sending, and one that takes longer than a call may, and keeps nothing of either", async () => {
+    const before = await entries(inbox);
+    const stalled = await quiet(`PUT /files/inbox/made/for/stall.bin HTTP/1.1\r\nhost: 127.0.0.1:${served.port}\r\nauthorization: Bearer ${token}\r\ncontent-length: 1000\r\n\r\n0123456789`, 1500);
+    expect(stalled.closed).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(await entries(inbox)).toEqual(before);
+    // One that keeps sending, slowly, is cut off at the total limit.
+    const result = await new Promise<string>((resolve) => {
+      const socket = connect(served.port as number, "127.0.0.1");
+      let text = "";
+      socket.on("data", (chunk) => (text += chunk.toString()));
+      socket.on("close", () => resolve(text.length === 0 ? "closed" : text.split("\r\n")[0] ?? ""));
+      socket.on("error", () => undefined);
+      socket.write(`PUT /files/inbox/made/for/slow.bin HTTP/1.1\r\nhost: 127.0.0.1:${served.port}\r\nauthorization: Bearer ${token}\r\ncontent-length: 1000\r\n\r\n`);
+      const ticker = setInterval(() => socket.write("x"), 200);
+      setTimeout(() => {
+        clearInterval(ticker);
+        socket.destroy();
+      }, 3000);
+    });
+    expect(result).toBe("closed");
+    await new Promise((resolve) => setTimeout(resolve, 100));
+    expect(await entries(inbox)).toEqual(before);
+  });
+});
+
+describe("an upload that comes to nothing", () => {
+  let served: Served;
+  let inbox: string;
+  let outside: string;
+  const entries = async (dir: string): Promise<string[]> => (await readdir(dir, { recursive: true })).sort();
+  const put = (target: string, body: Buffer | string | readonly Buffer[], headers: Record<string, string> = {}): Promise<Answer> => raw(served, "PUT", target, { headers: { ...auth, ...headers }, body });
+
+  beforeAll(async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-kit-undone-"));
+    inbox = join(dir, "in");
+    outside = join(dir, "outside");
+    await mkdir(join(inbox, "kept"), { recursive: true });
+    await mkdir(outside);
+    served = (await start("undone", { MCP_HTTP_FILES_INBOX: inbox, MCP_HTTP_FILES_MAX_BYTES: "1024" })).served;
+  });
+  afterAll(() => served.close());
+
+  it("takes the folders it made with it, and leaves the ones that were there", async () => {
+    const before = await entries(inbox);
+    expect((await put("/files/inbox/kept/new/deeper/a.txt", "what arrived", { "x-content-sha256": sha256("what was sent") })).status).toBe(422);
+    expect((await put("/files/inbox/fresh/b.bin", [Buffer.alloc(700), Buffer.alloc(700)])).status).toBe(413);
+    expect((await put("/files/inbox/fresh/c.bin", Buffer.alloc(5000))).status).toBe(413);
+    await mkdir(join(inbox, "kept", "isdir"));
+    expect((await put("/files/inbox/kept/isdir", "x")).status).toBe(409);
+    await new Promise<void>((resolve) => {
+      const req = request({ host: "127.0.0.1", port: served.port, method: "PUT", path: "/files/inbox/gone/halfway/d.bin", headers: { ...auth, "content-length": "900" } });
+      req.on("error", () => resolve());
+      req.write(Buffer.alloc(100));
+      setTimeout(() => {
+        req.destroy();
+        resolve();
+      }, 50);
+    });
+    await new Promise((resolve) => setTimeout(resolve, 150));
+    expect(await entries(inbox)).toEqual([...before, "kept/isdir"].sort());
+  });
+
+  it("keeps the folders an upload that succeeded needed", async () => {
+    expect((await put("/files/inbox/made/for/it.txt", "stored")).status).toBe(200);
+    expect(await readFile(join(inbox, "made", "for", "it.txt"), "utf8")).toBe("stored");
+  });
+
+  it("does not take a folder another upload has put a file in", async () => {
+    await put("/files/inbox/shared/first.txt", "first");
+    expect((await put("/files/inbox/shared/second.txt", "second", { "x-content-sha256": sha256("other") })).status).toBe(422);
+    expect(await readFile(join(inbox, "shared", "first.txt"), "utf8")).toBe("first");
+  });
+});
+
+describe("storeStream, held to a folder", () => {
+  it("refuses a temp file that turns out to be outside the folder it was to be in, and leaves nothing", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-kit-within-"));
+    const folder = join(dir, "folder");
+    await mkdir(folder);
+    const source = async function* (): AsyncGenerator<Buffer> {
+      yield Buffer.from("never stored");
+    };
+    const outside = await storeStream(source(), join(folder, "a.txt"), { maxBytes: 100, within: join(dir, "elsewhere") });
+    expect(outside).toEqual({ ok: false, reason: "outside" });
+    expect(await readdir(folder)).toEqual([]);
+    const inside = await storeStream(source(), join(folder, "a.txt"), { maxBytes: 100, within: await realpath(folder) });
+    expect(inside).toMatchObject({ ok: true, size: 12 });
+    expect(await readFile(join(folder, "a.txt"), "utf8")).toBe("never stored");
   });
 });

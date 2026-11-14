@@ -149,13 +149,25 @@ On the server (`MCP_HTTP_PORT` and tokens needed; not with
 With neither folder set these routes do not exist: a request for one gets the
 404 any unknown route gets. With either set, a request needs the same bearer
 token and `Host` as `/mcp`, counts against the same rate limit, and may only
-name a regular file whose real path is inside the folder; anything else is a
-404 that says nothing about why. Setting the inbox lets a request take as long
-as a call may (`MCP_HTTP_TIMEOUT_MS`) to arrive, so a large file on a slow
-link gets through. Every transfer leaves a `files {...}` line on stderr (the
-direction, the outcome, and for a file that moved its path, size and the start
-of its SHA-256). [Deploying](deploying.md#a-server-on-another-machine) shows it
-in use; [security](security.md#files-to-and-from-another-machine) has what it
+name a regular file whose real path is inside the folder; a path that fails
+that (an unsafe name, a missing file, a link out, a folder, a file the server
+cannot read) gets the same 404 that says nothing about why. What else an
+upload is told is about the request: 400 (a malformed `X-Content-SHA256`), 409
+(a folder is where the file would go), 413, 422 and 405 for the other method.
+A refused or broken upload leaves no file and takes away the folders it made.
+
+Node's 30 s limit on a request's arrival would cut a large upload short, and it
+cannot be lifted for one route, so with an inbox on it is replaced by limits
+where each request is known. Everything that is refused before its body is read
+(no token, another `Host`, an unknown route, the rate limit) closes the
+connection, so a body that never comes holds nothing; the body of `POST /mcp`
+has 30 s (or `MCP_HTTP_TIMEOUT_MS`, if less); and an upload that has signed in
+may not go quiet for a minute (or `MCP_HTTP_TIMEOUT_MS`, if less) nor take
+longer in all than `MCP_HTTP_TIMEOUT_MS`. With no inbox, nothing changes.
+Every transfer leaves a `files {...}` line on stderr (the direction, the
+outcome, and for a file that moved its path, size and the start of its
+SHA-256). [Deploying](deploying.md#a-server-on-another-machine) shows it in
+use; [security](security.md#files-to-and-from-another-machine) has what it
 guarantees.
 
 On the relay (it also reads the listener variables above: `MCP_HTTP_PORT`,
@@ -169,6 +181,7 @@ On the relay (it also reads the listener variables above: `MCP_HTTP_PORT`,
 | `MCP_RELAY_INBOX` | unset: no file goes up | An absolute folder, the same path as the server's inbox. A file in it that a call's arguments name by absolute path is uploaded before the call. |
 | `MCP_RELAY_OUTBOX` | unset: no file comes down | An absolute folder, the same path as the server's outbox. A file a result links there with a `file:` URI is fetched before the result is passed on. |
 | `MCP_RELAY_MAX_FILE_BYTES` | `268435456` (256 MiB) | The largest file the relay moves, up or down. |
+| `MCP_RELAY_ALLOW_PLAIN_HTTP` | unset: refused | `1` allows an `http://` upstream on a host that is not this machine; the token and the files then cross the network as they are, so only on a network that is encrypted already (a VPN, an overlay). |
 
 ### Limits (HTTP)
 

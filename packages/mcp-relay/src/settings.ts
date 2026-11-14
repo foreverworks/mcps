@@ -1,6 +1,4 @@
-import { isAbsolute, resolve } from "node:path";
-
-import { type AllowedHost, type ClientTokenFiles, DEFAULT_FILES_MAX_BYTES, FILES_VARIABLES, type Limits, limitsFrom, listenFrom } from "@foreverworks/mcp-kit";
+import { type AllowedHost, type ClientTokenFiles, DEFAULT_FILES_MAX_BYTES, FILES_VARIABLES, folderFrom, isLoopbackAddress, type Limits, limitsFrom, listenFrom } from "@foreverworks/mcp-kit";
 
 /**
  * What a relay is told, all of it from the environment.
@@ -19,6 +17,8 @@ export type RelaySettings = {
   /** The upstream's base URL: its scheme, host and port, and the path it lives under, if any. Never ends in a slash. */
   readonly upstream: string;
   readonly upstreamTokenFile: string;
+  /** Whether the upstream is plain http to a host that is not this machine, which MCP_RELAY_ALLOW_PLAIN_HTTP=1 allowed. */
+  readonly plainHttp: boolean;
   /** Where the clients put files the server's tools read by path. Absent: no file goes up. */
   readonly inbox?: string;
   /** Where files the server's tools hand back are put for the clients. Absent: no file comes down. */
@@ -28,17 +28,8 @@ export type RelaySettings = {
   readonly limits: Limits;
 };
 
-const folderFrom = (env: NodeJS.ProcessEnv, name: string): string | undefined => {
-  const value = env[name]?.trim();
-  if (!value) return undefined;
-  if (!isAbsolute(value)) {
-    throw new Error(`${name} "${value}" is not an absolute path: the server must be able to use the same path for its own folder, so write it in full`);
-  }
-  return resolve(value);
-};
-
 /** MCP_RELAY_UPSTREAM: the server's base URL, as its operator gives it out; the relay adds `/mcp` and `/files/...`. */
-const upstreamFrom = (raw: string | undefined): string => {
+const upstreamFrom = (raw: string | undefined, allowPlain: boolean): { readonly base: string; readonly plain: boolean } => {
   const value = raw?.trim();
   if (!value) throw new Error("MCP_RELAY_UPSTREAM is not set: write the base URL of the server this relay stands in for, for example https://mcp.example.com");
   let url: URL;
@@ -52,7 +43,15 @@ const upstreamFrom = (raw: string | undefined): string => {
   if (url.search !== "" || url.hash !== "") throw new Error("MCP_RELAY_UPSTREAM has a query or a fragment: write the base URL alone");
   const path = url.pathname.replace(/\/+$/, "");
   if (path.endsWith("/mcp")) throw new Error(`MCP_RELAY_UPSTREAM "${value}" ends in /mcp: write the server's base URL, without it`);
-  return `${url.origin}${path}`;
+  // A token and the files would cross the network as they are written: only where the network is encrypted already.
+  const plain = url.protocol === "http:" && !isLoopbackAddress(url.hostname.replace(/^\[|\]$/g, ""));
+  if (plain && !allowPlain) {
+    throw new Error(
+      `MCP_RELAY_UPSTREAM "${value}" is plain http to a host that is not this machine, so the relay's token and the files would cross the network unencrypted: ` +
+        "use https, or, on a network that is encrypted already (a VPN, an overlay), set MCP_RELAY_ALLOW_PLAIN_HTTP=1",
+    );
+  }
+  return { base: `${url.origin}${path}`, plain };
 };
 
 /**
@@ -68,7 +67,7 @@ export const settingsFrom = (env: NodeJS.ProcessEnv): RelaySettings => {
   if (files.length > 0) throw new Error(`${files.join(" and ")} configure a server's own file endpoints; a relay is told its folders by MCP_RELAY_INBOX and MCP_RELAY_OUTBOX`);
   const upstreamTokenFile = env["MCP_RELAY_UPSTREAM_TOKEN_FILE"]?.trim();
   if (!upstreamTokenFile) throw new Error("MCP_RELAY_UPSTREAM_TOKEN_FILE is not set: name the file that holds the bearer token the server accepts from this relay");
-  const upstream = upstreamFrom(env["MCP_RELAY_UPSTREAM"]);
+  const upstream = upstreamFrom(env["MCP_RELAY_UPSTREAM"], env["MCP_RELAY_ALLOW_PLAIN_HTTP"]?.trim() === "1");
   const inbox = folderFrom(env, "MCP_RELAY_INBOX");
   const outbox = folderFrom(env, "MCP_RELAY_OUTBOX");
   const max = env["MCP_RELAY_MAX_FILE_BYTES"]?.trim();
@@ -79,8 +78,9 @@ export const settingsFrom = (env: NodeJS.ProcessEnv): RelaySettings => {
     ...(listen.host === undefined ? {} : { host: listen.host }),
     ...(listen.allowedHosts === undefined ? {} : { allowedHosts: listen.allowedHosts }),
     tokens: listen.tokens,
-    upstream,
+    upstream: upstream.base,
     upstreamTokenFile,
+    plainHttp: upstream.plain,
     ...(inbox === undefined ? {} : { inbox }),
     ...(outbox === undefined ? {} : { outbox }),
     maxFileBytes,

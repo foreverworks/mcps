@@ -7,10 +7,10 @@ import {
   type Bucket,
   clientFor,
   hostAccepted,
-  isLoopbackAddress,
   LOOPBACK_ADDRESS,
   loadTokens,
   MCP_PATH,
+  pathnameOf,
   plainReply,
   urlHost,
 } from "@foreverworks/mcp-kit";
@@ -57,7 +57,7 @@ export const startRelay = async ({ settings, upstreamToken, log = (line) => cons
     const client = clientFor(req.headers.authorization, tokens);
     if (client === undefined) return plainReply(res, 401, "unauthorized");
     if (!hostAccepted(req.headers.host, state.bound, [], allowedHosts)) return plainReply(res, 421, "wrong host");
-    if (new URL(req.url ?? "/", "http://localhost").pathname !== MCP_PATH) return plainReply(res, 404, "not found");
+    if (pathnameOf(req.url) !== MCP_PATH) return plainReply(res, 404, "not found");
     if (!FORWARDED.has(req.method ?? "")) return plainReply(res, 405, "the relay forwards POST, GET and DELETE only");
     const step = admit(buckets, client, Date.now(), limits);
     if (!step.allowed) return plainReply(res, 429, "too many requests", { "retry-after": String(step.retryAfterSec) });
@@ -74,12 +74,11 @@ export const startRelay = async ({ settings, upstreamToken, log = (line) => cons
   state.bound = bound;
 
   const folders = [settings.inbox === undefined ? undefined : `inbox ${settings.inbox}`, settings.outbox === undefined ? undefined : `outbox ${settings.outbox}`].filter((part) => part !== undefined);
-  const cleartext = settings.upstream.startsWith("http:") && !isLoopbackAddress(new URL(settings.upstream).hostname.replace(/^\[|\]$/g, ""));
   log(
     `relay: listening on http://${urlHost(bindAddress)}:${bound}${MCP_PATH} for ${[...tokens.keys()].join(", ")}` +
       `${allowedHosts.length === 0 ? "" : `, and Host ${allowedHosts.map(allowedHostText).join(", ")}`}; ` +
       `forwarding to ${settings.upstream}${MCP_PATH}; ${folders.length === 0 ? "no files carried (set MCP_RELAY_INBOX, MCP_RELAY_OUTBOX)" : `carrying files for ${folders.join(" and ")}`}` +
-      `${cleartext ? "; WARNING: the upstream is plain http, so its token and the files cross the network unencrypted" : ""}`,
+      `${settings.plainHttp ? "; WARNING: the upstream is plain http (MCP_RELAY_ALLOW_PLAIN_HTTP=1), so its token and the files cross the network as they are: only for a network that is encrypted already" : ""}`,
   );
 
   return {

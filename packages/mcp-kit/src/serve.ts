@@ -31,6 +31,9 @@ import { unclassified, type ToolPolicy } from "./policy.js";
  * (serve/public.ts).
  */
 
+/** How long a request may take to arrive: Node's request timeout, and with an inbox on the limit of the one route's body. */
+const REQUEST_TIMEOUT_MS = 30_000;
+
 /** Where the one HTTP route lives. Anything else is a 404. */
 export const MCP_PATH = "/mcp";
 
@@ -233,36 +236,69 @@ export const checkPolicy = (name: string, register: (server: McpServer) => void,
   if (stale.length > 0) throw new Error(`${name}: the policy names tools nobody registers: ${stale.join(", ")}`);
 };
 
+/**
+ * The path of a request target, or undefined when it is not one a URL parser
+ * takes (`//` is the best known): that request is for no route.
+ */
+export const pathnameOf = (target: string | undefined): string | undefined => {
+  try {
+    return new URL(target ?? "/", "http://localhost").pathname;
+  } catch {
+    return undefined;
+  }
+};
+
 /** A plain-text answer, which is how this server (and a relay in front of one) refuses and fails. */
 export const reply = (res: ServerResponse, status: number, message: string, headers: Readonly<Record<string, string>> = {}): void => {
   res.writeHead(status, { "content-type": "text/plain; charset=utf-8", ...headers }).end(`${message}\n`);
 };
 
-/** The body, or why not: too large, or not JSON. */
-const readBody = (req: IncomingMessage, maxBytes: number): Promise<{ readonly ok: true; readonly body: unknown } | { readonly ok: false; readonly status: 400 | 413 }> =>
+/**
+ * The raw body, or why not: too large (413), hung up on or broken (400), or
+ * slower than `timeoutMs` (408; no limit unless one is given, as the HTTP
+ * server's own request timeout bounds it).
+ */
+export const readRawBody = (
+  req: IncomingMessage,
+  maxBytes: number,
+  timeoutMs?: number,
+): Promise<{ readonly ok: true; readonly body: Buffer } | { readonly ok: false; readonly status: 400 | 408 | 413 }> =>
   new Promise((resolve) => {
     const declared = Number(req.headers["content-length"] ?? "0");
     if (declared > maxBytes) return resolve({ ok: false, status: 413 });
     const chunks: Buffer[] = [];
     const total = { bytes: 0 };
+    const timer = timeoutMs === undefined ? undefined : setTimeout(() => resolve({ ok: false, status: 408 }), timeoutMs);
+    // The first answer given is the one that counts.
+    const settle = (answer: { readonly ok: true; readonly body: Buffer } | { readonly ok: false; readonly status: 400 | 408 | 413 }): void => {
+      clearTimeout(timer);
+      resolve(answer);
+    };
     req.on("data", (chunk: Buffer) => {
       total.bytes += chunk.length;
       if (total.bytes > maxBytes) {
         req.destroy();
-        resolve({ ok: false, status: 413 });
+        settle({ ok: false, status: 413 });
         return;
       }
       chunks.push(chunk);
     });
-    req.on("end", () => {
-      try {
-        resolve({ ok: true, body: JSON.parse(Buffer.concat(chunks).toString("utf8")) as unknown });
-      } catch {
-        resolve({ ok: false, status: 400 });
-      }
-    });
-    req.on("error", () => resolve({ ok: false, status: 400 }));
+    req.on("end", () => settle({ ok: true, body: Buffer.concat(chunks) }));
+    req.on("error", () => settle({ ok: false, status: 400 }));
+    // A client that hangs up mid-body ends neither way.
+    req.on("close", () => settle({ ok: false, status: 400 }));
   });
+
+/** The body as JSON, or why not: too large, too slow, or not JSON. */
+const readBody = async (req: IncomingMessage, maxBytes: number, timeoutMs?: number): Promise<{ readonly ok: true; readonly body: unknown } | { readonly ok: false; readonly status: 400 | 408 | 413 }> => {
+  const raw = await readRawBody(req, maxBytes, timeoutMs);
+  if (!raw.ok) return raw;
+  try {
+    return { ok: true, body: JSON.parse(raw.body.toString("utf8")) as unknown };
+  } catch {
+    return { ok: false, status: 400 };
+  }
+};
 
 type Runtime = {
   readonly options: ServeOptions;
@@ -411,28 +447,38 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
   const modern = createMcpHandler(({ era }) => fresh(runtime, era, "http"), { legacy: "reject", onerror, maxRequestBodySize: limits.maxBodyBytes });
   const serveModern = toNodeHandler(modern, { onerror, maxRequestBodySize: limits.maxBodyBytes });
 
+  // With an inbox on, nothing but these bounds stops a body from taking as long as it likes to arrive
+  // (the HTTP server's own request timeout is off then, for the one route that needs a longer one), so
+  // a refusal made before a body is read closes the connection, and the one route that reads a body
+  // of its own kind bounds it.
+  const early: Readonly<Record<string, string>> = files?.inbox === undefined ? {} : { connection: "close" };
+  const bodyTimeoutMs = files?.inbox === undefined ? undefined : Math.min(REQUEST_TIMEOUT_MS, limits.timeoutMs);
+
   const answer = async (req: IncomingMessage, res: ServerResponse): Promise<void> => {
     const caller = door.callerOf(req);
-    if (caller === undefined) return reply(res, 401, "unauthorized");
+    if (caller === undefined) return reply(res, 401, "unauthorized", early);
     const { client } = caller;
     // A DNS-rebinding page cannot present a token anyway; this refuses a stray Host too, and on a public server it is the only check.
-    if (!hostAccepted(req.headers.host, state.bound, door.publicHosts, allowedHosts)) return reply(res, 421, "wrong host");
+    if (!hostAccepted(req.headers.host, state.bound, door.publicHosts, allowedHosts)) return reply(res, 421, "wrong host", early);
     // The file endpoints, when switched on, are checked before the one route; with none on this is never reached.
     const fileRoute = files === undefined ? undefined : fileRouteOf(req.url, files);
     if (files !== undefined && fileRoute !== undefined) {
       const turn = admit(buckets, caller.bucket, Date.now(), limits);
-      if (!turn.allowed) return reply(res, 429, "too many requests", { "retry-after": String(turn.retryAfterSec) });
-      return serveFile({ files, service: options.name, client, log: runtime.log, reply }, fileRoute, req, res);
+      if (!turn.allowed) return reply(res, 429, "too many requests", { ...early, "retry-after": String(turn.retryAfterSec) });
+      return serveFile({ files, service: options.name, client, log: runtime.log, reply, timeoutMs: limits.timeoutMs }, fileRoute, req, res);
     }
-    if (new URL(req.url ?? "/", "http://localhost").pathname !== MCP_PATH) return reply(res, 404, "not found");
+    if (pathnameOf(req.url) !== MCP_PATH) return reply(res, 404, "not found", early);
     // Also a CORS preflight, answered with no CORS headers: ChatGPT and Claude call from their servers, never from a page.
-    if (req.method !== "POST") return reply(res, 405, "stateless server: POST only");
+    if (req.method !== "POST") return reply(res, 405, "stateless server: POST only", early);
 
     const step = admit(buckets, caller.bucket, Date.now(), limits);
-    if (!step.allowed) return reply(res, 429, "too many requests", { "retry-after": String(step.retryAfterSec) });
+    if (!step.allowed) return reply(res, 429, "too many requests", { ...early, "retry-after": String(step.retryAfterSec) });
 
-    const read = await readBody(req, limits.maxBodyBytes);
-    if (!read.ok) return reply(res, read.status, read.status === 413 ? `body larger than ${limits.maxBodyBytes} bytes` : "not JSON");
+    const read = await readBody(req, limits.maxBodyBytes, bodyTimeoutMs);
+    if (!read.ok) {
+      if (read.status === 408) return reply(res, 408, `body not received within ${bodyTimeoutMs} ms`, { connection: "close" });
+      return reply(res, read.status, read.status === 413 ? `body larger than ${limits.maxBodyBytes} bytes` : "not JSON");
+    }
 
     // Node's request types a method as optional; the SDK's adapter wants it, and a request always has one.
     const incoming = req as NodeIncomingMessageLike;
@@ -460,11 +506,21 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
     }
   };
 
-  const http = createServer((req, res) => void answer(req, res));
+  const http = createServer((req, res) => {
+    // Nothing a request can do may take the process down: a handler that throws is a 500, not an unhandled rejection.
+    answer(req, res).catch((error: unknown) => {
+      console.error(`${options.name}: request failed:`, error);
+      if (!res.headersSent) reply(res, 500, "internal error");
+      else res.destroy();
+    });
+  });
   // A client that trickles its REQUEST cannot hold a socket either; the handler's own limit is above.
-  // An inbox takes files, which take longer than a JSON-RPC message to arrive: the request may then
-  // take as long as a call may (every request is signed in by then, and the inbox has its own size cap).
-  http.requestTimeout = files?.inbox === undefined ? 30_000 : limits.timeoutMs;
+  // An inbox takes files, which take longer than a JSON-RPC message to arrive, and Node's timeout is for
+  // every request alike and cannot be lifted for one. So with an inbox it is off, and what it did is
+  // done where each request is known: the one route's body has `bodyTimeoutMs`, a refusal closes the
+  // connection (`early`), and an authenticated upload has an inactivity limit and a total one of its own
+  // (serve/filesServe.ts). The headers still have their 10 s.
+  http.requestTimeout = files?.inbox === undefined ? REQUEST_TIMEOUT_MS : 0;
   http.headersTimeout = 10_000;
   await new Promise<void>((resolve, reject) => {
     http.once("error", reject);

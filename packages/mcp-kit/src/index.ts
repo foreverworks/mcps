@@ -61,7 +61,9 @@ export {
   listenFrom,
   loadTokens,
   MCP_PATH,
+  pathnameOf,
   reply as plainReply,
+  readRawBody,
   serve,
   type Files,
   type Listen,
@@ -81,10 +83,11 @@ export {
   filesFrom,
   FILES_VARIABLES,
   filesUrlPath,
+  folderFrom,
   SHA256_HEADER,
   type FileEndpoints,
 } from "./serve/files.js";
-export { folderInside, openInside as openFileInside } from "./serve/filesServe.js";
+export { folderInside, openInside as openFileInside, removeFolders, type Folder, type Opened } from "./serve/filesServe.js";
 export { sha256OfHandle, storeStream, type Stored, type StoreOptions } from "./fileStream.js";
 export { idempotentWrites, isIdempotent, mergePolicies, needsPerson, summaryFrom, unclassified, type Access, type Confirmation, type ConfirmedRule, type ToolArgs, type ToolPolicy, type ToolRule } from "./policy.js";
 export { ALL_TOOLSETS, toolsetPolicy, toolsetsFrom, type Toolsets } from "./toolsets.js";

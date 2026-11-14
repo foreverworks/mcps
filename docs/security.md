@@ -201,21 +201,35 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
 - **No new way in.** The same bearer token and `Host` check as `/mcp`, and the
   same per-client rate limit.
 - **A path stays inside its folder.** It is percent-decoded once, must hold no
-  empty name, `.`, `..`, NUL or backslash, and is resolved with its links
-  followed; only a regular file whose real path is inside the folder is served
-  or written. The file actually opened is read back from the kernel and held
-  to the same rule, as for a tool's input file. Every refusal is the same 404.
+  empty name, `.`, `..`, NUL, backslash or name too long for a file system,
+  and is resolved with its links followed; only a regular file whose real path
+  is inside the folder is served or written. A file served is read back from
+  the kernel after it is opened, and the temp file of an upload after it is
+  created, and each is held to the same rule, as for a tool's input file. Every
+  way a path can fail (an unsafe name, a missing file, a link out, a folder, a
+  file the server cannot read) is the same bare 404. What else an upload is told
+  is about the request: 400 for a malformed `X-Content-SHA256`, 405 for the
+  other method, 409 when a folder is where the file would go, 413 over the
+  size cap, 422 for bytes that are not the ones hashed.
 - **Whole or not at all.** An upload goes to a temporary file in the target's
   folder and is renamed into place once the size cap and the SHA-256 the
-  sender gave (if it did) hold; a refused or broken upload leaves nothing. The
-  folders it makes are mode 0750 and the file 0640 (before the umask).
+  sender gave (if it did) hold. A refused or broken upload (a mismatch, an
+  over-long body, a client that gives up) leaves no file, and the folders it
+  made are taken away again (one that another upload has already put a file in
+  stays). The folders it makes are mode 0750 and the file 0640 (before the
+  umask).
+- **Bounded in time, too.** With an inbox on, Node's request timeout, which
+  would cut a large upload, is replaced: a refusal made before a body is read
+  closes the connection; a `POST /mcp` body has 30 s; an upload that has
+  signed in may not go quiet for a minute, nor take longer than a call may.
 - **A bounded cost.** An upload over `MCP_HTTP_FILES_MAX_BYTES` is refused, and
   the relay moves nothing over `MCP_RELAY_MAX_FILE_BYTES`.
 - **The relay holds one secret, and only the server's token.** Its clients
   present their own tokens to it; the log has a line per file (direction,
   path, size, the start of the hash) and never bytes, tokens or arguments.
-  Plain `http://` to an upstream that is not on loopback carries the token and
-  the files in the clear: the relay says so at start.
+  Plain `http://` to an upstream that is not on this machine would carry the
+  token and the files in the clear: the relay refuses to start with one unless
+  `MCP_RELAY_ALLOW_PLAIN_HTTP=1` says the network is encrypted already.
 
 ## The network
 

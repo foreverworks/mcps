@@ -1,11 +1,12 @@
 import type { IncomingHttpHeaders, IncomingMessage, ServerResponse } from "node:http";
 import { StringDecoder } from "node:string_decoder";
 
-import { type Limits, plainReply } from "@foreverworks/mcp-kit";
+import { type Limits, plainReply, readRawBody } from "@foreverworks/mcp-kit";
 
 import { failedCall, inboxPathsIn, messagesOf, toolCallArguments } from "./calls.js";
-import { dataOf, eventOf, splitEvents, withData } from "./sse.js";
-import { mirrorLinks, type Transfer, uploadFile } from "./transfer.js";
+import { contentEndOf, type Edit, idSourceOf, messageSpans, prepend, type Span, splice, textOf } from "./json.js";
+import { dataOf, eventOf, makeSplitter, withData } from "./sse.js";
+import { noteOnLinks, type Transfer, uploadFile } from "./transfer.js";
 import { type Answer, readAnswer, reasonOf, send, snippetOf, statusWords } from "./upstream.js";
 
 /**
@@ -37,53 +38,41 @@ const passed = (headers: IncomingHttpHeaders, names: ReadonlySet<string>): Recor
 export const requestHeaders = (headers: IncomingHttpHeaders): Record<string, string> => passed(headers, REQUEST_HEADERS);
 export const answerHeaders = (headers: IncomingHttpHeaders): Record<string, string> => passed(headers, ANSWER_HEADERS);
 
-const readRaw = (req: IncomingMessage, maxBytes: number): Promise<{ readonly ok: true; readonly body: Buffer } | { readonly ok: false; readonly status: 400 | 413 }> =>
-  new Promise((resolve) => {
-    if (Number(req.headers["content-length"] ?? "0") > maxBytes) return resolve({ ok: false, status: 413 });
-    const chunks: Buffer[] = [];
-    let total = 0;
-    req.on("data", (chunk: Buffer) => {
-      total += chunk.length;
-      if (total > maxBytes) {
-        req.destroy();
-        resolve({ ok: false, status: 413 });
-        return;
-      }
-      chunks.push(chunk);
-    });
-    req.on("end", () => resolve({ ok: true, body: Buffer.concat(chunks, total) }));
-    req.on("error", () => resolve({ ok: false, status: 400 }));
-    // A client that hangs up mid-body ends neither way; the first answer given is the one that counts.
-    req.on("close", () => resolve({ ok: false, status: 400 }));
-  });
-
-const parse = (body: Buffer): unknown => {
+const parse = (text: string): unknown => {
   try {
-    return JSON.parse(body.toString("utf8")) as unknown;
+    return JSON.parse(text) as unknown;
   } catch {
     return undefined;
   }
 };
 
 /** What to do with a POST: answer it here (every call in it failed to get its files across), or send this on, and add these responses to what comes back. */
-type Prepared = { readonly kind: "answer"; readonly body: unknown } | { readonly kind: "send"; readonly body: Buffer; readonly failed: readonly unknown[] };
+type Prepared = { readonly kind: "answer"; readonly body: string } | { readonly kind: "send"; readonly body: Buffer; readonly failed: readonly string[] };
+
+const unchanged = (raw: Buffer): Prepared => ({ kind: "send", body: raw, failed: [] });
 
 /**
  * Uploads the inbox files the tool calls in a request name. A call whose file
  * cannot be sent is not made: it is answered with a JSON-RPC error naming the
- * file and why, and the other messages of a batch go on without it.
+ * file and why, and the other messages of a batch go on without it. A request
+ * that needs nothing of the kind goes on as the very bytes it came in, and one
+ * that loses a message loses only that message's text: nothing else in it is
+ * written again.
  */
 const prepare = async (relay: Relay, raw: Buffer, signal: AbortSignal): Promise<Prepared> => {
   const { inbox } = relay.transfer;
-  const body = inbox === undefined ? undefined : parse(raw);
-  if (inbox === undefined || body === undefined) return { kind: "send", body: raw, failed: [] };
+  if (inbox === undefined) return unchanged(raw);
+  const text = raw.toString("utf8");
+  const body = parse(text);
+  const spans = body === undefined ? undefined : messageSpans(text);
   const messages = messagesOf(body);
+  if (body === undefined || spans === undefined || spans.length !== messages.length) return unchanged(raw);
   const calls = messages.map((message) => {
     const call = toolCallArguments(message);
-    return call === undefined ? undefined : { id: call.id, paths: inboxPathsIn(call.arguments, inbox) };
+    return call === undefined ? undefined : { paths: inboxPathsIn(call.arguments, inbox) };
   });
   const paths = [...new Set(calls.flatMap((call) => call?.paths ?? []))];
-  if (paths.length === 0) return { kind: "send", body: raw, failed: [] };
+  if (paths.length === 0) return unchanged(raw);
 
   const refused = new Map<string, string>();
   for (const path of paths) {
@@ -91,22 +80,37 @@ const prepare = async (relay: Relay, raw: Buffer, signal: AbortSignal): Promise<
     if (!moved.ok) refused.set(path, moved.reason);
   }
   const failed = messages.map((_message, at) => {
-    const call = calls[at];
-    const path = call?.paths.find((p) => refused.has(p));
-    return call === undefined || path === undefined ? undefined : failedCall(call.id, `The relay could not send ${path} to the server, so the call was not made: ${refused.get(path) as string}`);
+    const path = calls[at]?.paths.find((p) => refused.has(p));
+    const id = idSourceOf(text, spans[at] as Span);
+    return path === undefined || id === undefined ? undefined : failedCall(id, `The relay could not send ${path} to the server, so the call was not made: ${refused.get(path) as string}`);
   });
   const answers = failed.filter((answer) => answer !== undefined);
-  if (answers.length === 0) return { kind: "send", body: raw, failed: [] };
-  if (answers.length === messages.length) return { kind: "answer", body: Array.isArray(body) ? answers : answers[0] };
-  return { kind: "send", body: Buffer.from(JSON.stringify(messages.filter((_message, at) => failed[at] === undefined))), failed: answers };
+  if (answers.length === 0) return unchanged(raw);
+  if (answers.length === messages.length) return { kind: "answer", body: Array.isArray(body) ? `[${answers.join(",")}]` : (answers[0] as string) };
+  const kept = spans.filter((_span, at) => failed[at] === undefined).map((span) => textOf(text, span));
+  return { kind: "send", body: Buffer.from(`[${kept.join(",")}]`), failed: answers };
 };
 
-/** A response (or each of a batch's) with the files its links name brought over; the same object when there was nothing to bring. */
-const settle = async (relay: Relay, message: unknown, signal: AbortSignal): Promise<unknown> => {
-  if (!Array.isArray(message)) return mirrorLinks(relay.transfer, message, signal);
-  const settled: unknown[] = [];
-  for (const member of message) settled.push(await mirrorLinks(relay.transfer, member, signal));
-  return settled.every((member, at) => member === message[at]) ? message : settled;
+/**
+ * The text of a response (or of a batch of them) with a note added to each
+ * result that links files the relay could not bring over, after it has fetched
+ * the ones it could. The note goes into the text where it belongs; everything
+ * else is the characters it was. The same text when there is nothing to add,
+ * and undefined for text that is not JSON.
+ */
+const annotate = async (relay: Relay, text: string, signal: AbortSignal): Promise<string | undefined> => {
+  const body = parse(text);
+  if (body === undefined) return undefined;
+  const messages = messagesOf(body);
+  const spans = messageSpans(text);
+  if (spans === undefined || spans.length !== messages.length) return text;
+  const edits: Edit[] = [];
+  for (const [at, message] of messages.entries()) {
+    const note = await noteOnLinks(relay.transfer, message, signal);
+    const place = note === undefined ? undefined : contentEndOf(text, spans[at] as Span);
+    if (note !== undefined && place !== undefined) edits.push({ at: place.at, insert: `${place.after ? "," : ""}${JSON.stringify({ type: "text", text: note })}` });
+  }
+  return edits.length === 0 ? text : splice(text, edits);
 };
 
 const NEEDS_FETCH = '"resource_link"';
@@ -125,28 +129,34 @@ const writeAndWait = (res: ServerResponse, text: string): Promise<void> =>
       });
 
 /** An event stream, event by event as it arrives; only an event that carries a link is held while its files are fetched. */
-const streamEvents = async (relay: Relay, answer: Answer, res: ServerResponse, failed: readonly unknown[], signal: AbortSignal): Promise<void> => {
+const streamEvents = async (relay: Relay, answer: Answer, res: ServerResponse, failed: readonly string[], signal: AbortSignal): Promise<void> => {
   res.writeHead(answer.status, { ...answerHeaders(answer.headers), "content-type": "text/event-stream" });
   res.flushHeaders();
-  for (const response of failed) await writeAndWait(res, eventOf(JSON.stringify(response)));
+  for (const response of failed) await writeAndWait(res, eventOf(response));
   const rewrite = async (event: string): Promise<string> => {
     const data = relay.transfer.outbox === undefined ? undefined : dataOf(event);
     if (data === undefined || !data.includes(NEEDS_FETCH)) return event;
-    const message = parse(Buffer.from(data));
-    if (message === undefined) return event;
-    const settled = await settle(relay, message, signal);
-    return settled === message ? event : withData(event, JSON.stringify(settled));
+    const annotated = await annotate(relay, data, signal);
+    return annotated === undefined || annotated === data ? event : withData(event, annotated);
   };
   const decoder = new StringDecoder("utf8");
-  let pending = "";
+  const splitter = makeSplitter(MAX_HELD);
   try {
     for await (const chunk of answer.body as AsyncIterable<Buffer>) {
-      const cut = splitEvents(pending + decoder.write(chunk));
-      pending = cut.rest;
+      const cut = splitter.push(decoder.write(chunk));
       for (const event of cut.events) await writeAndWait(res, await rewrite(event));
+      if (cut.overflow) {
+        // An event that never ends is not one to hold: the stream stops after the last whole event.
+        relay.transfer.log(`relay-warning ${JSON.stringify({ message: `an event of the upstream's stream is longer than ${MAX_HELD} bytes without a blank line; the stream was ended there` })}`);
+        answer.body.destroy();
+        res.end();
+        return;
+      }
     }
-    pending += decoder.end();
-    if (pending !== "") await writeAndWait(res, pending);
+    const last = splitter.push(decoder.end());
+    for (const event of last.events) await writeAndWait(res, await rewrite(event));
+    const rest = splitter.finish();
+    if (rest !== "") await writeAndWait(res, rest);
     res.end();
   } catch {
     // The upstream or the client went away mid-stream: what was sent stays sent, and the stream ends where it is.
@@ -154,19 +164,31 @@ const streamEvents = async (relay: Relay, answer: Answer, res: ServerResponse, f
   }
 };
 
-/** A whole answer, with the links in it followed when it is JSON that has any. */
-const holdAnswer = async (relay: Relay, answer: Answer, res: ServerResponse, failed: readonly unknown[], signal: AbortSignal): Promise<void> => {
+/**
+ * A whole answer. It goes on as the very bytes it came in, unless there is
+ * something to add: a note on a result whose linked files could not be
+ * brought over (spliced into its text), or the responses of calls that were
+ * not made (put in front; and alone, when the upstream's answer has no JSON,
+ * as the 202 to a batch whose only other message was a notification).
+ */
+const holdAnswer = async (relay: Relay, answer: Answer, res: ServerResponse, failed: readonly string[], signal: AbortSignal): Promise<void> => {
   const body = await readAnswer(answer, MAX_HELD);
   if (body === undefined) return plainReply(res, 502, `the upstream's answer is larger than ${MAX_HELD} bytes, which is more than the relay holds`);
-  const type = String(answer.headers["content-type"] ?? "");
-  const needsLook = type.startsWith("application/json") && (failed.length > 0 || (relay.transfer.outbox !== undefined && body.includes(NEEDS_FETCH)));
-  const message = needsLook ? parse(body) : undefined;
-  const settled = message === undefined ? undefined : await settle(relay, message, signal);
-  const out =
-    settled === undefined
-      ? body
-      : Buffer.from(JSON.stringify(failed.length === 0 ? settled : [...failed, ...(Array.isArray(settled) ? (settled as unknown[]) : [settled])]));
-  res.writeHead(answer.status, { ...answerHeaders(answer.headers), "content-length": String(out.length) });
+  const json = String(answer.headers["content-type"] ?? "").startsWith("application/json");
+  const text = body.toString("utf8");
+  const looksAt = json && relay.transfer.outbox !== undefined && text.includes(NEEDS_FETCH);
+  const annotated = looksAt ? await annotate(relay, text, signal) : undefined;
+  const sent = annotated ?? text;
+  const headers = answerHeaders(answer.headers);
+  if (failed.length === 0) {
+    const out = annotated === undefined || annotated === text ? body : Buffer.from(annotated);
+    res.writeHead(answer.status, { ...headers, "content-length": String(out.length) });
+    res.end(out);
+    return;
+  }
+  const hasJson = json && parse(text) !== undefined;
+  const out = Buffer.from(hasJson ? prepend(sent, failed) : `[${failed.join(",")}]`);
+  res.writeHead(hasJson ? answer.status : 200, { ...headers, "content-type": "application/json", "content-length": String(out.length) });
   res.end(out);
 };
 
@@ -192,12 +214,11 @@ export const forwardMcp = async (relay: Relay, req: IncomingMessage, res: Server
     controller.abort();
   }, limits.timeoutMs);
   try {
-    const read = method === "POST" ? await readRaw(req, limits.maxBodyBytes) : undefined;
-    if (read !== undefined && !read.ok) return plainReply(res, read.status, read.status === 413 ? `body larger than ${limits.maxBodyBytes} bytes` : "not JSON");
+    const read = method === "POST" ? await readRawBody(req, limits.maxBodyBytes) : undefined;
+    if (read !== undefined && !read.ok) return plainReply(res, read.status, read.status === 413 ? `body larger than ${limits.maxBodyBytes} bytes` : read.status === 408 ? "request took too long to arrive" : "not JSON");
     const prepared: Prepared = read === undefined ? { kind: "send", body: Buffer.alloc(0), failed: [] } : await prepare(relay, read.body, controller.signal);
     if (prepared.kind === "answer") {
-      const text = JSON.stringify(prepared.body);
-      res.writeHead(200, { "content-type": "application/json", "content-length": String(Buffer.byteLength(text)) }).end(text);
+      res.writeHead(200, { "content-type": "application/json", "content-length": String(Buffer.byteLength(prepared.body)) }).end(prepared.body);
       return;
     }
     let answer: Answer;

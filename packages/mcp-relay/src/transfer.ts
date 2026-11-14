@@ -1,9 +1,9 @@
 import { lstat } from "node:fs/promises";
 import { join } from "node:path";
 
-import { FILES_INBOX_PATH, FILES_OUTBOX_PATH, filesUrlPath, folderInside, openFileInside, parseSha256, SHA256_HEADER, sha256OfHandle, storeStream } from "@foreverworks/mcp-kit";
+import { FILES_INBOX_PATH, FILES_OUTBOX_PATH, filesUrlPath, folderInside, openFileInside, parseSha256, removeFolders, SHA256_HEADER, sha256OfHandle, storeStream } from "@foreverworks/mcp-kit";
 
-import { linkUris, namesBelow, outboxPathOf, withNote } from "./calls.js";
+import { linkUris, namesBelow, outboxPathOf } from "./calls.js";
 import { type Answer, readAnswer, reasonOf, send, snippetOf, statusWords, type Upstream } from "./upstream.js";
 
 /**
@@ -49,15 +49,17 @@ const attempt = async (transfer: Transfer, run: () => Promise<Answer>): Promise<
  * A file the relay's inbox holds, sent to the same path in the server's. A
  * path that is not a regular file inside the inbox (a name the client made
  * up, a link to somewhere else) is not sent and not an error: the call goes
- * on, and the server's tool says what it finds. Streamed from the open file,
- * hashed first, so a large file is never held whole.
+ * on, and the server's tool says what it finds. A regular file that is there
+ * and cannot be read is an error, which names why: the call would otherwise
+ * fail on the server with "not found" for a file the client can see. Streamed
+ * from the open file, hashed first, so a large file is never held whole.
  */
 export const uploadFile = async (transfer: Transfer, path: string, signal: AbortSignal): Promise<Moved> => {
   const { inbox, upstream } = transfer;
   if (inbox === undefined) return { ok: true };
   const names = namesBelow(inbox, path);
-  const opened = await openFileInside(inbox, names).catch(() => undefined);
-  if (opened === undefined) return { ok: true };
+  const opened = await openFileInside(inbox, names);
+  if (!opened.ok) return opened.reason === "unreadable" ? failed(`it cannot be read by the relay (${opened.code})`) : { ok: true };
   const { handle, size } = opened;
   try {
     if (size > transfer.maxFileBytes) return failed(`it is ${size} bytes, over the relay's limit of ${transfer.maxFileBytes} bytes (MCP_RELAY_MAX_FILE_BYTES)`);
@@ -127,22 +129,25 @@ export const downloadFile = async (transfer: Transfer, path: string, signal: Abo
     return failed(`it is larger than the relay's limit of ${transfer.maxFileBytes} bytes (MCP_RELAY_MAX_FILE_BYTES)`);
   }
   try {
-    const dir = await folderInside(outbox, names.slice(0, -1));
-    if (dir === undefined) {
+    const folder = await folderInside(outbox, names.slice(0, -1));
+    if (folder === undefined) {
       discard(answer);
       return failed("it leads out of MCP_RELAY_OUTBOX, or through a file, on this machine");
     }
-    const target = join(dir, names.at(-1) as string);
-    if ((await lstat(target).catch(() => undefined))?.isDirectory()) {
+    // A fetch that comes to nothing takes the folders it made with it.
+    const nothing = async (reason: string): Promise<Moved> => {
       discard(answer);
-      return failed("a folder is where it should go on this machine");
-    }
-    const stored = await storeStream(answer.body, target, { maxBytes: transfer.maxFileBytes, sha256: expected });
+      await removeFolders(folder.created);
+      return failed(reason);
+    };
+    const target = join(folder.dir, names.at(-1) as string);
+    if ((await lstat(target).catch(() => undefined))?.isDirectory()) return await nothing("a folder is where it should go on this machine");
+    const stored = await storeStream(answer.body, target, { maxBytes: transfer.maxFileBytes, sha256: expected, within: folder.base });
     if (!stored.ok) {
-      discard(answer);
-      if (stored.reason === "too_large") return failed(`it is larger than the relay's limit of ${transfer.maxFileBytes} bytes (MCP_RELAY_MAX_FILE_BYTES)`);
-      if (stored.reason === "checksum_mismatch") return failed("it arrived damaged: its SHA-256 is not the one the upstream sent with it, so nothing was kept");
-      return failed("the transfer broke off, so nothing was kept");
+      if (stored.reason === "too_large") return await nothing(`it is larger than the relay's limit of ${transfer.maxFileBytes} bytes (MCP_RELAY_MAX_FILE_BYTES)`);
+      if (stored.reason === "checksum_mismatch") return await nothing("it arrived damaged: its SHA-256 is not the one the upstream sent with it, so nothing was kept");
+      if (stored.reason === "outside") return await nothing("it leads out of MCP_RELAY_OUTBOX on this machine");
+      return await nothing("the transfer broke off, so nothing was kept");
     }
     movedLine(transfer, "download", path, stored.size, stored.sha256);
     return { ok: true };
@@ -153,21 +158,23 @@ export const downloadFile = async (transfer: Transfer, path: string, signal: Abo
 };
 
 /**
- * A response with the files it links brought over. Every `resource_link` to a
+ * What to say about the files a response links that the relay cannot bring
+ * over, or undefined when there is nothing to say. Every `resource_link` to a
  * `file:` path below the outbox is fetched, once, before the response is
- * passed on; one that cannot be gets a line in a single text item added to the
- * result, so the client reads that the link does not lead to a file here. Links
- * to anywhere else, and every other message, come back as they were.
+ * passed on; one that cannot be gets a line in the note, which the caller adds
+ * to the result as one text item, so the client reads that the link does not
+ * lead to a file here. Links to anywhere else, and every other message, are
+ * left alone.
  */
-export const mirrorLinks = async (transfer: Transfer, message: unknown, signal: AbortSignal): Promise<unknown> => {
+export const noteOnLinks = async (transfer: Transfer, message: unknown, signal: AbortSignal): Promise<string | undefined> => {
   const { outbox } = transfer;
-  if (outbox === undefined) return message;
+  if (outbox === undefined) return undefined;
   const paths = [...new Set(linkUris(message).flatMap((uri) => outboxPathOf(uri, outbox) ?? []))];
   const notes: string[] = [];
   for (const path of paths) {
     const moved = await downloadFile(transfer, path, signal);
     if (!moved.ok) notes.push(`${path}: ${moved.reason}`);
   }
-  if (notes.length === 0) return message;
-  return withNote(message, `The relay could not bring ${notes.length === 1 ? "a file" : "some files"} the server saved to this machine, so ${notes.length === 1 ? "its link does" : "their links do"} not lead to a file here:\n${notes.join("\n")}`);
+  if (notes.length === 0) return undefined;
+  return `The relay could not bring ${notes.length === 1 ? "a file" : "some files"} the server saved to this machine, so ${notes.length === 1 ? "its link does" : "their links do"} not lead to a file here:\n${notes.join("\n")}`;
 };

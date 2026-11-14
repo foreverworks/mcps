@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { failedCall, inboxPathsIn, linkUris, messagesOf, namesBelow, outboxPathOf, stringsIn, toolCallArguments, withNote } from "../src/calls.js";
+import { failedCall, inboxPathsIn, linkUris, messagesOf, namesBelow, outboxPathOf, stringsIn, toolCallArguments } from "../src/calls.js";
 
 describe("the messages of a request", () => {
   it("are one, or the members of a batch", () => {
@@ -87,18 +87,15 @@ describe("the links of a response", () => {
       expect(outboxPathOf(other, outbox)).toBeUndefined();
     }
   });
-
-  it("get one text item added at the end, and no other message changes", () => {
-    const original = response([{ type: "text", text: "done" }]);
-    expect(withNote(original, "could not fetch a.txt")).toEqual(response([{ type: "text", text: "done" }, { type: "text", text: "could not fetch a.txt" }]));
-    expect(original.result.content).toHaveLength(1);
-    const notification = { method: "notifications/progress", params: {} };
-    expect(withNote(notification, "x")).toBe(notification);
-  });
 });
 
 describe("a call that was not made", () => {
   it("is answered by its id with a JSON-RPC error", () => {
-    expect(failedCall(3, "no")).toEqual({ jsonrpc: "2.0", id: 3, error: { code: -32000, message: "no" } });
+    expect(JSON.parse(failedCall("3", "no"))).toEqual({ jsonrpc: "2.0", id: 3, error: { code: -32000, message: "no" } });
+    expect(JSON.parse(failedCall('"s-1"', 'it said "no"\n'))).toEqual({ jsonrpc: "2.0", id: "s-1", error: { code: -32000, message: 'it said "no"\n' } });
+  });
+
+  it("is answered with the id as it was written, digit for digit", () => {
+    expect(failedCall("9007199254740993", "no")).toBe('{"jsonrpc":"2.0","id":9007199254740993,"error":{"code":-32000,"message":"no"}}');
   });
 });

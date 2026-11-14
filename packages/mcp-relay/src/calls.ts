@@ -75,8 +75,12 @@ export const outboxPathOf = (uri: string, outbox: string): string | undefined =>
   }
 };
 
-/** The response to `id` that says the call was not made, and why. */
-export const failedCall = (id: JsonRpcId, message: string): Json => ({ jsonrpc: "2.0", id, error: { code: -32000, message } });
+/**
+ * The response, as JSON text, that says the call with this id was not made and
+ * why. The id is the text it was written as (`json.ts`'s `idSourceOf`), so a
+ * big integer id is answered with the same digits.
+ */
+export const failedCall = (id: string, message: string): string => `{"jsonrpc":"2.0","id":${id},"error":{"code":-32000,"message":${JSON.stringify(message)}}}`;
 
 /** A tool result's content, if this message is a response that has any. */
 const contentOf = (message: unknown): unknown[] | undefined => {
@@ -89,10 +93,3 @@ const contentOf = (message: unknown): unknown[] | undefined => {
 /** The `uri` of every `resource_link` among a response's content items. */
 export const linkUris = (message: unknown): readonly string[] =>
   (contentOf(message) ?? []).flatMap((item) => (isObject(item) && item["type"] === "resource_link" && typeof item["uri"] === "string" ? [item["uri"]] : []));
-
-/** The response with one text item added at the end of its content; any other message unchanged. */
-export const withNote = (message: unknown, text: string): unknown => {
-  const content = contentOf(message);
-  if (content === undefined || !isObject(message)) return message;
-  return { ...message, result: { ...(message["result"] as Json), content: [...content, { type: "text", text }] } };
-};
