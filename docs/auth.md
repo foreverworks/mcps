@@ -28,7 +28,8 @@ Over stdio, the default, there is no authentication, as the specification
 asks; every caller is named `stdio`. Over HTTP (`MCP_HTTP_PORT` set,
 [`serve.ts`](../packages/mcp-kit/src/serve.ts)), a server serves one machine:
 
-- **Loopback, one route**: `127.0.0.1` only, `POST /mcp`, stateless (no
+- **Loopback, one route**: `127.0.0.1` only (or the address of
+  `MCP_HTTP_HOST`, for a server in a container), `POST /mcp`, stateless (no
   session id, a fresh server per request), for both protocol generations
   ([architecture.md](architecture.md#protocol-version)).
 - **A static bearer token per client**: `token-<client>` files in
@@ -38,7 +39,8 @@ asks; every caller is named `stdio`. Over HTTP (`MCP_HTTP_PORT` set,
   under 16 characters. Every token is compared in constant time, so timing
   does not reveal a near miss; a missing or wrong one gets a plain 401.
 - **Browsers kept out**: a `Host` other than `127.0.0.1:<port>` or
-  `localhost:<port>` gets 421 (DNS rebinding); the CORS preflight a page needs
+  `localhost:<port>` (or a name of `MCP_HTTP_ALLOWED_HOSTS`) gets 421 (DNS
+  rebinding); the CORS preflight a page needs
   to send `Authorization` gets a 401 without CORS headers.
 - **The token's client name is the identity** for the audit line, the rate
   limit (`MCP_HTTP_RATE`), the per-client ceiling (`MCP_CLIENT_MAX_ACCESS`),

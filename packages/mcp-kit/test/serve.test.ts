@@ -82,6 +82,58 @@ describe("listenFrom", () => {
   });
 });
 
+describe("listenFrom, where it binds", () => {
+  const tokens = { MCP_HTTP_PORT: "3000", MCP_HTTP_TOKEN_FILE: "/t" };
+
+  it("binds nothing of its own and allows no extra Host while neither variable is set", () => {
+    const listen = listenFrom(tokens);
+    expect(listen).not.toHaveProperty("host");
+    expect(listen).not.toHaveProperty("allowedHosts");
+    const empty = listenFrom({ ...tokens, MCP_HTTP_HOST: " ", MCP_HTTP_ALLOWED_HOSTS: "" });
+    expect(empty).toEqual(listen);
+    expect(empty).not.toHaveProperty("host");
+  });
+
+  it("carries the address to bind and the Host names to answer, with tokens", () => {
+    expect(listenFrom({ ...tokens, MCP_HTTP_HOST: "0.0.0.0", MCP_HTTP_ALLOWED_HOSTS: "mcp.internal, svc.example.org:8080" })).toEqual({
+      kind: "http",
+      port: 3000,
+      tokens: { kind: "file", file: "/t", client: "default" },
+      host: "0.0.0.0",
+      allowedHosts: [
+        { name: "mcp.internal", port: undefined },
+        { name: "svc.example.org", port: 8080 },
+      ],
+    });
+  });
+
+  it("refuses an address other than a loopback one without the allowed hosts, naming the variable to set", () => {
+    for (const host of ["0.0.0.0", "::", "192.0.2.10"]) {
+      expect(() => listenFrom({ ...tokens, MCP_HTTP_HOST: host })).toThrow(/MCP_HTTP_HOST "[^"]+" is not a loopback address.*set MCP_HTTP_ALLOWED_HOSTS/);
+    }
+    expect(() => listenFrom({ ...tokens, MCP_HTTP_HOST: "0.0.0.0", MCP_HTTP_ALLOWED_HOSTS: " " })).toThrow(/set MCP_HTTP_ALLOWED_HOSTS/);
+  });
+
+  it("lets a loopback address do without them, and the allowed hosts stand alone on the default one", () => {
+    for (const host of ["127.0.0.1", "127.0.0.2", "::1", "localhost"]) expect(listenFrom({ ...tokens, MCP_HTTP_HOST: host })).toMatchObject({ kind: "http", host });
+    expect(listenFrom({ ...tokens, MCP_HTTP_ALLOWED_HOSTS: "localhost" })).not.toHaveProperty("host");
+  });
+
+  it("takes the public hosts as the names to answer, and the allowed hosts beside them", () => {
+    const publicEnv = { MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_HOST: "0.0.0.0" };
+    expect(listenFrom(publicEnv)).toMatchObject({ kind: "public", host: "0.0.0.0" });
+    expect(listenFrom({ ...publicEnv, MCP_HTTP_ALLOWED_HOSTS: "mcp.internal" })).toMatchObject({ kind: "public", allowedHosts: [{ name: "mcp.internal" }] });
+  });
+
+  it("refuses an address that is not one, a bad host list, and either variable without a port", () => {
+    expect(() => listenFrom({ ...tokens, MCP_HTTP_HOST: "mcp.internal" })).toThrow(/is not an IP address/);
+    expect(() => listenFrom({ ...tokens, MCP_HTTP_ALLOWED_HOSTS: "https://mcp.internal" })).toThrow(/MCP_HTTP_ALLOWED_HOSTS entry/);
+    expect(() => listenFrom({ MCP_HTTP_HOST: "0.0.0.0" })).toThrow(/MCP_HTTP_HOST is set without MCP_HTTP_PORT/);
+    expect(() => listenFrom({ MCP_HTTP_ALLOWED_HOSTS: "mcp.internal" })).toThrow(/MCP_HTTP_ALLOWED_HOSTS is set without MCP_HTTP_PORT/);
+    expect(listenFrom({ MCP_HTTP_HOST: "", MCP_HTTP_ALLOWED_HOSTS: " " })).toEqual({ kind: "stdio" });
+  });
+});
+
 describe("tokens", () => {
   it("reads token-<client> files and ignores the other credentials beside them", async () => {
     const dir = await mkdtemp(join(tmpdir(), "mcp-kit-tokens-"));
@@ -217,6 +269,124 @@ describe("serve over http", () => {
     const authorization = `Bearer ${token}`;
     expect((await fetch(new URL("/other", url), { method: "POST", headers: { authorization } })).status).toBe(404);
     expect((await fetch(url, { method: "GET", headers: { authorization } })).status).toBe(405);
+  });
+});
+
+/** A POST to `url` with these headers, as its status: the Host header is the one thing node's fetch will not let a test choose. */
+const statusOf = (url: URL, headers: Record<string, string>): Promise<number> =>
+  new Promise((resolve, reject) => {
+    const req = request(url, { method: "POST", headers: { "content-type": "application/json", accept: "application/json, text/event-stream", ...headers } }, (res) => {
+      res.resume();
+      resolve(res.statusCode ?? 0);
+    });
+    req.on("error", reject);
+    req.end(JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} }));
+  });
+
+describe("serve over http, with the defaults", () => {
+  const token = "test-token-default-0123456789";
+  let served: Served;
+  let url: URL;
+
+  beforeAll(async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-kit-serve-default-"));
+    const tokenFile = join(dir, "token");
+    await writeFile(tokenFile, `${token}\n`);
+    served = await serve({
+      name: "plain",
+      version: "0.0.0",
+      register: (server: McpServer): void => {
+        server.registerTool("ping", { description: "answers pong", inputSchema: {} }, async () => ({ content: [{ type: "text" as const, text: "pong" }] }));
+      },
+      policy: { ping: { access: "read" } },
+      env: { MCP_HTTP_PORT: "0", MCP_HTTP_TOKEN_FILE: tokenFile },
+      log: () => undefined,
+    });
+    url = new URL(`http://127.0.0.1:${served.port}${MCP_PATH}`);
+  });
+
+  afterAll(() => served.close());
+
+  it("binds 127.0.0.1 and answers the two loopback Host names of its port and no other", async () => {
+    expect(served.address).toBe("127.0.0.1");
+    const authorization = `Bearer ${token}`;
+    expect(await statusOf(url, { authorization, host: `127.0.0.1:${served.port}` })).toBe(200);
+    expect(await statusOf(url, { authorization, host: `localhost:${served.port}` })).toBe(200);
+    for (const host of ["localhost", "127.0.0.1", `127.0.0.1:${served.port! + 1}`, "mcp.internal", `mcp.internal:${served.port}`, "[::1]"]) {
+      expect(await statusOf(url, { authorization, host })).toBe(421);
+    }
+  });
+});
+
+describe("serve over http, bound for a network", () => {
+  const token = "test-token-network-0123456789";
+  const other = "other-token-network-0123456789";
+  const audit: string[] = [];
+  let served: Served;
+  let url: URL;
+  const startup: string[] = [];
+
+  beforeAll(async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-kit-serve-network-"));
+    await writeFile(join(dir, `token-alice`), `${token}\n`);
+    const lines = (...args: unknown[]): void => void startup.push(args.join(" "));
+    const original = console.error;
+    console.error = lines;
+    try {
+      served = await serve({
+        name: "boxed",
+        version: "0.0.0",
+        register: (server: McpServer): void => {
+          server.registerTool("ping", { description: "answers pong", inputSchema: {} }, async () => ({ content: [{ type: "text" as const, text: "pong" }] }));
+        },
+        policy: { ping: { access: "read" } },
+        env: { MCP_HTTP_PORT: "0", MCP_HTTP_HOST: "0.0.0.0", MCP_HTTP_ALLOWED_HOSTS: "mcp.internal, Svc.Example.org:8080", MCP_HTTP_TOKENS_DIR: dir },
+        log: (line) => audit.push(line),
+      });
+    } finally {
+      console.error = original;
+    }
+    url = new URL(`http://127.0.0.1:${served.port}${MCP_PATH}`);
+  });
+
+  afterAll(() => served.close());
+
+  const authorization = `Bearer ${token}`;
+
+  it("binds the address it was given, and says so with the Host names it answers", () => {
+    expect(served.address).toBe("0.0.0.0");
+    expect(startup.join("\n")).toContain(`boxed: listening on http://0.0.0.0:${served.port}${MCP_PATH} for alice, and Host mcp.internal, svc.example.org:8080;`);
+  });
+
+  it("answers an allowed Host, with or without its port, in any case", async () => {
+    expect(await statusOf(url, { authorization, host: "mcp.internal" })).toBe(200);
+    expect(await statusOf(url, { authorization, host: `mcp.internal:${served.port}` })).toBe(200);
+    expect(await statusOf(url, { authorization, host: "MCP.Internal:9999" })).toBe(200);
+    expect(await statusOf(url, { authorization, host: "svc.example.org:8080" })).toBe(200);
+    expect(await statusOf(url, { authorization, host: "SVC.EXAMPLE.ORG:8080" })).toBe(200);
+  });
+
+  it("still answers the loopback Host names of its port", async () => {
+    expect(await statusOf(url, { authorization, host: `127.0.0.1:${served.port}` })).toBe(200);
+    expect(await statusOf(url, { authorization, host: `localhost:${served.port}` })).toBe(200);
+  });
+
+  it("refuses with a 421 a Host that is not listed, or whose port is not the listed one", async () => {
+    for (const host of ["evil.example", "mcp.internal.evil.example", "svc.example.org", "svc.example.org:9090", `localhost:${served.port! + 1}`, "localhost"]) {
+      expect(await statusOf(url, { authorization, host })).toBe(421);
+    }
+  });
+
+  it("still requires the token, on an allowed Host too, and tells the clients apart", async () => {
+    expect(await statusOf(url, { host: "mcp.internal" })).toBe(401);
+    expect(await statusOf(url, { authorization: `Bearer ${other}`, host: "mcp.internal" })).toBe(401);
+    expect(await statusOf(url, { authorization: "Basic abc", host: "mcp.internal" })).toBe(401);
+    const client = testClient("test-client");
+    await client.connect(new StreamableHTTPClientTransport(url, { requestInit: { headers: { authorization } } }));
+    expect((await client.listTools()).tools.map((t) => t.name)).toEqual(["ping"]);
+    expect(await client.callTool({ name: "ping", arguments: {} })).toMatchObject({ content: [{ type: "text" as const, text: "pong" }] });
+    await client.close();
+    expect(JSON.parse(audit[0]!.replace(/^audit /, ""))).toMatchObject({ svc: "boxed", tool: "ping", client: "alice", outcome: "ok" });
   });
 });
 

@@ -65,11 +65,12 @@ export {
   type Listen,
   type Served,
   type ServeOptions,
+  type Where,
   type ClientTokenFiles,
   type ClientTokens,
 } from "./serve.js";
 export type { Product } from "./serve/icons.js";
-export { PUBLIC_CLIENT, type PublicHost } from "./serve/public.js";
+export { PUBLIC_CLIENT, type AllowedHost, type PublicHost } from "./serve/public.js";
 export { idempotentWrites, isIdempotent, mergePolicies, needsPerson, summaryFrom, unclassified, type Access, type Confirmation, type ConfirmedRule, type ToolArgs, type ToolPolicy, type ToolRule } from "./policy.js";
 export { ALL_TOOLSETS, toolsetPolicy, toolsetsFrom, type Toolsets } from "./toolsets.js";
 export { ACCESS_META, annotationsFor, auditText, guard, registeredNames, REQUIRES_USER_META, requestContext, type AuditLine, type GuardOptions, type ServerVocabulary } from "./serve/guard.js";

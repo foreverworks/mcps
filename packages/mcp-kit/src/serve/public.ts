@@ -25,10 +25,13 @@ export const PUBLIC_CLIENT = "public";
 /** A host name the proxy forwards, and the port clients reach it on (443 unless listed with another). */
 export type PublicHost = { readonly name: string; readonly port: number };
 
+/** A host name MCP_HTTP_ALLOWED_HOSTS lists: any port when it names none, else that port as the request's Host header writes it. */
+export type AllowedHost = { readonly name: string; readonly port: number | undefined };
+
 const HTTPS_PORT = 443;
 
 /** A DNS name: dot-separated labels of letters, digits and inner hyphens, at most 63 characters each. */
-const HOST_NAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
+export const HOST_NAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)*$/;
 
 /**
  * A host as written in a Host header or the list: its name in lower case
@@ -36,7 +39,7 @@ const HOST_NAME = /^(?=.{1,253}$)[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-
  * literal in brackets, which no listed name matches, and for a port that is
  * not one.
  */
-const hostPort = (text: string): { readonly name: string; readonly port: number | undefined } | undefined => {
+export const hostPort = (text: string): { readonly name: string; readonly port: number | undefined } | undefined => {
   const value = text.trim().toLowerCase();
   if (value.startsWith("[")) return undefined;
   const colon = value.lastIndexOf(":");
@@ -70,14 +73,24 @@ export const publicHostsFrom = (raw: string): readonly PublicHost[] => {
 /**
  * Whether a request's Host header is one this server answers: the loopback
  * ones for its own port (a health check on the machine, or a proxy that sends
- * its upstream's address), and on a public server each listed name, with or
- * without its port. Anything else was not meant for this server, and on
+ * its upstream's address), on a public server each listed name, with or
+ * without its port, and on any server each of MCP_HTTP_ALLOWED_HOSTS
+ * (serve/bind.ts). Anything else was not meant for this server, and on
  * loopback it is how a DNS-rebinding page shows itself.
  */
-export const hostAccepted = (header: string | undefined, bound: number, publicHosts: readonly PublicHost[]): boolean => {
+export const hostAccepted = (
+  header: string | undefined,
+  bound: number,
+  publicHosts: readonly PublicHost[],
+  allowedHosts: readonly AllowedHost[] = [],
+): boolean => {
   if (header === `127.0.0.1:${bound}` || header === `localhost:${bound}`) return true;
   const asked = hostPort(header ?? "");
-  return asked !== undefined && publicHosts.some((host) => host.name === asked.name && host.port === (asked.port ?? HTTPS_PORT));
+  if (asked === undefined) return false;
+  return (
+    publicHosts.some((host) => host.name === asked.name && host.port === (asked.port ?? HTTPS_PORT)) ||
+    allowedHosts.some((host) => host.name === asked.name && (host.port === undefined || host.port === asked.port))
+  );
 };
 
 /** MCP_HTTP_CLIENT_IP_HEADER: a header name, in lower case as Node keys request headers. */

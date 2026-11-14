@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import { DEFAULT_SETTINGS } from "../src/serve/confirm.js";
+import { allowedHostsFrom } from "../src/serve/bind.js";
 import { beyondRead, callerKey, checkPublic, clientIpHeaderFrom, hostAccepted, publicHostsFrom } from "../src/serve/public.js";
 import type { ToolPolicy } from "../src/policy.js";
 
@@ -44,6 +45,39 @@ describe("hostAccepted", () => {
     expect(hostAccepted("evil.example", 3000, hosts)).toBe(false);
     expect(hostAccepted("rates.example.com.evil.example", 3000, hosts)).toBe(false);
     expect(hostAccepted("[2001:db8::1]:443", 3000, hosts)).toBe(false);
+  });
+});
+
+describe("hostAccepted, with allowed hosts", () => {
+  const allowed = allowedHostsFrom("mcp.internal,Svc.Example.org:8080");
+
+  it("takes an allowed name on any port, or none, and one with a port on that port only", () => {
+    expect(hostAccepted("mcp.internal", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("mcp.internal:3000", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("MCP.Internal:49152", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("mcp.internal.", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("svc.example.org:8080", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("SVC.example.org:8080", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("svc.example.org:9090", 3000, [], allowed)).toBe(false);
+    expect(hostAccepted("svc.example.org", 3000, [], allowed)).toBe(false);
+  });
+
+  it("still takes the loopback hosts of the bound port, and refuses every name not listed", () => {
+    expect(hostAccepted("127.0.0.1:3000", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("localhost:3000", 3000, [], allowed)).toBe(true);
+    expect(hostAccepted("localhost:3001", 3000, [], allowed)).toBe(false);
+    expect(hostAccepted("evil.example", 3000, [], allowed)).toBe(false);
+    expect(hostAccepted("mcp.internal.evil.example", 3000, [], allowed)).toBe(false);
+    expect(hostAccepted("evil.example.mcp.internal", 3000, [], allowed)).toBe(false);
+    expect(hostAccepted("[2001:db8::1]:8080", 3000, [], allowed)).toBe(false);
+    expect(hostAccepted(undefined, 3000, [], allowed)).toBe(false);
+  });
+
+  it("adds to a public server's names without replacing them", () => {
+    const hosts = publicHostsFrom("rates.example.com");
+    expect(hostAccepted("rates.example.com", 3000, hosts, allowed)).toBe(true);
+    expect(hostAccepted("mcp.internal:80", 3000, hosts, allowed)).toBe(true);
+    expect(hostAccepted("mcp.internal:80", 3000, hosts)).toBe(false);
   });
 });
 

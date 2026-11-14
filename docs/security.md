@@ -188,7 +188,9 @@ the path does.
 
 ## The network
 
-- **HTTP listens on loopback only** (`127.0.0.1`), on one route, `POST /mcp`.
+- **HTTP listens on loopback only** (`127.0.0.1`), on one route, `POST /mcp`,
+  unless `MCP_HTTP_HOST` binds another address for a server in a container,
+  and then `MCP_HTTP_ALLOWED_HOSTS` must name the hosts it answers.
 - **Every request carries a bearer token**, one per client
   (`MCP_HTTP_TOKENS_DIR/token-<client>`), compared in constant time against
   every token, so the time taken does not say which was nearly right. The
@@ -196,8 +198,8 @@ the path does.
   ceiling count. A server with an HTTP port and no token refuses to start.
 - **A web page cannot call it.** A browser cannot send `Authorization` without
   a CORS preflight, which gets a 401 with no CORS headers. A `Host` other than
-  `127.0.0.1:<port>` or `localhost:<port>` gets a 421, which stops DNS
-  rebinding.
+  `127.0.0.1:<port>` or `localhost:<port>` (and the names in
+  `MCP_HTTP_ALLOWED_HOSTS`, when set) gets a 421, which stops DNS rebinding.
 - **Limits**: body size, request time, and a per-client rate
   ([configuration.md](configuration.md#limits-http)).
 - **Egress**: `MCP_EGRESS_ALLOW` narrows outbound fetches to the server's

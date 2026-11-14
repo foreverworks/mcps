@@ -67,7 +67,9 @@ their icons. `servers/oblio` is a complete example.
 ## What it gives
 
 - **Serving.** `serve` speaks stdio, or Streamable HTTP on `127.0.0.1` when
-  `MCP_HTTP_PORT` is set, with a bearer token and a rate limit per client and
+  `MCP_HTTP_PORT` is set (on another address with `MCP_HTTP_HOST`, for a
+  server in a container, which then lists the `Host` names it answers in
+  `MCP_HTTP_ALLOWED_HOSTS`), with a bearer token and a rate limit per client and
   limits on a request's size and time. A server whose tools only read public
   data can instead be open to anyone behind a reverse proxy
   (`MCP_HTTP_PUBLIC_HOSTS`), with a rate limit per caller's address. Protocols 2025-11-25 and 2026-07-28 are

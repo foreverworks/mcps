@@ -13,7 +13,8 @@ import { installEgress, installKeepAlive } from "./serve/egress.js";
 import { guard, registeredNames, requestContext, type ServerVocabulary } from "./serve/guard.js";
 import { toolIconsOf, type Product } from "./serve/icons.js";
 import { admit, egressFrom, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
-import { callerKey, checkPublic, clientIpHeaderFrom, hostAccepted, PUBLIC_CLIENT, publicHostsFrom, type PublicHost } from "./serve/public.js";
+import { allowedHostsFrom, allowedHostText, bindHostFrom, isLoopbackAddress, LOOPBACK_ADDRESS, urlHost } from "./serve/bind.js";
+import { type AllowedHost, callerKey, checkPublic, clientIpHeaderFrom, hostAccepted, PUBLIC_CLIENT, publicHostsFrom, type PublicHost } from "./serve/public.js";
 import { shareClientRoots, shareRootsOf } from "./clientRoots.js";
 import { unclassified, type ToolPolicy } from "./policy.js";
 
@@ -36,11 +37,18 @@ export type ClientTokenFiles =
   | { readonly kind: "dir"; readonly dir: string }
   | { readonly kind: "file"; readonly file: string; readonly client: string };
 
+/**
+ * Where an HTTP listener binds and which Host names it answers besides the
+ * loopback ones, from MCP_HTTP_HOST and MCP_HTTP_ALLOWED_HOSTS. A key is absent
+ * when its variable is unset: 127.0.0.1, and the loopback Host names only.
+ */
+export type Where = { readonly host?: string; readonly allowedHosts?: readonly AllowedHost[] };
+
 export type Listen =
   | { readonly kind: "stdio" }
-  | { readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles }
+  | ({ readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles } & Where)
   /** Anyone may call, with no sign-in, through a proxy that forwards these hosts; callers told apart by `clientIpHeader`, else the connection. */
-  | { readonly kind: "public"; readonly port: number; readonly hosts: readonly PublicHost[]; readonly clientIpHeader?: string };
+  | ({ readonly kind: "public"; readonly port: number; readonly hosts: readonly PublicHost[]; readonly clientIpHeader?: string } & Where);
 
 /**
  * The transport, read from the environment: MCP_HTTP_PORT switches to HTTP, and
@@ -54,6 +62,13 @@ export type Listen =
  * contradiction, and so are public hosts and file roots: with no sign-in,
  * anyone could read the files there through a tool that takes a path.
  *
+ * The listener binds 127.0.0.1 and answers the loopback Host names only, until
+ * MCP_HTTP_HOST names another address to bind and MCP_HTTP_ALLOWED_HOSTS the
+ * Host names clients reach it by (serve/bind.ts), for a server in a container.
+ * An address other than a loopback one needs the allowed hosts (or the public
+ * hosts): the Host check is what stops a DNS-rebinding page, and with the
+ * listener open to a network it must name who the listener is for.
+ *
  * A plain throw, not a tagged failure: this is a process that must not start.
  */
 export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
@@ -61,12 +76,16 @@ export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
   const publicHosts = env["MCP_HTTP_PUBLIC_HOSTS"]?.trim();
   if (!port) {
     if (publicHosts) throw new Error("MCP_HTTP_PUBLIC_HOSTS is set without MCP_HTTP_PORT: there is no HTTP listener to make public");
+    for (const name of ["MCP_HTTP_HOST", "MCP_HTTP_ALLOWED_HOSTS"]) {
+      if (env[name]?.trim()) throw new Error(`${name} is set without MCP_HTTP_PORT: there is no HTTP listener for it to configure`);
+    }
     return { kind: "stdio" };
   }
   const parsed = Number(port);
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
     throw new Error(`MCP_HTTP_PORT "${port}" is not a port`);
   }
+  const where = whereFrom(env, Boolean(publicHosts));
   const ipHeader = env["MCP_HTTP_CLIENT_IP_HEADER"]?.trim();
   const tokenSettings = ["MCP_HTTP_TOKENS_DIR", "MCP_HTTP_TOKEN_FILE"].filter((name) => env[name]?.trim());
   if (publicHosts) {
@@ -76,17 +95,36 @@ export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
     if (env["MCP_FILE_ROOTS"]?.trim()) {
       throw new Error("MCP_HTTP_PUBLIC_HOSTS and MCP_FILE_ROOTS are both set: with no sign-in, anyone could read the files there through a tool that takes a path");
     }
-    return { kind: "public", port: parsed, hosts: publicHostsFrom(publicHosts), ...(ipHeader ? { clientIpHeader: clientIpHeaderFrom(ipHeader) } : {}) };
+    return { kind: "public", port: parsed, hosts: publicHostsFrom(publicHosts), ...(ipHeader ? { clientIpHeader: clientIpHeaderFrom(ipHeader) } : {}), ...where };
   }
   if (ipHeader) throw new Error("MCP_HTTP_CLIENT_IP_HEADER is set without MCP_HTTP_PUBLIC_HOSTS: a caller with a token is told apart by its token");
   const dir = env["MCP_HTTP_TOKENS_DIR"]?.trim();
-  if (dir) return { kind: "http", port: parsed, tokens: { kind: "dir", dir } };
+  if (dir) return { kind: "http", port: parsed, tokens: { kind: "dir", dir }, ...where };
   const file = env["MCP_HTTP_TOKEN_FILE"]?.trim();
-  if (file) return { kind: "http", port: parsed, tokens: { kind: "file", file, client: env["MCP_HTTP_TOKEN_CLIENT"]?.trim() || "default" } };
+  if (file) return { kind: "http", port: parsed, tokens: { kind: "file", file, client: env["MCP_HTTP_TOKEN_CLIENT"]?.trim() || "default" }, ...where };
   throw new Error(
     "MCP_HTTP_PORT is set without MCP_HTTP_TOKENS_DIR or MCP_HTTP_TOKEN_FILE: the server would answer anyone on this machine " +
       "(MCP_HTTP_PUBLIC_HOSTS serves one whose tools only read, to anyone, on purpose)",
   );
+};
+
+/**
+ * MCP_HTTP_HOST and MCP_HTTP_ALLOWED_HOSTS. A bind address that is not a
+ * loopback one is refused without the Host names clients reach it by, unless
+ * the server is public, where the proxy's host names do that.
+ */
+const whereFrom = (env: NodeJS.ProcessEnv, isPublic: boolean): Where => {
+  const hostSetting = env["MCP_HTTP_HOST"]?.trim();
+  const allowedSetting = env["MCP_HTTP_ALLOWED_HOSTS"]?.trim();
+  const host = hostSetting ? bindHostFrom(hostSetting) : undefined;
+  const allowedHosts = allowedSetting ? allowedHostsFrom(allowedSetting) : undefined;
+  if (host !== undefined && !isLoopbackAddress(host) && allowedHosts === undefined && !isPublic) {
+    throw new Error(
+      `MCP_HTTP_HOST "${host}" is not a loopback address, so the listener can be reached from other machines, and without MCP_HTTP_ALLOWED_HOSTS it answers only ` +
+        "the loopback Host names: set MCP_HTTP_ALLOWED_HOSTS to the names clients reach it by (a Host of any other name is how a DNS-rebinding page shows itself)",
+    );
+  }
+  return { ...(host === undefined ? {} : { host }), ...(allowedHosts === undefined ? {} : { allowedHosts }) };
 };
 
 /** client label -> token */
@@ -167,7 +205,7 @@ export type ServeOptions = {
 export type Served = {
   /** The bound port over HTTP, which is the only way to learn it when asked for port 0. */
   readonly port?: number;
-  /** The address bound over HTTP: always the loopback one, which a test holds it to. */
+  /** The address bound over HTTP: the loopback one, 127.0.0.1, unless MCP_HTTP_HOST names another, which a test holds it to. */
   readonly address?: string;
   readonly close: () => Promise<void>;
 };
@@ -348,8 +386,10 @@ const publicDoor = (hosts: readonly PublicHost[], clientIpHeader: string | undef
  * responses, or a stream for a call that asks for progress (asksProgress).
  * Kept so because plain clients (a script with curl) read one JSON answer.
  */
-const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits): Promise<Served> => {
+const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits, where: Where): Promise<Served> => {
   const { options } = runtime;
+  const bindAddress = where.host ?? LOOPBACK_ADDRESS;
+  const allowedHosts = where.allowedHosts ?? [];
   const buckets = new Map<string, Bucket>();
   const state = { bound: 0 };
   const onerror = (error: Error): void => console.error(`${options.name}: request failed:`, error);
@@ -361,7 +401,7 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
     if (caller === undefined) return reply(res, 401, "unauthorized");
     const { client } = caller;
     // A DNS-rebinding page cannot present a token anyway; this refuses a stray Host too, and on a public server it is the only check.
-    if (!hostAccepted(req.headers.host, state.bound, door.publicHosts)) return reply(res, 421, "wrong host");
+    if (!hostAccepted(req.headers.host, state.bound, door.publicHosts, allowedHosts)) return reply(res, 421, "wrong host");
     if (new URL(req.url ?? "/", "http://localhost").pathname !== MCP_PATH) return reply(res, 404, "not found");
     // Also a CORS preflight, answered with no CORS headers: ChatGPT and Claude call from their servers, never from a page.
     if (req.method !== "POST") return reply(res, 405, "stateless server: POST only");
@@ -404,12 +444,13 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
   http.headersTimeout = 10_000;
   await new Promise<void>((resolve, reject) => {
     http.once("error", reject);
-    http.listen(port, "127.0.0.1", resolve);
+    http.listen(port, bindAddress, resolve);
   });
   const bound = (http.address() as AddressInfo).port;
   state.bound = bound;
   // stderr, never stdout: the rule every server here keeps, whatever the transport.
-  console.error(`${options.name}: listening on http://127.0.0.1:${bound}${MCP_PATH} ${door.describe}; ${describeSettings(runtime.settings)}`);
+  const alsoHosts = allowedHosts.length === 0 ? "" : `, and Host ${allowedHosts.map(allowedHostText).join(", ")}`;
+  console.error(`${options.name}: listening on http://${urlHost(bindAddress)}:${bound}${MCP_PATH} ${door.describe}${alsoHosts}; ${describeSettings(runtime.settings)}`);
   return {
     port: bound,
     address: (http.address() as AddressInfo).address,
@@ -439,8 +480,8 @@ export const serve = async (options: ServeOptions): Promise<Served> => {
     case "stdio":
       return serveStdio(runtime);
     case "http":
-      return serveHttp(runtime, listen.port, tokenDoor(await loadTokens(listen.tokens)), limitsFrom(env));
+      return serveHttp(runtime, listen.port, tokenDoor(await loadTokens(listen.tokens)), limitsFrom(env), listen);
     case "public":
-      return serveHttp(runtime, listen.port, publicDoor(listen.hosts, listen.clientIpHeader), limitsFrom(env));
+      return serveHttp(runtime, listen.port, publicDoor(listen.hosts, listen.clientIpHeader), limitsFrom(env), listen);
   }
 };

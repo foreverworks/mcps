@@ -41,7 +41,9 @@ Read by `@foreverworks/mcp-kit`, so by every server.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MCP_HTTP_PORT` | unset: stdio | Serve Streamable HTTP on `127.0.0.1:<port>/mcp` instead of stdio. `0` picks a free port, which the startup line on stderr names. |
+| `MCP_HTTP_PORT` | unset: stdio | Serve Streamable HTTP on `127.0.0.1:<port>/mcp` instead of stdio (or on `MCP_HTTP_HOST`). `0` picks a free port, which the startup line on stderr names. |
+| `MCP_HTTP_HOST` | `127.0.0.1` | The address the HTTP listener binds: an IP address (`0.0.0.0` for every IPv4 interface, `::` for every interface, or one interface's address) or `localhost`, not a name to resolve. For a server in a container, reached over a private network on a published port; [below](#a-server-in-a-container). Any address but a loopback one (`127.x.x.x`, `::1`, `localhost`) needs `MCP_HTTP_ALLOWED_HOSTS` (or `MCP_HTTP_PUBLIC_HOSTS`), or the server refuses to start. |
+| `MCP_HTTP_ALLOWED_HOSTS` | | The `Host` header values the server answers besides `127.0.0.1:<port>` and `localhost:<port>`, separated by commas: `name` for that name on any port (or none), `name:port` for that port only, as the client writes it. A DNS name or an IPv4 address, compared without regard to case. It works with bearer tokens: the Host check stays, and a request still needs its token. Any other `Host` gets a 421. |
 | `MCP_HTTP_TOKENS_DIR` | | A directory of `token-<client>` files, one bearer token per client; other files in it are ignored. The client's name is what the audit line, the rate limit and `MCP_CLIENT_MAX_ACCESS` count. An empty file is a client this deployment does not have. |
 | `MCP_HTTP_TOKEN_FILE` | | One token file, for one client, when there is no directory. |
 | `MCP_HTTP_TOKEN_CLIENT` | `default` | The client name for `MCP_HTTP_TOKEN_FILE`. |
@@ -55,6 +57,40 @@ browser on the machine; it also refuses a token shorter than 16 characters,
 and a directory whose token files are all empty. Tokens are read once, at
 startup, so a new or changed one takes a restart. [auth.md](auth.md) has what
 else is possible and planned.
+
+#### A server in a container
+
+A server in a container listens on the container's own network, so
+`127.0.0.1` inside it is out of reach of the published port. Bind every
+interface and name the `Host` values clients reach it by:
+
+```bash
+docker run --rm -e MCP_SERVER=bnr -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
+  -e MCP_HTTP_ALLOWED_HOSTS=mcp.internal,localhost -e MCP_HTTP_TOKENS_DIR=/run/tokens \
+  -v "$PWD/tokens:/run/tokens:ro" -p 127.0.0.1:8080:8080 ghcr.io/foreverworks/mcps:main
+```
+
+[Deploying](deploying.md#in-a-container) has the image and the rest.
+
+- **The tokens stay.** `MCP_HTTP_ALLOWED_HOSTS` is not the public mode: a
+  request without a bearer token gets a 401 on an allowed `Host` too, and the
+  tokens are the ones of `MCP_HTTP_TOKENS_DIR` or `MCP_HTTP_TOKEN_FILE`.
+- **The `Host` check is what you configure.** It stops a web page that a
+  DNS-rebinding trick points at your server's address: such a page arrives
+  with its own name in `Host`. So a bind address that is not a loopback one
+  is refused unless you also list the names your clients use. Publish the
+  container's port on the interface your clients reach, and no wider: with
+  Docker, `-p 192.0.2.10:8080:8080`, or `-p 127.0.0.1:8080:8080` for this
+  machine only.
+- **A port in the name is exact.** `mcp.internal` accepts that name on any
+  port, or none; `mcp.internal:8080` accepts it on port 8080 only. A client
+  that reaches the server through a published port other than
+  `MCP_HTTP_PORT` sends that port in `Host`, so list the name without one.
+- **Unset, nothing changes.** Without both variables the server binds
+  `127.0.0.1` and answers its two loopback names, as before.
+- **Setting either without `MCP_HTTP_PORT` stops the start**, as a public
+  host does: there is no HTTP listener to configure. The startup line names
+  the address bound and the extra names answered.
 
 #### A public server, with no sign-in
 
@@ -74,7 +110,8 @@ MCP_HTTP_CLIENT_IP_HEADER=cf-connecting-ip npx -y @foreverworks/mcp-bnr
   tools stay listed, say they are disabled, and refuse every call. Read is
   not the same as public, though: a read tool over a mailbox reads that
   mailbox to anyone. Make public only a server whose data already is.
-- **It still listens on `127.0.0.1` only.** The proxy owns TLS, the firewall
+- **It still listens on `127.0.0.1`** (unless `MCP_HTTP_HOST` says otherwise,
+  for a proxy in another container). The proxy owns TLS, the firewall
   and anything static the address needs (a privacy page, files under
   `/.well-known/`). It forwards `POST /mcp` with the public `Host` it was
   reached at, or the loopback one; any other `Host` gets a 421.
