@@ -76,11 +76,11 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@bitwarden/cli": "2026.10.0",
+    "@bitwarden/cli": "2026.10.1",
     "@foreverworks/mcp-kit": "^0.2.0",
     "zod": "^4.6.7"
   },
   "devDependencies": {
-    "@simplewebauthn/server": "^14.0.3"
+    "@simplewebauthn/server": "^14.1.0"
   }
 }
