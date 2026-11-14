@@ -149,7 +149,6 @@ Every change keeps these; a feature that would give one up is rejected.
 | Paging `tools/list` | Nobody | No client needs it at 115 tools, the most any server here lists |
 | Tool tiers that hide tools | `workspace-mcp` ([tool_tiers.yaml](https://github.com/taylorwilsdon/google_workspace_mcp/blob/484f64b/core/tool_tiers.yaml)) | The access ceiling (`MCP_MAX_ACCESS`) already narrows a deployment; hiding by tier makes a tool's absence ambiguous |
 | OAuth as a resource server | GitHub, Sentry | Needed only off loopback; [auth.md](auth.md) plans it for that case |
-| Container images | GitHub, Playwright, Stripe | Worth it once packages are public; the systemd sandbox in [deploying.md](deploying.md) is the documented deployment |
 | Webhooks in Oblio (Porkbun's are kept as the vendor offers them) | an earlier Oblio server | An inbound endpoint on a loopback-only server |
 | Oblio delivery notes, e-Factura through Oblio | valentinludu's server ([mcpServer.ts](https://github.com/valentinludu/oblio-mcp/blob/4aaf4b6/src/mcpServer.ts)) | Delivery notes on demand only; e-Factura has its own server here, one source of truth |
 | Payments from a bank account | Algiras's server | It moves money; out of scope for a read-only bank feed |

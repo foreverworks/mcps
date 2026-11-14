@@ -123,7 +123,7 @@ never published: build them from source as above.
 - [Configuration](docs/configuration.md): the variables every server shares,
   and the conventions for the rest.
 - [Deploying](docs/deploying.md): client configuration, the HTTP transport,
-  and running a server as a systemd service.
+  and running a server as a systemd service or in a container.
 - [Security](docs/security.md): the threat model, the guard every call passes,
   money and confirmation, files in and out.
 - [Authentication](docs/auth.md): how clients, servers and the services behind

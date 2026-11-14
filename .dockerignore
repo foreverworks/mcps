@@ -1,0 +1,22 @@
+# What the image build does not need from the tree, or must never take.
+.git
+.github
+.changeset
+**/node_modules
+**/dist
+**/*.tsbuildinfo
+.built
+/bundles
+/_site
+*.log
+
+# Credentials never live in this tree (.gitignore); a build context must not carry one by chance.
+.env*
+**/*credentials*.json
+**/*client_secret*
+**/*.pem
+**/*.key
+
+# The build's own files.
+Dockerfile
+.dockerignore

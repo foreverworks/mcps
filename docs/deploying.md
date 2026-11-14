@@ -1,8 +1,8 @@
 # Deploying
 
 How to run these servers: started by your client, for you alone (stdio), or
-as one copy that several clients share (HTTP), under systemd when it runs
-every day. A server's own settings are in its README; the ones every server
+as one copy that several clients share (HTTP), under systemd or in a container
+when it runs every day. A server's own settings are in its README; the ones every server
 shares are in [configuration.md](configuration.md).
 
 ## Build
@@ -268,6 +268,76 @@ Two things the sandbox blocks until you allow them:
   (`<SERVER>_OUTBOX_DIR`) needs a `ReadWritePaths=` line, a group the service
   and the clients share, and `UMask=0027` so its files are readable by that
   group. Grants and token caches keep mode 0600 either way.
+
+## In a container
+
+One image holds every server, built once; a container runs one of them. Each
+push to `main` that passes the checks publishes it as
+`ghcr.io/foreverworks/mcps`, tagged with the commit (`:<full sha>`, what a
+deployment should pin) and `:main` (the latest). To build it yourself, from a
+checkout: `docker build -t mcps .`
+
+A container is reached over a network, not on the machine's own loopback, so
+the server binds every interface and lists the `Host` names its clients use
+([the two variables](configuration.md#a-server-in-a-container)), and it still
+wants its tokens:
+
+```bash
+mkdir tokens && openssl rand -base64 32 > tokens/token-alice
+sudo chown -R 10001:10001 tokens && chmod 0400 tokens/token-alice
+docker run --rm --name bnr \
+  -e MCP_SERVER=bnr -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
+  -e MCP_HTTP_ALLOWED_HOSTS=localhost,bnr.internal \
+  -e MCP_HTTP_TOKENS_DIR=/run/tokens -v "$PWD/tokens:/run/tokens:ro" \
+  -p 127.0.0.1:8080:8080 ghcr.io/foreverworks/mcps:main
+```
+
+```
+bnr: listening on http://0.0.0.0:8080/mcp for alice, and Host localhost, bnr.internal; every tool enabled; ...
+```
+
+- **`MCP_SERVER` chooses the server**, or the first argument does
+  (`docker run <image> bnr`). Anything else after the name goes to the server
+  (`--health`). A name that is not a server lists the ones there are.
+- **Publish the port where the clients are, and nowhere wider**:
+  `-p 127.0.0.1:8080:8080` for this machine, or an interface's address for a
+  private network. The container does not set `MCP_HTTP_HOST` for you: what it
+  should bind and answer to is the deployment's to say, and it would stop the
+  image running over stdio (`docker run -i <image> bnr`).
+- **Credentials and tokens are files you mount**, read-only, and variables you
+  pass: nothing is baked in. The process runs as the user `mcp`, id `10001`
+  (group `10001`), so a token or credential file must be readable by it: give
+  it the file, as above, rather than everyone.
+- **State** (token caches, grants a server was given) goes to
+  `/var/lib/mcp/mcps/<server>`, which `mcp` owns: mount a volume at
+  `/var/lib/mcp` to keep it across containers, or set `<SERVER>_STATE_DIR`.
+  A bind-mounted folder must belong to `10001:10001`.
+- **The code is read-only to the process** (the image's files belong to root),
+  so `--read-only` works with a `--tmpfs /tmp` and the state volume.
+- **`docker stop` is immediate**: the process ends on SIGTERM, status 143, as
+  it would outside a container.
+- **Every server's tools list with no credentials**, so `tools/list` is a quick
+  check that a container is up and its token works.
+
+### What a server needs besides Node
+
+The image holds Node and the servers' npm packages, nothing else. Most
+servers need nothing more; these start a program that is not in the image:
+
+| Server | Program | For |
+|---|---|---|
+| `printer` | `pdfinfo`, `pdftoppm` (Debian: `poppler-utils`) | printing a PDF |
+| `rag` | `pdftotext` (`poppler-utils`), `ocrmypdf`, `tesseract` and the language packs you use, `pandoc` | reading PDFs, scans, images and documents; it also needs a PostgreSQL with pgvector and its embedding endpoints |
+| `anaf-spv` | `java`, 8 or newer (`ANAF_SPV_JAVA`); and the command `ANAF_SPV_MAIL_MCP_COMMAND` names, if it is set | validating and filing declarations with ANAF's DUKIntegrator; reading a sign-in code through a mail server it starts over stdio |
+| `devices` | `ssh` (`openssh-client`); the program of a host's control command, for a host with no ssh target | reaching the machines it leases devices on (it speaks adb's protocol itself, and needs no `adb` binary) |
+| `google` | `gcloud` and a browser opener | its interactive `setup` command only, which runs on a person's computer, not in a container |
+
+`bitwarden` runs the Bitwarden command-line client, which is one of its npm
+dependencies and runs on the image's own Node. To add a program, build
+`FROM` the image with one line: `RUN apt-get update && apt-get install -y
+--no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*`, run as
+root (`USER root`), then `USER 10001:10001` again. The Dockerfile ends with
+where a stage for one server belongs in it, to build with `--target`.
 
 ## Checking it
 
