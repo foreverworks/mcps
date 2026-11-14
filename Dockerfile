@@ -7,6 +7,8 @@
 #     -v ./tokens:/run/tokens:ro -p 127.0.0.1:8080:8080 mcps
 #
 # docs/deploying.md, "In a container", has the rest: tokens, credentials, state.
+# MCP_SERVER=relay runs the relay (packages/mcp-relay), which is not a server: it
+# stands in, on a client's machine, for one that runs on another.
 
 # The base image: Node 22 (package.json asks for >=22.19) on Debian 13, pinned by
 # the digest of its multi-platform index, so a build never moves under you.

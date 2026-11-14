@@ -339,6 +339,47 @@ dependencies and runs on the image's own Node. To add a program, build
 root (`USER root`), then `USER 10001:10001` again. The Dockerfile ends with
 where a stage for one server belongs in it, to build with `--target`.
 
+## A server on another machine
+
+When a server runs in a container on another host, its clients no longer share
+its disk, and the tools that save a file into its outbox folder or read a file
+you copied into its inbox folder stop working: the folders are on the wrong
+machine. Two small parts of this repository fix that without changing the
+server or how a client uses it:
+
+- **File endpoints in the server's HTTP listener**, off unless you set
+  `MCP_HTTP_FILES_OUTBOX` (clients may read files below it) or
+  `MCP_HTTP_FILES_INBOX` (clients may write files below it). Same tokens and
+  `Host` check as the one route; paths confined to the folder
+  ([configuration](configuration.md#files-to-and-from-another-machine)).
+- **A relay**, [`mcp-relay`](../packages/mcp-relay), which runs on the clients'
+  machine, listens on a local port like the server does, and sends what it is
+  asked on to the server. Before a tool call it uploads the inbox files the
+  call's arguments name; before a result that links a file in the outbox
+  reaches the client, it fetches the file. Your client keeps its address, its
+  token, its folders and the paths in its calls.
+
+```bash
+# on the server's machine: the server, with both directions switched on
+docker run -d -e MCP_SERVER=notion -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
+  -e MCP_HTTP_ALLOWED_HOSTS=mcp.example.com -e MCP_HTTP_TOKENS_DIR=/run/tokens \
+  -e MCP_FILE_ROOTS=/srv/mcp/inbox -e NOTION_OUTBOX_DIR=/srv/mcp/outbox \
+  -e MCP_HTTP_FILES_INBOX=/srv/mcp/inbox -e MCP_HTTP_FILES_OUTBOX=/srv/mcp/outbox \
+  -v "$PWD/tokens:/run/tokens:ro" -v mcp-files:/srv/mcp \
+  -p 127.0.0.1:8080:8080 ghcr.io/foreverworks/mcps:main
+
+# on the client's machine: the relay, in front of it
+MCP_HTTP_PORT=8750 MCP_HTTP_TOKEN_FILE=relay-client-token \
+MCP_RELAY_UPSTREAM=https://mcp.example.com MCP_RELAY_UPSTREAM_TOKEN_FILE=upstream-token \
+MCP_RELAY_INBOX=/srv/mcp/inbox MCP_RELAY_OUTBOX=/srv/mcp/outbox \
+node packages/mcp-relay/dist/index.js     # or the image, with MCP_SERVER=relay
+```
+
+The relay's two folders must be at the same absolute paths as the server's,
+because the server's tools name their files with their own paths and the relay
+uses those names as they are. The relay's README has the whole setup, what goes
+wrong and what a client then sees.
+
 ## Checking it
 
 - **The startup line** (stderr, or the journal) names the address, the clients

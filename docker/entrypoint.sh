@@ -5,18 +5,26 @@
 # everywhere else. Whatever follows the name goes to the server, and so does
 # everything when the first argument starts with `-` (`--health`).
 #
+# `relay` is the one name that is not a server: the relay (packages/mcp-relay)
+# that stands in, on a client's machine, for a server that runs on another.
+#
 #   docker run --env MCP_SERVER=bnr <image>
 #   docker run <image> bnr
+#   docker run --env MCP_SERVER=relay <image>
 #
 # exit-on-signal.mjs makes `docker stop` end the server at once; see there.
 set -eu
 
 apps=/app/servers
+relay=/app/packages/mcp-relay
 
 available() {
-  for dir in "$apps"/*/; do
-    [ -f "${dir}dist/index.js" ] && basename "$dir"
-  done | tr '\n' ' '
+  {
+    for dir in "$apps"/*/; do
+      [ -f "${dir}dist/index.js" ] && basename "$dir"
+    done
+    [ -f "$relay/dist/index.js" ] && echo relay
+  } | tr '\n' ' '
 }
 
 case "${1:-}" in
@@ -32,16 +40,28 @@ if [ -z "$name" ]; then
   exit 64
 fi
 
-# A name is a folder of servers/ and nothing else: no path, no dot.
+# A name is a folder of servers/ (or the relay) and nothing else: no path, no dot.
 found=
+dir=
 case "$name" in
   *[!a-z0-9-]* | -*) ;;
-  *) if [ -f "$apps/$name/dist/index.js" ]; then found=yes; fi ;;
+  relay)
+    if [ -f "$relay/dist/index.js" ]; then
+      found=yes
+      dir="$relay"
+    fi
+    ;;
+  *)
+    if [ -f "$apps/$name/dist/index.js" ]; then
+      found=yes
+      dir="$apps/$name"
+    fi
+    ;;
 esac
 if [ -z "$found" ]; then
   echo "No server named \"$name\". Available: $(available)" >&2
   exit 64
 fi
 
-cd "$apps/$name"
+cd "$dir"
 exec node --import /usr/local/lib/mcp/exit-on-signal.mjs dist/index.js "$@"

@@ -1,0 +1,50 @@
+{
+  "name": "@foreverworks/mcp-relay",
+  "version": "0.1.0",
+  "private": true,
+  "description": "A relay for an MCP server that runs on another machine: a local address and token for its clients, and the files its tools take from an inbox folder or hand back to an outbox folder, carried with each call",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "relay",
+    "proxy",
+    "files"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://github.com/foreverworks/mcps/tree/main/packages/mcp-relay#readme",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "packages/mcp-relay"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-relay": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.2.0"
+  },
+  "devDependencies": {
+    "zod": "^4.6.7"
+  }
+}

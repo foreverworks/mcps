@@ -80,6 +80,7 @@ be identical for an API none of these servers talk to.
 | `dates.ts`, `identifiers.ts`, `csv.ts`, `compact.ts` | Calendar dates without a zone; check digits of Romanian CIF and CNP codes and of IBANs; CSV that is safe to open in a spreadsheet; objects without their `undefined` fields. |
 | `inputFile.ts`, `clientRoots.ts` | Files a tool takes as input, byte-exact: by path inside the server's roots, or as base64 with its SHA-256 ([security.md](security.md#files-going-in)). |
 | `outbox.ts`, `handedBack.ts` | Files a tool hands back (`saveToOutbox`), and the `resource_link` its result carries for each. |
+| `serve/files.ts`, `serve/filesServe.ts`, `fileStream.ts` | The file endpoints of the HTTP listener, for a server on another machine than its clients (off unless asked for): the settings and the one rule that turns a URL into a path inside a folder, the `GET` and `PUT` handlers, and the streamed, hashed, atomic write they and the relay share ([security.md](security.md#files-to-and-from-another-machine)). |
 | `files.ts`, `jsonFile.ts` | Files written whole or not at all, with their mode set before the rename; JSON state read and changed under a lock. |
 | `env.ts`, `secret.ts`, `configFile.ts`, `once.ts`, `issues.ts` | Locations, the state directory and the time zone from the environment; secrets and `app.json` read without ever quoting them; configuration loaded on first use. |
 | `verdict.ts` | The shell modes' contract: one line per check and an exit code (0 OK, 1 a person must act, 2 transient). |
@@ -87,6 +88,17 @@ be identical for an API none of these servers talk to.
 | `mcp.ts` | The MCP SDK as the servers see it: `McpServer`, `Client` and the transports, from the one module that names the SDK's packages. |
 | `smoke.ts` | The clients that drive a server: `connectSmoke` for smoke scripts (stdio, or a running server with `MCP_URL`), and `connectInMemory`, `testClient`, `elicitingClient` and `confirmingClient` for tests. |
 | `readonly.ts` | Types for wire data as it really arrives (read-only, an optional field possibly `null`) and for a tool's declared output. |
+
+### The relay (`packages/mcp-relay`)
+
+A program, not a library: it listens on the client's machine as a server does
+(the kit's token, `Host` and limit checks), sends `/mcp` on to a server that
+runs elsewhere, and moves the files that server's tools take and hand back
+through the file endpoints above. `forward.ts` carries a request and its
+answer (a stream stays a stream), `transfer.ts` moves one file in either
+direction, `calls.ts` and `sse.ts` are the pure parts that read a JSON-RPC
+message and cut an event stream, and `upstream.ts` is its one place that talks
+to the network. Its README is the guide for a person running one.
 
 ### The networking stack
 

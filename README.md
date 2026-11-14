@@ -65,6 +65,7 @@ These run from a clone of this repository and are not published to npm, the MCP 
 | Package | What it is |
 |---|---|
 | [mcp-kit](packages/mcp-kit) | Stdio and HTTP transports with per-client tokens, a guard that classifies, audits and can confirm every tool call, an HTTP and OAuth stack, exact decimals, and byte-exact file inputs |
+| [mcp-relay](packages/mcp-relay)<br><sub>Not published: only extras use it</sub> | A local address and token for its clients, and the files its tools take from an inbox folder or hand back to an outbox folder, carried with each call |
 | [receipts](packages/receipts)<br><sub>Not published: only extras use it</sub> | Itemised receipts, the join from a bank card charge to the order it paid, item search and CSV exports |
 <!-- servers:end -->
 
@@ -123,7 +124,8 @@ never published: build them from source as above.
 - [Configuration](docs/configuration.md): the variables every server shares,
   and the conventions for the rest.
 - [Deploying](docs/deploying.md): client configuration, the HTTP transport,
-  and running a server as a systemd service or in a container.
+  and running a server as a systemd service, in a container, or on another
+  machine with its files (the [relay](packages/mcp-relay)).
 - [Security](docs/security.md): the threat model, the guard every call passes,
   money and confirmation, files in and out.
 - [Authentication](docs/auth.md): how clients, servers and the services behind
