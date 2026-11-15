@@ -465,6 +465,63 @@
     }
   },
   {
+    "name": "similar",
+    "title": "Find similar documents",
+    "description": "Finds the documents in a collection that say most nearly the same thing as one of its documents, best first, each with a score (1 for the same text, and the same from either document's side), how much of each is found again in the other (forward and backward), and the closest pair of passages, which expand can read. Use it to find duplicates and near-duplicates to merge, related documents, or a document's closest neighbours before you write a new one. A document of more than 64 chunks, the named one or a result, is compared by 64 spread evenly through it, and the reply says which (sampled).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "collection": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 63,
+          "description": "A collection's name, as list_collections shows it."
+        },
+        "source": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The document to compare the others with: its source exactly as list_sources and search show it."
+        },
+        "limit": {
+          "default": 10,
+          "description": "Documents returned.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        },
+        "min_score": {
+          "default": 0,
+          "description": "Leave out documents scoring below this. The default 0 keeps every candidate except the rare one with a negative score.",
+          "type": "number",
+          "minimum": 0,
+          "maximum": 1
+        },
+        "candidates": {
+          "default": 10,
+          "description": "How many nearest chunks each compared chunk contributes when finding candidate documents; more finds more documents, and costs time.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 50
+        }
+      },
+      "required": [
+        "collection",
+        "source"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": false
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
     "name": "snapshot_collections",
     "title": "Freeze collections for comparison",
     "description": "Copy collections, documents and stored vectors in one database snapshot, without re-embedding or sending text elsewhere. Destinations must not exist. Copies are frozen and excluded from default searches; name them explicitly in search. Useful for comparing retrieval settings on an identical corpus while indexing continues. drop_collection removes a snapshot.",

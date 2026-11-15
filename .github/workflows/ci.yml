@@ -16,9 +16,23 @@ permissions:
 
 jobs:
   check:
-    # GitHub-hosted. The job needs node and npm only: no docker, no secret.
+    # GitHub-hosted. The job needs node and npm, and a throwaway Postgres with
+    # pgvector (pinned to the version the SQL was tested on) for the one test that
+    # runs the rag server's SQL; no secret.
     runs-on: ubuntu-latest
     timeout-minutes: 15
+    services:
+      postgres:
+        image: pgvector/pgvector:0.8.7-pg17
+        env:
+          POSTGRES_PASSWORD: test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
     strategy:
       fail-fast: false
       matrix:
@@ -36,8 +50,12 @@ jobs:
           cache: npm
       - run: npm ci
       # typecheck, then tests, then build, across every workspace, then the
-      # checks that hold the docs and the packages to the code.
+      # checks that hold the docs and the packages to the code. The rag
+      # server's store test (servers/rag/test/store.pg.test.ts) runs against
+      # the service above: it makes a database of its own there and drops it.
       - run: npm run check
+        env:
+          RAG_TEST_DATABASE_URL: postgresql://postgres:test@127.0.0.1:5432/postgres
       # Every tool whose access class changed since the last release is told
       # in a changeset or the changelog (.changeset/README.md). Needs git, so
       # it is not part of npm run check.

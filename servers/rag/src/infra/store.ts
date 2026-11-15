@@ -2,8 +2,9 @@ import { createHash } from "node:crypto";
 import type pg from "pg";
 
 import type { ChunkToStore, CollectionInfo, CollectionRow, DocumentRow, Hit, SaveResult, SearchScope, Store, StoredChunk } from "../app/ports.js";
-import { fail } from "../domain/errors.js";
+import { asAppError, fail } from "../domain/errors.js";
 import type { ProbeResult } from "../domain/provider.js";
+import type { ChunkRef } from "../domain/similar.js";
 import type { Pool } from "./database.js";
 
 /**
@@ -176,10 +177,132 @@ type ChunkSql = { collection: string; source: string; id: string; ordinal: numbe
 /** How long the full-text half of a search may take before it is left out. */
 const MATCH_TIMEOUT_MS = 5000;
 
+/**
+ * How long `similar` may run before it is cancelled (SQLSTATE 57014). Its 64 probes use the collection's
+ * HNSW index; a collection without a valid one, or a call that finds thousands of documents, would hold one
+ * of the pool's four connections for minutes and stall `search` behind it.
+ */
+const SIMILAR_TIMEOUT_MS = 15_000;
+
 /** New chunks per INSERT: one statement for a whole long document would carry hundreds of MB of vectors as one parameter. */
 const INSERT_BATCH = 256;
 
-export const makeStore = (pool: () => Promise<Pool>): Store => {
+/**
+ * Settings for the nearest-neighbour queries of the transaction they run in. A source filter applied after
+ * an HNSW scan can leave fewer rows than asked; pgvector 0.8's iterative scan keeps reading the index until
+ * the limit is met.
+ */
+const tuneHnsw = async (client: pg.PoolClient): Promise<void> => {
+  await query(client, "SET LOCAL hnsw.ef_search = 100");
+  await query(client, "SET LOCAL hnsw.iterative_scan = relaxed_order");
+};
+
+/** The SQL condition for "this chunk is one of the compared ones" (domain/similar.ts, samplePositions) given its position and its document's chunk count. */
+const sampled = (position: string, count: string): string =>
+  `${count} <= $4::int OR EXISTS (SELECT 1 FROM generate_series(0, $4::int - 1) AS k WHERE (2 * k * (${count} - 1) + $4::int - 1) / (2 * ($4::int - 1)) = ${position})`;
+
+/** A copy of a stored vector that lives in the row itself: see `similar` below for why. */
+const flat = (column: string): string => `subvector(${column}, 1, vector_dims(${column}))`;
+
+/**
+ * `similar`, in one statement, for the parameters: $1 collection, $2 source, $3 how many nearest chunks each
+ * compared chunk contributes, $4 the most chunks of a document that are compared (domain/similar.ts holds
+ * the rules this follows; a document of more chunks is sampled by the integer arithmetic samplePositions
+ * uses).
+ *
+ * `found` is a LATERAL join, one HNSW probe per compared chunk of the source against the collection's own
+ * partial index (`collection = $1` is what lets the planner use it), outside the source's own chunks; each
+ * document it finds gets a small integer, `doc`. `ranked` numbers the chunks of those documents by position
+ * without carrying their vectors through the window's sort, and `kept` fetches the vectors of the compared
+ * ones only. `pairs` holds every cosine once, as narrow rows (doc, position of the source's chunk, position
+ * of the document's chunk, cosine), and everything else is read from it: forward and backward are means of
+ * maxima, and the best pair is found by comparing the cosine with each source chunk's maximum, so that no
+ * sort of all the pairs is needed; only each document's best pair is joined back to the chunks it names.
+ * A cosine pgvector cannot compute (a zero vector gives NaN) counts as 0, as it does in memory. The last
+ * SELECT always returns a row, so the source's own size comes back even when no document was found.
+ *
+ * Measured on 70,000 chunks of 1,024 dimensions (1,000 documents of 70 chunks, a source of 70): 22 s at 10
+ * candidates and 55 s at 50 for a first version, which carried the chunk ids and locations in every pair
+ * row, sorted all the pairs, and fetched each stored vector from its TOAST table for every cosine (10
+ * million buffer reads for 1.35 million pairs). Vectors of 1,024 floats are stored out of line, so `kept`
+ * and `compared` hold flat copies (`subvector` over the whole vector), `kept` drives the cross join and
+ * `compared` is its small inner side (`OFFSET 0` keeps the planner from flattening that back). Now 2.7 s and
+ * 5.3 s.
+ */
+export const SIMILAR_SQL = `
+WITH own AS (
+  SELECT id, location, ${flat("embedding")} AS embedding, row_number() OVER (ORDER BY ordinal, id) - 1 AS pos, count(*) OVER () AS n
+  FROM rag_chunk WHERE collection = $1 AND source = $2
+), compared AS (
+  SELECT id, location, embedding, pos FROM own WHERE ${sampled("pos", "n")}
+), found AS (
+  SELECT source, row_number() OVER (ORDER BY source) AS doc
+  FROM (
+    SELECT DISTINCT near.source
+    FROM compared s
+    CROSS JOIN LATERAL (
+      SELECT c.source FROM rag_chunk c
+      WHERE c.collection = $1 AND c.source <> $2
+      ORDER BY c.embedding <=> s.embedding LIMIT $3::int
+    ) AS near
+  ) AS d
+), ranked AS (
+  SELECT f.doc, c.id, row_number() OVER (PARTITION BY f.doc ORDER BY c.ordinal, c.id) - 1 AS pos, count(*) OVER (PARTITION BY f.doc) AS n
+  FROM found f JOIN rag_chunk c ON c.collection = $1 AND c.source = f.source
+), kept AS MATERIALIZED (
+  SELECT r.doc, r.pos, ${flat("c.embedding")} AS embedding
+  FROM ranked r JOIN rag_chunk c ON c.collection = $1 AND c.id = r.id
+  WHERE ${sampled("r.pos", "r.n")}
+), pairs AS MATERIALIZED (
+  SELECT k.doc, x.spos, k.pos AS kpos, x.cos
+  FROM kept k
+  CROSS JOIN LATERAL (SELECT s.pos AS spos, coalesce(1 - nullif(s.embedding <=> k.embedding, 'NaN'::float8), 0) AS cos FROM compared s OFFSET 0) AS x
+), perchunk AS (
+  SELECT doc, spos, max(cos) AS top FROM pairs GROUP BY doc, spos
+), forward AS (
+  SELECT doc, avg(top) AS value FROM perchunk GROUP BY doc
+), backward AS (
+  SELECT doc, avg(top) AS value FROM (SELECT doc, kpos, max(cos) AS top FROM pairs GROUP BY doc, kpos) AS x GROUP BY doc
+), best_chunk AS (
+  SELECT DISTINCT ON (doc) doc, spos, top FROM perchunk ORDER BY doc, top DESC, spos
+), best AS (
+  SELECT b.doc, b.spos, min(p.kpos) AS kpos, b.top AS cos
+  FROM best_chunk b JOIN pairs p ON p.doc = b.doc AND p.spos = b.spos AND p.cos = b.top
+  GROUP BY b.doc, b.spos, b.top
+), documents AS (
+  SELECT doc, max(n) AS chunks FROM ranked GROUP BY doc
+)
+SELECT (SELECT coalesce(max(n), 0) FROM own) AS chunks, (SELECT count(*) FROM compared) AS compared,
+       f.source, d.chunks AS document_chunks, fw.value AS forward, bw.value AS backward, t.cos,
+       bs.id AS sid, bs.location AS sloc, ck.id AS cid, ck.location AS cloc
+FROM (SELECT 1) AS one
+LEFT JOIN found f ON true
+LEFT JOIN documents d ON d.doc = f.doc
+LEFT JOIN forward fw ON fw.doc = f.doc
+LEFT JOIN backward bw ON bw.doc = f.doc
+LEFT JOIN best t ON t.doc = f.doc
+LEFT JOIN compared bs ON bs.pos = t.spos
+LEFT JOIN ranked rk ON rk.doc = t.doc AND rk.pos = t.kpos
+LEFT JOIN rag_chunk ck ON ck.collection = $1 AND ck.id = rk.id`;
+
+type SimilarSql = {
+  chunks: string;
+  compared: string;
+  source: string | null;
+  document_chunks: string | null;
+  forward: number | null;
+  backward: number | null;
+  cos: number | null;
+  sid: string | null;
+  sloc: string | null;
+  cid: string | null;
+  cloc: string | null;
+};
+
+const chunkRef = (id: string | null, location: string | null): ChunkRef => ({ id: id ?? "", location: location ?? "" });
+
+export const makeStore = (pool: () => Promise<Pool>, tuning: { readonly similarTimeoutMs?: number } = {}): Store => {
+  const similarTimeoutMs = tuning.similarTimeoutMs ?? SIMILAR_TIMEOUT_MS;
   let ensured: number | undefined;
   let upgraded = false;
   const tablesExist = async (db: Pool): Promise<boolean> => (await query<{ t: string | null }>(db, "SELECT to_regclass('rag_collection')::text AS t")).rows[0]?.t != null;
@@ -414,10 +537,7 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
 
     nearest: async (scope, embedding, limit) =>
       inTransaction(await pool(), async (client) => {
-        // A source filter applied after an HNSW scan can leave fewer rows than asked;
-        // pgvector 0.8's iterative scan keeps reading the index until the limit is met.
-        await query(client, "SET LOCAL hnsw.ef_search = 100");
-        await query(client, "SET LOCAL hnsw.iterative_scan = relaxed_order");
+        await tuneHnsw(client);
         // One collection per query, so the planner proves its partial index applies; their cosines compare, as one model embedded them all.
         const hits: Hit[] = [];
         for (const collection of scope.collections) {
@@ -433,6 +553,41 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
         // relaxed_order may return neighbours slightly out of order: sort them again.
         return hits.sort((a, b) => b.value - a.value).slice(0, limit);
       }),
+
+    similar: async (scope) => {
+      try {
+        return await inTransaction(await pool(), async (client) => {
+          await tuneHnsw(client);
+          await query(client, `SET LOCAL statement_timeout = ${Math.trunc(similarTimeoutMs)}`);
+          const r = await query<SimilarSql>(client, SIMILAR_SQL, [scope.collection, scope.source, scope.candidates, scope.sample]);
+          return {
+            chunks: Number(r.rows[0]?.chunks ?? 0),
+            compared: Number(r.rows[0]?.compared ?? 0),
+            documents: r.rows.flatMap((x) =>
+              x.source === null
+                ? []
+                : [
+                    {
+                      source: x.source,
+                      chunks: Number(x.document_chunks),
+                      forward: Number(x.forward),
+                      backward: Number(x.backward),
+                      best: { value: Number(x.cos), chunk: chunkRef(x.cid, x.cloc), sourceChunk: chunkRef(x.sid, x.sloc) },
+                    },
+                  ],
+            ),
+          };
+        });
+      } catch (thrown) {
+        const e = asAppError(thrown);
+        if (e?.kind !== "database" || e.code !== "57014") throw thrown;
+        return fail({
+          kind: "database",
+          code: "57014",
+          message: `finding similar documents ran past its ${similarTimeoutMs / 1000} s limit and was cancelled; call again with a smaller candidates (health lists any collection without a vector index of its own, which makes it far slower)`,
+        });
+      }
+    },
 
     matching: async (scope: SearchScope, text, limit) =>
       inTransaction(await pool(), async (client) => {

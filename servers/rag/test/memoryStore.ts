@@ -4,6 +4,7 @@
  * cosine by brute force and "any word" full-text matching by set overlap.
  */
 import type { ChunkToStore, CollectionRow, DocumentRow, SaveResult, Store, StoredChunk } from "../src/app/ports.js";
+import { compare, samplePositions, type Compared } from "../src/domain/similar.js";
 
 type Doc = Omit<DocumentRow, "chunks">;
 type Row = StoredChunk & { readonly embedding: readonly number[] };
@@ -138,6 +139,39 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
         .map((r) => ({ collection: r.collection, id: r.id, value: cosine(r.embedding, embedding) }))
         .sort((a, b) => b.value - a.value)
         .slice(0, limit),
+    similar: async ({ collection, source, candidates, sample }) => {
+      // The same rules as the SQL (domain/similar.ts), by brute force: chunks in reading order, a long document sampled by position.
+      const inOrder = (name: string) =>
+        chunks.filter((r) => r.collection === collection && r.source === name).sort((a, b) => a.ordinal - b.ordinal || (a.id < b.id ? -1 : 1));
+      const own = inOrder(source);
+      const compared = samplePositions(own.length, sample).map((i) => own[i] as Row);
+      const outside = chunks.filter((r) => r.collection === collection && r.source !== source);
+      const found = new Set<string>();
+      for (const c of compared) {
+        outside
+          .map((r) => ({ source: r.source, value: cosine(r.embedding, c.embedding) }))
+          .sort((a, b) => b.value - a.value)
+          .slice(0, candidates)
+          .forEach((hit) => found.add(hit.source));
+      }
+      const documents = [...found].flatMap((name): Compared[] => {
+        const all = inOrder(name);
+        const kept = samplePositions(all.length, sample).map((i) => all[i] as Row);
+        const result = compare(compared.map((c) => kept.map((k) => cosine(c.embedding, k.embedding))));
+        const top = result === undefined ? undefined : { chunk: kept[result.best.column] as Row, sourceChunk: compared[result.best.row] as Row };
+        if (result === undefined || top === undefined) return [];
+        return [
+          {
+            source: name,
+            chunks: all.length,
+            forward: result.forward,
+            backward: result.backward,
+            best: { value: result.best.value, chunk: { id: top.chunk.id, location: top.chunk.location }, sourceChunk: { id: top.sourceChunk.id, location: top.sourceChunk.location } },
+          },
+        ];
+      });
+      return { chunks: own.length, compared: compared.length, documents };
+    },
     matching: async (scope, text, limit) => {
       const q = words(text);
       return chunks

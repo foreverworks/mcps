@@ -51,7 +51,9 @@ export const remedyFor = (error: AppError): string => {
     case "not_found":
       return "list_collections and list_sources say what exists";
     case "database":
-      return "call health; if the database is reachable, the message is Postgres's own and names what it refused";
+      return error.code === "57014"
+        ? "call again with a smaller candidates; if it is slow for every call, health lists any collection without a vector index of its own"
+        : "call health; if the database is reachable, the message is Postgres's own and names what it refused";
     case "model":
       return `call health: it says whether the ${error.endpoint} endpoint answers and which model it serves`;
     case "provider":

@@ -4,7 +4,9 @@ Let your AI assistant search your own documents and quote what they say:
 contracts, scanned letters, manuals, notes. It indexes files into a Postgres
 database with pgvector, finds the passages that answer a question (in any
 language the models read, worded differently from the text), and hands them
-back with the file and page or heading they came from. Embeddings and
+back with the file and page or heading they came from. It also finds the
+documents that say nearly the same thing as one you name, so duplicates can be
+merged and related notes found. Embeddings and
 reranking run on servers you host, so documents and questions stay on your
 machine. For a corpus too large to embed on a CPU, a collection can be
 indexed at Cloudflare Workers AI instead, which runs the same model; its
@@ -25,6 +27,10 @@ languages you need, and `pandoc`.
 - "Search the board minutes for every decision about the office move, and read
   me the paragraphs around the first one."
 - "Index notes/ again; only the files I changed this week should be read."
+- "Which notes in my notes collection say nearly the same thing as
+  notes/pricing.md? List the ones I could merge, with how alike they are."
+- "Before I write a new page on onboarding, show me the documents already
+  closest to the old onboarding guide."
 - "Remove the drafts folder from the index."
 - "Make a collection for the court archive indexed at Cloudflare, index it,
   and tell me what it cost."
@@ -221,6 +227,7 @@ each call (see Confirmation in [docs/security.md](../../docs/security.md)).
 | `list_sources` | read | The indexed files of a collection, with sha256, size, pages and chunks. |
 | `search` | read | Hybrid search (vectors and full text, fused by reciprocal rank) reranked, optionally over several phrasings of the question merged; passages with source, location and scores. |
 | `expand` | read | The chunks around a search result, in order. |
+| `similar` | read | The documents of a collection that say most nearly the same thing as one you name: a score (1 for identical text), how much of each is found in the other, and the closest pair of passages. For duplicates to merge, related documents, or a document's neighbours before you write a new one. |
 | `read_document` | read | A document's indexed text, chunk by chunk with locations, a page of it at a time. |
 
 ### Confirmation
@@ -274,6 +281,29 @@ it".
   documents a translation. Words the question lacks (a synonym, the documents'
   language) reach the full-text half that way, and the cost is one more
   embedding and two queries per phrasing, not more reranking.
+- **Similar documents** (`similar`) compare vectors that are already stored, so
+  no model is called. Each chunk of the document you name (64 spread evenly
+  through it, the first and the last included, when it has more) looks up its
+  `candidates` (10) nearest chunks outside the document, through the
+  collection's own HNSW index, and the documents holding those chunks are the
+  candidates. Each candidate is then scored exactly, in the same SQL statement,
+  so no vector leaves the database. `forward` is the mean, over the named
+  document's chunks, of the highest cosine to any chunk of the candidate: how
+  much of the document the candidate says again. `backward` is the same the
+  other way round: how much of the candidate the document says. `score` is
+  their mean, so identical documents score 1 and a pair scores the same
+  whichever one you start from. Being a mean of cosine similarities it is
+  near 0 for unrelated documents and can in principle fall below 0, which the
+  default `min_score` of 0 leaves out. A short note found inside a long report
+  scores high one way and low the other, which is why both halves are shown.
+  `best` is the single closest pair of chunks, each with its id and location
+  for `expand`. A candidate of more than 64 chunks is sampled the same way, and
+  its entry says so (`sampled`), as the reply does for the named document.
+  Results are ordered by the score shown (four decimals), then by source. A
+  call that runs past 15 seconds, as one would if the collection had no vector
+  index of its own, is cancelled with an error that suggests a smaller
+  `candidates`, so it holds a database connection that `search` needs for no
+  more than 15 seconds.
 
 Measured on one 16-vCPU AMD EPYC server with no GPU, 8 cores per model,
 `bge-m3` and `bge-reranker-v2-m3` as ONNX: 1.4 chunks of 512 tokens embedded per
@@ -343,6 +373,13 @@ Name them explicitly in `search.collections`; remove them with `drop_collection`
   optional query inference. Its reranker differs from the local one; evaluate
   it on your language and corpus before choosing it.
 - **No scheduling.** Nothing watches the folders; call `index_path` again.
+- **`similar` compares a sample of a long document.** One of more than 64 chunks
+  is compared by 64 spread evenly through it, so a change confined to the
+  chunks between them goes unseen; `sampled`, on the reply for the document you
+  name and on each result, says when this happened. It finds
+  candidates through each chunk's nearest chunks only, so a document that
+  matches a source only weakly, or whose matches are crowded out by many copies,
+  may need a larger `candidates`.
 
 ## Other servers for local RAG
 

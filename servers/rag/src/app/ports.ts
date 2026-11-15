@@ -7,6 +7,7 @@ import type { InputFiles } from "@foreverworks/mcp-kit";
 import type { Chunk, Section } from "../domain/chunk.js";
 import type { Kind } from "../domain/kinds.js";
 import type { Provider, ProbeResult, RemoteProvider, Usage } from "../domain/provider.js";
+import type { Compared } from "../domain/similar.js";
 
 /** What a model endpoint says it serves. */
 export type ModelInfo = { readonly model: string; readonly revision?: string | undefined };
@@ -175,6 +176,25 @@ export type Hit = { readonly collection: string; readonly id: string; readonly v
 
 export type SearchScope = { readonly collections: readonly string[]; readonly sourcePrefix?: string | undefined };
 
+/** Which document to compare with the others of its collection, and how widely to look for them. */
+export type SimilarScope = {
+  readonly collection: string;
+  readonly source: string;
+  /** How many nearest chunks each compared chunk of the source contributes when the candidate documents are found. */
+  readonly candidates: number;
+  /** The most chunks of any one document that are compared (domain/similar.ts, SAMPLE_CHUNKS). */
+  readonly sample: number;
+};
+
+/** The source's size as compared, and every candidate document scored against it, unordered. */
+export type SimilarFound = {
+  /** The source's chunks. */
+  readonly chunks: number;
+  /** How many of them were compared: at most `sample`. */
+  readonly compared: number;
+  readonly documents: readonly Compared[];
+};
+
 export type StoreStatus = {
   readonly vector: string | undefined;
   readonly unaccent: string | undefined;
@@ -222,6 +242,12 @@ export type Store = {
   readonly documents: (collection: string, options: { readonly prefix?: string | undefined; readonly limit: number; readonly offset: number }) => Promise<{ readonly total: number; readonly rows: readonly DocumentRow[] }>;
   /** Nearest by cosine, over collections embedded by one model; value is the cosine similarity. */
   readonly nearest: (scope: SearchScope, embedding: readonly number[], limit: number) => Promise<readonly Hit[]>;
+  /**
+   * The documents of the collection that hold one of the nearest chunks (outside the source) of any compared
+   * chunk of the source, each scored exactly against it (domain/similar.ts). Nothing is dropped or ordered
+   * here; the use case ranks them.
+   */
+  readonly similar: (scope: SimilarScope) => Promise<SimilarFound>;
   /** Full-text matches of any word of the query; value is the rank. */
   readonly matching: (scope: SearchScope, query: string, limit: number) => Promise<readonly Hit[]>;
   readonly chunks: (keys: readonly { readonly collection: string; readonly id: string }[]) => Promise<readonly StoredChunk[]>;

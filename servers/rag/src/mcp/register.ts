@@ -6,8 +6,10 @@ import { createCollection, dropCollection, listCollections, snapshotCollections 
 import { checkHealth } from "../app/usecases/health.js";
 import { indexPath, listSources, removeSource } from "../app/usecases/indexing.js";
 import { expand, readDocument, search } from "../app/usecases/search.js";
+import { similar } from "../app/usecases/similar.js";
 import { SUPPORTED_EXTENSIONS } from "../domain/kinds.js";
 import { CLOUDFLARE_RERANK_MODELS, MIN_PROBE_COSINE, PROVIDERS } from "../domain/provider.js";
+import { SAMPLE_CHUNKS } from "../domain/similar.js";
 import { handled } from "./envelope.js";
 
 const collection = z.string().trim().min(1).max(63).describe("A collection's name, as list_collections shows it.");
@@ -208,6 +210,34 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       },
     },
     handled((a) => expand(deps, a)),
+  );
+
+  server.registerTool(
+    "similar",
+    {
+      title: "Find similar documents",
+      description:
+        "Finds the documents in a collection that say most nearly the same thing as one of its documents, best first, each with a score (1 for the " +
+        "same text, and the same from either document's side), how much of each is found again in the other (forward and backward), and the closest " +
+        "pair of passages, which expand can read. Use it to find duplicates and near-duplicates to merge, related documents, or a document's " +
+        "closest neighbours before you write a new one. " +
+        `A document of more than ${SAMPLE_CHUNKS} chunks, the named one or a result, is compared by ${SAMPLE_CHUNKS} spread evenly through it, and the reply says which (sampled).`,
+      inputSchema: {
+        collection,
+        source: z.string().trim().min(1).describe("The document to compare the others with: its source exactly as list_sources and search show it."),
+        limit: z.number().int().min(1).max(50).default(10).describe("Documents returned."),
+        min_score: z.number().min(0).max(1).default(0).describe("Leave out documents scoring below this. The default 0 keeps every candidate except the rare one with a negative score."),
+        candidates: z
+          .number()
+          .int()
+          .min(1)
+          .max(50)
+          .default(10)
+          .describe("How many nearest chunks each compared chunk contributes when finding candidate documents; more finds more documents, and costs time."),
+      },
+      annotations: { openWorldHint: false },
+    },
+    handled((a) => similar(deps, { collection: a.collection, source: a.source, limit: a.limit, minScore: a.min_score, candidates: a.candidates })),
   );
 
   server.registerTool(

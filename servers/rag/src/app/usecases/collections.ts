@@ -24,7 +24,7 @@ export const modelNamed = (deps: Deps, name: string | undefined): EmbeddingModel
 };
 
 /** A collection as recorded; counting what it holds is list_collections' work, not every call's. */
-export const findCollection = async (deps: Deps, name: string): Promise<CollectionInfo> =>
+export const findCollection = async (deps: Pick<Deps, "store">, name: string): Promise<CollectionInfo> =>
   (await deps.store.collectionInfos()).find((c) => c.name === name) ?? fail(notFound(`no collection named "${name}"; create_collection makes one`));
 
 /**

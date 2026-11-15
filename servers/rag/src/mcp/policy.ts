@@ -21,4 +21,5 @@ export const POLICY: ToolPolicy = {
   search: { access: "read" },
   expand: { access: "read" },
   read_document: { access: "read" },
+  similar: { access: "read" },
 };

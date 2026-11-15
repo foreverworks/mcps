@@ -127,7 +127,9 @@ describe("the tool surface", () => {
     const { tools } = await client.listTools();
     await expect(`${JSON.stringify(tools, null, 2)}\n`).toMatchFileSnapshot("./tools.snapshot.json");
     expect(() => checkPolicy("rag", (s) => registerAll(s, buildDeps({})), POLICY)).not.toThrow();
-    expect(tools.filter((t) => t.annotations?.readOnlyHint === true).map((t) => t.name).sort()).toEqual(["expand", "health", "list_collections", "list_sources", "read_document", "search"]);
+    expect(tools.filter((t) => t.annotations?.readOnlyHint === true).map((t) => t.name).sort()).toEqual(["expand", "health", "list_collections", "list_sources", "read_document", "search", "similar"]);
+    // It reads this server's own index and nothing outside it, which the other readers (health, search) do not claim.
+    expect(tools.find((t) => t.name === "similar")?.annotations).toEqual({ readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false });
   });
 
   it("answers a tool that needs the database with a config error naming the variable, from an empty environment", async () => {
@@ -456,6 +458,114 @@ describe("index, search, read", () => {
     const found = await s.call("search", { query: "Who pays for major repairs to the structure?", limit: 1 });
     expect(found.results[0]?.source).toMatch(/contract\.md$/u);
     expect(found.note).toMatch(/full-text half ran past its time bound/u);
+  });
+});
+
+describe("similar", () => {
+  const PRICING = "# Pricing\n\nThe standard plan costs ten dollars per month and includes email support.\n\n## Billing\n\nAnnual billing gives two months free of charge.";
+  const DRAFT = `${PRICING}\n\n## Discounts\n\nStudents and teachers receive a discount on every plan.`;
+  const sections = (count: number, tag: string) =>
+    Array.from({ length: count }, (_, i) => `# ${tag} ${i}\n\nSection ${i} says something about topic${i} and subject${i}.`).join("\n\n");
+
+  const withNotes = async (files: Readonly<Record<string, string>>) => {
+    const s = await connected();
+    for (const [path, text] of Object.entries(files)) {
+      await mkdir(join(s.inbox, path, ".."), { recursive: true });
+      await writeFile(join(s.inbox, path), text);
+    }
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: s.inbox });
+    return s;
+  };
+
+  it("finds an identical copy first with score 1, then the draft that says more, and the unrelated documents after, never the source", async () => {
+    const s = await withNotes({ "notes/pricing.md": PRICING, "notes/pricing-copy.md": PRICING, "notes/pricing-draft.md": DRAFT });
+    const source = join(s.inbox, "notes/pricing.md");
+    const found = await s.call("similar", { collection: "docs", source });
+    expect(found).toMatchObject({ collection: "docs", source, chunks: 2, compared: 2, sampled: false });
+    const names = found.results.map((r: { source: string }) => r.source.slice(s.inbox.length + 1));
+    expect(names.slice(0, 2)).toEqual(["notes/pricing-copy.md", "notes/pricing-draft.md"]);
+    expect(names).not.toContain("notes/pricing.md");
+    expect(found.results[0]).toMatchObject({ score: 1, forward: 1, backward: 1, chunks: 2, sampled: false });
+    const [copy, draft, ...rest] = found.results as { score: number; forward: number; backward: number; chunks: number }[];
+    // The draft says everything the note says (forward 1) and one thing more, which the note does not (backward below 1).
+    expect(draft).toMatchObject({ forward: 1, chunks: 3 });
+    expect(draft?.backward).toBeLessThan(1);
+    expect(draft?.score).toBeGreaterThan(0.8);
+    expect(draft?.score).toBeLessThan(1);
+    expect(rest.length).toBeGreaterThan(0);
+    for (const unrelated of rest) expect(unrelated.score).toBeLessThan(draft?.score ?? 0);
+    const scores = found.results.map((r: { score: number }) => r.score);
+    expect(scores).toEqual([...scores].sort((a, b) => b - a));
+    expect(copy?.score).toBe(1);
+
+    // The closest pair names a chunk on each side, which expand reads.
+    const best = found.results[0].best;
+    expect(best).toMatchObject({ value: 1, location: "Pricing", source_location: "Pricing" });
+    const theirs = await s.call("expand", { collection: "docs", id: best.chunk, before: 0, after: 0 });
+    const mine = await s.call("expand", { collection: "docs", id: best.source_chunk, before: 0, after: 0 });
+    expect([theirs.source, mine.source]).toEqual([join(s.inbox, "notes/pricing-copy.md"), source]);
+    expect(theirs.chunks[0].text).toBe(mine.chunks[0].text);
+  });
+
+  it("scores a pair the same from either side, and keeps the best `limit` at or above `min_score`", async () => {
+    const s = await withNotes({ "notes/pricing.md": PRICING, "notes/pricing-copy.md": PRICING, "notes/pricing-draft.md": DRAFT });
+    const forward = await s.call("similar", { collection: "docs", source: join(s.inbox, "notes/pricing.md") });
+    const backward = await s.call("similar", { collection: "docs", source: join(s.inbox, "notes/pricing-draft.md") });
+    const draft = forward.results.find((r: { source: string }) => r.source.endsWith("pricing-draft.md"));
+    const note = backward.results.find((r: { source: string }) => r.source.endsWith("notes/pricing.md"));
+    expect(draft.score).toBe(note.score);
+    expect([draft.forward, draft.backward]).toEqual([note.backward, note.forward]);
+
+    expect((await s.call("similar", { collection: "docs", source: join(s.inbox, "notes/pricing.md"), limit: 1 })).results).toHaveLength(1);
+    const high = await s.call("similar", { collection: "docs", source: join(s.inbox, "notes/pricing.md"), min_score: draft.score });
+    expect(high.results.map((r: { source: string }) => r.source.slice(s.inbox.length + 1))).toEqual(["notes/pricing-copy.md", "notes/pricing-draft.md"]);
+    const exact = await s.call("similar", { collection: "docs", source: join(s.inbox, "notes/pricing.md"), min_score: 1 });
+    expect(exact.results.map((r: { score: number }) => r.score)).toEqual([1]);
+    // One nearest chunk per compared chunk finds at most as many documents as the source has chunks.
+    expect((await s.call("similar", { collection: "docs", source: join(s.inbox, "notes/pricing.md"), candidates: 1 })).results.length).toBeLessThanOrEqual(2);
+  });
+
+  it("says when a long document was compared by a sample of its chunks", async () => {
+    const s = await withNotes({ "long/one.md": sections(70, "Part"), "long/two.md": sections(70, "Part"), "long/short.md": sections(3, "Part") });
+    const found = await s.call("similar", { collection: "docs", source: join(s.inbox, "long/one.md") });
+    expect(found).toMatchObject({ chunks: 70, compared: 64, sampled: true });
+    expect(found.results[0]).toMatchObject({ source: join(s.inbox, "long/two.md"), score: 1, chunks: 70, sampled: true });
+    // The source is whole here; the long document is a result, and its entry says it was sampled.
+    const short = await s.call("similar", { collection: "docs", source: join(s.inbox, "long/short.md") });
+    expect(short).toMatchObject({ chunks: 3, compared: 3, sampled: false });
+    expect(short.results.find((r: { source: string }) => r.source === join(s.inbox, "long/one.md"))).toMatchObject({ chunks: 70, sampled: true });
+  });
+
+  it("answers a document with no chunks with no results", async () => {
+    const s = await withNotes({ "notes/pricing.md": PRICING });
+    const blank = join(s.inbox, "notes/blank.md");
+    await writeFile(blank, PRICING);
+    await s.call("index_path", { collection: "docs", path: blank });
+    await writeFile(blank, "");
+    await s.call("index_path", { collection: "docs", path: blank });
+    expect(await s.call("similar", { collection: "docs", source: blank })).toEqual({ collection: "docs", source: blank, chunks: 0, compared: 0, sampled: false, results: [] });
+  });
+
+  it("reports a collection that does not exist as search does, and a source that is not indexed with a hint to list_sources", async () => {
+    const s = await withNotes({ "notes/pricing.md": PRICING });
+    const source = join(s.inbox, "notes/pricing.md");
+    const nothing = await s.call("similar", { collection: "nope", source });
+    expect(nothing.error).toMatchObject({ kind: "not_found" });
+    expect(nothing.error.message).toBe((await s.call("search", { query: "price", collections: ["nope"] })).error.message);
+    const missing = await s.call("similar", { collection: "docs", source: "/data/notes/missing.md" });
+    expect(missing.error).toMatchObject({ kind: "not_found" });
+    expect(missing.error.message).toContain('"/data/notes/missing.md" is not indexed in collection "docs"');
+    expect(missing.error.message).toContain("list_sources");
+  });
+
+  it("refuses a limit, a score or a number of candidates outside what the schema allows", async () => {
+    const s = await withNotes({ "notes/pricing.md": PRICING });
+    const source = join(s.inbox, "notes/pricing.md");
+    for (const bad of [{ limit: 0 }, { limit: 51 }, { min_score: -0.1 }, { min_score: 1.1 }, { candidates: 0 }, { candidates: 51 }, { limit: 1.5 }]) {
+      const result = (await s.client.callTool({ name: "similar", arguments: { collection: "docs", source, ...bad } })) as { isError?: boolean };
+      expect(result.isError, JSON.stringify(bad)).toBe(true);
+    }
   });
 });
 
