@@ -2,7 +2,7 @@
  * The server as a client sees it, through the kit's guard: an in-memory store,
  * a bag-of-words embedder and a word-overlap reranker; no database, no models.
  */
-import { mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
+import { chmod, mkdir, mkdtemp, symlink, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -330,6 +330,19 @@ describe("index, search, read", () => {
     expect(out.error.message).toContain("outside the folders");
     const walked = await s.call("index_path", { collection: "docs", path: s.inbox });
     expect(walked.links_not_followed).toBe(1);
+  });
+
+  it.skipIf(process.getuid?.() === 0)("reports a file it may not open with the reason and its system code, and indexes the rest", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    const locked = join(s.inbox, "lease/locked.md");
+    await writeFile(locked, "# Locked\n\nA file whose owner did not let this server read it.");
+    await chmod(locked, 0o000);
+    const out = await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect(out).toMatchObject({ files: 4, indexed: 3, failed: 1 });
+    expect(out.failed_files).toEqual([{ status: "failed", source: locked, error: expect.stringContaining("EACCES") }]);
+    expect(out.failed_files[0].error).toBe(`unreadable: ${locked} cannot be opened by this server (EACCES)`);
+    expect(JSON.stringify(out)).not.toContain("[object Object]");
   });
 
   it("keeps the fused order and says why when the reranker fails", async () => {

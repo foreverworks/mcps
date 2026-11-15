@@ -1,4 +1,4 @@
-import { makeErrorKit } from "@foreverworks/mcp-kit";
+import { asInputFileError, makeErrorKit } from "@foreverworks/mcp-kit";
 
 /**
  * The ways this server fails, as plain tagged data (packages/mcp-kit, errors.ts).
@@ -32,10 +32,17 @@ export const notFound = (message: string): AppError => ({ kind: "not_found", mes
 
 export const { fail, asAppError } = makeErrorKit<AppError>("rag");
 
-/** One line for a failure inside a reply that goes on: ours by kind, anything else by its message. */
+/**
+ * One line for a failure inside a reply that goes on: ours by kind, a file the kit's reader refused by its
+ * code and message (which name the path and, for a file it could not open, the system's code such as
+ * EACCES), anything else by its message. The kit's failures are tagged plain objects, not Errors, so
+ * String() of one reads "[object Object]".
+ */
 export const describeFailure = (thrown: unknown): string => {
   const e = asAppError(thrown);
   if (e !== undefined) return `${e.kind}: ${e.message}`;
+  const file = asInputFileError(thrown);
+  if (file !== undefined) return `${file.kind === "input" ? file.code : file.kind}: ${file.message}`;
   return thrown instanceof Error ? thrown.message : String(thrown);
 };
 
