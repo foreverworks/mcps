@@ -74,7 +74,7 @@ be identical for an API none of these servers talk to.
 | `guardErrors.ts`, `inputFileErrors.ts` | The kit's own failures, which every server's envelope recognises beside its own. |
 | `call.ts` | The call a piece of code runs in: its abort signal, `reportProgress`, `pause` for a wait that stops on cancellation, `offerLink` for a link a person must open. |
 | `http.ts` | `makeHttp`: query, body, timeout, backoff with `Retry-After`, one renewal after a 401, never resend a write that may have happened, stop when the call is cancelled. |
-| `oauth.ts`, `tokens.ts` | RFC 6749 grants (refresh, client credentials, authorization code with PKCE) and a token source that mints once for every waiter, across processes. |
+| `oauth.ts`, `tokens.ts` | RFC 6749 grants (refresh, client credentials, authorization code with PKCE, password) and a token source that mints once for every waiter, across processes. |
 | `pendingAuthorization.ts` | The one begun authorization-code flow, kept in the state directory between the call that sends a person to the authorize page and the one that takes the address they land on, with or without its PKCE verifier. |
 | `upstream.ts` | A server as an MCP client of another one (a vault it reads a password from, a mailbox it reads a sign-in code from): connect over Streamable HTTP or stdio, list tools, call one, close. Failures are the server's own, through its `fail`. |
 | `backoff.ts`, `pacer.ts`, `concurrency.ts` | The retry schedule; pacing for APIs that limit bursts (`makePacer`) or volume (`makeThrottle`); fan-out with a limit, and short-lived caches. |
