@@ -2,7 +2,7 @@ import { fileRootsFrom } from "@foreverworks/mcp-kit";
 import { delimiter, resolve } from "node:path";
 import { z } from "zod";
 
-import type { Deps, EmbeddingModel } from "./app/ports.js";
+import type { Deps, EmbeddingModel, QueryInference } from "./app/ports.js";
 import { makeQueryInference } from "./app/inference.js";
 import { configError, fail } from "./domain/errors.js";
 import { makePool } from "./infra/database.js";
@@ -95,17 +95,30 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
   const reranker = makeReranker({ url: env["RAG_RERANK_URL"], variable: "RAG_RERANK_URL" });
   const provider = env["RAG_QUERY_PROVIDER"]?.trim() || "local";
   const timeoutMs = positive(env["RAG_QUERY_TIMEOUT_MS"], 2000);
-  const inferenceForTimeout = (deadline: number) => makeQueryInference({
+  type QueryOptions = { readonly timeoutMs?: number | undefined; readonly rerankModel?: string | undefined };
+  const makeInference = ({ timeoutMs: deadline = timeoutMs, rerankModel }: QueryOptions) => makeQueryInference({
     provider: provider === "cloudflare" ? "cloudflare" : "local",
     remote: (model) => model.remote.cloudflare === undefined ? undefined : makeCloudflareEmbedder(env, { attempts: 1, timeoutMs: deadline, model: model.remote.cloudflare.model, batch: model.remote.cloudflare.batch }),
-    remoteReranker: makeCloudflareReranker(env, { attempts: 1, timeoutMs: deadline }),
+    remoteReranker: makeCloudflareReranker(env, { attempts: 1, timeoutMs: deadline, ...(rerankModel === undefined ? {} : { model: rerankModel }) }),
     localReranker: reranker,
     batch: positive(env["RAG_RERANK_BATCH"], 32), timeoutMs: deadline,
     observe: (trace) => { if (provider === "cloudflare") process.stderr.write(`${JSON.stringify({ event: "query_inference", ...trace })}\n`); },
   });
-  const inference = inferenceForTimeout(timeoutMs);
+  // Repeated per-call comparisons share successful probes, just as the default provider does.
+  // A bounded set of option combinations keeps arbitrary deadline values from retaining state forever.
+  const inferences = new Map<string, QueryInference>();
+  const inferenceForOptions = (options: QueryOptions): QueryInference => {
+    const key = JSON.stringify([options.timeoutMs ?? timeoutMs, options.rerankModel ?? "default"]);
+    const existing = inferences.get(key);
+    if (existing !== undefined) return existing;
+    const made = makeInference(options);
+    inferences.set(key, made);
+    if (inferences.size > 16) inferences.delete(inferences.keys().next().value ?? "");
+    return made;
+  };
+  const inference = inferenceForOptions({});
   return {
-    inferenceForTimeout,
+    inferenceForOptions,
     inference: provider === "local" || provider === "cloudflare" ? inference : {
       ...inference,
       embed: async () => fail(configError("RAG_QUERY_PROVIDER must be local or cloudflare", "RAG_QUERY_PROVIDER")),

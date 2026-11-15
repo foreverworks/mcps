@@ -85,6 +85,7 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_CLOUDFLARE_API_TOKEN_FILE` | no | File holding a Cloudflare API token that may run Workers AI on that account: the account permission Workers AI Read is enough. For a local run, `RAG_CLOUDFLARE_API_TOKEN` may hold it instead. |
 | `RAG_CLOUDFLARE_MODEL` | no | The Workers AI model that matches the default embedding model. Default `@cf/baai/bge-m3`, which is `BAAI/bge-m3`. |
 | `RAG_CLOUDFLARE_BATCH` | no | Texts per Workers AI request. Default 64. |
+| `RAG_CLOUDFLARE_RERANK_MODEL` | no | Remote relevance model: `@cf/baai/bge-reranker-base` (default), `@cf/cloudflare/clef-flash`, or `@cf/cloudflare/clef`. Decision models score each passage on a fixed five-level rubric. |
 | `RAG_REMOTE_CONCURRENCY` | no | Files indexed at once for a collection embedded at a remote provider. Default 8; the local endpoint always takes one at a time. |
 
 Without them the server still starts and lists its tools, and each call that
@@ -295,7 +296,7 @@ the reranker, 38.
 ### Query inference at Workers AI
 
 Set `RAG_QUERY_PROVIDER=cloudflare` to send questions to the same Workers AI
-embedding model and candidate passages to `@cf/baai/bge-reranker-base`.
+embedding model and candidate passages to `RAG_CLOUDFLARE_RERANK_MODEL`.
 The database, hybrid retrieval and document indexing stay where configured.
 Before remote query vectors enter a local index, three English and Romanian
 probe texts must agree with its local model at cosine >= 0.999. Successful
@@ -315,6 +316,12 @@ probes, without making a remote request. `search.local_inference=true` forces
 local inference for a single comparison or a private query.
 `search.inference_timeout_ms` sets a remote deadline for one call, including a
 very short budget to verify fallback and recovery without disrupting the service.
+`search.reranker_model` selects a remote relevance model for one comparison.
+The Clef models rate each passage independently against the same query and a
+fixed rubric, from unrelated to directly answering the central question. All
+scores must be present, finite and inside the rubric; otherwise every candidate
+falls back to the local reranker. Clef reports input tokens rather than neurons;
+an absent neuron count is unknown, not evidence that an inference was free.
 
 For reproducible comparisons, `snapshot_collections` (write) freezes several
 collections in one database snapshot, copying their existing vectors locally.

@@ -9,6 +9,9 @@ export const PROVIDERS = ["local", "cloudflare"] as const;
 export type Provider = (typeof PROVIDERS)[number];
 export type RemoteProvider = Exclude<Provider, "local">;
 
+/** Workers AI models supported for candidate relevance scoring. Decision models use a fixed rubric. */
+export const CLOUDFLARE_RERANK_MODELS = ["@cf/baai/bge-reranker-base", "@cf/cloudflare/clef-flash", "@cf/cloudflare/clef"] as const;
+
 /** What embedding cost, as the provider reports it: Workers AI counts input tokens and neurons. */
 export type Usage = { readonly requests: number; readonly texts: number; readonly tokens: number; readonly neurons: number };
 

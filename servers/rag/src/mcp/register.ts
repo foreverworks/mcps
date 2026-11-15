@@ -7,7 +7,7 @@ import { checkHealth } from "../app/usecases/health.js";
 import { indexPath, listSources, removeSource } from "../app/usecases/indexing.js";
 import { expand, readDocument, search } from "../app/usecases/search.js";
 import { SUPPORTED_EXTENSIONS } from "../domain/kinds.js";
-import { MIN_PROBE_COSINE, PROVIDERS } from "../domain/provider.js";
+import { CLOUDFLARE_RERANK_MODELS, MIN_PROBE_COSINE, PROVIDERS } from "../domain/provider.js";
 import { handled } from "./envelope.js";
 
 const collection = z.string().trim().min(1).max(63).describe("A collection's name, as list_collections shows it.");
@@ -186,11 +186,12 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         rerank: z.boolean().default(true).describe("false returns the fused order, without the reranker: fast, less precise."),
         local_inference: z.boolean().default(false).describe("Use local query embedding and reranking for this call, for privacy or provider comparisons. Default: the server's configured query provider."),
         inference_timeout_ms: z.number().int().min(1).max(30000).optional().describe("Remote inference deadline per request for this call, in milliseconds. Expiry falls back locally; future calls keep the configured deadline."),
+        reranker_model: z.enum(CLOUDFLARE_RERANK_MODELS).optional().describe("Workers AI relevance model for this call, when Cloudflare query inference is configured. Default: the server's configured remote reranker. Useful for comparing models on frozen collections."),
         max_chars: z.number().int().min(100).max(5000).default(1200).describe("Each result's text is cut to about this many characters."),
       },
     },
     handled((a) =>
-      search(a.local_inference ? { ...deps, inference: undefined } : a.inference_timeout_ms === undefined ? deps : { ...deps, inference: deps.inferenceForTimeout?.(a.inference_timeout_ms) ?? deps.inference }, { query: a.query, also: a.also, collections: a.collections, sourcePrefix: a.source_prefix, limit: a.limit, candidates: a.candidates, rerank: a.rerank, maxChars: a.max_chars }),
+      search(a.local_inference ? { ...deps, inference: undefined } : a.inference_timeout_ms === undefined && a.reranker_model === undefined ? deps : { ...deps, inference: deps.inferenceForOptions?.({ timeoutMs: a.inference_timeout_ms, rerankModel: a.reranker_model }) ?? deps.inference }, { query: a.query, also: a.also, collections: a.collections, sourcePrefix: a.source_prefix, limit: a.limit, candidates: a.candidates, rerank: a.rerank, maxChars: a.max_chars }),
     ),
   );
 

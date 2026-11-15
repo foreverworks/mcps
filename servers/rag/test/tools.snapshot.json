@@ -431,6 +431,15 @@
           "minimum": 1,
           "maximum": 30000
         },
+        "reranker_model": {
+          "description": "Workers AI relevance model for this call, when Cloudflare query inference is configured. Default: the server's configured remote reranker. Useful for comparing models on frozen collections.",
+          "type": "string",
+          "enum": [
+            "@cf/baai/bge-reranker-base",
+            "@cf/cloudflare/clef-flash",
+            "@cf/cloudflare/clef"
+          ]
+        },
         "max_chars": {
           "default": 1200,
           "description": "Each result's text is cut to about this many characters.",

@@ -56,6 +56,27 @@ const failureOf = async (promise: Promise<unknown>) => {
 };
 
 describe("the Workers AI client", () => {
+  it("scores every passage with a decision model and reads its token usage", async () => {
+    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => answer(200, { success: true, result: { model: "clef-flash", answers: { p0: { type: "score", score: 1 }, p1: { type: "score", score: 3.5 } }, usage: { input_tokens: 321, output_tokens: 0 } } }));
+    const out = await makeCloudflareReranker(ENV, { fetch, model: "@cf/cloudflare/clef-flash" }).rerank("Which passage answers?", ["first", "second"]);
+    expect(out.scores).toEqual([{ index: 1, score: 0.875 }, { index: 0, score: 0.25 }]);
+    expect(out.usage.tokens).toBe(321);
+    const sent = JSON.parse(String(fetch.mock.calls[0]?.[1]?.body));
+    expect(sent).toMatchObject({ model: "clef-flash", state: { query: "Which passage answers?" }, questions: { p0: { type: "score", instructions: { passage: "first" } }, p1: { type: "score", instructions: { passage: "second" } } } });
+    expect(Object.keys(sent.questions)).toEqual(["p0", "p1"]);
+  });
+
+  it.each([
+    { model: "clef", answers: { p0: { type: "score", score: 1 } } },
+    { model: "clef-flash", answers: {} },
+    { model: "clef-flash", answers: { p0: { type: "score", score: 5 } } },
+    { model: "clef-flash", answers: { p0: { type: "score", score: null } } },
+    { model: "clef-flash", answers: { other: { type: "score", score: 1 } } },
+  ])("rejects invalid decision model answers", async (result) => {
+    const fetch = async () => answer(200, { success: true, result });
+    expect(await failureOf(makeCloudflareReranker(ENV, { fetch, model: "@cf/cloudflare/clef-flash" }).rerank("q", ["passage"]))).toMatchObject({ reason: "rejected" });
+  });
+
   it("maps rerank ids, requests all results and reports usage", async () => {
     const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => answer(200, { success: true, result: { response: [{ id: 1, score: 0.9 }, { id: 0, score: 0.1 }] } }));
     const out = await makeCloudflareReranker(ENV, { fetch }).rerank("question", ["one", "two"]);

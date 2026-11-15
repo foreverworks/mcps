@@ -242,7 +242,7 @@ export type Settings = {
 export type Deps = {
   readonly inference?: QueryInference | undefined;
   /** A per-call remote deadline, without changing the primary provider or future calls. */
-  readonly inferenceForTimeout?: ((ms: number) => QueryInference) | undefined;
+  readonly inferenceForOptions?: ((options: { readonly timeoutMs?: number | undefined; readonly rerankModel?: string | undefined }) => QueryInference) | undefined;
   readonly store: Store;
   /** Every embedding model configured, the default first; a configuration error when there is none or it cannot be read. */
   readonly models: () => readonly EmbeddingModel[];

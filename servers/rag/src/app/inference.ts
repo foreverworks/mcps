@@ -56,7 +56,7 @@ export const makeQueryInference = (options: Options): QueryInference => {
   };
   const complete = (trace: InferenceTrace): InferenceTrace => { options.observe?.(trace); return trace; };
   return {
-    status: () => ({ primary: options.provider, fallback: "local", remote_timeout_ms: options.timeoutMs, probes: [...probes.values()].filter((p) => p.until > now()).map((p) => p.probe) }),
+    status: () => ({ primary: options.provider, fallback: "local", remote_rerank_model: options.remoteReranker.model, remote_timeout_ms: options.timeoutMs, probes: [...probes.values()].filter((p) => p.until > now()).map((p) => p.probe) }),
     embed: async (model, texts, dimension) => {
       const start = now();
       let fallback: InferenceTrace["fallback"];
