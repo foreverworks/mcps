@@ -1,10 +1,7 @@
-import { join } from "node:path";
-
-import { authorizeUrl, type OAuthClient } from "@foreverworks/mcp-kit";
+import { authorizeUrl, type OAuthClient, pendingPkceAuthorizationFile } from "@foreverworks/mcp-kit";
 
 import type { LoginPort } from "../app/ports.js";
 import { type AppConfig, endpoints } from "./config.js";
-import { makePendingStore } from "./login/pendingStore.js";
 import { issuedOf } from "./oauthClient.js";
 
 /**
@@ -45,6 +42,6 @@ export const makeLogin = (options: { readonly config: AppConfig; readonly client
         // unreachable: the local session is forgotten either way
       }
     },
-    pending: makePendingStore(join(config.stateDir, "login.json"), config.stateDir),
+    pending: pendingPkceAuthorizationFile(config.stateDir, "login"),
   };
 };

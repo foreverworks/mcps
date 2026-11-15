@@ -1,7 +1,8 @@
+import { fillTemplate, type UpstreamAnswer, type UpstreamConnection, type UpstreamTool } from "@foreverworks/mcp-kit";
+
 import type { CodeWatch } from "../../app/ports.js";
 import { codesIn, firstNewCode } from "../../domain/codes.js";
 import { configError, fail } from "../../domain/errors.js";
-import { type Answer, type Connection, fillTemplate, succeeded, type ToolInfo } from "../upstream/mcp.js";
 import { type Poll, polling } from "./poll.js";
 
 /**
@@ -23,15 +24,15 @@ const QUERY_KEYS = ["query", "q", "search", "searchQuery", "search_query", "keyw
 const mailish = (name: string): boolean => /mail|message|inbox|thread|gmail|outlook/i.test(name);
 
 /** The search tool and the argument its query goes in, chosen from the server's tools/list. */
-export type SearchTool = { readonly tool: ToolInfo; readonly queryKey: string | undefined };
+export type SearchTool = { readonly tool: UpstreamTool; readonly queryKey: string | undefined };
 
 /**
  * Pick the search tool: the one named, or the best guess (a name with
  * "search" that takes a string query argument, preferring mail words in the
  * name). A config failure names the server's tools when nothing fits.
  */
-export const pickSearchTool = (tools: readonly ToolInfo[], named: string | undefined): SearchTool => {
-  const queryKeyOf = (t: ToolInfo): string | undefined => QUERY_KEYS.find((k) => t.stringProperties.includes(k));
+export const pickSearchTool = (tools: readonly UpstreamTool[], named: string | undefined): SearchTool => {
+  const queryKeyOf = (t: UpstreamTool): string | undefined => QUERY_KEYS.find((k) => t.stringProperties.includes(k));
   if (named !== undefined) {
     const tool = tools.find((t) => t.name === named) ?? fail(configError(`the mail MCP server has no tool "${named}" (ANAF_SPV_MAIL_SEARCH_TOOL); it has ${tools.map((t) => t.name).join(", ")}`));
     return { tool, queryKey: queryKeyOf(tool) };
@@ -76,7 +77,7 @@ export const searchArgs = (search: SearchTool, values: { readonly query: string;
 };
 
 /** Everything an answer shows, as one text: its text content and its structured content. */
-const shown = (answer: Answer): string => `${answer.text}\n${answer.json === undefined ? "" : JSON.stringify(answer.json)}`;
+const shown = (answer: UpstreamAnswer): string => `${answer.text}\n${answer.json === undefined ? "" : JSON.stringify(answer.json)}`;
 
 export type TextOptions = {
   readonly query: string;
@@ -86,10 +87,10 @@ export type TextOptions = {
   readonly poll: Poll;
 };
 
-export const watchText = async (connection: Connection, options: TextOptions): Promise<CodeWatch> => {
+export const watchText = async (connection: UpstreamConnection, options: TextOptions): Promise<CodeWatch> => {
   const search = pickSearchTool(await connection.tools(), options.tool);
   const args = searchArgs(search, options, options.argsTemplate);
-  const run = async (): Promise<readonly string[]> => codesIn(shown(succeeded("mail", search.tool.name, await connection.call(search.tool.name, args))));
+  const run = async (): Promise<readonly string[]> => codesIn(shown(await connection.call(search.tool.name, args)));
   const seen = new Set(await run());
   return {
     next: (deadlineMs) => polling(options.poll, deadlineMs, async () => firstNewCode(await run(), seen)),

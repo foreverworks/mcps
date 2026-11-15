@@ -1,10 +1,10 @@
 import { join } from "node:path";
 
-import { type HttpFailure, inputFilesFrom, makeHttp, readSecret } from "@foreverworks/mcp-kit";
+import { connectUpstream, type HttpFailure, inputFilesFrom, makeHttp, readSecret, type Transport, type UpstreamConnect, type UpstreamEndpoint } from "@foreverworks/mcp-kit";
 
 import type { Deps, DukPort } from "./app/ports.js";
 import { ATTACHMENT_MAX_BYTES } from "./domain/contact.js";
-import { asAppError, configError, fail } from "./domain/errors.js";
+import { asAppError, configError, fail, upstreamError } from "./domain/errors.js";
 import { type Cookies, sameCookies } from "./domain/session.js";
 import { makeBrowser } from "./infra/browser.js";
 import { type AppConfig, configFrom, type UpstreamSetting } from "./infra/config.js";
@@ -17,8 +17,13 @@ import { makeForms } from "./infra/portal/forms.js";
 import { makeStare } from "./infra/stare.js";
 import { makeLogin, makePortal } from "./infra/portal/portal.js";
 import { makeContactLedger, makeCuiOnly, makeDeclarationLedger, makeExclusive, makeFormsLock, makeLedger, makePortalLock, makeSessionStore } from "./infra/store.js";
-import { type Connect, makeConnect, type Source, type TransportFor } from "./infra/upstream/mcp.js";
 import { makeCredentialSource, type VaultConfig } from "./infra/vault.js";
+
+/** The two MCP servers this one is a client of. */
+export type Source = "mail" | "vault";
+
+/** How the connection to each source is made; tests pass in-memory servers. */
+export type TransportFor = (source: Source, endpoint: UpstreamEndpoint) => Promise<Transport>;
 
 /**
  * The composition root: the only module naming both a port and what
@@ -48,9 +53,14 @@ const failStare = (failure: HttpFailure): never =>
 
 export type Built = { readonly deps: Deps; readonly config: AppConfig; readonly stop: () => void };
 
-const connectFor = (source: Source, setting: UpstreamSetting, transportFor: TransportFor | undefined): Connect =>
+const connectFor = (source: Source, setting: UpstreamSetting, transportFor: TransportFor | undefined): UpstreamConnect =>
   setting.kind === "endpoint"
-    ? makeConnect(source, setting.endpoint, transportFor)
+    ? connectUpstream(setting.endpoint, {
+        name: source,
+        client: { name: "mcp-anaf-spv", version: "1.0.0" },
+        fail: (message) => fail(upstreamError(source, message)),
+        ...(transportFor === undefined ? {} : { transportFor: (endpoint: UpstreamEndpoint) => transportFor(source, endpoint) }),
+      })
     : async () => fail(configError(setting.kind === "invalid" ? setting.message : `no ${source} MCP server is configured`));
 
 const vaultConfig = (env: NodeJS.ProcessEnv, config: AppConfig, transportFor: TransportFor | undefined): VaultConfig => {

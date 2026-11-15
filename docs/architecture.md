@@ -75,13 +75,15 @@ be identical for an API none of these servers talk to.
 | `call.ts` | The call a piece of code runs in: its abort signal, `reportProgress`, `pause` for a wait that stops on cancellation, `offerLink` for a link a person must open. |
 | `http.ts` | `makeHttp`: query, body, timeout, backoff with `Retry-After`, one renewal after a 401, never resend a write that may have happened, stop when the call is cancelled. |
 | `oauth.ts`, `tokens.ts` | RFC 6749 grants (refresh, client credentials, authorization code with PKCE) and a token source that mints once for every waiter, across processes. |
+| `pendingAuthorization.ts` | The one begun authorization-code flow, kept in the state directory between the call that sends a person to the authorize page and the one that takes the address they land on, with or without its PKCE verifier. |
+| `upstream.ts` | A server as an MCP client of another one (a vault it reads a password from, a mailbox it reads a sign-in code from): connect over Streamable HTTP or stdio, list tools, call one, close. Failures are the server's own, through its `fail`. |
 | `backoff.ts`, `pacer.ts`, `concurrency.ts` | The retry schedule; pacing for APIs that limit bursts (`makePacer`) or volume (`makeThrottle`); fan-out with a limit, and short-lived caches. |
 | `decimal.ts`, `invoiceTotals.ts` | Exact decimal arithmetic on bigints, and an invoice's total by EN 16931's rounding: the one rule every server that issues or builds an invoice uses. |
 | `dates.ts`, `identifiers.ts`, `csv.ts`, `compact.ts` | Calendar dates without a zone; check digits of Romanian CIF and CNP codes and of IBANs; CSV that is safe to open in a spreadsheet; objects without their `undefined` fields. |
 | `inputFile.ts`, `clientRoots.ts` | Files a tool takes as input, byte-exact: by path inside the server's roots, or as base64 with its SHA-256 ([security.md](security.md#files-going-in)). |
 | `outbox.ts`, `handedBack.ts` | Files a tool hands back (`saveToOutbox`), and the `resource_link` its result carries for each. |
 | `serve/files.ts`, `serve/filesServe.ts`, `fileStream.ts` | The file endpoints of the HTTP listener, for a server on another machine than its clients (off unless asked for): the settings and the one rule that turns a URL into a path inside a folder, the `GET` and `PUT` handlers, and the streamed, hashed, atomic write they and the relay share ([security.md](security.md#files-to-and-from-another-machine)). |
-| `files.ts`, `jsonFile.ts` | Files written whole or not at all, with their mode set before the rename; JSON state read and changed under a lock. |
+| `files.ts`, `jsonFile.ts`, `storedFile.ts` | Files written whole or not at all, with their mode set before the rename; JSON state read and changed under a lock; one record in a state file (a session, a grant), checked against the server's own shape on disk at every read. |
 | `env.ts`, `secret.ts`, `configFile.ts`, `once.ts`, `issues.ts` | Locations, the state directory and the time zone from the environment; secrets and `app.json` read without ever quoting them; configuration loaded on first use. |
 | `verdict.ts` | The shell modes' contract: one line per check and an exit code (0 OK, 1 a person must act, 2 transient). |
 | `packageVersion.ts`, `packageIdentity.ts` | The version, title, home page and icon a server announces, from its own package. |

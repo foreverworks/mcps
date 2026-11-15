@@ -1,4 +1,4 @@
-import { issuesText, readJsonFile, writeJsonFile } from "@foreverworks/mcp-kit";
+import { storedFile } from "@foreverworks/mcp-kit";
 import { z } from "zod";
 
 import { configError, fail } from "../../domain/errors.js";
@@ -20,25 +20,21 @@ const stored = z.object({
 }) satisfies z.ZodType<StoredTokens>;
 
 /**
- * tokens.json: the whole grant in one file, snake_case (domain/tokens.ts).
- * Written atomically at 0600 by the kit's writeJsonFile; the lock is the
- * caller's (grant.ts).
+ * tokens.json: the whole grant in one file, snake_case (domain/tokens.ts);
+ * the lock is the caller's (grant.ts).
  */
 export const makeTokensFile = (path: string) => {
-  const readOptional = async (): Promise<TokenBundle | undefined> => {
-    const raw = await readJsonFile<unknown>(path);
-    if (raw === undefined) return undefined;
-    const parsed = stored.safeParse(raw);
-    if (!parsed.success)
-      return fail(configError(`tokens at ${path} lack or mistype: ${issuesText(parsed.error)}`));
-    return fromStored(parsed.data);
-  };
+  const file = storedFile(path, {
+    schema: stored,
+    fromDisk: fromStored,
+    toDisk: toStored,
+    corrupt: (issues) => fail(configError(`tokens at ${path} lack or mistype: ${issues}`)),
+  });
   return {
-    readOptional,
+    readOptional: file.read,
     // A missing token file and a corrupt one need the same human action.
     read: async (): Promise<TokenBundle> =>
-      (await readOptional()) ??
-      fail(configError(`tokens at ${path} are missing or unparseable; authorize with begin_authorization`)),
-    write: (bundle: TokenBundle): Promise<void> => writeJsonFile(path, toStored(bundle)),
+      (await file.read()) ?? fail(configError(`tokens at ${path} are missing or unparseable; authorize with begin_authorization`)),
+    write: file.write,
   } as const;
 };

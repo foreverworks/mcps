@@ -13,7 +13,7 @@ import { connectInMemory, guard, McpServer } from "@foreverworks/mcp-kit";
 import type { DukPort } from "../src/app/ports.js";
 import { buildDeps } from "../src/composition.js";
 import { asAppError } from "../src/domain/errors.js";
-import type { TransportFor } from "../src/infra/upstream/mcp.js";
+import type { TransportFor } from "../src/composition.js";
 import { vocabulary } from "../src/mcp/envelope.js";
 import { policyFor } from "../src/mcp/policy.js";
 import { registerAll } from "../src/mcp/register.js";

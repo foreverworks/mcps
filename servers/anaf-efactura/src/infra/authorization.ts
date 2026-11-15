@@ -1,10 +1,7 @@
-import { join } from "node:path";
-
-import { newState, type OAuthClient } from "@foreverworks/mcp-kit";
+import { newState, type OAuthClient, pendingAuthorizationFile } from "@foreverworks/mcp-kit";
 
 import type { AuthorizationPort } from "../app/ports.js";
 import type { AppConfig } from "./config.js";
-import { makePendingStore } from "./authorization/pendingStore.js";
 import { mintedOf } from "./oauthClient.js";
 
 /**
@@ -48,6 +45,6 @@ export const makeAuthorization = (options: {
     exchangeCode: async (code, redirectUri) => mintedOf(await (await client()).authorizationCode(code, redirectUri)),
     fromRedirect,
     newState: () => newState(),
-    pending: makePendingStore(join(stateDir, "authorization.json"), stateDir),
+    pending: pendingAuthorizationFile(stateDir, "authorization"),
   };
 };

@@ -1,7 +1,8 @@
+import type { UpstreamConnection, UpstreamTool } from "@foreverworks/mcp-kit";
+
 import type { CodeWatch } from "../../app/ports.js";
 import { codesIn, firstNewCode } from "../../domain/codes.js";
 import { fail, upstreamError } from "../../domain/errors.js";
-import { type Connection, succeeded, type ToolInfo } from "../upstream/mcp.js";
 import { type Poll, polling } from "./poll.js";
 
 /**
@@ -18,7 +19,7 @@ import { type Poll, polling } from "./poll.js";
 export const GOOGLE_TOOLS = { search: "search_threads", read: "get_thread" } as const;
 
 /** Whether a server has the two tools, with the arguments this driver sends. */
-export const looksLikeGoogle = (tools: readonly ToolInfo[]): boolean => {
+export const looksLikeGoogle = (tools: readonly UpstreamTool[]): boolean => {
   const search = tools.find((t) => t.name === GOOGLE_TOOLS.search);
   const read = tools.find((t) => t.name === GOOGLE_TOOLS.read);
   return search !== undefined && read !== undefined && search.properties.includes("query") && read.properties.includes("thread_id");
@@ -38,10 +39,10 @@ const objectOr = <T>(value: unknown, what: string): T =>
 
 export type GoogleOptions = { readonly query: string; readonly account: string | undefined; readonly poll: Poll };
 
-export const watchGoogle = async (connection: Connection, options: GoogleOptions): Promise<CodeWatch> => {
+export const watchGoogle = async (connection: UpstreamConnection, options: GoogleOptions): Promise<CodeWatch> => {
   const account = options.account ?? "*";
   const search = async (): Promise<readonly ThreadSummaryWire[]> => {
-    const answer = succeeded("mail", GOOGLE_TOOLS.search, await connection.call(GOOGLE_TOOLS.search, { query: options.query, max_results: 5, account }));
+    const answer = await connection.call(GOOGLE_TOOLS.search, { query: options.query, max_results: 5, account });
     return objectOr<SearchWire>(answer.json, GOOGLE_TOOLS.search).threads ?? [];
   };
   const keyOf = (t: ThreadSummaryWire): string => `${t.account ?? ""}/${t.id ?? ""}`;
@@ -55,7 +56,7 @@ export const watchGoogle = async (connection: Connection, options: GoogleOptions
     const changed = (await search()).filter((t) => t.id !== undefined && snippets.get(keyOf(t)) !== (t.snippet ?? ""));
     for (const t of changed) {
       const args = { thread_id: t.id ?? "", detail: "text", ...(t.account === undefined ? (account === "*" ? {} : { account }) : { account: t.account }) };
-      const thread = objectOr<ThreadWire>(succeeded("mail", GOOGLE_TOOLS.read, await connection.call(GOOGLE_TOOLS.read, args)).json, GOOGLE_TOOLS.read);
+      const thread = objectOr<ThreadWire>((await connection.call(GOOGLE_TOOLS.read, args)).json, GOOGLE_TOOLS.read);
       const recent = (thread.messages ?? [])
         .map((m) => ({ at: Number(m.internalDate ?? 0), text: `${m.body ?? ""}\n${m.snippet ?? ""}` }))
         .filter((m) => m.at >= startedAt - SKEW_MS)

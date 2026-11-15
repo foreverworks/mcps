@@ -7,7 +7,7 @@
 import { InMemoryTransport, McpServer, type Transport } from "@foreverworks/mcp-kit";
 import { z } from "zod";
 
-import type { Source, TransportFor } from "../../src/infra/upstream/mcp.js";
+import type { Source, TransportFor } from "../../src/composition.js";
 import { PASSWORD, USERNAME } from "./spv.js";
 
 export type Mail = { readonly id: string; readonly at: number; readonly body: string };

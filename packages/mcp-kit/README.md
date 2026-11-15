@@ -91,15 +91,19 @@ their icons. `servers/oblio` is a complete example.
   honours by itself, and `offerLink` for a sign-in page the client opens.
 - **Networking.** `makeHttp` (retries what is safe to retry, never resends a
   write whose outcome is unknown), `makeOAuthClient`, `makeTokenSource` with a
-  file store locked across processes, `bearer`, `makePacer` and `makeThrottle`
-  for an API's rate limits, `memoize` and `mapWithConcurrency`.
+  file store locked across processes, `bearer`,
+  `pendingPkceAuthorizationFile` for a browser sign-in begun in one call and
+  finished in another, `makePacer` and `makeThrottle` for an API's rate
+  limits, `memoize` and `mapWithConcurrency`, and `connectUpstream` for a
+  server that is itself the client of another MCP server (a vault, a mailbox).
 - **Exact data.** Decimal arithmetic on bigints, an invoice's total by
   EN 16931's rounding (`documentTotal`), zoneless calendar dates, check digits
   for Romanian CIF and CNP codes and IBANs, and CSV safe to open in a
   spreadsheet.
 - **Files and configuration.** `inputFilesFrom` (a file by path inside the
   server's roots, or base64 with its SHA-256), `writeFileAtomic`, JSON state
-  under a lock, `readSecret` and `readConfigFile`, which never quote what they
+  under a lock, `storedFile` for one record checked against its shape on
+  disk, `readSecret` and `readConfigFile`, which never quote what they
   read, `stateDirOf` and `timeZoneOf`, and `toolsetsFrom` and
   `toolsetPolicy` for a server of several products that loads only the ones
   a client asks for (`<SERVER>_TOOLSETS`).

@@ -5,7 +5,8 @@
  * What belongs here is machinery with no opinion about any one API: the failure
  * tag, the tool envelope, a backoff schedule, calendar and exact decimal
  * arithmetic, an invoice's total by EN 16931's rounding, the two rules for a
- * JSON file several processes share (and any file written whole), where a server's files are and how its app.json is
+ * JSON file several processes share (and any file written whole), a record kept in one (a session, a
+ * begun authorization), a client of another MCP server, where a server's files are and how its app.json is
  * read without quoting it, a file a tool takes as input (byte-exact, by path
  * or by checked base64), the shell modes' verdict line, the transport, and
  * the guard every call passes (policy, annotations, the ceiling, an optional
@@ -46,6 +47,8 @@ export {
 } from "./decimal.js";
 export { AMOUNT_SCALE, asAmount, computable, documentTotal, lineAmount, reversalTotal, type DocumentTotal, type RateTotal, type TaxedLine } from "./invoiceTotals.js";
 export { readJsonFile, withFileLock, writeJsonFile, type JsonFileOptions, type LockOptions } from "./jsonFile.js";
+export { storedFile, type DiskSchema, type StoredFile, type StoredFileOptions } from "./storedFile.js";
+export { pendingAuthorizationFile, pendingPkceAuthorizationFile, type PendingAuthorization, type PendingPkceAuthorization } from "./pendingAuthorization.js";
 export { writeFileAtomic } from "./files.js";
 export { run, type RunOptions, type RunResult } from "./run.js";
 export { csvOf } from "./csv.js";
@@ -130,6 +133,20 @@ export {
   type Random,
   type Redirect,
 } from "./oauth.js";
+export {
+  atPath,
+  connectUpstream,
+  fillTemplate,
+  upstreamTransport,
+  usingUpstream,
+  type UpstreamAnswer,
+  type UpstreamConnect,
+  type UpstreamConnection,
+  type UpstreamEndpoint,
+  type UpstreamOptions,
+  type UpstreamTool,
+  type UpstreamTransportFor,
+} from "./upstream.js";
 export { mimeTypeOf, resolveSaveDir, resourceLinkTo, type ResourceLink, type SaveDir } from "./outbox.js";
 export { collectHandedBack, noteHandedBack, saveToOutbox, type SavedFile } from "./handedBack.js";
 export {
