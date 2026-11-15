@@ -169,6 +169,7 @@ const stopsTheCall = (thrown: unknown): boolean => {
 export const indexPath = async (deps: Deps, args: IndexArgs) => {
   const started = deps.now().getTime();
   const collection = await findCollection(deps, args.collection);
+  if (collection.snapshot) return fail(inputError("a snapshot is frozen; index into a regular collection"));
   const model = await modelFor(deps, collection);
   const target: Target = { collection, model, remote: remoteFor(collection, model) };
   const language = args.language?.trim() || deps.settings.language;
@@ -263,6 +264,7 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
 
 export const removeSource = async (deps: Deps, args: { readonly collection: string; readonly path: string }) => {
   const collection = await findCollection(deps, args.collection);
+  if (collection.snapshot) return fail(inputError("a snapshot is frozen; drop the snapshot to remove it"));
   const given = args.path.trim();
   if (!given.startsWith("/")) return fail(inputError("give the absolute path the source was indexed under, as list_sources shows it"));
   const path = posix.normalize(given).replace(/\/+$/u, "");

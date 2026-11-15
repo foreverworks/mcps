@@ -1,6 +1,6 @@
 import { makeHttp, readSecret, type HttpFailure, type HttpOptions } from "@foreverworks/mcp-kit";
 
-import type { RemoteEmbedder } from "../app/ports.js";
+import type { RemoteEmbedder, RemoteReranker } from "../app/ports.js";
 import { configError, fail } from "../domain/errors.js";
 import type { Usage } from "../domain/provider.js";
 
@@ -41,8 +41,10 @@ const DAILY_ALLOCATION_SPENT: ReadonlySet<string> = new Set(["3036", "4006"]);
 const OUT_OF_CAPACITY = "3040";
 
 type RunResult = {
+  readonly success?: boolean;
   readonly result?: {
     readonly data?: unknown;
+    readonly response?: unknown;
     readonly shape?: unknown;
     readonly meta?: { readonly neurons?: unknown; readonly cost_metric_name_1?: unknown; readonly cost_metric_value_1?: unknown };
   };
@@ -79,7 +81,7 @@ const positive = (raw: string | undefined, fallback: number): number => {
 
 const asVectors = (data: unknown, count: number): readonly (readonly number[])[] | undefined =>
   Array.isArray(data) && data.length === count && data.every((v: unknown) => Array.isArray(v) && v.length > 0 && v.every((x) => typeof x === "number"))
-    ? (data as number[][])
+    && data.every((v: number[]) => v.every(Number.isFinite) && v.some((x) => x !== 0)) ? (data as number[][])
     : undefined;
 
 /** What one answer says it cost: its input tokens and neurons, 0 where it says nothing. */
@@ -96,11 +98,12 @@ export type CloudflareOptions = HttpOptions & {
   readonly model?: string | undefined;
   /** Texts per request; default RAG_CLOUDFLARE_BATCH, else 64. */
   readonly batch?: number | undefined;
+  /** Query inference uses one attempt, then falls back locally. Indexing keeps its retry policy. */
+  readonly attempts?: number;
 };
 
-export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, { model: chosen, batch, ...options }: CloudflareOptions = {}): RemoteEmbedder => {
+const makeCloudflareClient = (env: NodeJS.ProcessEnv, options: CloudflareOptions) => {
   const account = () => env["RAG_CLOUDFLARE_ACCOUNT_ID"]?.trim() ?? "";
-  const model = chosen?.trim() || env["RAG_CLOUDFLARE_MODEL"]?.trim() || DEFAULT_MODEL;
   const token = async (): Promise<string> =>
     (await readSecret(env, TOKEN, (message) => fail(configError(message, TOKEN.file)))) ??
     fail(configError("no Cloudflare API token: RAG_CLOUDFLARE_API_TOKEN_FILE names the file that holds it", TOKEN.file));
@@ -117,9 +120,6 @@ export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, { model: chosen, 
     ...options,
   });
   return {
-    provider: "cloudflare",
-    model,
-    batch: batch ?? positive(env["RAG_CLOUDFLARE_BATCH"], DEFAULT_BATCH),
     // A service's absent credential is a file holding a lone newline: the token is read, never only its setting.
     missing: async () => {
       const hasToken = await token().then(
@@ -128,14 +128,45 @@ export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, { model: chosen, 
       );
       return [...(account() === "" ? ["RAG_CLOUDFLARE_ACCOUNT_ID"] : []), ...(hasToken ? [] : [TOKEN.file])];
     },
+    run: async (model: string, body: unknown): Promise<RunResult> => {
+      if (account() === "") return fail(configError("RAG_CLOUDFLARE_ACCOUNT_ID is not set: the Cloudflare account that runs Workers AI", "RAG_CLOUDFLARE_ACCOUNT_ID"));
+      const out = await http<RunResult>(`${API}/accounts/${encodeURIComponent(account())}/ai/run/${model}`, { method: "POST", json: body, idempotent: true });
+      if (out?.success === false || out?.result == null) return fail({ kind: "provider", provider: "cloudflare", reason: "rejected", message: "Workers AI answered without a successful result" });
+      return out;
+    },
+  };
+};
+
+export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, { model: chosen, batch, ...options }: CloudflareOptions = {}): RemoteEmbedder => {
+  const model = chosen?.trim() || env["RAG_CLOUDFLARE_MODEL"]?.trim() || DEFAULT_MODEL;
+  const client = makeCloudflareClient(env, options);
+  return {
+    provider: "cloudflare", model, batch: batch ?? positive(env["RAG_CLOUDFLARE_BATCH"], DEFAULT_BATCH), missing: client.missing,
     embed: async (texts) => {
       if (texts.length === 0) return { vectors: [], usage: { requests: 0, texts: 0, tokens: 0, neurons: 0 } };
-      if (account() === "") return fail(configError("RAG_CLOUDFLARE_ACCOUNT_ID is not set: the Cloudflare account that runs Workers AI", "RAG_CLOUDFLARE_ACCOUNT_ID"));
-      // Embedding is a computation: sending it twice changes nothing, so a lost answer is asked again.
-      const out = await http<RunResult>(`${API}/accounts/${encodeURIComponent(account())}/ai/run/${model}`, { method: "POST", json: { text: texts }, idempotent: true });
+      const out = await client.run(model, { text: texts });
       const vectors = asVectors(out.result?.data, texts.length);
       if (vectors === undefined) return fail({ kind: "provider", provider: "cloudflare", reason: "rejected", message: `expected ${texts.length} vectors from Workers AI's ${model}` });
       return { vectors, usage: usageOf(out.result, texts.length) };
+    },
+  };
+};
+
+/** Workers AI returns the input index as `id`, not TEI's `index`. Never accept a partial ranking. */
+export const makeCloudflareReranker = (env: NodeJS.ProcessEnv, options: CloudflareOptions = {}): RemoteReranker => {
+  const client = makeCloudflareClient(env, options);
+  const model = "@cf/baai/bge-reranker-base";
+  return {
+    model,
+    rerank: async (query, texts) => {
+      const out = await client.run(model, { query, contexts: texts.map((text) => ({ text })), top_k: texts.length });
+      const rows = out.result?.response;
+      if (!Array.isArray(rows) || rows.length !== texts.length || !rows.every((r: unknown) => {
+        const row = r as { id?: unknown; score?: unknown } | null;
+        return row !== null && typeof row?.id === "number" && Number.isInteger(row.id) && row.id >= 0 && row.id < texts.length && typeof row.score === "number" && Number.isFinite(row.score) && row.score >= 0 && row.score <= 1;
+      }) || new Set(rows.map((r: { id: number }) => r.id)).size !== texts.length)
+        return fail({ kind: "provider", provider: "cloudflare", reason: "rejected", message: "Workers AI answered with an invalid ranking" });
+      return { scores: rows.map((r: { id: number; score: number }) => ({ index: r.id, score: r.score })).sort((a, b) => b.score - a.score), usage: usageOf(out.result, texts.length) };
     },
   };
 };

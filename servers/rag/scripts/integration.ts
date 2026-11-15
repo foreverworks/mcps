@@ -14,7 +14,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { Deps } from "../src/app/ports.js";
-import { createCollection, dropCollection } from "../src/app/usecases/collections.js";
+import { createCollection, dropCollection, snapshotCollections } from "../src/app/usecases/collections.js";
 import { checkHealth } from "../src/app/usecases/health.js";
 import { indexPath, listSources, removeSource } from "../src/app/usecases/indexing.js";
 import { expand, search } from "../src/app/usecases/search.js";
@@ -59,6 +59,7 @@ const main = async (): Promise<void> => {
   };
   const name = `it-${Date.now()}`;
   const other = `${name}-salted`;
+  const frozen = `${name}-frozen`;
   const ownIndex = async (collection: string): Promise<boolean> =>
     ((await (await pool()).query("SELECT 1 FROM pg_class WHERE relname = 'rag_hnsw_' || left(md5($1), 16)", [collection])).rowCount ?? 0) > 0;
   try {
@@ -80,6 +81,17 @@ const main = async (): Promise<void> => {
     const repairs = await search(deps, { query: "who pays major repairs structure", limit: 3, candidates: 10, rerank: true, maxChars: 400 });
     assert.equal(repairs.results[0]?.source, join(folder, "lease.md"));
     assert.equal(repairs.results[0]?.location, "Lease > Repairs");
+    // Stored vectors copied at one MVCC snapshot, independent of later source mutation.
+    await snapshotCollections(deps, [{ from: name, name: frozen }]);
+    assert.ok(await ownIndex(frozen));
+    const copy = await search(deps, { query: "who pays major repairs structure", collections: [frozen], limit: 3, candidates: 10, rerank: true, maxChars: 400 });
+    assert.deepEqual(copy.results.map((r) => r.id), repairs.results.map((r) => r.id));
+    assert.ok((await deps.store.collectionInfos()).find((r) => r.name === frozen)?.snapshot);
+    assert.ok(!repairs.collections?.includes(frozen));
+    await assert.rejects(snapshotCollections(deps, [{ from: name, name: `${name}-rollback` }, { from: name, name: `${name}-rollback` }]));
+    assert.ok(!(await deps.store.collectionInfos()).some((r) => r.name === `${name}-rollback`));
+    await assert.rejects(deps.store.snapshotCollections([{ from: name, name: `${name}-rollback` }, { from: `${name}-missing`, name: `${name}-rollback-other` }]));
+    assert.ok(!(await deps.store.collectionInfos()).some((r) => r.name.startsWith(`${name}-rollback`)));
     const scoped = await search(deps, { query: "lamp", sourcePrefix: join(folder, "text"), limit: 5, candidates: 10, rerank: false, maxChars: 200 });
     assert.ok(scoped.results.length > 0 && scoped.results.every((r) => r.source.startsWith(join(folder, "text"))));
     const around = await expand(deps, { collection: name, id: repairs.results[0]?.id ?? "", before: 2, after: 2 });
@@ -153,7 +165,7 @@ const main = async (): Promise<void> => {
     assert.ok(await ownIndex(other));
     console.log("integration: ok");
   } finally {
-    for (const c of [name, other]) console.log("drop:", JSON.stringify(await dropCollection(deps, c).catch((e: unknown) => String(e))), "index left:", await ownIndex(c));
+    for (const c of [name, other, frozen]) console.log("drop:", JSON.stringify(await dropCollection(deps, c).catch((e: unknown) => String(e))), "index left:", await ownIndex(c));
     await (await pool()).end();
     await rm(folder, { recursive: true, force: true });
   }

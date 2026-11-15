@@ -74,6 +74,8 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_EMBED_QUERY_PROMPT` | no | The prompt questions get with that model, by the name its own configuration gives it (text-embeddings-inference's `prompt_name`), for a model trained with one. Documents never get it. |
 | `RAG_EMBED_MODELS` | no | More embedding models, as a JSON object by name: `{"<name>": {"url": "...", "query_prompt": "...", "cloudflare_model": "...", "cloudflare_batch": 32}}`, only `url` required. See [Several embedding models](#several-embedding-models). |
 | `RAG_RERANK_URL` | yes | Base URL of a text-embeddings-inference server with a reranker model, such as `http://127.0.0.1:8531`. |
+| `RAG_QUERY_PROVIDER` | no | Query embedding and reranking: `local` (default), or `cloudflare` with automatic local fallback. Independent of a collection's indexing provider. |
+| `RAG_QUERY_TIMEOUT_MS` | no | Deadline per remote inference request during search. Default 2000 ms, one attempt. |
 | `RAG_SOURCE_ROOTS` | no | Folders, separated by `:`, the server may index from in place, besides `MCP_FILE_ROOTS`. Links inside them are never followed. |
 | `RAG_OCR_LANGUAGE` | no | Tesseract language code(s) for OCR when a call names none. Default `eng`. |
 | `RAG_MAX_FILE_BYTES` | no | Largest file it reads. Default 200 MiB. |
@@ -158,8 +160,8 @@ Each collection records where its chunks are embedded when it is indexed:
   your CPU: 100 MB of English text is about 27 million bge-m3 tokens, many
   hours of work for a CPU (see the measurements under How it works).
 
-Questions are always embedded by the model's local endpoint, so a collection
-indexed at Cloudflare is searched exactly like one indexed locally. That holds only while
+Questions use the configured query provider (local by default), independently
+of where documents were embedded. That holds only while
 both give the same vectors, so `create_collection` sends three probe texts to
 both and refuses the provider unless every pair has a cosine similarity of at
 least 0.999. `BAAI/bge-m3` served by text-embeddings-inference and
@@ -211,6 +213,7 @@ each call (see Confirmation in [docs/security.md](../../docs/security.md)).
 | `health` | read | The database (extensions, tables, dimension, collections), the embed and rerank endpoints (model, revision, dimension), the extractors on PATH with tesseract's languages, and which remote providers are configured. |
 | `list_collections` | read | Every collection with its description, embedding model, provider, what a remote provider has cost it, documents and chunks. |
 | `create_collection` | write | A named collection, recording the embedding model and dimension and where its chunks are embedded (a remote provider only after the probe); for an existing one, moves it to the provider named. The first one creates the tables. |
+| `snapshot_collections` | write | Freeze copies of collections and their stored vectors in one local database snapshot. Excluded from default search; explicitly name copies to compare inference settings. |
 | `drop_collection` | write | Deletes a collection and everything indexed in it. The files are not touched. |
 | `index_path` | write | Indexes a file or a folder: text extracted (OCR for scanned pages and images), cut into chunks with stable ids and their page or heading, and only new chunks embedded; unchanged files are passed over and do not count toward `max_files`, so a second call goes on from the first. `prune` removes sources no longer in the folder. |
 | `remove_source` | write | Removes one indexed file, or every one under a folder. |
@@ -289,6 +292,35 @@ rephrasings in `also` (10 won, none lost, McNemar p = 0.002), in the same 5 s.
 50 candidates instead of 20 gave 58 (not significant) and took 11 s; without
 the reranker, 38.
 
+### Query inference at Workers AI
+
+Set `RAG_QUERY_PROVIDER=cloudflare` to send questions to the same Workers AI
+embedding model and candidate passages to `@cf/baai/bge-reranker-base`.
+The database, hybrid retrieval and document indexing stay where configured.
+Before remote query vectors enter a local index, three English and Romanian
+probe texts must agree with its local model at cosine >= 0.999. Successful
+probes expire after an hour and are keyed by local revision and remote model.
+Named local query prompts fall back locally until they have a remote mapping.
+
+Each remote request has one attempt and a deadline (`RAG_QUERY_TIMEOUT_MS`,
+2000 ms by default). Missing configuration, refusal, quota, rate limits,
+timeouts, incompatible vectors and invalid responses fall back to the local
+endpoint. The next call tries Cloudflare again. If a rerank batch fails, every
+candidate is reranked locally so scores from different models never mix.
+`search` returns `inference` with the actual provider, model, elapsed time,
+reported usage and a closed fallback category. The same metadata goes to stderr
+when Cloudflare is selected; it never includes queries, passages or API errors.
+`health.query_inference` reports configuration and successful compatibility
+probes, without making a remote request. `search.local_inference=true` forces
+local inference for a single comparison or a private query.
+`search.inference_timeout_ms` sets a remote deadline for one call, including a
+very short budget to verify fallback and recovery without disrupting the service.
+
+For reproducible comparisons, `snapshot_collections` (write) freezes several
+collections in one database snapshot, copying their existing vectors locally.
+Snapshots cannot be indexed or pruned, and default searches exclude them.
+Name them explicitly in `search.collections`; remove them with `drop_collection`.
+
 ## Limitations
 
 - **Formats.** No legacy `.doc`, `.ppt` or `.xls`: convert them first (for
@@ -300,8 +332,9 @@ the reranker, 38.
   that built it: another model means another collection, indexed again.
 - **Slow on a CPU**, as measured above: index large folders in several calls
   (`max_files`) or at a remote provider, and keep `candidates` near 20.
-- **One remote provider**, Cloudflare Workers AI, and only for indexing: the
-  reranker and every question run on the local endpoints.
+- **One remote provider**, Cloudflare Workers AI, supported for indexing and
+  optional query inference. Its reranker differs from the local one; evaluate
+  it on your language and corpus before choosing it.
 - **No scheduling.** Nothing watches the folders; call `index_path` again.
 
 ## Other servers for local RAG

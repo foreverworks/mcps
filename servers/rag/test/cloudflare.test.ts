@@ -6,11 +6,11 @@ import { mkdtemp, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 
 import { asAppError } from "../src/domain/errors.js";
 import { addUsage, batches, compareProbe, cosine, MIN_PROBE_COSINE, NO_USAGE } from "../src/domain/provider.js";
-import { makeCloudflareEmbedder, usageOf } from "../src/infra/cloudflare.js";
+import { makeCloudflareEmbedder, makeCloudflareReranker, usageOf } from "../src/infra/cloudflare.js";
 
 type Sent = { readonly url: string; readonly headers: Record<string, string>; readonly body: unknown };
 
@@ -56,6 +56,30 @@ const failureOf = async (promise: Promise<unknown>) => {
 };
 
 describe("the Workers AI client", () => {
+  it("maps rerank ids, requests all results and reports usage", async () => {
+    const fetch = vi.fn(async (_input: string | URL | Request, _init?: RequestInit) => answer(200, { success: true, result: { response: [{ id: 1, score: 0.9 }, { id: 0, score: 0.1 }] } }));
+    const out = await makeCloudflareReranker(ENV, { fetch }).rerank("question", ["one", "two"]);
+    expect(out.scores).toEqual([{ index: 1, score: 0.9 }, { index: 0, score: 0.1 }]);
+    expect(JSON.parse(String(fetch.mock.calls[0]?.[1]?.body))).toEqual({ query: "question", contexts: [{ text: "one" }, { text: "two" }], top_k: 2 });
+  });
+
+  it.each([
+    [{ id: 0, score: 0.5 }],
+    [{ id: 0, score: 0.5 }, { id: 0, score: 0.4 }],
+    [{ id: 0, score: 0.5 }, { id: 2, score: 0.4 }],
+    [{ id: 0, score: 0.5 }, { id: 1, score: null }],
+    [{ id: 0, score: 0.5 }, { id: 1, score: 2 }],
+  ])("rejects an invalid or incomplete rerank", async (...rows) => {
+    const fetch = async () => answer(200, { success: true, result: { response: rows } });
+    expect(await failureOf(makeCloudflareReranker(ENV, { fetch }).rerank("question", ["one", "two"]))).toMatchObject({ reason: "rejected" });
+  });
+
+  it("makes one query attempt on a rate limit", async () => {
+    const fetch = vi.fn(async () => refusal(429, 3001, "limited", { "Retry-After": "60" }));
+    const ranker = makeCloudflareReranker(ENV, { fetch, attempts: 1, timeoutMs: 25 });
+    expect(await failureOf(ranker.rerank("q", ["one"]))).toMatchObject({ reason: "rate_limited" });
+    expect(fetch).toHaveBeenCalledTimes(1);
+  });
   it("posts the texts to the account's model with the token, and reads vectors and usage", async () => {
     const { embedder, sent } = client([(s) => ok((s.body as { text: string[] }).text)]);
     const out = await embedder.embed(["one", "two"]);

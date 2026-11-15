@@ -1,6 +1,6 @@
 import { fuse, fuseInOrder } from "../../domain/rrf.js";
 import { asAppError, describeFailure, fail, inputError } from "../../domain/errors.js";
-import type { CollectionInfo, Deps, EmbeddingModel, Hit } from "../ports.js";
+import type { CollectionInfo, Deps, EmbeddingModel, Hit, InferenceTrace } from "../ports.js";
 import { findCollection, modelFor } from "./collections.js";
 
 export type SearchArgs = {
@@ -50,14 +50,16 @@ const byModel = async (deps: Deps, collections: readonly CollectionInfo[]) => {
 };
 
 /** The ranked lists of one phrasing: each model's nearest chunks, then the full-text matches. */
-const listsFor = async (deps: Deps, groups: Awaited<ReturnType<typeof byModel>>, names: readonly string[], sourcePrefix: string | undefined, phrasing: string) => {
+const listsFor = async (deps: Deps, groups: Awaited<ReturnType<typeof byModel>>, names: readonly string[], sourcePrefix: string | undefined, phrasing: string, inference: InferenceTrace[]) => {
   // The full-text half gives up past its time bound (a question of only frequent words over a large
   // collection); the vector half then stands alone and the reply says so.
   let textTimedOut = false;
   const [nearest, matching] = await Promise.all([
     Promise.all(
       groups.map(async ({ model, collections }) => {
-        const [vector] = await model.embedder.embed([phrasing], { prompt: model.queryPrompt });
+        const embedded = deps.inference === undefined ? undefined : await deps.inference.embed(model, [phrasing], collections[0]?.dimension ?? 0);
+        if (embedded !== undefined) inference.push(embedded.trace);
+        const [vector] = embedded?.vectors ?? await model.embedder.embed([phrasing], { prompt: model.queryPrompt });
         if (vector === undefined) return fail({ kind: "model", endpoint: "embed", message: `no vector for the query from ${model.name}` });
         const odd = collections.find((c) => c.dimension !== vector.length);
         if (odd !== undefined) return fail({ kind: "mismatch", message: `collection "${odd.name}" holds ${odd.dimension}-dimension vectors, and ${model.name} embedded the question in ${vector.length}` });
@@ -89,14 +91,16 @@ const listsFor = async (deps: Deps, groups: Awaited<ReturnType<typeof byModel>>,
  * If the reranker fails the fused order stands and the reply says so.
  */
 export const search = async (deps: Deps, args: SearchArgs) => {
+  const start = performance.now();
+  const inference: InferenceTrace[] = [];
   const query = args.query.trim();
   if (query.length === 0) return fail(inputError("the query is empty"));
   const also = [...new Set((args.also ?? []).map((a) => a.trim()).filter((a) => a.length > 0 && a !== query))];
   const all = await deps.store.collections();
-  const names = args.collections === undefined || args.collections.length === 0 ? all.map((c) => c.name) : [...new Set(args.collections)];
+  const names = args.collections === undefined || args.collections.length === 0 ? all.filter((c) => !c.snapshot).map((c) => c.name) : [...new Set(args.collections)];
   if (names.length === 0) return { query, results: [], note: "there are no collections yet" };
   const groups = await byModel(deps, await Promise.all(names.map((name) => findCollection(deps, name))));
-  const perPhrasing = await Promise.all([query, ...also].map((p) => listsFor(deps, groups, names, args.sourcePrefix, p)));
+  const perPhrasing = await Promise.all([query, ...also].map((p) => listsFor(deps, groups, names, args.sourcePrefix, p, inference)));
   const textNote = perPhrasing.some((p) => p.textTimedOut) ? "the full-text half ran past its time bound and was left out; results come from the vector half" : undefined;
   const keep = Math.max(args.candidates, args.limit);
   // One ranked list per model, then the full-text one: a chunk is in at most one of the first.
@@ -120,7 +124,10 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   let rerankNote: string | undefined;
   if (args.rerank && candidates.length > 1) {
     try {
-      const scores = await rerankAll(deps, query, candidates.map((c) => c.chunk.body));
+      const texts = candidates.map((c) => c.chunk.body);
+      const ranked = deps.inference === undefined ? undefined : await deps.inference.rerank(query, texts);
+      if (ranked !== undefined) inference.push(ranked.trace);
+      const scores = ranked?.scores ?? await rerankAll(deps, query, texts);
       order = scores.flatMap((s) => { const c = candidates[s.index]; return c === undefined ? [] : [{ ...c, rerank: s.score, i: s.index }]; });
     } catch (thrown) {
       rerankNote = `the reranker failed (${describeFailure(thrown)}); results are in fused order`;
@@ -142,6 +149,7 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   });
   return {
     query,
+    ...(inference.length === 0 ? {} : { inference, elapsed_ms: Math.round(performance.now() - start) }),
     ...(also.length === 0 ? {} : { also }),
     collections: names,
     ...(groups.length > 1 ? { embedding_models: groups.map((g) => ({ name: g.model.name, collections: g.collections.map((c) => c.name) })) } : {}),

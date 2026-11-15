@@ -3,10 +3,11 @@ import { delimiter, resolve } from "node:path";
 import { z } from "zod";
 
 import type { Deps, EmbeddingModel } from "./app/ports.js";
+import { makeQueryInference } from "./app/inference.js";
 import { configError, fail } from "./domain/errors.js";
 import { makePool } from "./infra/database.js";
 import { makeExtractor } from "./infra/extract.js";
-import { makeCloudflareEmbedder } from "./infra/cloudflare.js";
+import { makeCloudflareEmbedder, makeCloudflareReranker } from "./infra/cloudflare.js";
 import { makeEmbedder, makeReranker } from "./infra/models.js";
 import { makeSources } from "./infra/sources.js";
 import { makeStore } from "./infra/store.js";
@@ -91,11 +92,29 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
     .filter((r) => r !== "")
     .map((r) => resolve(r));
   const roots = [...new Set([...fileRootsFrom(env, process.cwd()), ...extra])];
+  const reranker = makeReranker({ url: env["RAG_RERANK_URL"], variable: "RAG_RERANK_URL" });
+  const provider = env["RAG_QUERY_PROVIDER"]?.trim() || "local";
+  const timeoutMs = positive(env["RAG_QUERY_TIMEOUT_MS"], 2000);
+  const inferenceForTimeout = (deadline: number) => makeQueryInference({
+    provider: provider === "cloudflare" ? "cloudflare" : "local",
+    remote: (model) => model.remote.cloudflare === undefined ? undefined : makeCloudflareEmbedder(env, { attempts: 1, timeoutMs: deadline, model: model.remote.cloudflare.model, batch: model.remote.cloudflare.batch }),
+    remoteReranker: makeCloudflareReranker(env, { attempts: 1, timeoutMs: deadline }),
+    localReranker: reranker,
+    batch: positive(env["RAG_RERANK_BATCH"], 32), timeoutMs: deadline,
+    observe: (trace) => { if (provider === "cloudflare") process.stderr.write(`${JSON.stringify({ event: "query_inference", ...trace })}\n`); },
+  });
+  const inference = inferenceForTimeout(timeoutMs);
   return {
+    inferenceForTimeout,
+    inference: provider === "local" || provider === "cloudflare" ? inference : {
+      ...inference,
+      embed: async () => fail(configError("RAG_QUERY_PROVIDER must be local or cloudflare", "RAG_QUERY_PROVIDER")),
+      rerank: async () => fail(configError("RAG_QUERY_PROVIDER must be local or cloudflare", "RAG_QUERY_PROVIDER")),
+    },
     store: makeStore(makePool(env)),
     models: embeddingModelsFrom(env),
     providers: { cloudflare: { missing: makeCloudflareEmbedder(env).missing } },
-    reranker: makeReranker({ url: env["RAG_RERANK_URL"], variable: "RAG_RERANK_URL" }),
+    reranker,
     extractor: makeExtractor(),
     sources: makeSources(roots, { maxBytes: positive(env["RAG_MAX_FILE_BYTES"], DEFAULT_MAX_FILE_BYTES), script: env["MCP_FILE_SCRIPT"]?.trim() || undefined }),
     settings: {

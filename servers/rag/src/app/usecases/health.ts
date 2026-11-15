@@ -64,6 +64,7 @@ export const checkHealth = async (deps: Deps) => {
     extractors: tools,
     // What each remote provider would need, read from the settings: health never spends a provider's units.
     providers: Object.fromEntries(providers.map(({ name, missing }) => [name, { configured: missing.length === 0, ...(missing.length === 0 ? {} : { missing }) }])),
+    ...(deps.inference === undefined ? {} : { query_inference: deps.inference.status() }),
     roots: deps.sources.roots,
     language: deps.settings.language,
   };

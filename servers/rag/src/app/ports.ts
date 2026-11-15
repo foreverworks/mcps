@@ -56,6 +56,27 @@ export type Reranker = {
   readonly rerank: (query: string, texts: readonly string[]) => Promise<readonly { readonly index: number; readonly score: number }[]>;
 };
 
+export type RemoteReranker = {
+  readonly model: string;
+  readonly rerank: (query: string, texts: readonly string[]) => Promise<{ readonly scores: readonly { readonly index: number; readonly score: number }[]; readonly usage: Usage }>;
+};
+
+/** Safe operational metadata only. Never include an API's error message, input text or credentials. */
+export type InferenceTrace = {
+  readonly stage: "embed" | "rerank";
+  readonly provider: Provider;
+  readonly model: string;
+  readonly elapsed_ms: number;
+  readonly fallback?: { readonly reason: string; readonly status?: number } | undefined;
+  readonly usage?: Usage | undefined;
+};
+
+export type QueryInference = {
+  readonly embed: (model: EmbeddingModel, texts: readonly string[], dimension: number) => Promise<{ readonly vectors: readonly (readonly number[])[]; readonly trace: InferenceTrace }>;
+  readonly rerank: (query: string, texts: readonly string[]) => Promise<{ readonly scores: readonly { readonly index: number; readonly score: number }[]; readonly trace: InferenceTrace }>;
+  readonly status: () => object;
+};
+
 export type Extracted = {
   readonly sections: readonly Section[];
   /** Pages in the file (PDF), when known. */
@@ -99,6 +120,8 @@ export type Sources = {
 
 /** A collection as recorded, without counting what it holds. */
 export type CollectionInfo = {
+  /** A frozen copy, excluded from searches that do not name collections explicitly. */
+  readonly snapshot?: true;
   readonly name: string;
   readonly description: string;
   /** The model that embedded it, as its local endpoint names it (model@revision), and its dimension: every question is embedded with it. */
@@ -163,6 +186,8 @@ export type StoreStatus = {
 };
 
 export type Store = {
+  /** Atomically copies collections, documents and stored vectors, without re-embedding. Refuses existing destinations. */
+  readonly snapshotCollections: (copies: readonly { readonly from: string; readonly name: string }[]) => Promise<void>;
   readonly status: () => Promise<StoreStatus>;
   /** Creates the extensions it may and the tables, for vectors of this dimension; a no-op when they exist. */
   readonly ensureSchema: (dimension: number) => Promise<void>;
@@ -215,6 +240,9 @@ export type Settings = {
 };
 
 export type Deps = {
+  readonly inference?: QueryInference | undefined;
+  /** A per-call remote deadline, without changing the primary provider or future calls. */
+  readonly inferenceForTimeout?: ((ms: number) => QueryInference) | undefined;
   readonly store: Store;
   /** Every embedding model configured, the default first; a configuration error when there is none or it cannot be read. */
   readonly models: () => readonly EmbeddingModel[];

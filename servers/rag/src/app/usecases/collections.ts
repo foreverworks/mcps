@@ -92,6 +92,19 @@ export const listCollections = async (deps: Deps) => {
   return { count: rows.length, collections: rows };
 };
 
+/** A single database snapshot for all copies; stored vectors and lexical text stay local. */
+export const snapshotCollections = async (deps: Deps, copies: readonly { readonly from: string; readonly name: string }[]) => {
+  const names = copies.map((c) => c.name);
+  if (new Set(names).size !== names.length || names.some((n) => !COLLECTION_NAME.test(n))) return fail(inputError("snapshot destinations must be distinct valid collection names"));
+  const rows = await deps.store.collectionInfos();
+  for (const copy of copies) {
+    if (!rows.some((r) => r.name === copy.from)) return fail(notFound("snapshot source collection does not exist"));
+    if (rows.some((r) => r.name === copy.name)) return fail(inputError("snapshot destination already exists"));
+  }
+  await deps.store.snapshotCollections(copies);
+  return { snapshots: (await deps.store.collections()).filter((c) => names.includes(c.name)) };
+};
+
 /**
  * Makes a collection with an embedding model (the default unless one is
  * named), or, for one that exists, checks its description and model, builds
@@ -107,6 +120,7 @@ export const createCollection = async (
 ) => {
   if (!COLLECTION_NAME.test(args.name)) return fail(inputError(`"${args.name}" is not a collection name: lowercase letters, digits, - and _, at most 63, starting with a letter or digit`));
   const existing = (await deps.store.collectionInfos()).find((c) => c.name === args.name);
+  if (existing?.snapshot) return fail(inputError("a snapshot is frozen; create a new collection to index or change providers"));
   if (existing !== undefined && args.description !== undefined && existing.description !== args.description)
     return fail(inputError(`collection "${args.name}" exists with another description ("${existing.description}"); drop it first or keep its description`));
   const embedding = existing !== undefined && args.embeddingModel === undefined ? await modelFor(deps, existing) : modelNamed(deps, args.embeddingModel);

@@ -2,7 +2,7 @@ import type { McpServer } from "@foreverworks/mcp-kit";
 import { z } from "zod";
 
 import type { Deps } from "../app/ports.js";
-import { createCollection, dropCollection, listCollections } from "../app/usecases/collections.js";
+import { createCollection, dropCollection, listCollections, snapshotCollections } from "../app/usecases/collections.js";
 import { checkHealth } from "../app/usecases/health.js";
 import { indexPath, listSources, removeSource } from "../app/usecases/indexing.js";
 import { expand, readDocument, search } from "../app/usecases/search.js";
@@ -54,7 +54,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "large one; search and indexing go on meanwhile). The first collection also creates the tables. " +
         "embedding_provider says where its chunks are embedded when indexed: local (the server's own embed endpoint, the default) or a remote " +
         `service running the same model, which is faster for a large corpus and sends the documents' text there. A remote provider is accepted only after it ` +
-        `embeds probe texts as the local endpoint does (cosine at least ${MIN_PROBE_COSINE}), since every question is embedded locally. Naming another ` +
+        `embeds probe texts as the local endpoint does (cosine at least ${MIN_PROBE_COSINE}). Naming another ` +
         "provider for an existing collection moves it there, with the same probe; chunks already embedded stay, as both providers' vectors are alike.",
       inputSchema: {
         name: z.string().trim().describe("Lowercase letters, digits, - and _, at most 63 characters."),
@@ -73,6 +73,16 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       },
     },
     handled((a) => createCollection(deps, { name: a.name, description: a.description, provider: a.embedding_provider, embeddingModel: a.embedding_model })),
+  );
+
+  server.registerTool(
+    "snapshot_collections",
+    {
+      title: "Freeze collections for comparison",
+      description: "Copy collections, documents and stored vectors in one database snapshot, without re-embedding or sending text elsewhere. Destinations must not exist. Copies are frozen and excluded from default searches; name them explicitly in search. Useful for comparing retrieval settings on an identical corpus while indexing continues. drop_collection removes a snapshot.",
+      inputSchema: { copies: z.array(z.object({ from: collection, name: collection }).strict()).min(1).max(50) },
+    },
+    handled((a) => snapshotCollections(deps, a.copies)),
   );
 
   server.registerTool(
@@ -157,7 +167,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Collections built with " +
         "different embedding models are each searched with their own, the question embedded once per model. Each result has its " +
         "collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole " +
-        "document. Reranking is the slow part: about 0.5 s per candidate on a CPU. Pass `also`: rephrasings cost little and find more.",
+        "document. Query inference can use Cloudflare with local fallback when configured; inference reports the provider and a safe fallback reason. Pass `also`: rephrasings cost little and find more.",
       inputSchema: {
         query: z.string().trim().min(1).max(2000).describe("The question, in full sentences: the reranker reads it as written."),
         also: z
@@ -169,16 +179,18 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
               "and for a question in another language than the documents a translation into theirs. Each is retrieved like the query, " +
               "the candidates merged, and the reranker reads them against the query. Finds passages the query's own words miss; no answer guesses.",
           ),
-        collections: z.array(collection).max(50).optional().describe("Where to search. Default: every collection."),
+        collections: z.array(collection).max(50).optional().describe("Where to search. Default: every regular collection, excluding snapshots."),
         source_prefix: z.string().optional().describe("Only sources whose path starts with this; end a folder with /."),
         limit: z.number().int().min(1).max(50).default(5).describe("Results returned."),
         candidates: z.number().int().min(1).max(50).default(20).describe("Fused candidates the reranker reads; more finds more and costs time."),
         rerank: z.boolean().default(true).describe("false returns the fused order, without the reranker: fast, less precise."),
+        local_inference: z.boolean().default(false).describe("Use local query embedding and reranking for this call, for privacy or provider comparisons. Default: the server's configured query provider."),
+        inference_timeout_ms: z.number().int().min(1).max(30000).optional().describe("Remote inference deadline per request for this call, in milliseconds. Expiry falls back locally; future calls keep the configured deadline."),
         max_chars: z.number().int().min(100).max(5000).default(1200).describe("Each result's text is cut to about this many characters."),
       },
     },
     handled((a) =>
-      search(deps, { query: a.query, also: a.also, collections: a.collections, sourcePrefix: a.source_prefix, limit: a.limit, candidates: a.candidates, rerank: a.rerank, maxChars: a.max_chars }),
+      search(a.local_inference ? { ...deps, inference: undefined } : a.inference_timeout_ms === undefined ? deps : { ...deps, inference: deps.inferenceForTimeout?.(a.inference_timeout_ms) ?? deps.inference }, { query: a.query, also: a.also, collections: a.collections, sourcePrefix: a.source_prefix, limit: a.limit, candidates: a.candidates, rerank: a.rerank, maxChars: a.max_chars }),
     ),
   );
 

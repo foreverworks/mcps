@@ -141,6 +141,21 @@ describe("the tool surface", () => {
 });
 
 describe("index, search, read", () => {
+  it("freezes copies, excludes them from default search and refuses mutations", async () => {
+    const s = await connected();
+    await s.call("create_collection", { name: "docs" });
+    await s.call("index_path", { collection: "docs", path: "." });
+    const snapshot = await s.call("snapshot_collections", { copies: [{ from: "docs", name: "frozen" }] });
+    expect(snapshot.snapshots[0].snapshot).toBe(true);
+    expect((await s.call("search", { query: "repairs" })).results.every((r: { collection: string }) => r.collection === "docs")).toBe(true);
+    const before = await s.call("search", { query: "repairs", collections: ["frozen"] });
+    await s.call("remove_source", { collection: "docs", path: join(s.inbox, "lease") });
+    expect((await s.call("search", { query: "repairs", collections: ["frozen"] })).results).toEqual(before.results);
+    expect(await s.call("index_path", { collection: "frozen", path: "." })).toMatchObject({ error: { kind: "input" } });
+    expect(await s.call("remove_source", { collection: "frozen", path: join(s.inbox, "lease") })).toMatchObject({ error: { kind: "input" } });
+    expect(await s.call("snapshot_collections", { copies: [{ from: "docs", name: "frozen" }] })).toMatchObject({ error: { kind: "input" } });
+  });
+
   it("indexes a folder, finds the passage that answers a paraphrased question first, and reads around it", async () => {
     const s = await connected();
     expect((await s.call("create_collection", { name: "docs", description: "test" })).created).toBe(true);

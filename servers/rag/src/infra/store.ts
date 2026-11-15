@@ -71,6 +71,7 @@ const inTransaction = async <T>(pool: Pool, work: (client: pg.PoolClient) => Pro
  * and what a remote provider has cost it.
  */
 const UPGRADES: readonly string[] = [
+  "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS snapshot boolean NOT NULL DEFAULT false",
   "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS provider text NOT NULL DEFAULT 'local'",
   "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS provider_model text NOT NULL DEFAULT ''",
   "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS provider_probe jsonb",
@@ -136,9 +137,10 @@ const documentOf = (r: DocumentSql): DocumentRow => ({
   indexed: r.indexed.toISOString(),
 });
 
-const COLLECTION_COLUMNS = "c.name, c.description, c.model, c.dimension, c.created, c.provider, c.provider_model, c.provider_probe, c.spent_tokens, c.spent_neurons";
+const COLLECTION_COLUMNS = "c.name, c.description, c.model, c.dimension, c.created, c.provider, c.provider_model, c.provider_probe, c.spent_tokens, c.spent_neurons, c.snapshot";
 
 type CollectionSql = {
+  snapshot: boolean;
   name: string;
   description: string;
   model: string;
@@ -152,6 +154,7 @@ type CollectionSql = {
 };
 
 const collectionOf = (r: CollectionSql): CollectionInfo => ({
+  ...(r.snapshot ? { snapshot: true as const } : {}),
   name: r.name,
   description: r.description,
   model: r.model,
@@ -193,6 +196,23 @@ export const makeStore = (pool: () => Promise<Pool>): Store => {
   };
 
   return {
+    snapshotCollections: async (copies) => {
+      const db = await pool();
+      await ready(db);
+      await inTransaction(db, async (client) => {
+        await query(client, "SET TRANSACTION ISOLATION LEVEL REPEATABLE READ");
+        for (const copy of copies) {
+          const row = await query(client, `INSERT INTO rag_collection (name, description, model, dimension, provider, provider_model, provider_probe, snapshot)
+            SELECT $2, description, model, dimension, provider, provider_model, provider_probe, true FROM rag_collection WHERE name = $1`, [copy.from, copy.name]);
+          if (row.rowCount !== 1) return fail({ kind: "not_found", message: "snapshot source collection does not exist" });
+          await query(client, `INSERT INTO rag_document (collection, source, sha256, size, kind, pages, extraction, indexed)
+            SELECT $2, source, sha256, size, kind, pages, extraction, indexed FROM rag_document WHERE collection = $1`, [copy.from, copy.name]);
+          await query(client, `INSERT INTO rag_chunk (collection, source, id, ordinal, location, body, embedding, fts)
+            SELECT $2, source, id, ordinal, location, body, embedding, fts FROM rag_chunk WHERE collection = $1`, [copy.from, copy.name]);
+          await query(client, indexSql(copy.name, false));
+        }
+      });
+    },
     status: async () => {
       const db = await pool();
       const ext = await query<{ extname: string; extversion: string }>(db, "SELECT extname, extversion FROM pg_extension WHERE extname IN ('vector', 'unaccent')");

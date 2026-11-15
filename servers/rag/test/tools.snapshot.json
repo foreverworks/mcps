@@ -2,7 +2,7 @@
   {
     "name": "create_collection",
     "title": "Create a collection",
-    "description": "Make a named collection to index documents into, embedded by one of the server's embedding models (embedding_model, the default unless named); it records that model's revision and dimension, and only that model can search or grow it later. Creating one that exists with the same description is a no-op, except that a collection made before each had a vector index of its own gets it built (minutes for a large one; search and indexing go on meanwhile). The first collection also creates the tables. embedding_provider says where its chunks are embedded when indexed: local (the server's own embed endpoint, the default) or a remote service running the same model, which is faster for a large corpus and sends the documents' text there. A remote provider is accepted only after it embeds probe texts as the local endpoint does (cosine at least 0.999), since every question is embedded locally. Naming another provider for an existing collection moves it there, with the same probe; chunks already embedded stay, as both providers' vectors are alike.",
+    "description": "Make a named collection to index documents into, embedded by one of the server's embedding models (embedding_model, the default unless named); it records that model's revision and dimension, and only that model can search or grow it later. Creating one that exists with the same description is a no-op, except that a collection made before each had a vector index of its own gets it built (minutes for a large one; search and indexing go on meanwhile). The first collection also creates the tables. embedding_provider says where its chunks are embedded when indexed: local (the server's own embed endpoint, the default) or a remote service running the same model, which is faster for a large corpus and sends the documents' text there. A remote provider is accepted only after it embeds probe texts as the local endpoint does (cosine at least 0.999). Naming another provider for an existing collection moves it there, with the same probe; chunks already embedded stay, as both providers' vectors are alike.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -366,7 +366,7 @@
   {
     "name": "search",
     "title": "Search",
-    "description": "Find the passages that answer a question, in any language the model reads (a Romanian question finds a Romanian passage worded differently). Hybrid: the nearest chunks by embedding and the full-text matches of any of its words (accents ignored), fused by reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Collections built with different embedding models are each searched with their own, the question embedded once per model. Each result has its collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole document. Reranking is the slow part: about 0.5 s per candidate on a CPU. Pass `also`: rephrasings cost little and find more.",
+    "description": "Find the passages that answer a question, in any language the model reads (a Romanian question finds a Romanian passage worded differently). Hybrid: the nearest chunks by embedding and the full-text matches of any of its words (accents ignored), fused by reciprocal rank; then the reranker reads the best candidates against the question and decides the order. Collections built with different embedding models are each searched with their own, the question embedded once per model. Each result has its collection, chunk id, source path, location (page or heading), text and scores. expand reads around a hit, read_document the whole document. Query inference can use Cloudflare with local fallback when configured; inference reports the provider and a safe fallback reason. Pass `also`: rephrasings cost little and find more.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -387,7 +387,7 @@
           }
         },
         "collections": {
-          "description": "Where to search. Default: every collection.",
+          "description": "Where to search. Default: every regular collection, excluding snapshots.",
           "maxItems": 50,
           "type": "array",
           "items": {
@@ -420,6 +420,17 @@
           "description": "false returns the fused order, without the reranker: fast, less precise.",
           "type": "boolean"
         },
+        "local_inference": {
+          "default": false,
+          "description": "Use local query embedding and reranking for this call, for privacy or provider comparisons. Default: the server's configured query provider.",
+          "type": "boolean"
+        },
+        "inference_timeout_ms": {
+          "description": "Remote inference deadline per request for this call, in milliseconds. Expiry falls back locally; future calls keep the configured deadline.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 30000
+        },
         "max_chars": {
           "default": 1200,
           "description": "Each result's text is cut to about this many characters.",
@@ -442,6 +453,57 @@
     },
     "_meta": {
       "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "snapshot_collections",
+    "title": "Freeze collections for comparison",
+    "description": "Copy collections, documents and stored vectors in one database snapshot, without re-embedding or sending text elsewhere. Destinations must not exist. Copies are frozen and excluded from default searches; name them explicitly in search. Useful for comparing retrieval settings on an identical corpus while indexing continues. drop_collection removes a snapshot.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "copies": {
+          "minItems": 1,
+          "maxItems": 50,
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "from": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63,
+                "description": "A collection's name, as list_collections shows it."
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 63,
+                "description": "A collection's name, as list_collections shows it."
+              }
+            },
+            "required": [
+              "from",
+              "name"
+            ],
+            "additionalProperties": false
+          }
+        }
+      },
+      "required": [
+        "copies"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
     }
   }
 ]

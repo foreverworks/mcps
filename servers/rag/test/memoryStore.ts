@@ -48,6 +48,14 @@ export const memoryStore = (): Store & { readonly rows: () => readonly Row[] } =
   };
 
   return {
+    snapshotCollections: async (copies) => {
+      if (copies.some((c) => collections.has(c.name) || !collections.has(c.from))) throw new Error("invalid snapshot");
+      for (const copy of copies) {
+        collections.set(copy.name, { ...collections.get(copy.from)!, name: copy.name, snapshot: true });
+        for (const doc of [...documents.values()].filter((d) => d.collection === copy.from)) documents.set(docKey(copy.name, doc.source), { ...doc, collection: copy.name });
+        chunks.push(...chunks.filter((c) => c.collection === copy.from).map((c) => ({ ...c, collection: copy.name })));
+      }
+    },
     rows: () => chunks,
     status: async () => ({ vector: "0.8.7", unaccent: "1.1", dimension, collections: collections.size, unindexed: [] }),
     ensureSchema: async (d) => {

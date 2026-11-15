@@ -13,6 +13,7 @@ export const POLICY: ToolPolicy = {
   health: { access: "read" },
   list_collections: { access: "read" },
   create_collection: { access: "write", idempotent: true },
+  snapshot_collections: { access: "write" },
   drop_collection: { access: "write", confirm: true, summary: dropLine },
   index_path: { access: "write", idempotent: true },
   remove_source: { access: "write", idempotent: true },
