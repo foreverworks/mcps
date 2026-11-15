@@ -80,7 +80,7 @@
     "@googleapis/docs": "^14.1.1",
     "@googleapis/drive": "^27.0.0",
     "@googleapis/gmail": "^22.0.2",
-    "@googleapis/sheets": "^18.1.1",
+    "@googleapis/sheets": "^18.1.2",
     "@googleapis/slides": "^10.1.1",
     "@types/html-to-text": "^9.0.4",
     "@types/proper-lockfile": "^4.1.4"
