@@ -56,12 +56,30 @@ describe("a generated mailbox password", () => {
     expect(asked[0]).toContain("Porkbun generates its password, saved in this server's outbox");
   });
 
-  it("is not linked in the result, so no client opens it on its own", async () => {
+  it.each([
+    ["setup_mailbox", { domain: "example.com", address: "hello" }],
+    ["create_mailbox", { domain: "example.com", address: "hello", cost_cents: 3600 }],
+  ])("%s links the file in the result, so a relay can fetch it back to the client", async (tool, args) => {
     const dir = outbox();
     porkbun(answer());
     const { client } = await connect({ ...keyFiles(), PORKBUN_OUTBOX_DIR: dir });
-    const result = (await client.callTool({ name: "setup_mailbox", arguments: { domain: "example.com", address: "hello" } })) as { content: readonly Record<string, unknown>[] };
+    const result = (await client.callTool({ name: tool, arguments: args })) as { content: readonly Record<string, unknown>[] };
+    const path = join(dir, "hello@example.com.password");
+    expect(result.content.map((c) => c["type"])).toEqual(["text", "resource_link"]);
+    expect(result.content[1]).toEqual({ type: "resource_link", uri: `file://${dir}/hello%40example.com.password`, name: "hello@example.com.password", size: `${GENERATED}\n`.length });
+    // The link names the file; the password itself is in the file alone.
+    expect(JSON.stringify(result.content)).not.toContain(GENERATED);
+    expect(readFileSync(path, "utf8")).toBe(`${GENERATED}\n`);
+    expect(statSync(path).mode & 0o777).toBe(0o640);
+  });
+
+  it("links nothing when Porkbun generated no password, or the call gave one", async () => {
+    const dir = outbox();
+    porkbun({ status: "SUCCESS", domain: "example.com", passwordGenerated: false });
+    const { client } = await connect({ ...keyFiles(), PORKBUN_OUTBOX_DIR: dir });
+    const result = (await client.callTool({ name: "setup_mailbox", arguments: { domain: "example.com", address: "hello", password: "Invented-Given-Pa55!" } })) as { content: readonly Record<string, unknown>[] };
     expect(result.content.map((c) => c["type"])).toEqual(["text"]);
+    expect(readdirSync(dir)).toEqual([]);
   });
 
   it("without an outbox, refuses before anything is bought or set up", async () => {

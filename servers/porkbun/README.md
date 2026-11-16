@@ -520,9 +520,10 @@ Four keep bytes out of the model's hands:
   saved as `<address>.password`, and the answer's `password` says where,
   never what. Move it to a password manager and delete the file.
 
-The certificate, the invoice and a zone file are linked in the result (a
-`resource_link`), so a client can open them without reading the JSON; a
-mailbox password deliberately is not.
+The certificate, the invoice, a zone file and a generated mailbox password are
+linked in the result (a `resource_link`), so a client can open them without
+reading the JSON, and a relay on the client's machine fetches them back from a
+remote server.
 
 ### Checks before sending
 

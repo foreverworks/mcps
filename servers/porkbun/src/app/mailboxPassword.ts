@@ -1,4 +1,4 @@
-import { unsetPath, writeFileAtomic } from "@foreverworks/mcp-kit";
+import { saveToOutbox, unsetPath } from "@foreverworks/mcp-kit";
 
 import { fail, OUTBOX_VARIABLE } from "../domain/errors.js";
 import { callTool } from "./callTool.js";
@@ -9,8 +9,11 @@ import type { Deps, ToolArgs } from "./ports.js";
  * out of the conversation. Without `password` in the call, Porkbun makes one
  * and returns it once, in the answer's `password`; here it is written to the
  * outbox instead (`<address>.password`, owner and group only, as the TLS key
- * is), and the answer says where. So the outbox must be set before anything
- * is bought: once the mailbox exists, the password cannot be asked for again.
+ * is), and the answer says where. The kit's saveToOutbox also links the file
+ * in the result, which is what lets a relay on the client's machine fetch it
+ * back: an unlinked outbox file stays on the server's host. So the outbox must
+ * be set before anything is bought: once the mailbox exists, the password
+ * cannot be asked for again.
  */
 
 /** Owner read and write, group read: the outbox's group is who may take files out of it. */
@@ -43,7 +46,7 @@ export const withPasswordSaved = async (deps: Deps, tool: string, args: ToolArgs
   if (answer === undefined || typeof password !== "string" || deps.outbox === undefined) return result;
   const { password: _secret, ...rest } = answer;
   try {
-    const path = await writeFileAtomic(deps.outbox, fileName(answer, args), `${password}\n`, { mode: PASSWORD_MODE });
+    const { path } = await saveToOutbox(deps.outbox, fileName(answer, args), `${password}\n`, { mode: PASSWORD_MODE });
     return { ...rest, password: { saved: path, mode: "0640", note: "Porkbun shows it once; move it to a password manager and delete the file" } };
   } catch (cause: unknown) {
     return { ...rest, password: { saved: false, note: `could not be saved (${(cause as Error).message}); set a new one with set_email_password` } };
