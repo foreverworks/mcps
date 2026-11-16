@@ -138,10 +138,13 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
       description:
         "The calibration print uses to correct this printer: how many measured patches, from which sheets, how closely the fitted model " +
         "matches each sheet, and the model itself in a few numbers: the coverage printed for each 10% sent, and the left-right density offset " +
-        "across the page in mid tones.",
-      inputSchema: {},
+        "across the page in mid tones. With save it also writes the calibration file itself to the outbox, byte for byte as stored, and " +
+        "answers its path, SHA-256 and size under saved: load_calibration accepts that file, so it moves the calibration to another server.",
+      inputSchema: {
+        save: z.boolean().default(false).describe("Also write the calibration file to the outbox (default: only describe it)."),
+      },
     },
-    handled(async () => wire(await showCalibration(deps))),
+    handled((a: { save: boolean }) => showCalibration(deps, { save: a.save }).then(wire)),
   );
 
   server.registerTool(

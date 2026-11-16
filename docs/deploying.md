@@ -326,7 +326,7 @@ servers need nothing more; these start a program that is not in the image:
 
 | Server | Program | For |
 |---|---|---|
-| `printer` | `pdfinfo`, `pdftoppm` (Debian: `poppler-utils`) | printing a PDF |
+| `printer` | `pdfinfo`, `pdftoppm` (Debian: `poppler-utils`); the image's `printer` build has them ([below](#the-printer-image)) | printing a PDF |
 | `rag` | `pdftotext` (`poppler-utils`), `ocrmypdf`, `tesseract` and the language packs you use, `pandoc` | reading PDFs, scans, images and documents; it also needs a PostgreSQL with pgvector and its embedding endpoints |
 | `anaf-spv` | `java`, 8 or newer (`ANAF_SPV_JAVA`); and the command `ANAF_SPV_MAIL_MCP_COMMAND` names, if it is set | validating and filing declarations with ANAF's DUKIntegrator; reading a sign-in code through a mail server it starts over stdio |
 | `devices` | `ssh` (`openssh-client`); the program of a host's control command, for a host with no ssh target | reaching the machines it leases devices on (it speaks adb's protocol itself, and needs no `adb` binary) |
@@ -336,8 +336,48 @@ servers need nothing more; these start a program that is not in the image:
 dependencies and runs on the image's own Node. To add a program, build
 `FROM` the image with one line: `RUN apt-get update && apt-get install -y
 --no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*`, run as
-root (`USER root`), then `USER 10001:10001` again. The Dockerfile ends with
-where a stage for one server belongs in it, to build with `--target`.
+root (`USER root`), then `USER 10001:10001` again. The Dockerfile says where a
+stage for one server belongs in it, to build with `--target`; `printer` is the
+first.
+
+### The printer image
+
+The printer server renders a PDF with poppler, and the plain image leaves
+poppler out, as it leaves out everything only one server needs. So that you do
+not have to build your own, the same Dockerfile has a stage called `printer`:
+the plain image with `poppler-utils` (`pdfinfo` and `pdftoppm`) and the data
+and fonts poppler draws with added. Each push to `main` publishes it beside the
+plain image, in the same package, tagged `:<full sha>-printer` (the same commit
+as the plain image's `:<full sha>`). It is only that one image with more in it:
+everything above applies to it, and `MCP_SERVER=printer` runs the server.
+
+```bash
+docker run --rm --name printer \
+  -e MCP_SERVER=printer -e PRINTER_URI=ipps://printer.example:443/ipp/print \
+  -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
+  -e MCP_HTTP_ALLOWED_HOSTS=localhost -e MCP_HTTP_TOKENS_DIR=/run/tokens \
+  -v "$PWD/tokens:/run/tokens:ro" -p 127.0.0.1:8080:8080 \
+  ghcr.io/foreverworks/mcps:<full sha>-printer
+```
+
+What it adds, over the plain image:
+
+- **`poppler-utils`**, which holds `pdfinfo` and `pdftoppm`.
+- **`poppler-data`**, the character maps and encodings that PDFs in Chinese,
+  Japanese, Korean and other non-Latin scripts refer to.
+- **`fonts-urw-base35`**, the fonts poppler falls back on. A PDF may name a
+  standard font, Helvetica, Times or Courier, without embedding it, and the
+  renderer must then find one itself; with no font installed the text would be
+  drawn in whatever is left, with other widths and other line breaks. This set
+  is metric-compatible with those fonts (Nimbus Sans, Roman and Mono, Symbol,
+  Dingbats), and fontconfig also offers it for Arial, Times New Roman and
+  Courier New.
+
+It adds no font with Chinese, Japanese or Korean glyphs, which run to tens of
+megabytes; a PDF in those scripts prints correctly when it embeds its fonts,
+as almost all do. To build it yourself, from a checkout:
+`docker build --target printer -t mcps-printer .` (a plain `docker build .`
+still builds the image with nothing added).
 
 ## A server on another machine
 

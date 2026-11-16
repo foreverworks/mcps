@@ -14,12 +14,14 @@ import { fail, inputError } from "../domain/errors.js";
 /** The calibration file in the server's state directory; the one it replaced is kept beside it. */
 export const makeCalibrationStore = (stateDir: string): CalibrationStore => {
   const path = join(stateDir, "calibration.json");
+  const raw = (): Promise<Uint8Array | undefined> => readFile(path).catch((cause: NodeJS.ErrnoException) => (cause.code === "ENOENT" ? undefined : Promise.reject(cause)));
   return {
     path,
+    raw,
     load: async (): Promise<Calibration | undefined> => {
-      const text = await readFile(path, "utf8").catch((cause: NodeJS.ErrnoException) => (cause.code === "ENOENT" ? undefined : Promise.reject(cause)));
-      if (text === undefined) return undefined;
-      const parsed = parseCalibration(text);
+      const bytes = await raw();
+      if (bytes === undefined) return undefined;
+      const parsed = parseCalibration(Buffer.from(bytes).toString("utf8"));
       return parsed.ok ? parsed.calibration : fail({ kind: "calibration", message: `${path} is not a usable calibration: ${parsed.problems.join("; ")}` });
     },
     save: async (calibration) => {

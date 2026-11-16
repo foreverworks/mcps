@@ -58,7 +58,9 @@ The commands above set only what is required; [Configuration](#configuration) ha
 
 PDFs are rendered with poppler's `pdfinfo` and `pdftoppm`, found on `PATH`:
 install `poppler-utils` on Debian and Ubuntu, or `brew install poppler` on
-macOS. PNG and JPEG are decoded in-process.
+macOS. PNG and JPEG are decoded in-process. In a container, use the image's
+`printer` build, which already holds poppler and the fonts it falls back on
+([In a container](../../docs/deploying.md#in-a-container)).
 
 ## Configuration
 
@@ -68,7 +70,7 @@ macOS. PNG and JPEG are decoded in-process.
 | `PRINTER_TLS_SHA256` | for TLS, usually | The device certificate's SHA-256 fingerprint (64 hex digits, colons allowed). Set, only that certificate is accepted; unset, only one that verifies normally, which a printer's own rarely does. |
 | `PRINTER_ESCL_URL` | no | The scanner's eSCL root. Default: `/eSCL` on the same host's web server, over `https://` when `PRINTER_URI` is TLS. |
 | `PRINTER_STATE_DIR` | no | Where `calibration.json` (and the one it replaced) is kept; the default is in [docs/configuration.md](../../docs/configuration.md). |
-| `PRINTER_OUTBOX_DIR` | no | Where dry runs (`print/`, `calibration/`) and scans (`scan/`) are written, mode 0640. Default: `outbox` in the state folder. |
+| `PRINTER_OUTBOX_DIR` | no | Where dry runs (`print/`, `calibration/<sheet>/`), saved calibrations (`calibration/`) and scans (`scan/`) are written, mode 0640. Default: `outbox` in the state folder. |
 
 With none of these set, the server still starts, and a tool that needs the
 device answers a `config` error naming the variable. `print` and
@@ -128,9 +130,23 @@ Calibrating takes two sheets:
 From then on `print` corrects every page (`correction: false` sends the greys
 as they are), and `calibration` sums up the model in a few numbers.
 
+### Moving a calibration to another server
+
+A calibration belongs to the printer, not to the server that measured it, so
+it is worth keeping when you move the server to another machine or run a
+second one. Ask the old server for `calibration` with `save: true`: it writes
+the calibration file to its outbox, byte for byte as it is stored, and answers
+where (`saved`: `path`, `sha256` and `size`). Copy that file into the new
+server's file folder and ask the new server to `load_calibration` from it. The
+new server then holds the same patches and sheets, and says so in the summary
+it answers. The file is the same JSON that `load_calibration` always takes, so
+it is also a backup you can read, and edit, if you ever need to drop a bad
+patch. `calibration` without `save` writes nothing.
+
 ## Tools
 
-**read** changes nothing; write changes a print job, the calibration or the
+**read** changes nothing on the printer (`calibration` with `save` writes only
+its file to the outbox); write changes a print job, the calibration or the
 outbox; **write** in bold puts paper through the printer or uses the scanner,
 and is confirmed with you before every call ([below](#confirmation)).
 
@@ -139,7 +155,7 @@ and is confirmed with you before every call ([below](#confirmation)).
 | `health` | read | Whether the server works: ok unless a setting, the device's certificate or the calibration is wrong. A printer that is off or busy is reported (`reachable: false`), not a failure. |
 | `status` | read | The printer's state and reasons in plain words, whether it accepts jobs, supplies with levels, firmware, paper and formats; the scanner's state and recent jobs; whether a calibration is loaded. |
 | `job` | read | One print job by number with its state and reasons, or the current and recently completed jobs (10 of each by default, up to 50). |
-| `calibration` | read | The loaded calibration: patches per sheet, how closely the fitted model matches each sheet, the tone response and the left-right profile in a few numbers. |
+| `calibration` | read | The loaded calibration: patches per sheet, how closely the fitted model matches each sheet, the tone response and the left-right profile in a few numbers. With `save: true` it also writes the calibration file to the outbox and answers its path, SHA-256 and size. |
 | `print` | **write** | Prints a PDF, PNG or JPEG on A4 at 600 dpi in grey as lossless PWG raster, corrected when calibrated, and waits for the job to finish. 1 to 20 copies, collated, at most 100 sheets a call; `pages` picks PDF pages (`"1-3,5"`). `dry_run` writes the raster and previews to the outbox instead. |
 | `scan` | **write** | Scans the glass to a PDF or JPEG in the outbox: 50 to 1200 dpi (default 300), grey or colour, A4, Letter or the whole glass, checked first against what the scanner offers. |
 | `calibration_sheet` | **write** | Prints the calibration sheet uncorrected (342 grey patches, black and paper references, marks to find it in a scan); `dry_run` writes a preview instead. |

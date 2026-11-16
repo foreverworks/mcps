@@ -87,16 +87,28 @@ ENTRYPOINT ["/usr/local/bin/mcp-server"]
 
 # What a server needs besides Node and its npm packages (a PDF toolkit for
 # printer and rag, a Java runtime for anaf-spv's declarations; the list is in
-# docs/deploying.md) is not in the image above: most servers need nothing, and
-# every package is attack surface in every container. To build it in, give
-# the server a stage of its own here, after `runtime` and before `image`:
-#
-#   FROM runtime AS printer
-#   USER root
-#   RUN apt-get update && apt-get install -y --no-install-recommends poppler-utils \
-#    && rm -rf /var/lib/apt/lists/*
-#   USER 10001:10001
-#
-# and build it with `docker build --target printer .`. A plain `docker build .`
-# builds the last stage, which is the image with nothing added.
+# docs/deploying.md) is not in the image: most servers need nothing, and every
+# package is attack surface in every container. A server that needs one gets a
+# stage of its own, after `runtime` and before `image`, built with
+# `docker build --target <server> .`:
+FROM runtime AS printer
+# poppler-utils is `pdfinfo` and `pdftoppm`, which printer runs to render a PDF.
+# A PDF may name a standard font (Helvetica, Times, Courier) without embedding
+# it, and poppler then draws it with whatever font the system offers:
+# fonts-urw-base35 is the metric-compatible set (Nimbus Sans, Roman and Mono,
+# Symbol, Dingbats), so those pages keep their line breaks and glyph widths, and
+# fontconfig also maps Arial, Times New Roman and Courier New onto it.
+# poppler-data holds the CMaps and encodings that PDFs in CJK and other
+# non-Latin scripts refer to. No CJK glyph font is added: those are tens of
+# megabytes, and a PDF that does not embed one is rare.
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends poppler-utils poppler-data fonts-urw-base35 \
+ && rm -rf /var/lib/apt/lists/*
+USER 10001:10001
+LABEL org.opencontainers.image.description="The MCP servers of foreverworks/mcps with poppler (pdfinfo, pdftoppm) added, for the printer server; MCP_SERVER chooses the one a container runs"
+
+# The last stage is the one a plain `docker build .` builds, and the image
+# workflow names it too (`target: image`): keep it last, and nothing above is
+# built unless a build asks for it.
 FROM runtime AS image

@@ -7,7 +7,8 @@
  * installed.
  */
 import { execFileSync } from "node:child_process";
-import { mkdtempSync, readFileSync, writeFileSync } from "node:fs";
+import { createHash } from "node:crypto";
+import { existsSync, mkdtempSync, readFileSync, statSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
@@ -213,6 +214,45 @@ describe("status", () => {
     expect(status.scanner).toMatchObject({ ok: false, error: { kind: "config" } });
     const dry = await s.call("print", { file: { path: s.put("page.png", png(30, 40, 128)) }, dry_run: true });
     expect(dry).toMatchObject({ dry_run: true, printed: false, correction: "off" });
+  });
+});
+
+describe("calibration", () => {
+  const without = ({ path: _path, ...rest }: Record<string, unknown>) => rest;
+  const sha256 = (bytes: Buffer): string => createHash("sha256").update(bytes).digest("hex");
+
+  it("saves the calibration to the outbox as stored, and another server loads that file into the same calibration", async () => {
+    const old = await connected();
+    await old.call("load_calibration", { file: { path: old.put("calibration.json", fixture("calibration.json")) } });
+    const described = await old.call("calibration");
+    expect(described).toMatchObject({ loaded: true, points: 156 });
+    expect(described.saved).toBeUndefined();
+    expect(existsSync(join(old.root, "state", "outbox"))).toBe(false);
+
+    const stored = readFileSync(described.path);
+    const saved = await old.call("calibration", { save: true });
+    expect(without(saved)).toEqual({ ...without(described), saved: { path: expect.stringContaining(join(old.root, "state", "outbox", "calibration", "calibration-")), sha256: sha256(stored), size: stored.length } });
+    expect(readFileSync(saved.saved.path).equals(stored)).toBe(true);
+    expect(statSync(saved.saved.path).mode & 0o777).toBe(0o640);
+
+    const next = await connected();
+    const loaded = await next.call("load_calibration", { file: { path: next.put("moved.json", readFileSync(saved.saved.path)) } });
+    expect(loaded).toMatchObject({ loaded: true, points: 156, from: { name: "moved.json", sha256: saved.saved.sha256, size: saved.saved.size } });
+    const moved = await next.call("calibration");
+    expect(moved.sheets).toEqual([
+      { sheet: "S1", points: expect.any(Number), mean_abs_error: expect.any(Number) },
+      { sheet: "S2", points: expect.any(Number), mean_abs_error: expect.any(Number) },
+      { sheet: "S3", points: expect.any(Number), mean_abs_error: expect.any(Number) },
+    ]);
+    expect(without(moved)).toEqual(without(described));
+    expect(readFileSync(moved.path).equals(stored)).toBe(true);
+  });
+
+  it("has nothing to save before a calibration is loaded, and writes nothing", async () => {
+    const s = await connected();
+    expect(await s.call("calibration")).toMatchObject({ loaded: false });
+    expect((await s.call("calibration", { save: true })).error).toMatchObject({ kind: "input", message: expect.stringContaining("nothing to save") });
+    expect(existsSync(join(s.root, "state", "outbox"))).toBe(false);
   });
 });
 

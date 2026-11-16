@@ -3,7 +3,7 @@ import type { FileSource } from "@foreverworks/mcp-kit";
 import { type Calibration, parseCalibration, sheetsOf } from "../../domain/correction/calibration.js";
 import { lateralAt, type Model, fitModel, predict } from "../../domain/correction/model.js";
 import { interp } from "../../domain/correction/numeric.js";
-import { fail } from "../../domain/errors.js";
+import { fail, inputError } from "../../domain/errors.js";
 import type { Deps } from "../ports.js";
 
 /**
@@ -32,9 +32,25 @@ const summary = (calibration: Calibration) => {
   return { note: calibration.note, points: calibration.points.length, sheets: fitError(calibration, model), ...describeModel(model) };
 };
 
-export const showCalibration = async (deps: Deps) => {
+const stamp = (ms: number): string => new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d+Z$/, "Z");
+
+/**
+ * The loaded calibration, summed up. With `save`, also the file itself in the
+ * outbox: the bytes as stored, which are exactly what `load_calibration`
+ * accepts, so a calibration moves to another server by saving it here and
+ * loading the file there.
+ */
+export const showCalibration = async (deps: Deps, args: { readonly save: boolean }) => {
   const calibration = await deps.calibration.load();
-  return calibration === undefined ? { loaded: false, path: deps.calibration.path } : { loaded: true, path: deps.calibration.path, ...summary(calibration) };
+  if (calibration === undefined) {
+    if (args.save) return fail(inputError("no calibration is loaded, so there is nothing to save; load one with load_calibration or measure a sheet with measure_calibration first"));
+    return { loaded: false, path: deps.calibration.path };
+  }
+  const shown = { loaded: true, path: deps.calibration.path, ...summary(calibration) };
+  if (!args.save) return shown;
+  const bytes = await deps.calibration.raw();
+  if (bytes === undefined) return fail({ kind: "calibration", message: `${deps.calibration.path} was removed while it was being read; call again` });
+  return { ...shown, saved: await deps.outbox.save(`calibration/calibration-${stamp(deps.now())}.json`, bytes) };
 };
 
 export const loadCalibration = async (deps: Deps, args: { readonly file: FileSource }) => {

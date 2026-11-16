@@ -40,6 +40,8 @@ export type Render = {
 export type CalibrationStore = {
   readonly path: string;
   readonly load: () => Promise<Calibration | undefined>;
+  /** The stored file's bytes, as they are on disk (what `save` last wrote), or undefined when none is stored. */
+  readonly raw: () => Promise<Uint8Array | undefined>;
   /** Replaces it, keeping the one before beside it. */
   readonly save: (calibration: Calibration) => Promise<void>;
 };
