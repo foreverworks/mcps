@@ -328,7 +328,7 @@ servers need nothing more; these start a program that is not in the image:
 |---|---|---|
 | `printer` | `pdfinfo`, `pdftoppm` (Debian: `poppler-utils`); the image's `printer` build has them ([below](#the-printer-image)) | printing a PDF |
 | `rag` | `pdftotext` (`poppler-utils`), `ocrmypdf`, `tesseract` and the language packs you use, `pandoc` | reading PDFs, scans, images and documents; it also needs a PostgreSQL with pgvector and its embedding endpoints |
-| `anaf-spv` | `java`, 8 or newer (`ANAF_SPV_JAVA`); and the command `ANAF_SPV_MAIL_MCP_COMMAND` names, if it is set | validating and filing declarations with ANAF's DUKIntegrator; reading a sign-in code through a mail server it starts over stdio |
+| `anaf-spv` | `java`, 8 or newer (`ANAF_SPV_JAVA`; the image's `anafspv` build has Java 21, [below](#the-anaf-spv-image)); and the command `ANAF_SPV_MAIL_MCP_COMMAND` names, if it is set | validating and filing declarations with ANAF's DUKIntegrator; reading a sign-in code through a mail server it starts over stdio |
 | `devices` | `ssh` (`openssh-client`); the program of a host's control command, for a host with no ssh target | reaching the machines it leases devices on (it speaks adb's protocol itself, and needs no `adb` binary) |
 | `google` | `gcloud` and a browser opener | its interactive `setup` command only, which runs on a person's computer, not in a container |
 
@@ -338,7 +338,7 @@ dependencies and runs on the image's own Node. To add a program, build
 --no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*`, run as
 root (`USER root`), then `USER 10001:10001` again. The Dockerfile says where a
 stage for one server belongs in it, to build with `--target`; `printer` is the
-first.
+first, `anafspv` the second.
 
 ### The printer image
 
@@ -378,6 +378,40 @@ megabytes; a PDF in those scripts prints correctly when it embeds its fonts,
 as almost all do. To build it yourself, from a checkout:
 `docker build --target printer -t mcps-printer .` (a plain `docker build .`
 still builds the image with nothing added).
+
+### The anaf-spv image
+
+The anaf-spv server validates a declaration, and makes its PDF, by running
+ANAF's DUKIntegrator, which is a Java program, and the plain image has no Java.
+The Dockerfile has a stage called `anafspv` for it: the plain image with a Java
+runtime added. Each push to `main` publishes it beside the plain image, in the
+same package, tagged `:<full sha>-anafspv` (the same commit as the plain
+image's `:<full sha>`), after `java -version` has been run in it. It is only
+that one image with more in it: everything above applies to it, and
+`MCP_SERVER=anaf-spv` runs the server, which finds `java` on its `PATH` (set
+`ANAF_SPV_JAVA` to use another).
+
+```bash
+docker run --rm --name anaf-spv \
+  -e MCP_SERVER=anaf-spv \
+  -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
+  -e MCP_HTTP_ALLOWED_HOSTS=localhost -e MCP_HTTP_TOKENS_DIR=/run/tokens \
+  -v "$PWD/tokens:/run/tokens:ro" -p 127.0.0.1:8080:8080 \
+  ghcr.io/foreverworks/mcps:<full sha>-anafspv
+```
+
+What it adds, over the plain image, installed without Debian's recommended
+packages so that nothing else comes along:
+
+- **`openjdk-21-jre-headless`**, the Java runtime, without display libraries.
+- **`libfontconfig1`, `libfreetype6` and `libharfbuzz0b`**, the font libraries
+  the runtime loads when a program draws text. The runtime package only
+  recommends them, and DUKIntegrator's PDF step may need them.
+- **`fonts-dejavu-core`**, one font for the runtime to draw with: the font
+  libraries need at least one font installed.
+
+To build it yourself, from a checkout:
+`docker build --target anafspv -t mcps-anafspv .`
 
 ## A server on another machine
 

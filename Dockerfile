@@ -108,6 +108,21 @@ RUN apt-get update \
 USER 10001:10001
 LABEL org.opencontainers.image.description="The MCP servers of foreverworks/mcps with poppler (pdfinfo, pdftoppm) added, for the printer server; MCP_SERVER chooses the one a container runs"
 
+FROM runtime AS anafspv
+# anaf-spv runs ANAF's DUKIntegrator, a Java program, to validate a declaration
+# and to make its PDF: openjdk-21-jre-headless is the runtime, with no display
+# libraries (the server needs `java` on its PATH, or ANAF_SPV_JAVA). The package
+# only recommends the font stack, and the PDF step (`-p`) may draw text through
+# the JDK's font code, which loads fontconfig, FreeType and HarfBuzz and wants a
+# font to fall back on: fonts-dejavu-core is the smallest set that gives it one.
+# Installed without recommends, so nothing else comes with them.
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openjdk-21-jre-headless libfontconfig1 libfreetype6 libharfbuzz0b fonts-dejavu-core \
+ && rm -rf /var/lib/apt/lists/*
+USER 10001:10001
+LABEL org.opencontainers.image.description="The MCP servers of foreverworks/mcps with a Java runtime and fonts added, for the anaf-spv server; MCP_SERVER chooses the one a container runs"
+
 # The last stage is the one a plain `docker build .` builds, and the image
 # workflow names it too (`target: image`): keep it last, and nothing above is
 # built unless a build asks for it.

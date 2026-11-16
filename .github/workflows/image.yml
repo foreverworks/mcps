@@ -3,9 +3,11 @@ name: image
 # Builds the container image (the Dockerfile at the root: every server, one per
 # container) and publishes it to GitHub's registry as ghcr.io/<repository>,
 # tagged with the full commit and, while the commit is still the head of main,
-# `main`. Beside it, into the same package, goes the `printer` build of the
-# same Dockerfile (the image plus poppler, which the printer server runs),
-# tagged `<full commit>-printer`, after pdftoppm and pdfinfo have been run in it.
+# `main`. Beside it, into the same package, go two more builds of the same
+# Dockerfile: `printer` (the image plus poppler, which the printer server runs),
+# tagged `<full commit>-printer`, after pdftoppm and pdfinfo have been run in it,
+# and `anafspv` (the image plus a Java runtime, which the anaf-spv server runs),
+# tagged `<full commit>-anafspv`, after `java -version` has been run in it.
 # docs/deploying.md, "In a container", says how they are used.
 #
 # It runs when `ci` has finished on a push to main and passed, so a main that
@@ -67,6 +69,7 @@ jobs:
           fi
           { echo 'list<<TAGS'; echo "$tags"; echo 'TAGS'; } >> "$GITHUB_OUTPUT"
           echo "printer=$IMAGE:$SHA-printer" >> "$GITHUB_OUTPUT"
+          echo "anafspv=$IMAGE:$SHA-anafspv" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -119,12 +122,40 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ env.SHA }}
 
+      # The same for anaf-spv's build: a Java runtime that does not start in
+      # it fails the job, and nothing is pushed under its tag.
+      - name: Build the anaf-spv image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: anafspv
+          load: true
+          tags: mcps-anafspv-check
+          labels: |
+            org.opencontainers.image.revision=${{ env.SHA }}
+
+      - name: Check that Java runs in the anaf-spv image
+        run: docker run --rm --entrypoint java mcps-anafspv-check -version
+
+      - name: Push the anaf-spv image
+        id: build-anafspv
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: anafspv
+          push: true
+          tags: ${{ steps.tags.outputs.anafspv }}
+          labels: |
+            org.opencontainers.image.revision=${{ env.SHA }}
+
       - name: Say what was published
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
           TAGS: ${{ steps.tags.outputs.list }}
           PRINTER_DIGEST: ${{ steps.build-printer.outputs.digest }}
           PRINTER_TAG: ${{ steps.tags.outputs.printer }}
+          ANAFSPV_DIGEST: ${{ steps.build-anafspv.outputs.digest }}
+          ANAFSPV_TAG: ${{ steps.tags.outputs.anafspv }}
         run: |
           {
             echo "### Image published"
@@ -143,4 +174,12 @@ jobs:
             echo "Pull it pinned: \`$IMAGE@$PRINTER_DIGEST\`"
             echo
             echo "Tag: \`$PRINTER_TAG\`"
+            echo
+            echo "### anaf-spv image published"
+            echo
+            echo "Digest: \`$ANAFSPV_DIGEST\`"
+            echo
+            echo "Pull it pinned: \`$IMAGE@$ANAFSPV_DIGEST\`"
+            echo
+            echo "Tag: \`$ANAFSPV_TAG\`"
           } >> "$GITHUB_STEP_SUMMARY"
