@@ -836,13 +836,15 @@ describe("local-only collections", () => {
     expect(health.local_only_collections).toEqual(["journal", "later"]);
     expect(health.local_only_invalid).toEqual(["journal;notes", "journal notes"]);
     expect(health.local_only_unknown).toEqual(["later"]);
-    expect(health.problems).toEqual([expect.stringContaining('RAG_LOCAL_ONLY_COLLECTIONS lists "journal;notes"'), expect.stringContaining('lists "journal notes"')]);
+    // Only the setting's own problems: the extractors' (pdftotext, pandoc and the rest) depend on the machine running the tests.
+    const localOnlyProblems = (problems: readonly string[] | undefined) => (problems ?? []).filter((p) => p.startsWith("RAG_LOCAL_ONLY_COLLECTIONS"));
+    expect(localOnlyProblems(health.problems)).toEqual([expect.stringContaining('RAG_LOCAL_ONLY_COLLECTIONS lists "journal;notes"'), expect.stringContaining('lists "journal notes"')]);
     // A name with no collection yet is information, not a failure: the collection is covered once it exists.
     const fine = await connected({ localOnly: new Set(["later"]) });
     const ok = await fine.call("health");
-    expect(ok).toMatchObject({ ok: true, local_only_collections: ["later"], local_only_unknown: ["later"] });
+    expect(ok).toMatchObject({ local_only_collections: ["later"], local_only_unknown: ["later"] });
     expect(ok.local_only_invalid).toBeUndefined();
-    expect(ok.problems).toBeUndefined();
+    expect(localOnlyProblems(ok.problems)).toEqual([]);
     await fine.call("create_collection", { name: "later" });
     expect((await fine.call("health")).local_only_unknown).toBeUndefined();
   });
