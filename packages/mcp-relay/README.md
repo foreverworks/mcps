@@ -278,10 +278,13 @@ The relay listens as a server does, so the kit's HTTP variables apply to it
 | `MCP_RELAY_MAX_FILE_BYTES` | `268435456` (256 MiB) | The largest file the relay moves, either way. |
 | `MCP_RELAY_ALLOW_PLAIN_HTTP` | unset: refused | Set to `1` to allow an `http://` upstream on a host that is not this machine. The relay's token and the files then cross the network as they are written, so use it only on a network that is encrypted already (a VPN or an overlay). An `https://` upstream, or `http://` to this machine, needs nothing. |
 
-On the server, the kit's file endpoints take three variables
+On the server, the kit's file endpoints take four variables
 ([configuration](../../docs/configuration.md#files-to-and-from-another-machine)):
-`MCP_HTTP_FILES_OUTBOX`, `MCP_HTTP_FILES_INBOX` and
-`MCP_HTTP_FILES_MAX_BYTES`.
+`MCP_HTTP_FILES_OUTBOX`, `MCP_HTTP_FILES_INBOX`, `MCP_HTTP_FILES_MAX_BYTES` and
+`MCP_HTTP_FILES_MAX_AGE_MIN`. The last one deletes the files from both folders
+after that many minutes: set it when the server's folders are tmpfs in a
+container, where nothing else clears them, since your machine keeps the real
+copy of every file the relay moves.
 
 ## Security
 

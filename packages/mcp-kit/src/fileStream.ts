@@ -1,7 +1,8 @@
-import { createHash, randomUUID } from "node:crypto";
+import { createHash } from "node:crypto";
 import { type FileHandle, open, readlink, rename, rm } from "node:fs/promises";
 import { dirname, join } from "node:path";
 
+import { tempSuffix } from "./files.js";
 import { isInside } from "./inputFile/roots.js";
 
 /**
@@ -61,7 +62,7 @@ const writeAll = async (handle: FileHandle, chunk: Uint8Array): Promise<void> =>
  */
 export const storeStream = async (source: AsyncIterable<Uint8Array>, target: string, { mode = 0o640, maxBytes, sha256, within }: StoreOptions): Promise<Stored> => {
   // A short name of its own, so that a target whose name nearly fills a file system's limit still has a temp file.
-  const tmp = join(dirname(target), `.${process.pid}.${randomUUID()}.tmp`);
+  const tmp = join(dirname(target), tempSuffix());
   const handle = await open(tmp, "wx", mode);
   const hash = createHash("sha256");
   let size = 0;

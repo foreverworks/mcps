@@ -145,6 +145,7 @@ On the server (`MCP_HTTP_PORT` and tokens needed; not with
 | `MCP_HTTP_FILES_OUTBOX` | unset: off | An absolute folder. Switches on `GET /files/outbox/<path>`, which streams a file below it with `Content-Length`, `Content-Type` and `X-Content-SHA256`. Set it to the folder the server's tools save to. |
 | `MCP_HTTP_FILES_INBOX` | unset: off | An absolute folder. Switches on `PUT /files/inbox/<path>`, which writes a file below it, whole or not at all, with mode 0640, making the folders on the way, and answers `{ "path", "size", "sha256" }`. A request that carries `X-Content-SHA256` is refused (422) when the bytes differ, and nothing is kept. Set it to a folder in `MCP_FILE_ROOTS`. |
 | `MCP_HTTP_FILES_MAX_BYTES` | `268435456` (256 MiB) | The largest file the inbox takes; a larger one gets a 413. Needs `MCP_HTTP_FILES_INBOX`. |
+| `MCP_HTTP_FILES_MAX_AGE_MIN` | unset: files stay | A whole number of minutes above zero. A file below either folder that was last written longer ago than this is deleted, and so is a folder it leaves empty (never the folder itself). Needs `MCP_HTTP_FILES_INBOX` or `MCP_HTTP_FILES_OUTBOX`. |
 
 With neither folder set these routes do not exist: a request for one gets the
 404 any unknown route gets. With either set, a request needs the same bearer
@@ -155,6 +156,21 @@ cannot read) gets the same 404 that says nothing about why. What else an
 upload is told is about the request: 400 (a malformed `X-Content-SHA256`), 409
 (a folder is where the file would go), 413, 422 and 405 for the other method.
 A refused or broken upload leaves no file and takes away the folders it made.
+
+**Clearing the folders.** On a plain install the operating system's own clean-up
+(systemd-tmpfiles, for one) keeps the two folders from growing. A server in a
+container whose folders are tmpfs has nothing of the kind: no file is ever
+deleted, the folders fill, and tmpfs pages count against the container's
+memory limit. Set `MCP_HTTP_FILES_MAX_AGE_MIN` there. It is safe because the
+client keeps its own copy of every file; the server's copy is only in
+transit, so give it longer than a tool takes to save a file and the client to
+fetch it (a few hours is generous when a relay does the fetching). The server
+looks once when it starts and then every quarter of the age, never oftener than
+every minute nor rarer than every hour. A file counts by when it was last
+written, so one an upload is still writing is never taken, and links are
+neither followed nor deleted. A sweep that fails writes one `files {...}` line
+with the system's error code and the next goes on. Unset, nothing is deleted
+and nothing runs.
 
 **A client with a ceiling gets no files.** A client named in
 `MCP_CLIENT_MAX_ACCESS` (at any class, `money` too) is refused both endpoints

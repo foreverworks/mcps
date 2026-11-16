@@ -235,7 +235,11 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
   closes the connection; a `POST /mcp` body has 30 s; an upload that has
   signed in may not go quiet for a minute, nor take longer than a call may.
 - **A bounded cost.** An upload over `MCP_HTTP_FILES_MAX_BYTES` is refused, and
-  the relay moves nothing over `MCP_RELAY_MAX_FILE_BYTES`.
+  the relay moves nothing over `MCP_RELAY_MAX_FILE_BYTES`. With
+  `MCP_HTTP_FILES_MAX_AGE_MIN` the folders do not grow without end either: a
+  file last written longer ago than that is deleted, only ever a regular file
+  found below the folders (a link is neither followed nor deleted), and never
+  one an upload is still writing.
 - **The relay holds the server's tokens, and nothing else of the server's.**
   Its clients present their own tokens to it. With
   `MCP_RELAY_UPSTREAM_TOKENS_DIR` it holds one upstream token per client and

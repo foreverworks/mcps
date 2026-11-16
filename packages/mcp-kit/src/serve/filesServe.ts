@@ -249,7 +249,7 @@ const receiveFile = async (context: FilesContext, names: readonly string[], req:
 };
 
 /** How long an upload may go without a byte before the connection is dropped. */
-const UPLOAD_IDLE_MS = 60_000;
+export const UPLOAD_IDLE_MS = 60_000;
 
 /**
  * An upload's own limits: it may not go quiet for a minute (or less, when

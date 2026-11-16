@@ -1,12 +1,12 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, realpath, stat, symlink, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, stat, symlink, utimes, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/server";
-import { afterAll, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
 
 import { guardSettingsFrom, hasClientCeiling } from "../src/serve/confirm.js";
 import { DEFAULT_FILES_MAX_BYTES, fileRouteOf, FILES_REFUSED_FOR_CEILING, filesFrom, filesUrlPath, segmentsOf } from "../src/serve/files.js";
@@ -35,6 +35,24 @@ describe("filesFrom", () => {
     }
     expect(() => filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out", MCP_HTTP_FILES_MAX_BYTES: "10" })).toThrow(/without MCP_HTTP_FILES_INBOX/);
   });
+
+  it("keeps files for ever while MCP_HTTP_FILES_MAX_AGE_MIN is unset or blank: the key is not there", () => {
+    expect(filesFrom({ MCP_HTTP_FILES_INBOX: "/srv/in", MCP_HTTP_FILES_MAX_AGE_MIN: "  " })).toEqual({ inbox: "/srv/in", maxBytes: DEFAULT_FILES_MAX_BYTES });
+    expect(filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out" })).not.toHaveProperty("maxAgeMin");
+  });
+
+  it("reads MCP_HTTP_FILES_MAX_AGE_MIN as a whole number of minutes, for either folder or both", () => {
+    expect(filesFrom({ MCP_HTTP_FILES_INBOX: "/srv/in", MCP_HTTP_FILES_MAX_AGE_MIN: " 90 " })).toEqual({ inbox: "/srv/in", maxBytes: DEFAULT_FILES_MAX_BYTES, maxAgeMin: 90 });
+    expect(filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out", MCP_HTTP_FILES_MAX_AGE_MIN: "1" })).toEqual({ outbox: "/srv/out", maxBytes: DEFAULT_FILES_MAX_BYTES, maxAgeMin: 1 });
+    expect(filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out", MCP_HTTP_FILES_INBOX: "/srv/in", MCP_HTTP_FILES_MAX_AGE_MIN: "1440" })).toMatchObject({ maxAgeMin: 1440 });
+  });
+
+  it("refuses an age that is not a whole number of minutes above zero, and an age with no folder to clear", () => {
+    for (const bad of ["0", "-5", "1.5", "1e3", "+5", "0x10", "an hour", "30m", "99999999999999999999"]) {
+      expect(() => filesFrom({ MCP_HTTP_FILES_INBOX: "/srv/in", MCP_HTTP_FILES_MAX_AGE_MIN: bad })).toThrow(/MCP_HTTP_FILES_MAX_AGE_MIN ".*" is not a number of minutes/);
+    }
+    expect(() => filesFrom({ MCP_HTTP_FILES_MAX_AGE_MIN: "60" })).toThrow(/MCP_HTTP_FILES_MAX_AGE_MIN is set without MCP_HTTP_FILES_INBOX or MCP_HTTP_FILES_OUTBOX/);
+  });
 });
 
 describe("listenFrom, with the file endpoints", () => {
@@ -56,12 +74,15 @@ describe("listenFrom, with the file endpoints", () => {
   });
 
   it("stops the start for any of the variables without a port, and for a server that is open to anyone", () => {
-    for (const name of ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES"]) {
+    for (const name of ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES", "MCP_HTTP_FILES_MAX_AGE_MIN"]) {
       expect(() => listenFrom({ [name]: "/srv/x" })).toThrow(new RegExp(`${name} is set without MCP_HTTP_PORT`));
       expect(listenFrom({ [name]: " " })).toEqual({ kind: "stdio" });
     }
     expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_FILES_OUTBOX: "/srv/out" })).toThrow(
       /MCP_HTTP_PUBLIC_HOSTS and MCP_HTTP_FILES_OUTBOX are both set/,
+    );
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_FILES_MAX_AGE_MIN: "60" })).toThrow(
+      /MCP_HTTP_PUBLIC_HOSTS and MCP_HTTP_FILES_MAX_AGE_MIN are both set/,
     );
   });
 });
@@ -858,5 +879,68 @@ describe("storeStream, held to a folder", () => {
     const inside = await storeStream(source(), join(folder, "a.txt"), { maxBytes: 100, within: await realpath(folder) });
     expect(inside).toMatchObject({ ok: true, size: 12 });
     expect(await readFile(join(folder, "a.txt"), "utf8")).toBe("never stored");
+  });
+});
+
+describe("retention of the folders (MCP_HTTP_FILES_MAX_AGE_MIN)", () => {
+  const old = async (path: string, minutes: number): Promise<void> => {
+    await mkdir(join(path, ".."), { recursive: true });
+    await writeFile(path, "in transit");
+    const when = new Date(Date.now() - minutes * 60_000);
+    await utimes(path, when, when);
+  };
+
+  it("deletes old files from both folders as the server starts, keeps the fresh ones, and goes on serving", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-kit-retention-"));
+    const inbox = join(dir, "in");
+    const outbox = join(dir, "out");
+    await old(join(inbox, "2026-01", "scan.pdf"), 600);
+    await old(join(inbox, "recent.pdf"), 5);
+    await old(join(outbox, "report.csv"), 600);
+    await old(join(outbox, "today.csv"), 1);
+    const log: string[] = [];
+    const lines: string[] = [];
+    const original = console.error;
+    console.error = (...args: unknown[]): void => void lines.push(args.join(" "));
+    let served: Served | undefined;
+    try {
+      served = (await start("retention", { MCP_HTTP_FILES_INBOX: inbox, MCP_HTTP_FILES_OUTBOX: outbox, MCP_HTTP_FILES_MAX_AGE_MIN: "60" }, log)).served;
+    } finally {
+      console.error = original;
+    }
+    try {
+      expect(lines.join("\n")).toContain("; files older than 60 min are deleted;");
+      await vi.waitFor(async () => {
+        expect(await readdir(inbox)).toEqual(["recent.pdf"]);
+        expect(await readdir(outbox)).toEqual(["today.csv"]);
+      });
+      expect(log[0]).toBe(`files ${JSON.stringify({ svc: "retention", direction: "sweep", outcome: "ok", removed: 2, folders: 1 })}`);
+
+      const stored = await raw(served, "PUT", "/files/inbox/new.txt", { headers: auth, body: "fresh upload" });
+      expect(stored.status).toBe(200);
+      expect((await raw(served, "GET", "/files/outbox/today.csv", { headers: auth })).status).toBe(200);
+      expect((await raw(served, "GET", "/files/outbox/report.csv", { headers: auth })).status).toBe(404);
+    } finally {
+      await served.close();
+    }
+  });
+
+  it("changes nothing while it is unset: an old file stays, and no line says otherwise", async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-kit-retention-"));
+    const inbox = join(dir, "in");
+    await old(join(inbox, "scan.pdf"), 1e6);
+    const log: string[] = [];
+    const { served } = await start("kept", { MCP_HTTP_FILES_INBOX: inbox }, log);
+    try {
+      expect((await raw(served, "PUT", "/files/inbox/another.txt", { headers: auth, body: "x" })).status).toBe(200);
+      expect(await readdir(inbox)).toEqual(["another.txt", "scan.pdf"]);
+      expect(log.filter((line) => line.includes("sweep"))).toEqual([]);
+    } finally {
+      await served.close();
+    }
+  });
+
+  it("refuses to start on an age that is not a number of minutes", async () => {
+    await expect(start("bad", { MCP_HTTP_FILES_INBOX: "/srv/in", MCP_HTTP_FILES_MAX_AGE_MIN: "soon" })).rejects.toThrow(/MCP_HTTP_FILES_MAX_AGE_MIN "soon" is not a number of minutes/);
   });
 });

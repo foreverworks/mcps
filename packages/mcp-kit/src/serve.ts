@@ -12,6 +12,7 @@ import { describeSettings, type GuardSettings, guardSettingsFrom, hasClientCeili
 import { installEgress, installKeepAlive } from "./serve/egress.js";
 import { describeFiles, type FileEndpoints, fileRouteOf, FILES_VARIABLES, filesFrom } from "./serve/files.js";
 import { serveFile } from "./serve/filesServe.js";
+import { startSweeping } from "./serve/filesSweep.js";
 import { guard, registeredNames, requestContext, type ServerVocabulary } from "./serve/guard.js";
 import { toolIconsOf, type Product } from "./serve/icons.js";
 import { admit, egressFrom, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
@@ -533,10 +534,13 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
   const alsoHosts = allowedHosts.length === 0 ? "" : `, and Host ${allowedHosts.map(allowedHostText).join(", ")}`;
   const alsoFiles = files === undefined ? "" : `; ${describeFiles(files)}`;
   console.error(`${options.name}: listening on http://${urlHost(bindAddress)}:${bound}${MCP_PATH} ${door.describe}${alsoHosts}${alsoFiles}; ${describeSettings(runtime.settings)}`);
+  // Retention of the file folders (MCP_HTTP_FILES_MAX_AGE_MIN): nothing starts unless it is set.
+  const sweeping = files === undefined ? undefined : startSweeping(files, { service: options.name, log: runtime.log });
   return {
     port: bound,
     address: (http.address() as AddressInfo).address,
     close: async () => {
+      await sweeping?.stop();
       await modern.close();
       await new Promise<void>((resolve) => http.close(() => resolve()));
     },

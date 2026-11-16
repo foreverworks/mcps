@@ -80,6 +80,9 @@ their icons. `servers/oblio` is a complete example.
   [`mcp-relay`](../mcp-relay) to use (off unless set). A client held to a
   ceiling (`MCP_CLIENT_MAX_ACCESS`) is refused them with a 403: files cross
   outside the tool calls a ceiling checks, so they are for clients with none.
+  `MCP_HTTP_FILES_MAX_AGE_MIN` deletes files from the two folders after that
+  many minutes, for a container whose folders are tmpfs: nothing else clears
+  them there, and the client keeps its own copy.
 - **The guard.** Every registered tool is checked against the policy at
   start. Inputs are strict; annotations and `_meta` come from the class; a
   ceiling (`MCP_MAX_ACCESS`, and `MCP_CLIENT_MAX_ACCESS` per client) refuses

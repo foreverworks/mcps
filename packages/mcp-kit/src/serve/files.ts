@@ -37,6 +37,8 @@ export type FileEndpoints = {
   readonly inbox?: string;
   /** The most bytes a PUT may carry. */
   readonly maxBytes: number;
+  /** Whole minutes after which a file in either folder is deleted (serve/filesSweep.ts). The key is absent when MCP_HTTP_FILES_MAX_AGE_MIN is unset: files are kept. */
+  readonly maxAgeMin?: number;
 };
 
 /**
@@ -55,13 +57,15 @@ export const folderFrom = (env: NodeJS.ProcessEnv, name: string): string | undef
 };
 
 /** The names that switch the endpoints on, or configure them; each one needs MCP_HTTP_PORT and tokens. */
-export const FILES_VARIABLES = ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES"] as const;
+export const FILES_VARIABLES = ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES", "MCP_HTTP_FILES_MAX_AGE_MIN"] as const;
 
 /**
  * MCP_HTTP_FILES_OUTBOX and MCP_HTTP_FILES_INBOX, each a folder that switches
- * its direction on, and MCP_HTTP_FILES_MAX_BYTES for the inbox. Undefined when
- * neither folder is set. A size without an inbox to cap is a mistake worth
- * stopping for, like a bind address without the hosts.
+ * its direction on, MCP_HTTP_FILES_MAX_BYTES for the inbox, and
+ * MCP_HTTP_FILES_MAX_AGE_MIN for how long a file stays in either. Undefined
+ * when neither folder is set. A size without an inbox to cap, or an age
+ * without a folder to clear, is a mistake worth stopping for, like a bind
+ * address without the hosts.
  *
  * A plain throw, not a tagged failure: this is a process that must not start.
  */
@@ -70,11 +74,31 @@ export const filesFrom = (env: NodeJS.ProcessEnv): FileEndpoints | undefined => 
   const inbox = folderFrom(env, "MCP_HTTP_FILES_INBOX");
   const max = env["MCP_HTTP_FILES_MAX_BYTES"]?.trim();
   if (inbox === undefined && max) throw new Error("MCP_HTTP_FILES_MAX_BYTES is set without MCP_HTTP_FILES_INBOX: only a file put into the inbox has a size limit");
-  if (outbox === undefined && inbox === undefined) return undefined;
+  const age = env["MCP_HTTP_FILES_MAX_AGE_MIN"]?.trim();
+  if (outbox === undefined && inbox === undefined) {
+    if (age) throw new Error("MCP_HTTP_FILES_MAX_AGE_MIN is set without MCP_HTTP_FILES_INBOX or MCP_HTTP_FILES_OUTBOX: there is no folder whose files it could delete");
+    return undefined;
+  }
   const maxBytes = max ? Number(max) : DEFAULT_FILES_MAX_BYTES;
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new Error(`MCP_HTTP_FILES_MAX_BYTES "${max}" is not a number of bytes`);
-  return { ...(outbox === undefined ? {} : { outbox }), ...(inbox === undefined ? {} : { inbox }), maxBytes };
+  const maxAgeMin = age ? Number(age) : undefined;
+  if (age && (!/^\d+$/.test(age) || !Number.isSafeInteger(maxAgeMin) || maxAgeMin === 0)) {
+    throw new Error(`MCP_HTTP_FILES_MAX_AGE_MIN "${age}" is not a number of minutes: write a whole number above zero, or leave it unset to keep files`);
+  }
+  return {
+    ...(outbox === undefined ? {} : { outbox }),
+    ...(inbox === undefined ? {} : { inbox }),
+    maxBytes,
+    ...(maxAgeMin === undefined ? {} : { maxAgeMin }),
+  };
 };
+
+/**
+ * How often files older than `maxAgeMin` are looked for: a quarter of the age,
+ * so a file is gone within a quarter again of its age at most, but never
+ * oftener than a minute (a sweep reads the whole folder) nor rarer than an hour.
+ */
+export const sweepIntervalMs = (maxAgeMin: number): number => Math.min(60, Math.max(1, maxAgeMin / 4)) * 60_000;
 
 /** Which folder a file request is for, and what follows the route in the request's target, still percent-encoded. */
 export type FileRoute = { readonly direction: "outbox" | "inbox"; readonly rest: string };
@@ -144,6 +168,7 @@ export const describeFiles = (files: FileEndpoints): string =>
   [
     files.outbox === undefined ? undefined : `GET ${FILES_OUTBOX_PATH}/ reads ${files.outbox}`,
     files.inbox === undefined ? undefined : `PUT ${FILES_INBOX_PATH}/ writes ${files.inbox} (up to ${files.maxBytes} bytes)`,
+    files.maxAgeMin === undefined ? undefined : `files older than ${files.maxAgeMin} min are deleted`,
   ]
     .filter((part): part is string => part !== undefined)
     .join("; ");
