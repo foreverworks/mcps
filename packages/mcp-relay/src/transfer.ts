@@ -76,7 +76,7 @@ export const uploadFile = async (transfer: Transfer, path: string, signal: Abort
     if (typeof answer === "string") return failed(answer);
     if (answer.status !== 200) {
       discard(answer);
-      return failed(statusWords(answer.status, upstream));
+      return failed(statusWords(answer.status, upstream, "upload"));
     }
     const text = await readAnswer(answer, 64 * 1024);
     const stored = parseStored(text);
@@ -118,11 +118,11 @@ export const downloadFile = async (transfer: Transfer, path: string, signal: Abo
   if (answer.status === 403) {
     // The words already say why; the server's own, which say the same, would only repeat them.
     discard(answer);
-    return failed(statusWords(answer.status, upstream));
+    return failed(statusWords(answer.status, upstream, "download"));
   }
   if (answer.status !== 200) {
     const note = await readAnswer(answer, 512);
-    return failed(`${statusWords(answer.status, upstream)}${note === undefined || note.length === 0 ? "" : ` (${snippetOf(note, upstream)})`}`);
+    return failed(`${statusWords(answer.status, upstream, "download")}${note === undefined || note.length === 0 ? "" : ` (${snippetOf(note, upstream)})`}`);
   }
   const expected = parseSha256(String(answer.headers[SHA256_HEADER] ?? ""));
   if (expected === undefined) {

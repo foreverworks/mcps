@@ -172,15 +172,30 @@ neither followed nor deleted. A sweep that fails writes one `files {...}` line
 with the system's error code and the next goes on. Unset, nothing is deleted
 and nothing runs.
 
-**A client with a ceiling gets no files.** A client named in
-`MCP_CLIENT_MAX_ACCESS` (at any class, `money` too) is refused both endpoints
-with a 403 and a plain sentence that says why: its calls are limited by a
-ceiling, and files cross outside the tool calls that ceiling checks. The
-refusal comes before the path or the method is looked at, so it says nothing
-of what the folders hold, and an upload it refuses is read and thrown away,
-never stored. The inbox and the outbox belong to the clients with no ceiling.
-There is no setting to lift it. If a held client needs a tool that takes or
-returns a file, give it a server of its own, or take its entry out of
+**A client with a ceiling gets only its own files.** A client named in
+`MCP_CLIENT_MAX_ACCESS` (at any class, `money` too) may fetch from the outbox
+exactly the files its own calls handed back: a `read` tool that saves an
+attachment, an invoice archive or a downloaded document and links it in its
+result. That grants nothing the call did not: a tool within the client's
+ceiling made the file for it. Everything else it asks of the endpoints gets a
+403 and a plain sentence that says why: its calls are limited by a ceiling,
+and files cross outside the tool calls that ceiling checks. That covers every
+upload, a file another client's call saved (even when a result of its own
+links it), a guessed path, a folder, a path out of the outbox, and its own path
+once another file or a link is there. The refusal says nothing of what the
+folders hold, and an upload it refuses is read and thrown away, never stored.
+
+The server remembers which files each held client's calls handed back, in
+memory: at most 10,000 per client (the oldest go first), each for as long as
+`MCP_HTTP_FILES_MAX_AGE_MIN` keeps the files, or for 24 hours when it is unset.
+A record names the file as it was when the call ended, so a file written later
+at the same path is not the one recorded. A restart forgets every record:
+a held client that fetches a file its call made before the restart gets the
+403, and the way on is to call the tool again. Behind a relay that fetch
+happens right after the call, so only a restart in that moment costs
+anything: the result's note names the file, and calling the tool again brings
+it. There is no setting to lift the rule. If a held client needs a
+tool that takes a file, give it a server of its own, or take its entry out of
 `MCP_CLIENT_MAX_ACCESS`. A client with no entry keeps the endpoints as they
 were, and `MCP_MAX_ACCESS` (one ceiling for every client of the server) does
 not close them.
@@ -237,7 +252,7 @@ and in `_meta["foreverworks.com/access"]`.
 | Variable | Default | Meaning |
 |---|---|---|
 | `MCP_MAX_ACCESS` | `money` | The highest class this server runs: `read`, `write` or `money`. A tool above it is still listed, says it is disabled, and refuses every call (`access_denied`). |
-| `MCP_CLIENT_MAX_ACCESS` | | Lower ceilings for named clients, as `client=class` pairs separated by commas (`mail-reader=read,bob=write`). The client is the name of the bearer token it called with (`MCP_HTTP_TOKENS_DIR`). A call above its class is refused (`access_denied`, naming the client), and so is any request to the [file endpoints](#files-to-and-from-another-machine) (403). Meant for another server that calls this one as its client and needs to read, not to send or pay. |
+| `MCP_CLIENT_MAX_ACCESS` | | Lower ceilings for named clients, as `client=class` pairs separated by commas (`mail-reader=read,bob=write`). The client is the name of the bearer token it called with (`MCP_HTTP_TOKENS_DIR`). A call above its class is refused (`access_denied`, naming the client), and so is any request to the [file endpoints](#files-to-and-from-another-machine) (403) but a download of a file its own calls handed back. Meant for another server that calls this one as its client and needs to read, not to send or pay. |
 | `MCP_CONFIRM` | `client` | Who confirms with the person a `money` call, and a `write` its policy marks `confirm` (one that acts outside the computer): `client`, `elicit` or `none`, as below. |
 
 [security.md](security.md#money-and-confirmation) explains each value of

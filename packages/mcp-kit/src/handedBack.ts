@@ -16,13 +16,25 @@ import { type ResourceLink, resourceLinkTo } from "./outbox.js";
  *
  * Outside a call (a shell mode, a test of a writer alone) there is nothing to
  * collect into, and a note is a no-op.
+ *
+ * The guard watches the same notes for the whole call (`watchHandedBack`),
+ * envelope or not, since it alone knows which client made the call: over HTTP
+ * that is how a client held to a ceiling may fetch the files its own calls
+ * handed back, and nothing else (serve/ownFiles.ts).
  */
 const calls = new AsyncLocalStorage<Map<string, ResourceLink>>();
+
+/** The guard's view of one call: the path and size of every file handed back inside it. */
+const watched = new AsyncLocalStorage<Map<string, number>>();
 
 /** A file this call saved to its outbox, at an absolute path, of `size` bytes. One link per path, the last size noted. */
 export const noteHandedBack = (path: string, size: number): void => {
   calls.getStore()?.set(path, resourceLinkTo(path, size));
+  watched.getStore()?.set(path, size);
 };
+
+/** Runs one call, noting in `into` the path and size of every file it hands back, whichever envelope links them. */
+export const watchHandedBack = <T>(into: Map<string, number>, run: () => Promise<T>): Promise<T> => watched.run(into, run);
 
 /** Runs one call, and answers what it returned with the links to the files it handed back, in the order first noted. */
 export const collectHandedBack = async <T>(run: () => Promise<T>): Promise<{ readonly value: T; readonly links: readonly ResourceLink[] }> => {

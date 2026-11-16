@@ -124,25 +124,34 @@ const refusedWords = (status: number, upstream: Upstream): string =>
 /**
  * Why the server's file endpoints turned this client away with a 403: the
  * client is held to a ceiling (MCP_CLIENT_MAX_ACCESS on the server), and files
- * cross outside the tool calls that ceiling checks. Not about the relay's
- * token, so it must not send anyone to look at the token files.
+ * cross outside the tool calls that ceiling checks. Such a client sends no
+ * file, and fetches only the files its own calls handed back, while the server
+ * still has the record of them. Not about the relay's token, so it must not
+ * send anyone to look at the token files.
  */
-const ceilingWords = (upstream: Upstream): string =>
-  `the upstream does not carry files for ${upstream.mode === "one" ? "this client" : upstream.client} (403): its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS on the server), and files cross outside the tool calls that ceiling checks, so file transfers are for clients with no ceiling; use a client with none for a tool that takes or returns a file`;
+const ceilingWords = (upstream: Upstream, direction: "upload" | "download"): string => {
+  const who = upstream.mode === "one" ? "this client" : upstream.client;
+  const held = `${upstream.mode === "one" ? "its" : `${who}'s`} calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS on the server), and files cross outside the tool calls that ceiling checks`;
+  return direction === "upload"
+    ? `the upstream takes no files from ${who} (403): ${held}, so uploads are for clients with no ceiling; use a client with none for a tool that takes a file`
+    : `the upstream does not give ${who} this file (403): ${held}; a client held so fetches only the files its own calls handed back, while the server remembers those calls: if this file came from one of them, the server has since restarted or let the record go with its outbox's retention, so call the tool again`;
+};
+
+/** What a request was for: an upload to the file endpoints, a download from them, or the MCP route. */
+export type Subject = "upload" | "download" | "call";
 
 /**
  * What an answer other than the one wanted says about the upstream, for a
- * person to read: `file` for the file endpoints, `call` for the MCP route.
- * 401 is always about the relay's token, never the client's. So is a 403 from
- * the route; from a file endpoint it is the client's ceiling.
+ * person to read. 401 is always about the relay's token, never the client's.
+ * So is a 403 from the route; from a file endpoint it is the client's ceiling.
  */
-export const statusWords = (status: number, upstream: Upstream, subject: "file" | "call" = "file"): string => {
-  if (status === 403 && subject === "file") return ceilingWords(upstream);
+export const statusWords = (status: number, upstream: Upstream, subject: Subject): string => {
+  if (status === 403 && subject !== "call") return ceilingWords(upstream, subject);
   if (status === 401 || status === 403) return refusedWords(status, upstream);
-  if (status === 404) return subject === "file" ? "the upstream answered 404: its file endpoint is off, or the file is not there" : "the upstream answered 404: is MCP_RELAY_UPSTREAM the base URL of the server?";
-  if (status === 413) return subject === "file" ? "the upstream refused the file as too large (413); its MCP_HTTP_FILES_MAX_BYTES is the limit" : "the upstream refused the request as too large (413)";
+  if (status === 404) return subject !== "call" ? "the upstream answered 404: its file endpoint is off, or the file is not there" : "the upstream answered 404: is MCP_RELAY_UPSTREAM the base URL of the server?";
+  if (status === 413) return subject !== "call" ? "the upstream refused the file as too large (413); its MCP_HTTP_FILES_MAX_BYTES is the limit" : "the upstream refused the request as too large (413)";
   if (status === 421) return "the upstream does not answer to the name in MCP_RELAY_UPSTREAM (421); its MCP_HTTP_ALLOWED_HOSTS must list it";
-  if (status === 422 && subject === "file") return "the upstream received other bytes than were sent (422)";
+  if (status === 422 && subject !== "call") return "the upstream received other bytes than were sent (422)";
   if (status === 429) return "the upstream is limiting this client's requests (429)";
   if (status >= 500) return `the upstream failed (${status})`;
   return `the upstream answered ${status}`;

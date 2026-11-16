@@ -1,16 +1,19 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, realpath, stat, symlink, utimes, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, readdir, readFile, realpath, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import type { McpServer } from "@modelcontextprotocol/server";
-import { afterAll, beforeAll, describe, expect, it, vi } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
+import { z } from "zod";
 
 import { guardSettingsFrom, hasClientCeiling } from "../src/serve/confirm.js";
 import { DEFAULT_FILES_MAX_BYTES, fileRouteOf, FILES_REFUSED_FOR_CEILING, filesFrom, filesUrlPath, segmentsOf } from "../src/serve/files.js";
+import { makeHandled } from "../src/envelope.js";
 import { storeStream } from "../src/fileStream.js";
+import { saveToOutbox } from "../src/handedBack.js";
 import { listenFrom, MCP_PATH, serve, type Served } from "../src/serve.js";
 
 const sha256 = (data: string | Buffer): string => createHash("sha256").update(data).digest("hex");
@@ -698,6 +701,213 @@ describe("a client held to a ceiling (MCP_CLIENT_MAX_ACCESS), and the file endpo
     expect(lines).toContainEqual({ svc: "ceilinged", client: "writer", direction: "upload", outcome: "refused_ceiling" });
     expect(lines.filter((line) => line["outcome"] === "refused_ceiling").every((line) => Object.keys(line).sort().join() === "client,direction,outcome,svc")).toBe(true);
     expect(JSON.stringify(lines.filter((line) => line["outcome"] === "refused_ceiling"))).not.toMatch(/board-minutes|CONFIDENTIAL|q3\.csv|scan\.pdf/);
+  });
+});
+
+/** A server whose read tools save files to the outbox through the kit's writer, inside the kit's envelope, as a real server's do. */
+const handled = makeHandled({ asAppError: () => undefined, remedyFor: () => "" });
+const savingTools =
+  (outbox: string, elsewhere: string) =>
+  (server: McpServer): void => {
+    server.registerTool(
+      "fetch_document",
+      { description: "saves a document to the outbox and links it", inputSchema: { name: z.string(), text: z.string(), folder: z.string().optional() } },
+      handled(async ({ name, text, folder }: { name: string; text: string; folder?: string | undefined }) => {
+        const saved = await saveToOutbox(join(outbox, folder ?? ""), name, text);
+        return { saved: saved.path, sha256: saved.sha256, size: saved.size };
+      }),
+    );
+    server.registerTool(
+      "fetch_then_fail",
+      { description: "saves a document, then fails", inputSchema: { name: z.string() } },
+      handled(async ({ name }: { name: string }) => {
+        await saveToOutbox(outbox, name, "half of a document");
+        throw new Error("the service went away halfway");
+      }),
+    );
+    server.registerTool(
+      "save_elsewhere",
+      { description: "saves a document outside the outbox", inputSchema: { name: z.string() } },
+      handled(async ({ name }: { name: string }) => (await saveToOutbox(elsewhere, name, "outside the outbox")).path),
+    );
+  };
+const SAVING_POLICY = { fetch_document: { access: "read" }, fetch_then_fail: { access: "read" }, save_elsewhere: { access: "read" } } as const;
+
+type Saving = { readonly served: Served; readonly dir: string; readonly outbox: string; readonly inbox: string; readonly elsewhere: string; readonly env: Record<string, string> };
+
+const startSaving = async (env: Record<string, string> = {}, at?: string): Promise<Saving> => {
+  const dir = at ?? (await mkdtemp(join(tmpdir(), "mcp-kit-own-files-")));
+  const [outbox, inbox, elsewhere, tokens] = ["out", "in", "elsewhere", "tokens"].map((name) => join(dir, name)) as [string, string, string, string];
+  for (const folder of [outbox, inbox, elsewhere, tokens]) await mkdir(folder, { recursive: true });
+  for (const client of ["reader", "other", "open"]) await writeFile(join(tokens, `token-${client}`), `${client}-token-0123456789abcdef\n`);
+  const full = { MCP_HTTP_PORT: "0", MCP_HTTP_TOKENS_DIR: tokens, MCP_HTTP_FILES_OUTBOX: outbox, MCP_HTTP_FILES_INBOX: inbox, MCP_CLIENT_MAX_ACCESS: "reader=read,other=read", ...env };
+  const served = await serve({ name: "saving", version: "0.0.0", register: savingTools(outbox, elsewhere), policy: SAVING_POLICY, env: full, log: () => undefined });
+  return { served, dir, outbox, inbox, elsewhere, env };
+};
+
+const bearerOf = (client: string): { authorization: string } => ({ authorization: `Bearer ${client}-token-0123456789abcdef` });
+
+/** One tool call over HTTP, as a client with this name makes it: the result. */
+const callAs = async (served: Served, client: string, name: string, args: Record<string, unknown>): Promise<{ content: { type: string; text?: string; uri?: string }[]; isError?: boolean }> => {
+  const answer = await raw(served, "POST", MCP_PATH, {
+    headers: { ...bearerOf(client), "content-type": "application/json", accept: "application/json, text/event-stream" },
+    body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name, arguments: args } }),
+  });
+  return (JSON.parse(answer.body.toString()) as { result: { content: { type: string; text?: string; uri?: string }[]; isError?: boolean } }).result;
+};
+
+const fetched = (served: Served, client: string, path: string): Promise<Answer> => raw(served, "GET", `/files/outbox/${path}`, { headers: bearerOf(client) });
+
+const refusedAsHeld = (answer: Answer): void => {
+  expect(answer.status).toBe(403);
+  expect(answer.body.toString()).toBe(`${FILES_REFUSED_FOR_CEILING}\n`);
+  expect(answer.headers["x-content-sha256"]).toBeUndefined();
+};
+
+describe("a client held to a ceiling, and the files its own calls handed back", () => {
+  let world: Saving;
+  beforeAll(async () => {
+    world = await startSaving();
+  });
+  afterAll(() => world.served.close());
+
+  it("fetches the file its own call linked: 200, the bytes, and the SHA-256 the call reported", async () => {
+    const text = "%PDF-1.7 statement of account";
+    const result = await callAs(world.served, "reader", "fetch_document", { name: "statement.pdf", text });
+    const reported = JSON.parse(result.content[0]?.text as string) as { saved: string; sha256: string; size: number };
+    expect(result.content[1]).toMatchObject({ type: "resource_link", uri: `file://${join(world.outbox, "statement.pdf")}` });
+    for (let round = 0; round < 2; round += 1) {
+      const answer = await fetched(world.served, "reader", "statement.pdf");
+      expect(answer.status).toBe(200);
+      expect(answer.body.toString()).toBe(text);
+      expect(answer.headers["x-content-sha256"]).toBe(reported.sha256);
+      expect(reported.sha256).toBe(sha256(text));
+      expect(answer.headers["content-type"]).toBe("application/pdf");
+    }
+
+    await callAs(world.served, "reader", "fetch_document", { name: "q3 #1.csv", text: "id,amount\n1,10\n", folder: "2026-09/reports" });
+    const nested = await fetched(world.served, "reader", filesUrlPath("/files/outbox", "2026-09/reports/q3 #1.csv").slice("/files/outbox/".length));
+    expect(nested.status).toBe(200);
+    expect(nested.body.toString()).toBe("id,amount\n1,10\n");
+  });
+
+  it("is refused every file another client's call handed back, held or not, and so is the other held client its own", async () => {
+    await callAs(world.served, "reader", "fetch_document", { name: "reader-only.pdf", text: "for reader" });
+    await callAs(world.served, "other", "fetch_document", { name: "other-only.pdf", text: "for other" });
+    await callAs(world.served, "open", "fetch_document", { name: "open-only.pdf", text: "for open" });
+    refusedAsHeld(await fetched(world.served, "reader", "other-only.pdf"));
+    refusedAsHeld(await fetched(world.served, "reader", "open-only.pdf"));
+    refusedAsHeld(await fetched(world.served, "other", "reader-only.pdf"));
+    expect((await fetched(world.served, "other", "other-only.pdf")).body.toString()).toBe("for other");
+  });
+
+  it("is refused a guessed path, a folder and a path out of the outbox, with the same 403 whether anything is there or not", async () => {
+    await writeFile(join(world.outbox, "planted.txt"), "put here by something else");
+    await callAs(world.served, "reader", "save_elsewhere", { name: "outside.txt" });
+    for (const path of ["planted.txt", "missing.pdf", "", "2026-09", "2026-09/reports", "..%2felsewhere%2foutside.txt", "../elsewhere/outside.txt", "%2e%2e/elsewhere/outside.txt", "reports//q3.csv"]) {
+      refusedAsHeld(await fetched(world.served, "reader", path));
+    }
+    refusedAsHeld(await raw(world.served, "GET", "/files/outbox", { headers: bearerOf("reader") }));
+  });
+
+  it("is refused a link to its own file, a link put where its file was, a file written later at its path, and its file once deleted", async () => {
+    await callAs(world.served, "reader", "fetch_document", { name: "mine.txt", text: "mine" });
+    await symlink(join(world.outbox, "mine.txt"), join(world.outbox, "alias.txt"));
+    refusedAsHeld(await fetched(world.served, "reader", "alias.txt"));
+
+    await callAs(world.served, "reader", "fetch_document", { name: "swap.txt", text: "mine too" });
+    await callAs(world.served, "open", "fetch_document", { name: "theirs.txt", text: "theirs" });
+    await unlink(join(world.outbox, "swap.txt"));
+    await symlink(join(world.outbox, "theirs.txt"), join(world.outbox, "swap.txt"));
+    refusedAsHeld(await fetched(world.served, "reader", "swap.txt"));
+
+    await callAs(world.served, "reader", "fetch_document", { name: "same-name.txt", text: "reader's version" });
+    expect((await fetched(world.served, "reader", "same-name.txt")).status).toBe(200);
+    await callAs(world.served, "open", "fetch_document", { name: "same-name.txt", text: "open's version!" });
+    refusedAsHeld(await fetched(world.served, "reader", "same-name.txt"));
+    expect((await fetched(world.served, "open", "same-name.txt")).body.toString()).toBe("open's version!");
+
+    await callAs(world.served, "reader", "fetch_document", { name: "gone.txt", text: "soon gone" });
+    await unlink(join(world.outbox, "gone.txt"));
+    refusedAsHeld(await fetched(world.served, "reader", "gone.txt"));
+  });
+
+  it("is refused every upload and every other method, on its own paths too, and nothing is stored", async () => {
+    await callAs(world.served, "reader", "fetch_document", { name: "kept.pdf", text: "kept" });
+    for (const [method, target] of [
+      ["PUT", "/files/inbox/scan.pdf"],
+      ["PUT", "/files/inbox/kept.pdf"],
+      ["PUT", "/files/outbox/kept.pdf"],
+      ["DELETE", "/files/outbox/kept.pdf"],
+      ["POST", "/files/outbox/kept.pdf"],
+      ["GET", "/files/inbox/kept.pdf"],
+    ] as const) {
+      refusedAsHeld(await raw(world.served, method, target, { headers: bearerOf("reader"), ...(method === "GET" ? {} : { body: "bytes the client wants stored" }) }));
+    }
+    expect(await readdir(world.inbox)).toEqual([]);
+    expect(await readFile(join(world.outbox, "kept.pdf"), "utf8")).toBe("kept");
+  });
+
+  it("gets nothing for a call that failed, though it saved a file before failing", async () => {
+    const result = await callAs(world.served, "reader", "fetch_then_fail", { name: "half.txt" });
+    expect(result.isError).toBe(true);
+    expect(result.content).toHaveLength(1);
+    expect(await readFile(join(world.outbox, "half.txt"), "utf8")).toBe("half of a document");
+    refusedAsHeld(await fetched(world.served, "reader", "half.txt"));
+  });
+
+  it("leaves the client with no ceiling as it was: any file, a 404 for a missing one, and uploads", async () => {
+    for (const name of ["statement.pdf", "reader-only.pdf", "planted.txt", "alias.txt"]) expect((await fetched(world.served, "open", name)).status).toBe(200);
+    expect((await fetched(world.served, "open", "missing.pdf")).status).toBe(404);
+    expect((await fetched(world.served, "open", "../elsewhere/outside.txt")).status).toBe(404);
+    const body = Buffer.from("scanned pages");
+    const up = await raw(world.served, "PUT", "/files/inbox/open/scan.pdf", { headers: { ...bearerOf("open"), "x-content-sha256": sha256(body) }, body });
+    expect(up.status).toBe(200);
+  });
+
+  it("forgets every record when the server restarts: the same fetch is refused until the tool is called again", async () => {
+    await world.served.close();
+    world = await startSaving({}, world.dir);
+    refusedAsHeld(await fetched(world.served, "reader", "statement.pdf"));
+    await callAs(world.served, "reader", "fetch_document", { name: "statement.pdf", text: "%PDF-1.7 statement of account" });
+    expect((await fetched(world.served, "reader", "statement.pdf")).status).toBe(200);
+  });
+});
+
+describe("how long a held client's record of its own files is kept", () => {
+  afterEach(() => {
+    vi.useRealTimers();
+  });
+
+  const fetchAfter = async (world: Saving, minutes: readonly number[]): Promise<number[]> => {
+    const started = Date.now();
+    vi.useFakeTimers({ toFake: ["Date"] });
+    vi.setSystemTime(started);
+    await callAs(world.served, "reader", "fetch_document", { name: "aged.txt", text: "aged" });
+    const statuses: number[] = [];
+    for (const minute of minutes) {
+      vi.setSystemTime(started + minute * 60_000);
+      statuses.push((await fetched(world.served, "reader", "aged.txt")).status);
+    }
+    return statuses;
+  };
+
+  it("as long as the outbox keeps its files, with MCP_HTTP_FILES_MAX_AGE_MIN", async () => {
+    const world = await startSaving({ MCP_HTTP_FILES_MAX_AGE_MIN: "30" });
+    try {
+      expect(await fetchAfter(world, [0, 29, 31])).toEqual([200, 200, 403]);
+    } finally {
+      await world.served.close();
+    }
+  });
+
+  it("for a day where the outbox keeps its files for ever", async () => {
+    const world = await startSaving();
+    try {
+      expect(await fetchAfter(world, [23 * 60, 24 * 60 + 1])).toEqual([200, 403]);
+    } finally {
+      await world.served.close();
+    }
   });
 });
 

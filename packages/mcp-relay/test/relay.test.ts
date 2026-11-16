@@ -18,7 +18,7 @@ describe("a relay in front of a server on another disk", () => {
   describe.each(["legacy", "modern"] as const)("for a client of protocol %s", (era) => {
     it("serves the server's tools under its own local address", async () => {
       const client = await connectTo(world, era);
-      expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual(["count_and_save", "echo", "link_to", "read_input", "read_inputs", "save_blob", "save_report"]);
+      expect((await client.listTools()).tools.map((t) => t.name).sort()).toEqual(["count_and_save", "echo", "fetch_document", "link_to", "read_input", "read_inputs", "save_blob", "save_report"]);
       expect(client.getNegotiatedProtocolVersion()).toBe(era === "modern" ? "2026-07-28" : "2025-11-25");
       await client.close();
     });

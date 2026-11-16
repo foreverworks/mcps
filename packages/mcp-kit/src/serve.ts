@@ -13,6 +13,7 @@ import { installEgress, installKeepAlive } from "./serve/egress.js";
 import { describeFiles, type FileEndpoints, fileRouteOf, FILES_VARIABLES, filesFrom } from "./serve/files.js";
 import { serveFile } from "./serve/filesServe.js";
 import { startSweeping } from "./serve/filesSweep.js";
+import { DEFAULT_OWN_FILES_MAX_AGE_MIN, makeOwnFiles, type OwnFiles } from "./serve/ownFiles.js";
 import { guard, registeredNames, requestContext, type ServerVocabulary } from "./serve/guard.js";
 import { toolIconsOf, type Product } from "./serve/icons.js";
 import { admit, egressFrom, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
@@ -318,7 +319,7 @@ type Runtime = {
  * question is the call's own result and the client retries with the answer;
  * the stateless HTTP transport cannot carry a 2025 request back.
  */
-const fresh = ({ options, toolIcons, settings, log }: Runtime, era: ProtocolEra, transport: "stdio" | "http"): McpServer => {
+const fresh = ({ options, toolIcons, settings, log }: Runtime, era: ProtocolEra, transport: "stdio" | "http", ownFiles?: OwnFiles): McpServer => {
   const info = {
     name: options.name,
     version: options.version,
@@ -337,6 +338,7 @@ const fresh = ({ options, toolIcons, settings, log }: Runtime, era: ProtocolEra,
       midCall,
       icons: toolIcons,
       ...(options.vocabulary === undefined ? {} : { vocabulary: options.vocabulary }),
+      ...(ownFiles === undefined ? {} : { handedBack: (client: string, files: ReadonlyMap<string, number>) => (hasClientCeiling(settings, client) ? ownFiles.record(client, files) : Promise.resolve()) }),
     }),
   );
   return server;
@@ -426,6 +428,17 @@ const publicDoor = (hosts: readonly PublicHost[], clientIpHeader: string | undef
 });
 
 /**
+ * The record of the outbox files each held client's calls handed back, which
+ * the file endpoints serve it and nothing else (serve/ownFiles.ts): kept only
+ * where there is an outbox and a client with a ceiling of its own, for as
+ * long as the outbox keeps its files, or a day where it keeps them for ever.
+ */
+const ownFilesFor = (files: FileEndpoints | undefined, settings: GuardSettings): OwnFiles | undefined =>
+  files?.outbox === undefined || Object.keys(settings.clientMaxAccess ?? {}).length === 0
+    ? undefined
+    : makeOwnFiles({ outbox: files.outbox, maxAgeMs: (files.maxAgeMin ?? DEFAULT_OWN_FILES_MAX_AGE_MIN) * 60_000 });
+
+/**
  * Stateless: no session id, and a fresh server per request. Nothing about a
  * connection outlives its request, so a restart of the service costs a session
  * only the call that was in flight, and a client that hangs up cancels its
@@ -445,7 +458,8 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
   const buckets = new Map<string, Bucket>();
   const state = { bound: 0 };
   const onerror = (error: Error): void => console.error(`${options.name}: request failed:`, error);
-  const modern = createMcpHandler(({ era }) => fresh(runtime, era, "http"), { legacy: "reject", onerror, maxRequestBodySize: limits.maxBodyBytes });
+  const ownFiles = ownFilesFor(files, runtime.settings);
+  const modern = createMcpHandler(({ era }) => fresh(runtime, era, "http", ownFiles), { legacy: "reject", onerror, maxRequestBodySize: limits.maxBodyBytes });
   const serveModern = toNodeHandler(modern, { onerror, maxRequestBodySize: limits.maxBodyBytes });
 
   // With an inbox on, nothing but these bounds stops a body from taking as long as it likes to arrive
@@ -467,7 +481,7 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
       const turn = admit(buckets, caller.bucket, Date.now(), limits);
       if (!turn.allowed) return reply(res, 429, "too many requests", { ...early, "retry-after": String(turn.retryAfterSec) });
       const limited = hasClientCeiling(runtime.settings, client);
-      return serveFile({ files, service: options.name, client, limited, log: runtime.log, reply, timeoutMs: limits.timeoutMs }, fileRoute, req, res);
+      return serveFile({ files, service: options.name, client, limited, ...(ownFiles === undefined ? {} : { ownFiles }), log: runtime.log, reply, timeoutMs: limits.timeoutMs }, fileRoute, req, res);
     }
     if (pathnameOf(req.url) !== MCP_PATH) return reply(res, 404, "not found", early);
     // Also a CORS preflight, answered with no CORS headers: ChatGPT and Claude call from their servers, never from a page.
@@ -485,7 +499,7 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
     // Node's request types a method as optional; the SDK's adapter wants it, and a request always has one.
     const incoming = req as NodeIncomingMessageLike;
     const legacy = await isLegacyRequest(await toWebRequest(incoming, read.body), read.body);
-    const server = legacy ? fresh(runtime, "legacy", "http") : undefined;
+    const server = legacy ? fresh(runtime, "legacy", "http", ownFiles) : undefined;
     res.on("close", () => void server?.close());
     const timer = setTimeout(() => {
       if (!res.headersSent) reply(res, 504, `no answer within ${limits.timeoutMs} ms`);

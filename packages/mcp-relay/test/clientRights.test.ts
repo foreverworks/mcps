@@ -1,9 +1,9 @@
-import { access, readFile, writeFile } from "node:fs/promises";
+import { access, readFile, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { connectTo, jsonOf, startWorld, type World } from "./harness.js";
+import { connectTo, jsonOf, sha256, startWorld, type World } from "./harness.js";
 
 /**
  * What per-client tokens are for: the server holds each client to its own
@@ -70,9 +70,9 @@ describe("clients the server tells apart, through the relay", () => {
         (error: unknown) => error as { message: string },
       );
       expect(failure?.message).toContain(path);
-      expect(failure?.message).toContain("the upstream does not carry files for alice (403)");
-      expect(failure?.message).toContain("a ceiling (MCP_CLIENT_MAX_ACCESS on the server)");
-      expect(failure?.message).toContain("for clients with no ceiling");
+      expect(failure?.message).toContain("the upstream takes no files from alice (403)");
+      expect(failure?.message).toContain("alice's calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS on the server)");
+      expect(failure?.message).toContain("uploads are for clients with no ceiling");
       // Not the words for a refused token, which would send a person to the wrong file.
       expect(failure?.message).not.toContain("refused the relay's token");
       expect(failure?.message).not.toContain(world.clients["alice"]?.upstreamToken as string);
@@ -99,7 +99,8 @@ describe("clients the server tells apart, through the relay", () => {
       const refused = (await alice.callTool({ name: "link_to", arguments: { uris: [uri] } })) as { content: { text?: string }[] };
       const note = refused.content.at(-1)?.text as string;
       expect(note).toContain("made-for-bob.txt");
-      expect(note).toContain("the upstream does not carry files for alice (403)");
+      expect(note).toContain("the upstream does not give alice this file (403)");
+      expect(note).toContain("fetches only the files its own calls handed back");
       expect(note).not.toContain("refused the relay's token");
       expect(note).not.toContain("output of another client's call");
       expect(await exists(join(world.localOut, "made-for-bob.txt"))).toBe(false);
@@ -107,6 +108,31 @@ describe("clients the server tells apart, through the relay", () => {
       const fetched = (await bob.callTool({ name: "link_to", arguments: { uris: [uri] } })) as { content: { text?: string }[] };
       expect(fetched.content).toHaveLength(2);
       expect(await readFile(join(world.localOut, "made-for-bob.txt"), "utf8")).toBe("output of another client's call");
+    } finally {
+      await alice.close();
+      await bob.close();
+    }
+  });
+
+  it("brings the client held to read the file its own call handed back, byte for byte, and nothing it merely links", async () => {
+    const alice = await as("alice");
+    const bob = await as("bob");
+    try {
+      const own = (await alice.callTool({ name: "fetch_document", arguments: { name: "statement-alice.pdf", text: "%PDF-1.7 alice's statement" } })) as { content: { type: string; text?: string }[] };
+      expect(own.content).toHaveLength(2);
+      expect(own.content[1]).toMatchObject({ type: "resource_link" });
+      expect(await readFile(join(world.localOut, "statement-alice.pdf"), "utf8")).toBe("%PDF-1.7 alice's statement");
+      expect(jsonOf(own)).toMatchObject({ sha256: sha256("%PDF-1.7 alice's statement") });
+      expect(world.relayLog.some((line) => line.startsWith("relay-file ") && line.includes("statement-alice.pdf") && line.includes(sha256("%PDF-1.7 alice's statement").slice(0, 12)))).toBe(true);
+
+      // A file bob's call handed back stays bob's, even when a call of alice's links it.
+      await bob.callTool({ name: "fetch_document", arguments: { name: "statement-bob.pdf", text: "bob's statement" } });
+      const uri = `file://${join(world.localOut, "statement-bob.pdf")}`;
+      await rm(join(world.localOut, "statement-bob.pdf"));
+      const echoed = (await alice.callTool({ name: "link_to", arguments: { uris: [uri] } })) as { content: { text?: string }[] };
+      expect(echoed.content.at(-1)?.text).toContain("the upstream does not give alice this file (403)");
+      expect(echoed.content.at(-1)?.text).not.toContain("bob's statement");
+      expect(await exists(join(world.localOut, "statement-bob.pdf"))).toBe(false);
     } finally {
       await alice.close();
       await bob.close();
@@ -132,7 +158,7 @@ describe("a relay whose one upstream token is held to a ceiling", () => {
         () => undefined,
         (error: unknown) => error as { message: string },
       );
-      expect(failure?.message).toContain("the upstream does not carry files for this client (403)");
+      expect(failure?.message).toContain("the upstream takes no files from this client (403): its calls are limited by a ceiling");
       expect(failure?.message).toContain("MCP_CLIENT_MAX_ACCESS");
       expect(failure?.message).not.toContain("MCP_RELAY_UPSTREAM_TOKEN_FILE");
       expect(failure?.message).not.toContain(world.upstreamToken);

@@ -72,7 +72,8 @@ export const ceilingRefusing = (access: Access, settings: GuardSettings, client:
  * Whether `client` has a ceiling of its own, whatever its level
  * (MCP_CLIENT_MAX_ACCESS names it). A client with one is held to the tool
  * calls the guard checks; the file endpoints (serve/files.ts) move bytes
- * outside those calls and so are refused to it. Own keys only: a client
+ * outside those calls and so are refused to it, but for the files its own
+ * calls handed back (serve/ownFiles.ts). Own keys only: a client
  * called `constructor` has no ceiling because the object has a member by that
  * name.
  */

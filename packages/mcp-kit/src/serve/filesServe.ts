@@ -9,6 +9,7 @@ import { isInside } from "../inputFile/roots.js";
 import { parseSha256 } from "../inputFile/bytes.js";
 import { mimeTypeOf } from "../outbox.js";
 import { type FileEndpoints, type FileRoute, FILES_REFUSED_FOR_CEILING, segmentsOf, SHA256_HEADER } from "./files.js";
+import type { OwnFiles } from "./ownFiles.js";
 
 /**
  * The file endpoints' answers (serve/files.ts): `GET /files/outbox/<path>`
@@ -22,11 +23,18 @@ import { type FileEndpoints, type FileRoute, FILES_REFUSED_FOR_CEILING, segments
  * unsafe name, a missing file, a link out, a directory, a file unreadable to
  * the server) is the same 404 with the same words, so the answer says nothing
  * about what the folder holds. What else an upload can be told is about the
- * request, not the folder: 400 (a malformed X-Content-SHA256), 403 (a client
- * held to a ceiling, refused before anything else is read), 405 (the other
+ * request, not the folder: 400 (a malformed X-Content-SHA256), 405 (the other
  * method), 409 (a folder is where the file would go), 413 (over the size cap),
  * 422 (the bytes are not the ones hashed), 429 (the rate limit, from the
  * caller) and a plain 500.
+ *
+ * A client held to a ceiling (MCP_CLIENT_MAX_ACCESS) is answered otherwise:
+ * a GET of a file one of its own calls handed back, while the server keeps
+ * the record of it (serve/ownFiles.ts), is sent as to anyone, and every other
+ * request it makes is the same 403, before its method or path says anything
+ * of the folders: an upload, another client's file, a guessed or listed path,
+ * a path out of the outbox, its own path with another file or a link there
+ * now, a record expired or lost to a restart, a file since deleted.
  */
 
 /** What the server writes about each file it moves or refuses: never the bytes, and the path only for a file that moved. */
@@ -37,8 +45,10 @@ export type FilesContext = {
   /** The server's name and the caller's, for the log line. */
   readonly service: string;
   readonly client: string;
-  /** Whether the client has a ceiling of its own (MCP_CLIENT_MAX_ACCESS), which keeps it from both endpoints. */
+  /** Whether the client has a ceiling of its own (MCP_CLIENT_MAX_ACCESS), which keeps it from both endpoints but for the files its own calls handed back. */
   readonly limited: boolean;
+  /** The files each held client's calls handed back; absent where nobody is held or there is no outbox, and then a held client gets none. */
+  readonly ownFiles?: OwnFiles;
   readonly log: FilesLog;
   /** The longest an upload may take in all (MCP_HTTP_TIMEOUT_MS); it also may not go quiet for longer than a minute. */
   readonly timeoutMs: number;
@@ -155,14 +165,28 @@ export const folderInside = async (root: string, names: readonly string[]): Prom
 const outcomeLine = (context: FilesContext, line: Readonly<Record<string, unknown>>): void =>
   context.log(`files ${JSON.stringify({ svc: context.service, client: context.client, ...line })}`);
 
-const sendFile = async (context: FilesContext, names: readonly string[], res: ServerResponse): Promise<void> => {
+/**
+ * Sends the file at `names` in the outbox. For a held client, `refused`
+ * answers instead when the file opened is not the one its record names (or
+ * there is none), so a held client's answer is the file or the one 403.
+ */
+const sendFile = async (context: FilesContext, names: readonly string[], res: ServerResponse, refused?: () => void): Promise<void> => {
   const { files, reply } = context;
   const found = await openInside(files.outbox as string, names);
   if (!found.ok) {
+    if (refused !== undefined) return refused();
     outcomeLine(context, { direction: "download", outcome: "not_found" });
     return reply(res, 404, NOT_FOUND);
   }
   const { handle, size } = found;
+  if (refused !== undefined) {
+    const path = join(files.outbox as string, ...names);
+    const own = await handle.stat({ bigint: true }).then((stats) => context.ownFiles?.holds(context.client, path, stats) === true, () => false);
+    if (!own) {
+      await handle.close();
+      return refused();
+    }
+  }
   try {
     const sha256 = await sha256OfHandle(handle, size);
     res.writeHead(200, {
@@ -264,13 +288,26 @@ const boundUpload = (context: FilesContext, req: IncomingMessage): (() => void) 
   return () => clearTimeout(timer);
 };
 
+/**
+ * A held client's request: a GET of a file its own calls handed back, which
+ * is sent, or the one 403. Nothing it is told says whether a path is bad, a
+ * method wrong or a file there.
+ */
+const serveHeld = async (context: FilesContext, route: FileRoute, req: IncomingMessage, res: ServerResponse, direction: Direction): Promise<void> => {
+  const refused = (): void => refuse(context, req, res, 403, FILES_REFUSED_FOR_CEILING, "refused_ceiling", direction);
+  if (route.direction !== "outbox" || req.method !== "GET" || context.ownFiles === undefined) return refused();
+  const names = segmentsOf(route.rest);
+  if (names === undefined || !context.ownFiles.has(context.client, join(context.files.outbox as string, ...names))) return refused();
+  return sendFile(context, names, res, refused);
+};
+
 /** Answers one file request, whatever goes wrong with a plain 500. */
 export const serveFile = async (context: FilesContext, route: FileRoute, req: IncomingMessage, res: ServerResponse): Promise<void> => {
   const lift = route.direction === "inbox" ? boundUpload(context, req) : () => undefined;
   const direction: Direction = route.direction === "outbox" ? "download" : "upload";
   try {
-    // First of all: a client held to a ceiling is told nothing of the folders, not even that a path is bad or a method wrong.
-    if (context.limited) return refuse(context, req, res, 403, FILES_REFUSED_FOR_CEILING, "refused_ceiling", direction);
+    // First of all: a client held to a ceiling gets its own files and is told nothing else of the folders, not even that a path is bad or a method wrong.
+    if (context.limited) return await serveHeld(context, route, req, res, direction);
     const wanted = route.direction === "outbox" ? "GET" : "PUT";
     if (req.method !== wanted) return context.reply(res, 405, "method not allowed", { allow: wanted });
     const names = segmentsOf(route.rest);

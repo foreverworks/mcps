@@ -6,8 +6,10 @@ import { isAbsolute, resolve } from "node:path";
  * to and from another machine"). Off unless a variable is set, and then only
  * the direction it names: with none, these routes do not exist and answer as
  * any unknown route does. A client held to a ceiling (MCP_CLIENT_MAX_ACCESS)
- * is refused both with a 403: the ceiling checks tool calls, and a file moves
- * outside them, so the endpoints belong to clients with none.
+ * is refused both with a 403, but for a GET of a file one of its own calls
+ * handed back (serve/ownFiles.ts): the ceiling checks tool calls, and a file
+ * moves outside them, so the endpoints belong to clients with none, and a
+ * held client gets only what a call within its ceiling made for it.
  *
  * This file is the pure half: the settings, which request is a file request,
  * and the one rule for turning a URL into a path inside a folder. The streams
@@ -126,11 +128,13 @@ export const fileRouteOf = (target: string | undefined, files: FileEndpoints): F
 
 /**
  * What a client held to a ceiling (MCP_CLIENT_MAX_ACCESS) is told when it asks
- * for a file: the ceiling checks tool calls, and a file crosses outside them,
- * so these endpoints are for clients with none. Says nothing of the folders.
+ * for anything but a file one of its own calls handed back: the ceiling checks
+ * tool calls, and a file crosses outside them, so these endpoints are for
+ * clients with none. Says nothing of the folders, and covers every reason
+ * alike (an upload, another client's file, a record forgotten).
  */
 export const FILES_REFUSED_FOR_CEILING =
-  "files are not available to this client: its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS), and files cross outside the tool calls that ceiling checks; the file endpoints are for clients with no ceiling";
+  "this file is not available to this client: its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS), and files cross outside the tool calls that ceiling checks, so it may only fetch a file one of its own calls handed back, while the server still remembers that call (a restart forgets it, and so does the outbox's retention: call the tool again); uploads, and every other file, are for clients with no ceiling";
 
 /** The longest name a file system takes (ext4, xfs, zfs and the rest of what servers run on). */
 const MAX_NAME_BYTES = 255;

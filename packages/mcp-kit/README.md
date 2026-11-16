@@ -78,8 +78,11 @@ their icons. `servers/oblio` is a complete example.
   `MCP_HTTP_FILES_OUTBOX` and `MCP_HTTP_FILES_INBOX` switch on routes that
   carry the files its tools hand back and take by path, for
   [`mcp-relay`](../mcp-relay) to use (off unless set). A client held to a
-  ceiling (`MCP_CLIENT_MAX_ACCESS`) is refused them with a 403: files cross
-  outside the tool calls a ceiling checks, so they are for clients with none.
+  ceiling (`MCP_CLIENT_MAX_ACCESS`) may fetch only the files its own calls
+  handed back, and is refused everything else with a 403: files cross outside
+  the tool calls a ceiling checks, so the rest is for clients with none. The
+  server remembers those files in memory, for the outbox's retention or a
+  day, and forgets them on a restart (the client then calls the tool again).
   `MCP_HTTP_FILES_MAX_AGE_MIN` deletes files from the two folders after that
   many minutes, for a container whose folders are tmpfs: nothing else clears
   them there, and the client keeps its own copy.
@@ -87,7 +90,8 @@ their icons. `servers/oblio` is a complete example.
   start. Inputs are strict; annotations and `_meta` come from the class; a
   ceiling (`MCP_MAX_ACCESS`, and `MCP_CLIENT_MAX_ACCESS` per client) refuses
   what is above it (and keeps a client with its own ceiling from the file
-  endpoints, which move bytes outside tool calls); `MCP_CONFIRM` says whether the client or the server
+  endpoints, which move bytes outside tool calls, but for the files its own
+  calls handed back); `MCP_CONFIRM` says whether the client or the server
   confirms a `money` call; a declared output schema is checked and sent as
   structured content; every call is audited.
 - **Results and failures.** `makeErrorKit` for tagged failures, `makeHandled`
