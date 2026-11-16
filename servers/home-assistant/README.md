@@ -126,7 +126,7 @@ bold is approved by you before every call ([below](#confirmation)).
 
 | Tool | Access | What it does |
 |---|---|---|
-| `health` | read | Whether the server works with the instance: version, state, time zone, whether the WebSocket API signs in, and entities per domain; `ok: false` with the problem. |
+| `health` | read | Whether the server works with the instance: version, state, time zone, whether the WebSocket API signs in, and entities per domain; `ok: false` with the problem. An instance that does not answer at all is `reachable: false`, not a failure. |
 | `list_entities` | read | Finds entities by domain, area or words: one row each with id, name, state, unit and area (up to 1,000, default 100). |
 | `get_states` | read | The state of up to 50 entities, with their attributes and when they last changed. |
 | `list_areas` | read | Every area (or one) with its floor, devices and entities, from Home Assistant's registries. |
@@ -181,7 +181,10 @@ folder, restart Home Assistant, check the token, then restart this server.
 Assistant runs and that this machine reaches it: a browser here should open
 the same address. The message names what the network said
 (`ECONNREFUSED`: nothing listens on that port; `ENOTFOUND`: the name does not
-resolve here).
+resolve here). `health` says the same as `reachable: false` with
+`ok: true`: a Home Assistant that is switched off or restarting is not a
+fault of this server, so a monitor that reads `ok` stays quiet while you
+update the machine it runs on.
 
 **`unavailable`.** Home Assistant answered with a server error: it is
 starting, stopping or restarting. Wait a minute and call `health`.

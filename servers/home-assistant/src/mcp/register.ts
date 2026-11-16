@@ -77,7 +77,8 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "Whether this server works with its Home Assistant: the version, whether it is RUNNING, its time zone (history and logbook " +
         "times carry an offset), whether the WebSocket API signs in too, whose token it holds and whether that user is an " +
         "administrator (if not, the tools that need one are listed), and how many entities each domain has. ok: false comes with " +
-        "the problem. Call it first, and whenever a call fails with unreachable or auth.",
+        "the problem. A Home Assistant that does not answer at all (switched off, restarting, no route from here) is not a failure: " +
+        "it is reported as reachable: false, with what the network said. Call it first, and whenever a call fails with unreachable or auth.",
       inputSchema: {},
     },
     handled(() => health(deps)),

@@ -135,6 +135,7 @@ describe("health", () => {
     expect(await call("health")).toEqual({
       ok: true,
       url: URL_,
+      reachable: true,
       version: VERSION,
       state: "RUNNING",
       time_zone: "Europe/Bucharest",
@@ -153,6 +154,25 @@ describe("health", () => {
     const out = await (await setup({ fake: { haState: "STARTING" } })).call("health");
     expect(out.ok).toBe(false);
     expect(out.problems).toEqual(["Home Assistant is STARTING, not RUNNING"]);
+  });
+
+  it("reports an instance that does not answer as reachable: false, not as a failure, and asks nothing more", async () => {
+    for (const network of ["refused", "timeout"] as const) {
+      const { call, fake } = await setup({ fake: { network } });
+      const out = await call("health");
+      expect(out, network).toMatchObject({ ok: true, url: URL_, reachable: false });
+      expect(out.problems, network).toBeUndefined();
+      expect(out.note, network).toContain(network === "refused" ? "ECONNREFUSED" : "did not answer within 30 s");
+      expect(out.note, network).toContain("HOME_ASSISTANT_URL");
+      expect(fake.sockets, network).toEqual([]);
+    }
+  });
+
+  it("still fails on an instance that answers wrongly", async () => {
+    const out = await (await setup({ fake: { routes: { "GET /api/config": () => ({ status: 503, text: "503: Service Unavailable" }) } } })).call("health");
+    expect(out.ok).toBe(false);
+    expect(out.reachable).toBeUndefined();
+    expect(out.problems[0]).toContain("REST API: unavailable");
   });
 });
 

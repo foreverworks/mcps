@@ -21,6 +21,13 @@ const problemOf = (thrown: unknown, what: string): string => {
  * learned (a user made an administrator since then is seen here). A token
  * of a user who is not one is fine: the tools that need one are listed. One request at a time, and none after a refusal: each refused
  * token is a failed login to Home Assistant.
+ *
+ * An instance that does not answer at all (switched off, restarting, its
+ * machine down, or no route from here) is reported as reachable: false and
+ * is not a failure of this server, as a printer that is switched off is not:
+ * at home it often is, and a monitor that pages on it pages for nothing.
+ * Anything that answers wrongly (a refused token, a server error, recovery
+ * mode) still is.
  */
 export const health = async (deps: Deps) => {
   let url: string;
@@ -38,6 +45,8 @@ export const health = async (deps: Deps) => {
   try {
     config = await deps.ha.config();
   } catch (thrown) {
+    const known = asAppError(thrown);
+    if (known?.kind === "unreachable") return { ok: true, url, reachable: false, note: `${known.message} (${remedyFor(known)})` };
     return { ok: false, url, problems: [problemOf(thrown, "REST API")] };
   }
   const problems: string[] = [];
@@ -63,6 +72,7 @@ export const health = async (deps: Deps) => {
     ok: problems.length === 0,
     problems: problems.length === 0 ? undefined : problems,
     url,
+    reachable: true,
     version: config.version,
     state: config.state,
     time_zone: config.timeZone,
