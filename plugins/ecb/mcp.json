@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "ecb": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-ecb@0.1.0"
+      ]
+    }
+  }
+}

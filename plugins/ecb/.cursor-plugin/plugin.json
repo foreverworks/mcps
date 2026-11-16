@@ -1,0 +1,22 @@
+{
+  "name": "foreverworks-ecb",
+  "version": "0.1.0",
+  "description": "Look up the European Central Bank's euro rate for any day, and convert between any two currencies.",
+  "author": {
+    "name": "Forever Works"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/ecb/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "ecb",
+    "european-central-bank",
+    "euro",
+    "exchange-rates",
+    "currency"
+  ],
+  "logo": "assets/icon.png"
+}

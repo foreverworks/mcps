@@ -80,7 +80,7 @@ systemd, grants live in a `StateDirectory=` only the service's user reads
 | `bitwarden` | a personal API key and the master password, for the official CLI | by hand | none |
 | `bolt-food`, `glovo` | a refresh token from the consumer web app (no public API) | by hand, from the browser's developer tools | about a year for Bolt; by hand |
 | `trademarks`, `typesafe` | EUIPO OAuth client credentials and an optional USPTO TSDR API key; a TypeSafe API key | by hand | automatic / none |
-| `bnr`, `devices` | none (public data; the operator's own SSH access to the hosts) | | |
+| `bnr`, `ecb`, `devices` | none (public data; the operator's own SSH access to the hosts) | | |
 
 The model never sees an upstream token (consent tools return expiry dates and
 granted scopes), and the client's own credential never goes upstream.

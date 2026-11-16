@@ -49,6 +49,13 @@
       "version": "0.1.3"
     },
     {
+      "name": "foreverworks-ecb",
+      "displayName": "ECB exchange rates",
+      "source": "./plugins/ecb",
+      "description": "Look up the European Central Bank's euro rate for any day, and convert between any two currencies.",
+      "version": "0.1.0"
+    },
+    {
       "name": "foreverworks-enable-banking",
       "displayName": "Enable Banking",
       "source": "./plugins/enable-banking",

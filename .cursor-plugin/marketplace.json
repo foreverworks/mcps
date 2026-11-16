@@ -33,6 +33,10 @@
       "source": "eas"
     },
     {
+      "name": "foreverworks-ecb",
+      "source": "ecb"
+    },
+    {
       "name": "foreverworks-enable-banking",
       "source": "enable-banking"
     },

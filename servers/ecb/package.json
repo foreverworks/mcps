@@ -1,0 +1,59 @@
+{
+  "name": "@foreverworks/mcp-ecb",
+  "version": "0.1.0",
+  "description": "MCP server for the European Central Bank's euro exchange rates: the rate in force on any day since 1999, every currency or a window of fixings, and exact conversions between any two currencies, cross rates through the euro included",
+  "mcpName": "com.foreverworks/ecb",
+  "mcp": {
+    "title": "ECB exchange rates",
+    "audience": "general",
+    "maturity": "beta",
+    "tagline": "Look up the European Central Bank's euro rate for any day, and convert between any two currencies.",
+    "inputs": {}
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "ecb",
+    "european-central-bank",
+    "euro",
+    "exchange-rates",
+    "currency"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://foreverworks.github.io/mcps/servers/ecb/",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/ecb"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-ecb": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.3.0",
+    "zod": "^4.6.7"
+  }
+}
