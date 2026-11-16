@@ -1,5 +1,6 @@
 import { Agent, setGlobalDispatcher } from "undici";
 
+import { EGRESS_DENIED } from "../egressDenied.js";
 import { egressFrom, hostAllowed } from "./limits.js";
 
 /**
@@ -10,7 +11,7 @@ import { egressFrom, hostAllowed } from "./limits.js";
 
 /** A refused host, as the TypeError fetch itself throws for a network failure. */
 const refused = (host: string): TypeError =>
-  Object.assign(new TypeError(`egress to ${host} is not allowed for this server (MCP_EGRESS_ALLOW)`), { cause: { code: "EGRESS_DENIED" } });
+  Object.assign(new TypeError(`egress to ${host} is not allowed for this server (MCP_EGRESS_ALLOW)`), { cause: { code: EGRESS_DENIED } });
 
 /** The fetch each installed guard wraps, so that installing again replaces the guard instead of stacking another on it. */
 const wrapped = new WeakMap<typeof fetch, typeof fetch>();
@@ -26,9 +27,11 @@ const wrapped = new WeakMap<typeof fetch, typeof fetch>();
 export const installEgress = (patterns: readonly string[]): void => {
   const current = globalThis.fetch;
   const inner = wrapped.get(current) ?? current;
-  const guard: typeof fetch = (input, init) => {
+  // async, so that an address that does not parse rejects as fetch itself does, never throws.
+  const guard: typeof fetch = async (input, init) => {
     const url = new URL(input instanceof Request ? input.url : input.toString());
-    return hostAllowed(url.hostname, patterns) ? inner(input, init) : Promise.reject(refused(url.hostname));
+    if (!hostAllowed(url.hostname, patterns)) throw refused(url.hostname);
+    return inner(input, init);
   };
   wrapped.set(guard, inner);
   globalThis.fetch = guard;

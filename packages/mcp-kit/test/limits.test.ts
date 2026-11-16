@@ -89,6 +89,12 @@ describe("hostAllowed", () => {
     expect(hostAllowed("169.254.169.254", patterns)).toBe(false); // personal-data-check: allow (the cloud metadata address, which must be refused)
   });
 
+  it("names an IPv6 address with or without the brackets a URL puts around it", () => {
+    expect(hostAllowed("[2001:db8::1]", ["2001:db8::1"])).toBe(true);
+    expect(hostAllowed("2001:db8::1", ["[2001:db8::1]"])).toBe(true);
+    expect(hostAllowed("[2001:db8::2]", ["2001:db8::1"])).toBe(false);
+  });
+
   it("is off when MCP_EGRESS_ALLOW is unset", () => {
     expect(egressFrom({})).toBeUndefined();
     expect(egressFrom({ MCP_EGRESS_ALLOW: " a.com, *.b.com ," })).toEqual(["a.com", "*.b.com"]);

@@ -1,4 +1,4 @@
-import { makeHttp, makePacer, NOT_JSON, type HttpAuth, type HttpFailure, type HttpOptions, type HttpRequest } from "@foreverworks/mcp-kit";
+import { liveFetch, makeHttp, makePacer, NOT_JSON, type HttpAuth, type HttpFailure, type HttpOptions, type HttpRequest } from "@foreverworks/mcp-kit";
 
 import { driftError, fail, inputError } from "../domain/errors.js";
 
@@ -68,8 +68,7 @@ const failureFor =
 
 export const makeRegisterHttp = (policy: RegisterHttpPolicy, { fetch: injected, ...options }: RegisterHttpOptions = {}): HttpRequest => {
   const pace = makePacer(policy.gapMs, options.sleep === undefined ? {} : { sleep: options.sleep });
-  // The global is read at call time, so the kit's egress guard (and a test's isolation) is the one in force.
-  const send: typeof fetch = injected ?? ((input, init) => fetch(input, init));
+  const send: typeof fetch = injected ?? liveFetch;
   return makeHttp({
     service: policy.service,
     ...(policy.auth === undefined ? {} : { auth: policy.auth }),

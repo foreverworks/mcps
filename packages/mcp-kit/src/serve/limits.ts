@@ -113,14 +113,19 @@ export const admit = (
   return { allowed: step.allowed, retryAfterSec: step.retryAfterSec };
 };
 
+/** A host as a list names it: lower case, no final dot, and an IPv6 address without the brackets a URL puts around it. Pure. */
+const bare = (host: string): string => host.trim().toLowerCase().replace(/^\[|\]$/g, "").replace(/\.$/, "");
+
 /**
  * Whether a host may be reached. Patterns are exact hostnames or `*.` suffixes
- * (`*.googleapis.com` matches `gmail.googleapis.com`, not `googleapis.com`).
+ * (`*.googleapis.com` matches `gmail.googleapis.com`, not `googleapis.com`). An
+ * IPv6 address matches with or without brackets, as a URL's hostname has them
+ * and `MCP_EGRESS_ALLOW` names it without.
  */
 export const hostAllowed = (host: string, patterns: readonly string[]): boolean => {
-  const h = host.toLowerCase().replace(/\.$/, "");
+  const h = bare(host);
   return patterns.some((p) => {
-    const pattern = p.trim().toLowerCase();
+    const pattern = bare(p);
     return pattern.startsWith("*.") ? h.endsWith(pattern.slice(1)) : h === pattern;
   });
 };

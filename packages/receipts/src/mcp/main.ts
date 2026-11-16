@@ -49,6 +49,9 @@ export const startServer = async <D>(spec: ServerSpec<D>): Promise<Served> => {
  */
 export const runServer = <D>(spec: ServerSpec<D>): void => {
   const main = async (): Promise<void> => {
+    // Before the health check too, so `--health` is judged by the list the server runs under:
+    // a wrong MCP_EGRESS_ALLOW fails it, instead of failing every tool call later.
+    guardEgress(process.env);
     if (process.argv.includes("--health")) process.exit(await spec.healthCheck());
     await startServer(spec);
   };

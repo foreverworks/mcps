@@ -249,7 +249,7 @@ On the relay (it also reads the listener variables above: `MCP_HTTP_PORT`,
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MCP_EGRESS_ALLOW` | unset: no limit | The hosts the process may fetch from, separated by commas: `api.example.com`, or `*.example.com` for its subdomains (not `example.com` itself). A request to any other host fails before a connection is made. Raw sockets and child processes are not covered; sandbox those at the OS level. |
+| `MCP_EGRESS_ALLOW` | unset: no limit | The hosts the process may fetch from, separated by commas: `api.example.com`, or `*.example.com` for its subdomains (not `example.com` itself); an IPv6 address is written without brackets. A request to any other host fails before a connection is made. Only the address a request starts at is checked: a redirect that a listed host answers with is followed to wherever it points, so the list does not stop a host you trust from sending the server elsewhere. A hostname check in the connector of the undici Agent (the one `MCP_KEEPALIVE_MS` builds) would close that; it is not built. Raw sockets and child processes are not covered; sandbox those at the OS level. |
 | `MCP_KEEPALIVE_MS` | Node's 4 s | How long idle upstream connections stay open, so a service answering calls seconds apart does not pay a TLS handshake each time. A value that is not a positive number leaves Node's default. |
 
 ### What tools may do

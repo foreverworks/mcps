@@ -5,11 +5,11 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 
 import { checkPolicy, makeErrorKit, McpServer, StreamableHTTPClientTransport, testClient, type Served } from "@foreverworks/mcp-kit";
-import { afterAll, afterEach, beforeAll, describe, expect, it } from "vitest";
+import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
 import { type CommonError, commonRemedy, joinErrors } from "../src/domain/index.js";
-import { POLICY, type ReceiptTools, registerReceiptTools, startServer } from "../src/mcp/index.js";
+import { POLICY, type ReceiptTools, registerReceiptTools, runServer, startServer } from "../src/mcp/index.js";
 
 /**
  * The allowlist (MCP_EGRESS_ALLOW) holds for a server started the way a
@@ -143,5 +143,40 @@ describe("a receipts server started through its entry point", () => {
     expect(answer.isError).not.toBe(true);
     expect(JSON.parse(answer.text)).toEqual({ body: "from upstream" });
     expect(reached).toEqual([`127.0.0.1:${upstreamPort}/orders`]);
+  });
+});
+
+describe("a receipts server's --health", () => {
+  const realFetch = globalThis.fetch;
+  const argv = process.argv;
+  const allow = process.env["MCP_EGRESS_ALLOW"];
+  afterEach(() => {
+    globalThis.fetch = realFetch;
+    process.argv = argv;
+    if (allow === undefined) delete process.env["MCP_EGRESS_ALLOW"];
+    else process.env["MCP_EGRESS_ALLOW"] = allow;
+    vi.restoreAllMocks();
+  });
+
+  it("is judged by the allowlist the server runs under, so a host missing from it fails the check", async () => {
+    process.argv = [...argv, "--health"];
+    process.env["MCP_EGRESS_ALLOW"] = "127.0.0.1";
+    const exited = new Promise<number>((resolve) => {
+      vi.spyOn(process, "exit").mockImplementation(((code?: number) => {
+        resolve(code ?? 0);
+      }) as typeof process.exit);
+    });
+    const DENIED = 3;
+    const OTHER = 4;
+    runServer({
+      name: "egress-health",
+      version: "0.0.0",
+      instructions: "i",
+      buildDeps,
+      register: () => undefined,
+      // The code of the failure tells the guard's refusal from a connection that failed some other way.
+      healthCheck: () => fetch("http://localhost:9/").then(() => 0, (thrown: { cause?: { code?: string } }) => (thrown.cause?.code === "EGRESS_DENIED" ? DENIED : OTHER)),
+    });
+    expect(await exited).toBe(DENIED);
   });
 });

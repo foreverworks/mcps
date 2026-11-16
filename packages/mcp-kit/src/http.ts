@@ -1,5 +1,6 @@
 import { backoffMs, retryAfterSeconds } from "./backoff.js";
 import { callSignal, noteWriteSent, pause, unlessCancelled } from "./call.js";
+import { isEgressDenied } from "./egressDenied.js";
 import { liveFetch } from "./liveFetch.js";
 
 /**
@@ -234,10 +235,12 @@ export const makeHttp = (policy: HttpPolicy): HttpRequest => {
         signal: abortOf(),
       }).then(
         (response) => ({ response }),
-        (cause: unknown) => ({ cause: cause instanceof Error ? cause.message : String(cause) }),
+        (cause: unknown) => ({ cause: cause instanceof Error ? cause.message : String(cause), denied: isEgressDenied(cause) }),
       );
 
       if ("cause" in sent) {
+        // The egress guard refused the host before anything was sent, and waiting will not change its answer.
+        if (sent.denied) return fail({ kind: "transport", message: `${service} unreachable on ${what}: ${sent.cause}` });
         if (idempotent) unlessCancelled(`${what} was abandoned in flight`);
         if (!idempotent) return fail({ kind: OUTCOME_UNKNOWN, status: 0, message: `transport error on ${what}; ${service} may have acted on it: ${sent.cause}` });
         if (last) return fail({ kind: "transport", message: `${service} unreachable on ${what}: ${sent.cause}` });

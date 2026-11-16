@@ -1,4 +1,4 @@
-import { type HttpFailure, type HttpOptions, type HttpRequest, makeHttp } from "@foreverworks/mcp-kit";
+import { type HttpFailure, type HttpOptions, type HttpRequest, liveFetch, makeHttp } from "@foreverworks/mcp-kit";
 
 import type { RatesDocument, RatesPort } from "../app/ports.js";
 import { fail, notFound } from "../domain/errors.js";
@@ -44,8 +44,7 @@ const failureFor = (failure: HttpFailure): never => {
 export type EcbOptions = HttpOptions & { readonly fetch?: typeof fetch; readonly base?: string };
 
 export const makeEcb = (now: () => number, { fetch: injected, base = ECB_BASE, ...options }: EcbOptions = {}): RatesPort => {
-  // The global is read at call time, so the kit's egress guard (and a test's isolation) is the one in force.
-  const send: typeof fetch = injected ?? ((input, init) => fetch(input, init));
+  const send: typeof fetch = injected ?? liveFetch;
   const http: HttpRequest = makeHttp({
     service: "the ECB",
     isRetryable: (status) => status === 429 || status >= 500,

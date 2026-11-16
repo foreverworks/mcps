@@ -31,9 +31,15 @@ report a vulnerability, see [SECURITY.md](../SECURITY.md).
 - **Bearer tokens are static.** They do not expire and are not scoped: whoever
   reads a token file is that client until the token is replaced and the server
   restarted. There is no OAuth; [auth.md](auth.md) compares the options.
-- **The egress list covers `fetch` only.** Raw sockets and child processes are
-  for the OS sandbox to contain.
-  It covers a request made through the global `fetch` as it is when the
+- **The egress list covers `fetch` only, and only the address a request starts
+  at.** Raw sockets and child processes are for the OS sandbox to contain. So
+  is a redirect: `fetch` follows one inside undici without calling the global
+  `fetch` again, so a listed host that answers with a redirect sends the
+  server to wherever it points. A hostname check in the connector of the
+  undici Agent, the Agent the kit already builds for `MCP_KEEPALIVE_MS` (the
+  printer server builds its own on undici's `buildConnector`), would close
+  this; it is not built.
+  The list covers a request made through the global `fetch` as it is when the
   request is made, not one made through a reference taken earlier, so the code
   keeps the kit's `liveFetch`, never `fetch`, wherever a fetch is held as a
   value, and a test fails the build on a source file that does not.

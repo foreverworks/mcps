@@ -81,6 +81,23 @@ describe("the egress guard", () => {
     expect(asked).toEqual(["https://api.example.com/v1/orders", "https://img.cdn.example.net/a.png"]);
   });
 
+  it("reads an IPv6 host as MCP_EGRESS_ALLOW names it, without the brackets of the URL", async () => {
+    installEgress(["2001:db8::1"]);
+    await fetch("http://[2001:db8::1]:8123/api/");
+    expect(await refusal(fetch("http://[2001:db8::2]:8123/api/"))).toBeInstanceOf(TypeError);
+    expect(asked).toEqual(["http://[2001:db8::1]:8123/api/"]);
+  });
+
+  it("rejects an address that does not parse, as fetch does, instead of throwing", async () => {
+    installEgress(["api.example.com"]);
+    let pending: Promise<Response> | undefined;
+    expect(() => {
+      pending = fetch("not an address");
+    }).not.toThrow();
+    expect(await refusal(pending as Promise<Response>)).toBeInstanceOf(TypeError);
+    expect(asked).toEqual([]);
+  });
+
   it("installing again puts the new list in force instead of stacking another guard on the first", async () => {
     installEgress(["first.example.com"]);
     installEgress(["second.example.com"]);

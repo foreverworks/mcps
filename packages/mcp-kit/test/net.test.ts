@@ -89,6 +89,16 @@ describe("makeHttp", () => {
     expect(seen).toHaveLength(3);
   });
 
+  it("does not retry a host the egress guard refused, read or write, and says nothing was sent", async () => {
+    const refused = () => Object.assign(new TypeError("egress to api.test is not allowed for this server (MCP_EGRESS_ALLOW)"), { cause: { code: "EGRESS_DENIED" } });
+    const read = scripted([refused(), json(200, [1])]);
+    expect(await failureOf(makeHttp(policy(read.fetchImpl, { attempts: 5 }))("https://api.test/x"))).toMatchObject({ kind: "transport", message: expect.stringContaining("MCP_EGRESS_ALLOW") });
+    expect(read.seen).toHaveLength(1);
+    const write = scripted([refused()]);
+    expect(await failureOf(makeHttp(policy(write.fetchImpl))("https://api.test/x", { method: "POST", json: {} }))).toMatchObject({ kind: "transport", message: expect.stringContaining("api.test") });
+    expect(write.seen).toHaveLength(1);
+  });
+
   it("never retries a POST the server may have acted on", async () => {
     const one = scripted([json(502, { e: 1 })]);
     expect(await failureOf(makeHttp(policy(one.fetchImpl))("https://api.test/x", { method: "POST", json: {} }))).toMatchObject({ kind: "outcome_unknown", status: 502 });
