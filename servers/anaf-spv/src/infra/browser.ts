@@ -1,3 +1,5 @@
+import { liveFetch } from "@foreverworks/mcp-kit";
+
 import { fail } from "../domain/errors.js";
 import type { Cookies } from "../domain/session.js";
 
@@ -88,7 +90,7 @@ export const makeBrowser = (origin: string, options: BrowserOptions = {}) => {
    * Answers the last page and the cookies it ended with.
    */
   const go = async (cookies: Cookies, path: string, request: Request = {}): Promise<Page> => {
-    const doFetch = options.fetch ?? globalThis.fetch;
+    const doFetch = options.fetch ?? liveFetch;
     const jar = jarOf(cookies);
     const hops: Hop[] = [];
     let url = new URL(path, origin);

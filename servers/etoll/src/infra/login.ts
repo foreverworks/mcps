@@ -1,4 +1,4 @@
-import { authorizeUrl, type OAuthClient, pendingPkceAuthorizationFile } from "@foreverworks/mcp-kit";
+import { authorizeUrl, liveFetch, type OAuthClient, pendingPkceAuthorizationFile } from "@foreverworks/mcp-kit";
 
 import type { LoginPort } from "../app/ports.js";
 import { type AppConfig, endpoints } from "./config.js";
@@ -13,7 +13,7 @@ import { issuedOf } from "./oauthClient.js";
  */
 export const makeLogin = (options: { readonly config: AppConfig; readonly client: OAuthClient; readonly fetch?: typeof fetch }): LoginPort => {
   const { config, client } = options;
-  const doFetch = options.fetch ?? fetch;
+  const doFetch = options.fetch ?? liveFetch;
   const urls = endpoints(config.issuer);
   return {
     redirectUri: config.redirectUri,

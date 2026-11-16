@@ -108,6 +108,8 @@ export {
 } from "./serve/confirm.js";
 export { asGuardError, failGuard, guardRemedy, type GuardError } from "./guardErrors.js";
 export { admit, DEFAULT_LIMITS, egressFrom, hostAllowed, limitsFrom, MAX_CALLERS, take, type Bucket, type Limits } from "./serve/limits.js";
+export { guardEgress } from "./serve/egress.js";
+export { liveFetch } from "./liveFetch.js";
 export type { DeepReadonly, OutputOf, Wire } from "./readonly.js";
 export { makeHttp, NOT_JSON, OUTCOME_UNKNOWN, redactCredentials, type HttpAuth, type HttpFailure, type HttpOptions, type HttpPolicy, type HttpRequest, type Query, type RequestSpec, type Sleep } from "./http.js";
 export { epochNow, fileTokenStore, makeTokenSource, memoryTokenStore, type Minted, type TokenSource, type TokenSourceOptions, type TokenStore } from "./tokens.js";

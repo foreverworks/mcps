@@ -1,5 +1,6 @@
 import { backoffMs, retryAfterSeconds } from "./backoff.js";
 import { callSignal, noteWriteSent, pause, unlessCancelled } from "./call.js";
+import { liveFetch } from "./liveFetch.js";
 
 /**
  * The one HTTP client every server uses: a request that retries what is worth
@@ -208,7 +209,7 @@ export const makeHttp = (policy: HttpPolicy): HttpRequest => {
     const target = withQuery(url, spec.query);
     const payload = payloadOf(spec);
     const what = `${method} ${url}`;
-    const doFetch = policy.fetch ?? fetch;
+    const doFetch = policy.fetch ?? liveFetch;
 
     const signal = callSignal();
     // A read listens to the call's signal in flight too; a write only before it is sent.

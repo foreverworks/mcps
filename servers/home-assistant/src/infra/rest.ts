@@ -1,4 +1,4 @@
-import { type HttpFailure, makeHttp, NOT_JSON, type RequestSpec, type Sleep } from "@foreverworks/mcp-kit";
+import { type HttpFailure, liveFetch, makeHttp, NOT_JSON, type RequestSpec, type Sleep } from "@foreverworks/mcp-kit";
 
 import { type AppError, asAppError, drift, fail } from "../domain/errors.js";
 import { apiUrl, type Connection, egressHostOf } from "./connection.js";
@@ -88,7 +88,7 @@ const failureOf = (f: HttpFailure, path: string, host: string, timeoutMs: number
 };
 
 export const makeRest = (conn: Connection, options: RestOptions = {}): Rest => {
-  const inner = options.fetch ?? fetch;
+  const inner = options.fetch ?? liveFetch;
   const described = ((input: Parameters<typeof fetch>[0], init?: Parameters<typeof fetch>[1]) =>
     inner(input, init).catch((thrown: unknown) => {
       throw new Error(describeFetchError(thrown));

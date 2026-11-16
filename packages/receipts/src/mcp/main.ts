@@ -1,4 +1,4 @@
-import { type McpServer, type PackageIdentity, serve } from "@foreverworks/mcp-kit";
+import { guardEgress, type McpServer, type PackageIdentity, serve, type Served } from "@foreverworks/mcp-kit";
 
 import { POLICY } from "./policy.js";
 
@@ -15,10 +15,34 @@ export type ServerSpec<D> = Partial<PackageIdentity> & {
 };
 
 /**
- * A receipts server's main. stdio by default, or HTTP when MCP_HTTP_PORT is
- * set; `serve` in mcp-kit decides, and nothing here knows which. Nothing is
- * logged to stdout: over stdio it IS the protocol channel, and a stray line
- * there corrupts the session.
+ * Build a receipts server's dependencies and serve them: stdio by default, or
+ * HTTP when MCP_HTTP_PORT is set; `serve` in mcp-kit decides, and nothing here
+ * knows which.
+ *
+ * The egress allowlist (MCP_EGRESS_ALLOW) goes in force first. `serve` would
+ * install it too, but `buildDeps` runs before `serve`, and an API client that
+ * takes the global `fetch` while it is built keeps the unguarded one for good:
+ * its requests would never be checked against the list.
+ */
+export const startServer = async <D>(spec: ServerSpec<D>): Promise<Served> => {
+  guardEgress(process.env);
+  const deps = spec.buildDeps();
+  const { name, version, title, websiteUrl, icons, instructions } = spec;
+  return serve({
+    name,
+    version,
+    ...(title === undefined ? {} : { title }),
+    ...(websiteUrl === undefined ? {} : { websiteUrl }),
+    ...(icons === undefined ? {} : { icons }),
+    instructions,
+    policy: POLICY,
+    register: (server) => spec.register(server, deps),
+  });
+};
+
+/**
+ * A receipts server's main. Nothing is logged to stdout: over stdio it IS the
+ * protocol channel, and a stray line there corrupts the session.
  *
  * One binary, two modes: `--health` shares the server's composition root, so
  * the check can never drift from what the server itself would do.
@@ -26,18 +50,7 @@ export type ServerSpec<D> = Partial<PackageIdentity> & {
 export const runServer = <D>(spec: ServerSpec<D>): void => {
   const main = async (): Promise<void> => {
     if (process.argv.includes("--health")) process.exit(await spec.healthCheck());
-    const deps = spec.buildDeps();
-    const { name, version, title, websiteUrl, icons, instructions } = spec;
-    await serve({
-      name,
-      version,
-      ...(title === undefined ? {} : { title }),
-      ...(websiteUrl === undefined ? {} : { websiteUrl }),
-      ...(icons === undefined ? {} : { icons }),
-      instructions,
-      policy: POLICY,
-      register: (server) => spec.register(server, deps),
-    });
+    await startServer(spec);
   };
   main().catch((error: unknown) => {
     console.error(`${spec.name} failed to start:`, error);

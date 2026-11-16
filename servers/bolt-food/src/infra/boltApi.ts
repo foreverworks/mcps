@@ -1,4 +1,4 @@
-import { bearer, makeHttp, makePacer, makeTokenSource, memoryTokenStore, type Minted, type Query, type Sleep } from "@foreverworks/mcp-kit";
+import { bearer, liveFetch, makeHttp, makePacer, makeTokenSource, memoryTokenStore, type Minted, type Query, type Sleep } from "@foreverworks/mcp-kit";
 
 import type { BoltPort } from "../app/ports.js";
 import { apiError, authError, fail } from "../domain/errors.js";
@@ -49,7 +49,7 @@ export type BoltApiOptions = {
 };
 
 export const makeBoltApi = (credentials: () => Promise<Credentials>, options: BoltApiOptions = {}): BoltPort => {
-  const { fetch: doFetch = fetch, now = Date.now, detailGapMs = DETAIL_GAP_MS, timeoutMs = 30_000 } = options;
+  const { fetch: doFetch = liveFetch, now = Date.now, detailGapMs = DETAIL_GAP_MS, timeoutMs = 30_000 } = options;
   /** Tests inject time; otherwise the kit and the pacer sleep for real. */
   const sleep = options.sleep ? { sleep: options.sleep } : {};
   const random = options.random ? { random: options.random } : {};

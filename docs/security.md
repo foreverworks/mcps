@@ -33,6 +33,10 @@ report a vulnerability, see [SECURITY.md](../SECURITY.md).
   restarted. There is no OAuth; [auth.md](auth.md) compares the options.
 - **The egress list covers `fetch` only.** Raw sockets and child processes are
   for the OS sandbox to contain.
+  It covers a request made through the global `fetch` as it is when the
+  request is made, not one made through a reference taken earlier, so the code
+  keeps the kit's `liveFetch`, never `fetch`, wherever a fetch is held as a
+  value, and a test fails the build on a source file that does not.
 - **A file root is trusted as a whole.** A tool may read any regular file in
   the roots, so a root should hold only files meant for the server.
 - **The services and the clients are outside.** What a bank, Google or a tax

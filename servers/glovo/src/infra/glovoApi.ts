@@ -1,4 +1,4 @@
-import { type HttpAuth, makeHttp, makePacer, makeTokenSource, memoryTokenStore, type Minted, type Query, type Sleep } from "@foreverworks/mcp-kit";
+import { type HttpAuth, liveFetch, makeHttp, makePacer, makeTokenSource, memoryTokenStore, type Minted, type Query, type Sleep } from "@foreverworks/mcp-kit";
 
 import type { GlovoPort, HistoryPage } from "../app/ports.js";
 import { apiError, authError, fail } from "../domain/errors.js";
@@ -87,7 +87,7 @@ const appHeaders = (deviceUrn: string, session: ReturnType<typeof makeSession>) 
 });
 
 export const makeGlovoApi = (credentials: () => Promise<Credentials>, options: GlovoApiOptions = {}): GlovoPort => {
-  const { fetch: doFetch = fetch, now = Date.now, callGapMs = CALL_GAP_MS, timeoutMs = 30_000 } = options;
+  const { fetch: doFetch = liveFetch, now = Date.now, callGapMs = CALL_GAP_MS, timeoutMs = 30_000 } = options;
   /** Tests inject time; otherwise the kit and the pacer sleep for real. */
   const sleep = options.sleep ? { sleep: options.sleep } : {};
   const random = options.random ? { random: options.random } : {};

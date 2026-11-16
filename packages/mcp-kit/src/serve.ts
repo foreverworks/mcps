@@ -9,14 +9,14 @@ import { createMcpHandler, type Icon, isLegacyRequest, McpServer, type ProtocolE
 import { serveStdio as serveStdioEntry } from "@modelcontextprotocol/server/stdio";
 
 import { describeSettings, type GuardSettings, guardSettingsFrom, hasClientCeiling } from "./serve/confirm.js";
-import { installEgress, installKeepAlive } from "./serve/egress.js";
+import { guardEgress, installKeepAlive } from "./serve/egress.js";
 import { describeFiles, type FileEndpoints, fileRouteOf, FILES_VARIABLES, filesFrom, heldMaxAgeMinOf } from "./serve/files.js";
 import { serveFile } from "./serve/filesServe.js";
 import { startSweeping } from "./serve/filesSweep.js";
 import { makeOwnFiles, type OwnFiles } from "./serve/ownFiles.js";
 import { guard, registeredNames, requestContext, type ServerVocabulary } from "./serve/guard.js";
 import { toolIconsOf, type Product } from "./serve/icons.js";
-import { admit, egressFrom, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
+import { admit, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
 import { allowedHostsFrom, allowedHostText, bindHostFrom, isLoopbackAddress, LOOPBACK_ADDRESS, urlHost } from "./serve/bind.js";
 import { type AllowedHost, callerKey, checkPublic, clientIpHeaderFrom, hostAccepted, PUBLIC_CLIENT, publicHostsFrom, type PublicHost } from "./serve/public.js";
 import { shareClientRoots, shareRootsOf } from "./clientRoots.js";
@@ -568,8 +568,7 @@ export const serve = async (options: ServeOptions): Promise<Served> => {
   const listen = listenFrom(env);
   const settings = options.settings ?? guardSettingsFrom(env);
   if (listen.kind === "public") checkPublic(options.name, options.policy, settings);
-  const egress = egressFrom(env);
-  if (egress !== undefined) installEgress(egress);
+  guardEgress(env);
   installKeepAlive(env);
   const runtime: Runtime = {
     options,

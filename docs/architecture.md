@@ -74,6 +74,7 @@ be identical for an API none of these servers talk to.
 | `guardErrors.ts`, `inputFileErrors.ts` | The kit's own failures, which every server's envelope recognises beside its own. |
 | `call.ts` | The call a piece of code runs in: its abort signal, `reportProgress`, `pause` for a wait that stops on cancellation, `offerLink` for a link a person must open. |
 | `http.ts` | `makeHttp`: query, body, timeout, backoff with `Retry-After`, one renewal after a 401, never resend a write that may have happened, stop when the call is cancelled. |
+| `liveFetch.ts` | `liveFetch`, the global `fetch` looked up at every call. A fetch kept as a value (a default, an option) is this, never `fetch`: the egress guard replaces `globalThis.fetch` after a server has built its dependencies, and a reference taken while building would skip it. A test holds every `src` to that. |
 | `oauth.ts`, `tokens.ts` | RFC 6749 grants (refresh, client credentials, authorization code with PKCE, password) and a token source that mints once for every waiter, across processes. |
 | `pendingAuthorization.ts` | The one begun authorization-code flow, kept in the state directory between the call that sends a person to the authorize page and the one that takes the address they land on, with or without its PKCE verifier. |
 | `upstream.ts` | A server as an MCP client of another one (a vault it reads a password from, a mailbox it reads a sign-in code from): connect over Streamable HTTP or stdio, list tools, call one, close. Failures are the server's own, through its `fail`. |
