@@ -49,8 +49,13 @@ export type World = {
   readonly relayUrl: string;
   readonly relayToken: string;
   readonly relayLog: string[];
+  /** With `WorldOptions.clients`: what each client holds, at the relay and upstream. Empty otherwise. */
+  readonly clients: Readonly<Record<string, ClientTokens>>;
   readonly close: () => Promise<void>;
 };
+
+/** One client's two tokens: the one it presents to the relay, and the one the relay presents upstream for it. */
+export type ClientTokens = { readonly relayToken: string; readonly upstreamToken: string };
 
 export const upstreamToken = "upstream-token-0123456789abcdef";
 export const relayToken = "relay-client-token-0123456789abcdef";
@@ -62,17 +67,36 @@ export type WorldOptions = {
   readonly relayEnv?: Record<string, string>;
   /** The token the relay presents upstream, when it should not be the right one. */
   readonly presentedToken?: string;
+  /**
+   * Clients of the relay that the server tells apart, instead of the one
+   * `alice` the relay has and the one `relay` the server has: each has a
+   * `token-<name>` of its own at the relay and on the server, and the relay
+   * presents the server's for it from MCP_RELAY_UPSTREAM_TOKENS_DIR.
+   */
+  readonly clients?: readonly string[];
+  /** Extra settings for the server, over the usual ones (MCP_CLIENT_MAX_ACCESS, for one). */
+  readonly serverEnv?: Record<string, string>;
 };
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
 
 export const startWorld = async (options: WorldOptions = {}): Promise<World> => {
   const dir = await mkdtemp(join(tmpdir(), "mcp-relay-world-"));
-  const [remoteIn, remoteOut, localIn, localOut, upstreamTokens, relayTokens] = ["remote/in", "remote/out", "local/in", "local/out", "remote/tokens", "local/tokens"].map((name) => join(dir, name));
+  const [remoteIn, remoteOut, localIn, localOut, upstreamTokens, relayTokens, perClient] = ["remote/in", "remote/out", "local/in", "local/out", "remote/tokens", "local/tokens", "local/upstream-tokens"].map((name) => join(dir, name));
   for (const folder of [remoteIn, remoteOut, localIn, localOut, upstreamTokens, relayTokens]) await mkdir(folder as string, { recursive: true });
-  await writeFile(join(upstreamTokens as string, "token-relay"), `${upstreamToken}\n`);
-  await writeFile(join(relayTokens as string, "token-alice"), `${relayToken}\n`);
-  await writeFile(join(dir, "upstream-token"), `${options.presentedToken ?? upstreamToken}\n`);
+  const clients = Object.fromEntries((options.clients ?? []).map((name) => [name, { relayToken: `relay-token-of-${name}-0123456789abcdef`, upstreamToken: `server-token-of-${name}-0123456789abcdef` }]));
+  if (options.clients === undefined) {
+    await writeFile(join(upstreamTokens as string, "token-relay"), `${upstreamToken}\n`);
+    await writeFile(join(relayTokens as string, "token-alice"), `${relayToken}\n`);
+    await writeFile(join(dir, "upstream-token"), `${options.presentedToken ?? upstreamToken}\n`);
+  } else {
+    await mkdir(perClient as string, { recursive: true });
+    for (const [name, held] of Object.entries(clients)) {
+      await writeFile(join(upstreamTokens as string, `token-${name}`), `${held.upstreamToken}\n`);
+      await writeFile(join(relayTokens as string, `token-${name}`), `${held.relayToken}\n`);
+      await writeFile(join(perClient as string, `upstream-${name}`), `${held.upstreamToken}\n`);
+    }
+  }
   const asRemote = (path: string): string => (path.startsWith(localIn as string) ? `${remoteIn}${path.slice((localIn as string).length)}` : path);
   const asLocal = (path: string): string => `${localOut}${path.slice((remoteOut as string).length)}`;
 
@@ -137,6 +161,7 @@ export const startWorld = async (options: WorldOptions = {}): Promise<World> => 
       MCP_HTTP_TOKENS_DIR: upstreamTokens as string,
       MCP_HTTP_FILES_OUTBOX: remoteOut as string,
       MCP_HTTP_FILES_INBOX: remoteIn as string,
+      ...options.serverEnv,
       ...(options.serverMaxBytes === undefined ? {} : { MCP_HTTP_FILES_MAX_BYTES: String(options.serverMaxBytes) }),
     },
     log: (line) => upstreamAudit.push(line),
@@ -148,12 +173,12 @@ export const startWorld = async (options: WorldOptions = {}): Promise<World> => 
     MCP_HTTP_PORT: "0",
     MCP_HTTP_TOKENS_DIR: relayTokens as string,
     MCP_RELAY_UPSTREAM: upstreamUrl,
-    MCP_RELAY_UPSTREAM_TOKEN_FILE: join(dir, "upstream-token"),
+    ...(options.clients === undefined ? { MCP_RELAY_UPSTREAM_TOKEN_FILE: join(dir, "upstream-token") } : { MCP_RELAY_UPSTREAM_TOKENS_DIR: perClient as string }),
     MCP_RELAY_INBOX: localIn as string,
     MCP_RELAY_OUTBOX: localOut as string,
     ...options.relayEnv,
   });
-  const relay = await startRelay({ settings, upstreamToken: options.presentedToken ?? upstreamToken, log: (line) => relayLog.push(line) });
+  const relay = await startRelay({ settings, log: (line) => relayLog.push(line) });
 
   return {
     dir,
@@ -169,6 +194,7 @@ export const startWorld = async (options: WorldOptions = {}): Promise<World> => 
     relayUrl: `http://127.0.0.1:${relay.port}/mcp`,
     relayToken,
     relayLog,
+    clients,
     close: async () => {
       await relay.close();
       await upstream.close();
@@ -231,6 +257,6 @@ export const relayTo = async (
     MCP_RELAY_OUTBOX: localOut as string,
     ...env,
   });
-  const relay = await startRelay({ settings, upstreamToken: token, log: (line) => log.push(line) });
+  const relay = await startRelay({ settings, log: (line) => log.push(line) });
   return { relay, url: `http://127.0.0.1:${relay.port}/mcp`, log, localIn: localIn as string, localOut: localOut as string, dir, close: () => relay.close() };
 };

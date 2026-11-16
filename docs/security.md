@@ -224,9 +224,18 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
   signed in may not go quiet for a minute, nor take longer than a call may.
 - **A bounded cost.** An upload over `MCP_HTTP_FILES_MAX_BYTES` is refused, and
   the relay moves nothing over `MCP_RELAY_MAX_FILE_BYTES`.
-- **The relay holds one secret, and only the server's token.** Its clients
-  present their own tokens to it; the log has a line per file (direction,
-  path, size, the start of the hash) and never bytes, tokens or arguments.
+- **The relay holds the server's tokens, and nothing else of the server's.**
+  Its clients present their own tokens to it. With
+  `MCP_RELAY_UPSTREAM_TOKENS_DIR` it holds one upstream token per client and
+  sends each client's calls and files under that client's token only, so the
+  server's `MCP_CLIENT_MAX_ACCESS` (which holds tool calls; the file endpoints
+  check the token and audit the client, not its ceiling) and audit line see the
+  client that really called; it refuses to start when a client would have no token of its own or
+  two would share one, and never sends one client's token for another's. With
+  `MCP_RELAY_UPSTREAM_TOKEN_FILE` every client shares one token and one
+  client's rights upstream, and the relay warns at start when it has more than
+  one. The log has a line per file (direction, path, size, the start of the
+  hash) and never bytes, tokens or arguments.
   Plain `http://` to an upstream that is not on this machine would carry the
   token and the files in the clear: the relay refuses to start with one unless
   `MCP_RELAY_ALLOW_PLAIN_HTTP=1` says the network is encrypted already.

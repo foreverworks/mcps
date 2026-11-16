@@ -177,7 +177,8 @@ On the relay (it also reads the listener variables above: `MCP_HTTP_PORT`,
 | Variable | Default | Meaning |
 |---|---|---|
 | `MCP_RELAY_UPSTREAM` | required | The base URL of the server (`https://mcp.example.com`), without `/mcp`. |
-| `MCP_RELAY_UPSTREAM_TOKEN_FILE` | required | The file holding the bearer token the server accepts from the relay. |
+| `MCP_RELAY_UPSTREAM_TOKEN_FILE` | one of the two is required | The file holding the bearer token the server accepts from the relay, one for all the relay's clients: the server sees them as a single client. Set this or `MCP_RELAY_UPSTREAM_TOKENS_DIR`, never both. With more than one client the relay says so at start. |
+| `MCP_RELAY_UPSTREAM_TOKENS_DIR` | one of the two is required | A folder with an `upstream-<client>` file for each client the relay accepts (`upstream-default` for a relay with one client token in `MCP_HTTP_TOKEN_FILE`), each holding the token the server knows that client by, so the server holds each client to its own rights. The relay refuses to start when a client has no file, or a blank one, or two clients have the same token. Read once, at start. Files for other clients, and `token-*` files, are ignored. |
 | `MCP_RELAY_INBOX` | unset: no file goes up | An absolute folder, the same path as the server's inbox. A file in it that a call's arguments name by absolute path is uploaded before the call. |
 | `MCP_RELAY_OUTBOX` | unset: no file comes down | An absolute folder, the same path as the server's outbox. A file a result links there with a `file:` URI is fetched before the result is passed on. |
 | `MCP_RELAY_MAX_FILE_BYTES` | `268435456` (256 MiB) | The largest file the relay moves, up or down. |

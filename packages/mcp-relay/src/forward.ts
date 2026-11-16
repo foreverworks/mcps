@@ -7,18 +7,20 @@ import { failedCall, inboxPathsIn, messagesOf, toolCallArguments } from "./calls
 import { contentEndOf, type Edit, idSourceOf, messageSpans, prepend, type Span, splice, textOf } from "./json.js";
 import { dataOf, eventOf, makeSplitter, withData } from "./sse.js";
 import { noteOnLinks, type Transfer, uploadFile } from "./transfer.js";
-import { type Answer, readAnswer, reasonOf, send, snippetOf, statusWords } from "./upstream.js";
+import { type Answer, readAnswer, reasonOf, send, snippetOf, statusWords, type Upstream, withoutTokens } from "./upstream.js";
 
 /**
  * One request to the MCP route, carried to the server and back: POST, GET (its
- * event stream) and DELETE, with the relay's token in place of the client's
- * and the MCP headers passed both ways. Before a tool call goes, the inbox
- * files its arguments name are uploaded; before a response or an event that
- * carries a link to an outbox file reaches the client, the file is fetched.
- * What the relay does not need to read it does not touch: a stream stays a
- * stream, an event with no link goes on as it came.
+ * event stream) and DELETE, with the token the relay holds for that client in
+ * place of the client's own, and the MCP headers passed both ways. Before a
+ * tool call goes, the inbox files its arguments name are uploaded; before a
+ * response or an event that carries a link to an outbox file reaches the
+ * client, the file is fetched, both with that client's token. What the relay
+ * does not need to read it does not touch: a stream stays a stream, an event
+ * with no link goes on as it came.
  */
 export type Relay = {
+  /** The client's own: its upstream carries that client's token, for the call and for every file moved for it. */
   readonly transfer: Transfer;
   readonly limits: Limits;
 };
@@ -195,11 +197,27 @@ const holdAnswer = async (relay: Relay, answer: Answer, res: ServerResponse, fai
 /** An answer that is not a success, as the status a server would give and a sentence that says it was the upstream. */
 const failure = async (relay: Relay, answer: Answer, res: ServerResponse): Promise<void> => {
   const note = await readAnswer(answer, 512);
-  const words = statusWords(answer.status, "call");
+  const words = statusWords(answer.status, relay.transfer.upstream, "call");
   const text = note === undefined || note.length === 0 ? "" : snippetOf(note, relay.transfer.upstream);
   // The client's own token was fine, or it would not be here: a refusal of the relay's is a bad gateway, not a 401 that would send it to sign in.
   plainReply(res, answer.status === 401 || answer.status === 403 ? 502 : answer.status, text === "" ? words : `${words}: ${text}`, answerHeaders({ "retry-after": answer.headers["retry-after"], allow: answer.headers["allow"] }));
 };
+
+/** The most causes of an error the log follows: a cycle, or a library that wraps a wrap, ends here. */
+const MAX_CAUSES = 5;
+
+/** The error and what caused it, and what caused that, as far as there is one that has not come up already. */
+const causesOf = (error: unknown, seen: readonly unknown[] = []): readonly unknown[] =>
+  seen.length >= MAX_CAUSES || seen.includes(error) ? seen : error instanceof Error && error.cause !== undefined ? causesOf(error.cause, [...seen, error]) : [...seen, error];
+
+/**
+ * An error as text for the log: its stack (or message), and under it the
+ * stack of what caused it, one by one, because the reason is often there (a
+ * failed `fetch` says only that it failed). With every upstream token taken
+ * out of it, since an error may quote text the upstream wrote.
+ */
+export const failureText = (error: unknown, upstream: Upstream): string =>
+  withoutTokens(causesOf(error).map((one) => (one instanceof Error ? (one.stack ?? one.message) : String(one))).join("\ncaused by: "), upstream);
 
 /** Carries one request to the MCP route to the upstream and its answer back. */
 export const forwardMcp = async (relay: Relay, req: IncomingMessage, res: ServerResponse): Promise<void> => {
@@ -238,7 +256,8 @@ export const forwardMcp = async (relay: Relay, req: IncomingMessage, res: Server
     if (String(answer.headers["content-type"] ?? "").startsWith("text/event-stream")) return await streamEvents(relay, answer, res, prepared.failed, controller.signal);
     return await holdAnswer(relay, answer, res, prepared.failed, controller.signal);
   } catch (error: unknown) {
-    console.error("relay: request failed:", error);
+    // Whatever went wrong, a token is not in the line: the error may quote text the upstream wrote.
+    transfer.log(`relay: request failed: ${failureText(error, transfer.upstream)}`);
     if (!res.headersSent) plainReply(res, 500, "internal error");
     else res.destroy();
   } finally {

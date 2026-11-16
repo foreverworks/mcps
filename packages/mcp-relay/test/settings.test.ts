@@ -17,7 +17,7 @@ describe("settingsFrom", () => {
       allowedHosts: [{ name: "relay.internal", port: undefined }],
       tokens: { kind: "dir", dir: "/run/tokens" },
       upstream: "https://mcp.example.com",
-      upstreamTokenFile: "/run/upstream-token",
+      upstreamTokens: { kind: "file", file: "/run/upstream-token" },
       inbox: "/srv/inbox",
       outbox: "/srv/outbox",
       maxFileBytes: 256 * 1024 * 1024,
@@ -49,6 +49,12 @@ describe("settingsFrom", () => {
     expect(settingsFrom({ ...base, MCP_RELAY_ALLOW_PLAIN_HTTP: "1" })).toMatchObject({ plainHttp: false });
   });
 
+  it("takes a folder of upstream tokens, one for each client, instead of one file", () => {
+    const folder = { ...base, MCP_RELAY_UPSTREAM_TOKEN_FILE: " ", MCP_RELAY_UPSTREAM_TOKENS_DIR: "/run/upstream-tokens" };
+    expect(settingsFrom(folder).upstreamTokens).toEqual({ kind: "dir", dir: "/run/upstream-tokens" });
+    expect(settingsFrom(base).upstreamTokens).toEqual({ kind: "file", file: "/run/upstream-token" });
+  });
+
   it("takes a size limit of its own", () => {
     expect(settingsFrom({ ...base, MCP_RELAY_MAX_FILE_BYTES: "1048576" }).maxFileBytes).toBe(1048576);
   });
@@ -64,12 +70,29 @@ describe("settingsFrom", () => {
     ["an upstream with a password", { MCP_RELAY_UPSTREAM: "https://user:secret@mcp.example.com" }, /user name or password/],
     ["an upstream with a query", { MCP_RELAY_UPSTREAM: "https://mcp.example.com?x=1" }, /query or a fragment/],
     ["an upstream that is the route", { MCP_RELAY_UPSTREAM: "https://mcp.example.com/mcp" }, /ends in \/mcp/],
-    ["no upstream token", { MCP_RELAY_UPSTREAM_TOKEN_FILE: "" }, /MCP_RELAY_UPSTREAM_TOKEN_FILE is not set/],
+    ["no upstream token", { MCP_RELAY_UPSTREAM_TOKEN_FILE: "" }, /MCP_RELAY_UPSTREAM_TOKEN_FILE is not set, and neither is MCP_RELAY_UPSTREAM_TOKENS_DIR/],
+    ["no upstream token and a blank folder", { MCP_RELAY_UPSTREAM_TOKEN_FILE: "", MCP_RELAY_UPSTREAM_TOKENS_DIR: "  " }, /MCP_RELAY_UPSTREAM_TOKEN_FILE is not set, and neither is MCP_RELAY_UPSTREAM_TOKENS_DIR/],
+    ["both a token file and a folder of them", { MCP_RELAY_UPSTREAM_TOKENS_DIR: "/run/upstream-tokens" }, /MCP_RELAY_UPSTREAM_TOKEN_FILE and MCP_RELAY_UPSTREAM_TOKENS_DIR are both set: set only one/],
     ["a folder that is not in full", { MCP_RELAY_INBOX: "inbox" }, /MCP_RELAY_INBOX "inbox" is not an absolute path/],
     ["an outbox that is not in full", { MCP_RELAY_OUTBOX: "./out" }, /MCP_RELAY_OUTBOX/],
     ["a size that is not one", { MCP_RELAY_MAX_FILE_BYTES: "-1" }, /is not a number of bytes/],
   ])("refuses to start with %s", (_what, change, message) => {
     expect(() => settingsFrom({ ...base, ...change })).toThrow(message);
+  });
+
+  it.each([
+    ["neither", { MCP_RELAY_UPSTREAM_TOKEN_FILE: "" }],
+    ["both", { MCP_RELAY_UPSTREAM_TOKENS_DIR: "/run/upstream-tokens" }],
+  ])("says, when %s upstream token setting is given, which to use and why", (_which, change) => {
+    let said = "";
+    try {
+      settingsFrom({ ...base, ...change });
+    } catch (thrown) {
+      said = (thrown as Error).message;
+    }
+    // A folder when the server should tell clients apart, a file when they may share one token's rights.
+    expect(said).toMatch(/MCP_RELAY_UPSTREAM_TOKENS_DIR.*upstream-<client>.*its own rights/);
+    expect(said).toMatch(/MCP_RELAY_UPSTREAM_TOKEN_FILE.*(shares|may have the rights of one token)/);
   });
 
   it("does not put the upstream's secret in the message about it", () => {

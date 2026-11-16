@@ -379,6 +379,26 @@ MCP_RELAY_INBOX=/srv/mcp/inbox MCP_RELAY_OUTBOX=/srv/mcp/outbox \
 node packages/mcp-relay/dist/index.js     # or the image, with MCP_SERVER=relay
 ```
 
+With more than one client behind the relay, give each its own token on the
+server and let the relay present it: a folder of `upstream-<client>` files
+instead of the one file. The server then sees each client under its own name
+and holds it to its own rights (`MCP_CLIENT_MAX_ACCESS=alice=read` keeps alice
+to reading, through the relay too).
+
+```bash
+# on the server's machine, in its tokens folder: token-alice and token-bob, one for each client
+# on the client's machine: tokens/ holds token-alice and token-bob (what the clients present to the relay),
+# upstream-tokens/ holds upstream-alice and upstream-bob (what the relay presents to the server for each)
+MCP_HTTP_PORT=8750 MCP_HTTP_TOKENS_DIR=tokens \
+MCP_RELAY_UPSTREAM=https://mcp.example.com MCP_RELAY_UPSTREAM_TOKENS_DIR=upstream-tokens \
+MCP_RELAY_INBOX=/srv/mcp/inbox MCP_RELAY_OUTBOX=/srv/mcp/outbox \
+node packages/mcp-relay/dist/index.js
+```
+
+The relay reads the folder once, at start, and refuses to start when a client
+it accepts has no usable file there, so adding a client means adding its
+`token-<client>` and `upstream-<client>` files and restarting the relay.
+
 The relay's two folders must be at the same absolute paths as the server's,
 because the server's tools name their files with their own paths and the relay
 uses those names as they are. The relay's README has the whole setup, what goes

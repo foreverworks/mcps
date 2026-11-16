@@ -76,7 +76,7 @@ export const uploadFile = async (transfer: Transfer, path: string, signal: Abort
     if (typeof answer === "string") return failed(answer);
     if (answer.status !== 200) {
       discard(answer);
-      return failed(statusWords(answer.status));
+      return failed(statusWords(answer.status, upstream));
     }
     const text = await readAnswer(answer, 64 * 1024);
     const stored = parseStored(text);
@@ -117,7 +117,7 @@ export const downloadFile = async (transfer: Transfer, path: string, signal: Abo
   if (typeof answer === "string") return failed(answer);
   if (answer.status !== 200) {
     const note = await readAnswer(answer, 512);
-    return failed(`${statusWords(answer.status)}${note === undefined || note.length === 0 ? "" : ` (${snippetOf(note, upstream)})`}`);
+    return failed(`${statusWords(answer.status, upstream)}${note === undefined || note.length === 0 ? "" : ` (${snippetOf(note, upstream)})`}`);
   }
   const expected = parseSha256(String(answer.headers[SHA256_HEADER] ?? ""));
   if (expected === undefined) {

@@ -15,9 +15,10 @@ import {
   urlHost,
 } from "@foreverworks/mcp-kit";
 
-import { forwardMcp } from "./forward.js";
+import { forwardMcp, type Relay } from "./forward.js";
 import type { RelaySettings } from "./settings.js";
-import { closeUpstream, upstreamAt } from "./upstream.js";
+import { closeUpstreams, upstreamsAt } from "./upstream.js";
+import { loadUpstreamTokens, sharedTokenWarning } from "./upstreamTokens.js";
 
 /**
  * The relay's listener: the front of a server, as far as a client can see.
@@ -34,22 +35,26 @@ export type Started = {
 };
 
 export type StartOptions = {
+  /** Where the upstream tokens are read from, with the rest: the relay refuses to start when a client of it would have none. */
   readonly settings: RelaySettings;
-  /** The bearer token the upstream accepts from this relay. */
-  readonly upstreamToken: string;
   /** Where the log lines go; stderr by default. */
   readonly log?: (line: string) => void;
 };
 
 const FORWARDED = new Set(["POST", "GET", "DELETE"]);
 
-export const startRelay = async ({ settings, upstreamToken, log = (line) => console.error(line) }: StartOptions): Promise<Started> => {
+export const startRelay = async ({ settings, log = (line) => console.error(line) }: StartOptions): Promise<Started> => {
   const tokens = await loadTokens(settings.tokens);
-  const upstream = upstreamAt(settings.upstream, upstreamToken);
+  // Before anything listens: a client without a token upstream is a relay that does not start, never one that sends it another's.
+  const upstreamTokens = await loadUpstreamTokens(settings.upstreamTokens, [...tokens.keys()]);
+  const upstreams = upstreamsAt(settings.upstream, upstreamTokens);
   const { limits } = settings;
   const bindAddress = settings.host ?? LOOPBACK_ADDRESS;
   const allowedHosts = settings.allowedHosts ?? [];
-  const relay = { limits, transfer: { upstream, inbox: settings.inbox, outbox: settings.outbox, maxFileBytes: settings.maxFileBytes, log } };
+  // One relay per client, each with its own upstream (its token) over the one shared pool of connections: whatever a call moves, it moves as that client.
+  const relays = new Map<string, Relay>(
+    [...upstreams.byClient].map(([client, upstream]) => [client, { limits, transfer: { upstream, inbox: settings.inbox, outbox: settings.outbox, maxFileBytes: settings.maxFileBytes, log } }]),
+  );
   const buckets = new Map<string, Bucket>();
   const state = { bound: 0 };
 
@@ -61,6 +66,9 @@ export const startRelay = async ({ settings, upstreamToken, log = (line) => cons
     if (!FORWARDED.has(req.method ?? "")) return plainReply(res, 405, "the relay forwards POST, GET and DELETE only");
     const step = admit(buckets, client, Date.now(), limits);
     if (!step.allowed) return plainReply(res, 429, "too many requests", { "retry-after": String(step.retryAfterSec) });
+    const relay = relays.get(client);
+    // Every client the listener accepts has one; were it missing, a refusal is the only safe answer, not another client's token.
+    if (relay === undefined) return plainReply(res, 500, "internal error");
     void forwardMcp(relay, req, res);
   });
   // A client that trickles its request cannot hold a socket, as on a server.
@@ -77,9 +85,13 @@ export const startRelay = async ({ settings, upstreamToken, log = (line) => cons
   log(
     `relay: listening on http://${urlHost(bindAddress)}:${bound}${MCP_PATH} for ${[...tokens.keys()].join(", ")}` +
       `${allowedHosts.length === 0 ? "" : `, and Host ${allowedHosts.map(allowedHostText).join(", ")}`}; ` +
-      `forwarding to ${settings.upstream}${MCP_PATH}; ${folders.length === 0 ? "no files carried (set MCP_RELAY_INBOX, MCP_RELAY_OUTBOX)" : `carrying files for ${folders.join(" and ")}`}` +
+      `forwarding to ${settings.upstream}${MCP_PATH} with ${upstreamTokens.mode === "one" ? "one token for all clients" : "a token of its own for each client"}; ${folders.length === 0 ? "no files carried (set MCP_RELAY_INBOX, MCP_RELAY_OUTBOX)" : `carrying files for ${folders.join(" and ")}`}` +
       `${settings.plainHttp ? "; WARNING: the upstream is plain http (MCP_RELAY_ALLOW_PLAIN_HTTP=1), so its token and the files cross the network as they are: only for a network that is encrypted already" : ""}`,
   );
+
+  // Said once, apart from the line above so that it is not missed in it: several clients that share one token are one client to the server.
+  const shared = sharedTokenWarning(upstreamTokens);
+  if (shared !== undefined) log(`relay: ${shared}`);
 
   return {
     port: bound,
@@ -89,7 +101,7 @@ export const startRelay = async ({ settings, upstreamToken, log = (line) => cons
         server.close(() => resolve());
         server.closeIdleConnections();
       });
-      closeUpstream(upstream);
+      closeUpstreams(upstreams);
     },
   };
 };
