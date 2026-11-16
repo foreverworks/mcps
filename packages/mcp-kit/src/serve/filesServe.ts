@@ -8,7 +8,7 @@ import { sha256OfHandle, storeStream } from "../fileStream.js";
 import { isInside } from "../inputFile/roots.js";
 import { parseSha256 } from "../inputFile/bytes.js";
 import { mimeTypeOf } from "../outbox.js";
-import { type FileEndpoints, type FileRoute, segmentsOf, SHA256_HEADER } from "./files.js";
+import { type FileEndpoints, type FileRoute, FILES_REFUSED_FOR_CEILING, segmentsOf, SHA256_HEADER } from "./files.js";
 
 /**
  * The file endpoints' answers (serve/files.ts): `GET /files/outbox/<path>`
@@ -22,7 +22,8 @@ import { type FileEndpoints, type FileRoute, segmentsOf, SHA256_HEADER } from ".
  * unsafe name, a missing file, a link out, a directory, a file unreadable to
  * the server) is the same 404 with the same words, so the answer says nothing
  * about what the folder holds. What else an upload can be told is about the
- * request, not the folder: 400 (a malformed X-Content-SHA256), 405 (the other
+ * request, not the folder: 400 (a malformed X-Content-SHA256), 403 (a client
+ * held to a ceiling, refused before anything else is read), 405 (the other
  * method), 409 (a folder is where the file would go), 413 (over the size cap),
  * 422 (the bytes are not the ones hashed), 429 (the rate limit, from the
  * caller) and a plain 500.
@@ -36,6 +37,8 @@ export type FilesContext = {
   /** The server's name and the caller's, for the log line. */
   readonly service: string;
   readonly client: string;
+  /** Whether the client has a ceiling of its own (MCP_CLIENT_MAX_ACCESS), which keeps it from both endpoints. */
+  readonly limited: boolean;
   readonly log: FilesLog;
   /** The longest an upload may take in all (MCP_HTTP_TIMEOUT_MS); it also may not go quiet for longer than a minute. */
   readonly timeoutMs: number;
@@ -193,9 +196,11 @@ const drain = (req: IncomingMessage): void => {
   req.once("close", () => clearTimeout(timer));
 };
 
+type Direction = "download" | "upload";
+
 /** A refusal of a body that may still be on its way. */
-const refuse = (context: FilesContext, req: IncomingMessage, res: ServerResponse, status: number, message: string, outcome: string): void => {
-  outcomeLine(context, { direction: "upload", outcome });
+const refuse = (context: FilesContext, req: IncomingMessage, res: ServerResponse, status: number, message: string, outcome: string, direction: Direction = "upload"): void => {
+  outcomeLine(context, { direction, outcome });
   context.reply(res, status, message);
   drain(req);
 };
@@ -262,12 +267,15 @@ const boundUpload = (context: FilesContext, req: IncomingMessage): (() => void) 
 /** Answers one file request, whatever goes wrong with a plain 500. */
 export const serveFile = async (context: FilesContext, route: FileRoute, req: IncomingMessage, res: ServerResponse): Promise<void> => {
   const lift = route.direction === "inbox" ? boundUpload(context, req) : () => undefined;
+  const direction: Direction = route.direction === "outbox" ? "download" : "upload";
   try {
+    // First of all: a client held to a ceiling is told nothing of the folders, not even that a path is bad or a method wrong.
+    if (context.limited) return refuse(context, req, res, 403, FILES_REFUSED_FOR_CEILING, "refused_ceiling", direction);
     const wanted = route.direction === "outbox" ? "GET" : "PUT";
     if (req.method !== wanted) return context.reply(res, 405, "method not allowed", { allow: wanted });
     const names = segmentsOf(route.rest);
     if (names === undefined) {
-      outcomeLine(context, { direction: route.direction === "outbox" ? "download" : "upload", outcome: "not_found" });
+      outcomeLine(context, { direction, outcome: "not_found" });
       return context.reply(res, 404, NOT_FOUND);
     }
     await (route.direction === "outbox" ? sendFile(context, names, res) : receiveFile(context, names, req, res));

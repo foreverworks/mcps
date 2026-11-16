@@ -1,0 +1,5 @@
+---
+"@foreverworks/mcp-kit": patch
+---
+
+A client held to a ceiling (`MCP_CLIENT_MAX_ACCESS`) is now refused both file endpoints, `GET /files/outbox/<path>` and `PUT /files/inbox/<path>`, with a 403 and a plain sentence that says why: its calls are limited by a ceiling, and files cross outside the tool calls that ceiling checks, so the endpoints are for clients with none. Before, any client with a valid token could put a file into the server's inbox or fetch any file in its outbox, including one another client's calls had produced, however low its ceiling was. A client is held by an entry of its own, at any class (`money` too); `MCP_MAX_ACCESS` alone changes nothing here. The refusal is the first answer, before the path or the method is looked at, so it is the same whether a file is there or not and says nothing of what the folders hold; a body it refuses is read and thrown away, never stored. A client with no entry is served as before, and a request with no valid token is still a 401. There is no new setting. See docs/configuration.md, "Files to and from another machine".

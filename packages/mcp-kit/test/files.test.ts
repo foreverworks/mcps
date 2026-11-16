@@ -8,7 +8,8 @@ import { join } from "node:path";
 import type { McpServer } from "@modelcontextprotocol/server";
 import { afterAll, beforeAll, describe, expect, it } from "vitest";
 
-import { DEFAULT_FILES_MAX_BYTES, fileRouteOf, filesFrom, filesUrlPath, segmentsOf } from "../src/serve/files.js";
+import { guardSettingsFrom, hasClientCeiling } from "../src/serve/confirm.js";
+import { DEFAULT_FILES_MAX_BYTES, fileRouteOf, FILES_REFUSED_FOR_CEILING, filesFrom, filesUrlPath, segmentsOf } from "../src/serve/files.js";
 import { storeStream } from "../src/fileStream.js";
 import { listenFrom, MCP_PATH, serve, type Served } from "../src/serve.js";
 
@@ -538,6 +539,161 @@ describe("the inbox endpoint", () => {
     expect(lines).toContainEqual({ svc: "inbox", client: "default", direction: "upload", outcome: "ok", path: "scan.pdf", size: 13, sha256: sha256("scanned pages").slice(0, 12) });
     expect(lines).toContainEqual({ svc: "inbox", client: "default", direction: "upload", outcome: "checksum_mismatch" });
     expect(JSON.stringify(lines)).not.toMatch(/scanned pages|what arrived/);
+  });
+});
+
+describe("a client held to a ceiling (MCP_CLIENT_MAX_ACCESS), and the file endpoints", () => {
+  const log: string[] = [];
+  let served: Served;
+  let inbox: string;
+  let outbox: string;
+  const secretName = "board-minutes-2026.pdf";
+  const secretBytes = "CONFIDENTIAL minutes of another client's call";
+  const bearer = (client: string): { authorization: string } => ({ authorization: `Bearer ${client}-token-0123456789abcdef` });
+  const entries = async (dir: string): Promise<string[]> => (await readdir(dir, { recursive: true })).sort();
+
+  beforeAll(async () => {
+    const dir = await mkdtemp(join(tmpdir(), "mcp-kit-ceiling-files-"));
+    inbox = join(dir, "in");
+    outbox = join(dir, "out");
+    const tokens = join(dir, "tokens");
+    await mkdir(inbox);
+    await mkdir(join(outbox, "reports"), { recursive: true });
+    await mkdir(tokens);
+    await writeFile(join(outbox, secretName), secretBytes);
+    await writeFile(join(outbox, "reports", "q3.csv"), "id,amount\n1,10\n");
+    for (const client of ["reader", "writer", "payer", "open", "constructor"]) await writeFile(join(tokens, `token-${client}`), `${client}-token-0123456789abcdef\n`);
+    served = await serve({
+      name: "ceilinged",
+      version: "0.0.0",
+      register: ping,
+      policy: { ping: { access: "read" } },
+      env: {
+        MCP_HTTP_PORT: "0",
+        MCP_HTTP_TOKENS_DIR: tokens,
+        MCP_HTTP_FILES_OUTBOX: outbox,
+        MCP_HTTP_FILES_INBOX: inbox,
+        MCP_HTTP_FILES_MAX_BYTES: String(2 * 1024 * 1024),
+        MCP_CLIENT_MAX_ACCESS: "reader=read,writer=write,payer=money",
+      },
+      log: (line) => log.push(line),
+    });
+  });
+  afterAll(() => served.close());
+
+  const held = ["reader", "writer", "payer"] as const;
+  const asked: readonly (readonly [string, string, string])[] = [
+    ["downloads a file that is there", "GET", `/files/outbox/${secretName}`],
+    ["downloads a file in a folder", "GET", "/files/outbox/reports/q3.csv"],
+    ["downloads a file that is not there", "GET", "/files/outbox/missing.pdf"],
+    ["asks for the outbox folder itself", "GET", "/files/outbox/"],
+    ["asks for a path out of the folder", "GET", "/files/outbox/../secret"],
+    ["uploads a file", "PUT", "/files/inbox/scan.pdf"],
+    ["uploads into a folder", "PUT", "/files/inbox/2026-09/scan.pdf"],
+    ["uploads to a bad path", "PUT", "/files/inbox/%2e%2e/scan.pdf"],
+    ["uses the wrong method on an upload", "GET", "/files/inbox/scan.pdf"],
+    ["uses the wrong method on a download", "PUT", `/files/outbox/${secretName}`],
+    ["deletes", "DELETE", `/files/outbox/${secretName}`],
+  ];
+  const cases = held.flatMap((client) => asked.map(([what, method, target]) => [client, what, method, target] as const));
+
+  it.each(cases)("refuses %s, which %s, with a 403 that says why", async (client, _what, method, target) => {
+    const answer = await raw(served, method, target, { headers: bearer(client), ...(method === "PUT" ? { body: "bytes the client wants stored" } : {}) });
+    expect(answer.status).toBe(403);
+    expect(answer.headers["content-type"]).toBe("text/plain; charset=utf-8");
+    const words = answer.body.toString();
+    expect(words).toBe(`${FILES_REFUSED_FOR_CEILING}\n`);
+    expect(words).toMatch(/ceiling/);
+    expect(words).toMatch(/outside the tool calls/);
+    expect(words).toMatch(/clients with no ceiling/);
+  });
+
+  it("is the same answer whether the file is there or not, and never has a name or a byte of the folder in it", async () => {
+    const answers = await Promise.all(
+      ["reader", "writer", "payer"].flatMap((client) => [secretName, "reports/q3.csv", "missing.pdf", "..%2f..%2fetc%2fpasswd"].map((name) => raw(served, "GET", `/files/outbox/${name}`, { headers: bearer(client) }))),
+    );
+    const bodies = new Set(answers.map((answer) => answer.body.toString()));
+    expect(bodies.size).toBe(1);
+    const everything = answers.map((answer) => `${JSON.stringify(answer.headers)}${answer.body.toString()}`).join("\n");
+    for (const leak of [secretName, "board-minutes", "CONFIDENTIAL", "q3.csv", "reports", "id,amount"]) expect(everything).not.toContain(leak);
+    expect(answers.every((answer) => answer.headers["x-content-sha256"] === undefined)).toBe(true);
+  });
+
+  it("stores nothing of an upload it refuses, a large one included, and the client still reads the answer", async () => {
+    for (const client of held) {
+      const big = Buffer.alloc(1024 * 1024, 7);
+      const answer = await raw(served, "PUT", `/files/inbox/${client}/big.bin`, { headers: { ...bearer(client), "x-content-sha256": sha256(big) }, body: big });
+      expect(answer.status).toBe(403);
+      expect(answer.body.toString()).toBe(`${FILES_REFUSED_FOR_CEILING}\n`);
+    }
+    expect(await entries(inbox)).toEqual([]);
+  });
+
+  it("serves the client that has no ceiling as it always did, in both directions", async () => {
+    const down = await raw(served, "GET", `/files/outbox/${secretName}`, { headers: bearer("open") });
+    expect(down.status).toBe(200);
+    expect(down.body.toString()).toBe(secretBytes);
+    expect(down.headers["x-content-sha256"]).toBe(sha256(secretBytes));
+    expect((await raw(served, "GET", "/files/outbox/missing.pdf", { headers: bearer("open") })).status).toBe(404);
+
+    const body = Buffer.from("scanned pages");
+    const up = await raw(served, "PUT", "/files/inbox/open/scan.pdf", { headers: { ...bearer("open"), "x-content-sha256": sha256(body) }, body });
+    expect(up.status).toBe(200);
+    expect(JSON.parse(up.body.toString())).toEqual({ path: join(inbox, "open", "scan.pdf"), size: 13, sha256: sha256(body) });
+    expect(await readFile(join(inbox, "open", "scan.pdf"), "utf8")).toBe("scanned pages");
+  });
+
+  it("holds a client by an entry of its own, so a client whose name is a member of every object has none", async () => {
+    const down = await raw(served, "GET", `/files/outbox/${secretName}`, { headers: bearer("constructor") });
+    expect(down.status).toBe(200);
+    expect(down.body.toString()).toBe(secretBytes);
+  });
+
+  it("still answers 401 to a request with no token or a wrong one, and 421 to another Host, before it says anything about ceilings", async () => {
+    for (const [method, target] of [["GET", `/files/outbox/${secretName}`], ["PUT", "/files/inbox/anon.txt"]] as const) {
+      const none = await raw(served, method, target);
+      expect(none.status).toBe(401);
+      expect(none.body.toString()).toBe("unauthorized\n");
+      const wrong = await raw(served, method, target, { headers: { authorization: "Bearer reader-token-0123456789abcdeX" } });
+      expect(wrong.status).toBe(401);
+      expect(wrong.body.toString()).toBe("unauthorized\n");
+      expect((await raw(served, method, target, { headers: { ...bearer("reader"), host: "evil.example" } })).status).toBe(421);
+    }
+    expect(await entries(inbox)).not.toContain("anon.txt");
+  });
+
+  it("leaves the held client its tool calls, which the ceiling checks", async () => {
+    const call = (client: string): Promise<Answer> =>
+      raw(served, "POST", MCP_PATH, {
+        headers: { ...bearer(client), "content-type": "application/json", accept: "application/json, text/event-stream" },
+        body: JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/call", params: { name: "ping", arguments: {} } }),
+      });
+    for (const client of ["reader", "open"]) expect(JSON.parse((await call(client)).body.toString())).toMatchObject({ result: { content: [{ type: "text", text: "pong" }] } });
+  });
+
+  it("logs each refusal with the client and the direction, and nothing of the path or the bytes", () => {
+    const lines = log.filter((line) => line.startsWith("files ")).map((line) => JSON.parse(line.slice("files ".length)) as Record<string, unknown>);
+    expect(lines).toContainEqual({ svc: "ceilinged", client: "reader", direction: "download", outcome: "refused_ceiling" });
+    expect(lines).toContainEqual({ svc: "ceilinged", client: "writer", direction: "upload", outcome: "refused_ceiling" });
+    expect(lines.filter((line) => line["outcome"] === "refused_ceiling").every((line) => Object.keys(line).sort().join() === "client,direction,outcome,svc")).toBe(true);
+    expect(JSON.stringify(lines.filter((line) => line["outcome"] === "refused_ceiling"))).not.toMatch(/board-minutes|CONFIDENTIAL|q3\.csv|scan\.pdf/);
+  });
+});
+
+describe("hasClientCeiling", () => {
+  it("is true for a client named in MCP_CLIENT_MAX_ACCESS, at any level, and false for every other", () => {
+    const settings = guardSettingsFrom({ MCP_CLIENT_MAX_ACCESS: "a=read, b=write,c=money" });
+    expect(["a", "b", "c", "d", ""].map((client) => hasClientCeiling(settings, client))).toEqual([true, true, true, false, false]);
+  });
+
+  it("is false for all while none is set, and does not take a name that objects have for a client's", () => {
+    expect(hasClientCeiling(guardSettingsFrom({}), "a")).toBe(false);
+    const settings = guardSettingsFrom({ MCP_CLIENT_MAX_ACCESS: "a=read" });
+    for (const name of ["constructor", "toString", "__proto__", "hasOwnProperty"]) expect(hasClientCeiling(settings, name)).toBe(false);
+  });
+
+  it("is not changed by the server-wide ceiling, which the guard checks on its own", () => {
+    expect(hasClientCeiling(guardSettingsFrom({ MCP_MAX_ACCESS: "read" }), "a")).toBe(false);
   });
 });
 

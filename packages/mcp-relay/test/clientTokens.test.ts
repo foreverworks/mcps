@@ -329,7 +329,7 @@ describe("what the upstream says about a token", () => {
     const upstream = await server({
       onRequest: (req, res) => {
         if (req.method === "POST") return false;
-        res.writeHead(req.method === "PUT" ? 401 : 403, { "content-type": "text/plain" }).end(`${quoting}\n`);
+        res.writeHead(401, { "content-type": "text/plain" }).end(`${quoting}\n`);
         return true;
       },
     });
@@ -347,7 +347,7 @@ describe("what the upstream says about a token", () => {
       // No file to send: the call goes, and the link in its answer cannot be fetched.
       const fetched = (await (await post(relay.url, own.alice, readCall(2, "/nowhere/report.txt"))).json()) as { result: { content: { text?: string; uri?: string }[] } };
       const note = fetched.result.content.at(-1)?.text as string;
-      expect(note).toContain("refused the relay's token for alice (403); check upstream-alice in MCP_RELAY_UPSTREAM_TOKENS_DIR");
+      expect(note).toContain("refused the relay's token for alice (401); check upstream-alice in MCP_RELAY_UPSTREAM_TOKENS_DIR");
       expect(note).toContain("[token]");
       expect(JSON.stringify(fetched)).not.toContain(up.alice);
       expect(JSON.stringify(fetched)).not.toContain(up.bob);

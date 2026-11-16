@@ -73,7 +73,9 @@ The guard derives everything else from that class:
 - **A ceiling per client.** `MCP_CLIENT_MAX_ACCESS=<client>=<class>,...` holds
   a named client (by its token) lower still. A server that calls another to
   find a code in a mailbox, say, is held to `read` there: it can search the
-  mailbox, not send from it.
+  mailbox, not send from it. A client held so is also kept from the
+  [file endpoints](#files-to-and-from-another-machine): files cross outside
+  the tool calls a ceiling checks.
 - **An audit line per call** on stderr: server, tool, client, the `account`
   label, access class, outcome and duration. Never the other arguments, a
   result or a token.
@@ -200,6 +202,16 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
   with either set.
 - **No new way in.** The same bearer token and `Host` check as `/mcp`, and the
   same per-client rate limit.
+- **A client with a ceiling gets no files.** `MCP_CLIENT_MAX_ACCESS` checks
+  tool calls, and a file crosses outside them: an upload lands in the inbox
+  without a tool running, and the outbox holds what every client's calls
+  produced. So a client named there, at any class, is refused both endpoints
+  with a 403, before the path is read, and nothing is stored from an upload it
+  sends. A client held to `read` cannot put a file in the server's inbox or
+  fetch another client's file from its outbox. The inbox and the outbox belong
+  to the clients with no ceiling, which is how a server with one trusted client
+  has always worked. There is no setting to lift this; a held client that needs
+  files needs a server of its own.
 - **A path stays inside its folder.** It is percent-decoded once, must hold no
   empty name, `.`, `..`, NUL, backslash or name too long for a file system,
   and is resolved with its links followed; only a regular file whose real path
@@ -208,8 +220,8 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
   created, and each is held to the same rule, as for a tool's input file. Every
   way a path can fail (an unsafe name, a missing file, a link out, a folder, a
   file the server cannot read) is the same bare 404. What else an upload is told
-  is about the request: 400 for a malformed `X-Content-SHA256`, 405 for the
-  other method, 409 when a folder is where the file would go, 413 over the
+  is about the request: 400 for a malformed `X-Content-SHA256`, 403 for a client
+  held to a ceiling, 405 for the other method, 409 when a folder is where the file would go, 413 over the
   size cap, 422 for bytes that are not the ones hashed.
 - **Whole or not at all.** An upload goes to a temporary file in the target's
   folder and is renamed into place once the size cap and the SHA-256 the
@@ -228,9 +240,9 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
   Its clients present their own tokens to it. With
   `MCP_RELAY_UPSTREAM_TOKENS_DIR` it holds one upstream token per client and
   sends each client's calls and files under that client's token only, so the
-  server's `MCP_CLIENT_MAX_ACCESS` (which holds tool calls; the file endpoints
-  check the token and audit the client, not its ceiling) and audit line see the
-  client that really called; it refuses to start when a client would have no token of its own or
+  server's `MCP_CLIENT_MAX_ACCESS` (which holds its tool calls and keeps it
+  from the file endpoints, so a held client's call that names a file is not
+  made) and audit line see the client that really called; it refuses to start when a client would have no token of its own or
   two would share one, and never sends one client's token for another's. With
   `MCP_RELAY_UPSTREAM_TOKEN_FILE` every client shares one token and one
   client's rights upstream, and the relay warns at start when it has more than

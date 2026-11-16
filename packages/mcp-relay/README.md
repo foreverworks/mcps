@@ -175,13 +175,17 @@ goes through. The relay adds no rights of its own and takes none away: **a
 client can do through the relay what its upstream token may do on the server,
 and no more.** The ceiling is always the server's.
 
-The ceiling holds tool calls. Files are a different gate: the server's file
-endpoints take any client that has a token and record it in the audit line and
-the rate limit, but do not read `MCP_CLIENT_MAX_ACCESS`. So a client held to
-`read` that names an inbox file in a write call has the file uploaded, and then
-the call refused; and it can fetch any file in the server's outbox. The inbox,
-the size limit and the rate limit bound what that costs; if a held client must
-not see what others download, give it a server of its own.
+**A held client moves no files.** The ceiling checks tool calls, and a file
+crosses outside them: an upload lands in the server's inbox without a tool
+running, and the outbox holds what every client's calls produced. So the
+server's file endpoints refuse a client named in `MCP_CLIENT_MAX_ACCESS`,
+whatever its class, with a 403. Through the relay, alice (held to `read`) can
+call a tool that needs no file, but a call whose arguments name a file in the
+relay's inbox is not made, and a link in a result to a file in the server's
+outbox is not followed; each says why in words of its own, not as a refused
+token. Bob, with no ceiling, moves files as before. If alice needs a tool that
+takes or returns a file, give her a server of her own, or take her out of
+`MCP_CLIENT_MAX_ACCESS`.
 
 **Set it up.** Make a token on the server for each client, a `token-alice` and
 a `token-bob` in its tokens folder, and put each token in a file on the
@@ -290,7 +294,9 @@ On the server, the kit's file endpoints take three variables
   call, a stream, and every file moved for a client go upstream under that
   client's token and no other, so the server's ceiling for the client
   (`MCP_CLIENT_MAX_ACCESS`), its audit line and its rate limit are the real
-  client's. The relay cannot lift a client above its upstream token, and it has
+  client's. A client with a ceiling moves no files at all: the server's file
+  endpoints are for clients with none, so a held client's upload and download
+  are refused (403) and the relay says so. The relay cannot lift a client above its upstream token, and it has
   no fallback: a client without a token of its own is a relay that does not
   start. With the single `MCP_RELAY_UPSTREAM_TOKEN_FILE` your clients share
   one identity and one set of rights, the highest any of them needs, which is
@@ -343,6 +349,7 @@ On the server, the kit's file endpoints take three variables
 | The server refuses the relay's token | A 502, never a 401 (your client's own token was fine): `the upstream refused the relay's token (401); check MCP_RELAY_UPSTREAM_TOKEN_FILE`. With a token for each client it names the client and its file: `the upstream refused the relay's token for alice (401); check upstream-alice in MCP_RELAY_UPSTREAM_TOKENS_DIR`. Only that client is affected. |
 | The server's ceiling for the client is below the tool's class | The server's own answer, passed on: the tool result is an `access_denied` that names the client and the setting (`MCP_CLIENT_MAX_ACCESS`). Raise it on the server for that client; nothing in the relay can. |
 | The server fails or says no | The same status, with words that say it was the upstream: `the upstream failed (500): ...`. |
+| The server's file endpoints refuse the client (403), because it is held to a ceiling | A file named in a call is not sent and the call is not made; a file a result links is not fetched. The words say it is the client's ceiling, not the token: `the upstream does not carry files for alice (403): its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS on the server), and files cross outside the tool calls that ceiling checks, so file transfers are for clients with no ceiling; ...`. Use a client with no ceiling for a tool that takes or returns a file. |
 | A file named in a call cannot be uploaded | The call is not made. A JSON-RPC error names the file and why, for example `The relay could not send /srv/mcp/inbox/scan.pdf to the server, so the call was not made: the upstream refused the file as too large (413)`. In a batch the other calls go on. |
 | A file a result links cannot be fetched | The result goes through unchanged, with one text item added at the end that names each file and why. |
 | A link is to anywhere but a `file:` path in the outbox | Left alone. |

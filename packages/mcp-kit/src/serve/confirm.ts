@@ -68,6 +68,16 @@ export const ceilingRefusing = (access: Access, settings: GuardSettings, client:
   return own !== undefined && !within(access, own) ? { allowed: own, client } : undefined;
 };
 
+/**
+ * Whether `client` has a ceiling of its own, whatever its level
+ * (MCP_CLIENT_MAX_ACCESS names it). A client with one is held to the tool
+ * calls the guard checks; the file endpoints (serve/files.ts) move bytes
+ * outside those calls and so are refused to it. Own keys only: a client
+ * called `constructor` has no ceiling because the object has a member by that
+ * name.
+ */
+export const hasClientCeiling = (settings: GuardSettings, client: string): boolean => Object.hasOwn(settings.clientMaxAccess ?? {}, client);
+
 /** The settings from the environment; a value that is not one of the options is a process that must not start. */
 export const guardSettingsFrom = (env: NodeJS.ProcessEnv): GuardSettings => {
   const max = env["MCP_MAX_ACCESS"]?.trim() || "money";

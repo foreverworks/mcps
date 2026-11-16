@@ -156,6 +156,19 @@ upload is told is about the request: 400 (a malformed `X-Content-SHA256`), 409
 (a folder is where the file would go), 413, 422 and 405 for the other method.
 A refused or broken upload leaves no file and takes away the folders it made.
 
+**A client with a ceiling gets no files.** A client named in
+`MCP_CLIENT_MAX_ACCESS` (at any class, `money` too) is refused both endpoints
+with a 403 and a plain sentence that says why: its calls are limited by a
+ceiling, and files cross outside the tool calls that ceiling checks. The
+refusal comes before the path or the method is looked at, so it says nothing
+of what the folders hold, and an upload it refuses is read and thrown away,
+never stored. The inbox and the outbox belong to the clients with no ceiling.
+There is no setting to lift it. If a held client needs a tool that takes or
+returns a file, give it a server of its own, or take its entry out of
+`MCP_CLIENT_MAX_ACCESS`. A client with no entry keeps the endpoints as they
+were, and `MCP_MAX_ACCESS` (one ceiling for every client of the server) does
+not close them.
+
 Node's 30 s limit on a request's arrival would cut a large upload short, and it
 cannot be lifted for one route, so with an inbox on it is replaced by limits
 where each request is known. Everything that is refused before its body is read
@@ -208,7 +221,7 @@ and in `_meta["foreverworks.com/access"]`.
 | Variable | Default | Meaning |
 |---|---|---|
 | `MCP_MAX_ACCESS` | `money` | The highest class this server runs: `read`, `write` or `money`. A tool above it is still listed, says it is disabled, and refuses every call (`access_denied`). |
-| `MCP_CLIENT_MAX_ACCESS` | | Lower ceilings for named clients, as `client=class` pairs separated by commas (`mail-reader=read,bob=write`). The client is the name of the bearer token it called with (`MCP_HTTP_TOKENS_DIR`). A call above its class is refused (`access_denied`, naming the client). Meant for another server that calls this one as its client and needs to read, not to send or pay. |
+| `MCP_CLIENT_MAX_ACCESS` | | Lower ceilings for named clients, as `client=class` pairs separated by commas (`mail-reader=read,bob=write`). The client is the name of the bearer token it called with (`MCP_HTTP_TOKENS_DIR`). A call above its class is refused (`access_denied`, naming the client), and so is any request to the [file endpoints](#files-to-and-from-another-machine) (403). Meant for another server that calls this one as its client and needs to read, not to send or pay. |
 | `MCP_CONFIRM` | `client` | Who confirms with the person a `money` call, and a `write` its policy marks `confirm` (one that acts outside the computer): `client`, `elicit` or `none`, as below. |
 
 [security.md](security.md#money-and-confirmation) explains each value of

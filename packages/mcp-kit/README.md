@@ -77,11 +77,14 @@ their icons. `servers/oblio` is a complete example.
   may reach. For a server that runs on another machine than its clients,
   `MCP_HTTP_FILES_OUTBOX` and `MCP_HTTP_FILES_INBOX` switch on routes that
   carry the files its tools hand back and take by path, for
-  [`mcp-relay`](../mcp-relay) to use (off unless set).
+  [`mcp-relay`](../mcp-relay) to use (off unless set). A client held to a
+  ceiling (`MCP_CLIENT_MAX_ACCESS`) is refused them with a 403: files cross
+  outside the tool calls a ceiling checks, so they are for clients with none.
 - **The guard.** Every registered tool is checked against the policy at
   start. Inputs are strict; annotations and `_meta` come from the class; a
   ceiling (`MCP_MAX_ACCESS`, and `MCP_CLIENT_MAX_ACCESS` per client) refuses
-  what is above it; `MCP_CONFIRM` says whether the client or the server
+  what is above it (and keeps a client with its own ceiling from the file
+  endpoints, which move bytes outside tool calls); `MCP_CONFIRM` says whether the client or the server
   confirms a `money` call; a declared output schema is checked and sent as
   structured content; every call is audited.
 - **Results and failures.** `makeErrorKit` for tagged failures, `makeHandled`

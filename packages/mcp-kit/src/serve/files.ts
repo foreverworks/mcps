@@ -5,7 +5,9 @@ import { isAbsolute, resolve } from "node:path";
  * (MCP_HTTP_FILES_OUTBOX, MCP_HTTP_FILES_INBOX; docs/configuration.md, "Files
  * to and from another machine"). Off unless a variable is set, and then only
  * the direction it names: with none, these routes do not exist and answer as
- * any unknown route does.
+ * any unknown route does. A client held to a ceiling (MCP_CLIENT_MAX_ACCESS)
+ * is refused both with a 403: the ceiling checks tool calls, and a file moves
+ * outside them, so the endpoints belong to clients with none.
  *
  * This file is the pure half: the settings, which request is a file request,
  * and the one rule for turning a URL into a path inside a folder. The streams
@@ -97,6 +99,14 @@ export const fileRouteOf = (target: string | undefined, files: FileEndpoints): F
   }
   return undefined;
 };
+
+/**
+ * What a client held to a ceiling (MCP_CLIENT_MAX_ACCESS) is told when it asks
+ * for a file: the ceiling checks tool calls, and a file crosses outside them,
+ * so these endpoints are for clients with none. Says nothing of the folders.
+ */
+export const FILES_REFUSED_FOR_CEILING =
+  "files are not available to this client: its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS), and files cross outside the tool calls that ceiling checks; the file endpoints are for clients with no ceiling";
 
 /** The longest name a file system takes (ext4, xfs, zfs and the rest of what servers run on). */
 const MAX_NAME_BYTES = 255;

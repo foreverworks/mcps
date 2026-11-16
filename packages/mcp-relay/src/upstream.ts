@@ -122,11 +122,22 @@ const refusedWords = (status: number, upstream: Upstream): string =>
     : `the upstream refused the relay's token for ${upstream.client} (${status}); check ${upstreamFileOf(upstream.client)} in MCP_RELAY_UPSTREAM_TOKENS_DIR`;
 
 /**
+ * Why the server's file endpoints turned this client away with a 403: the
+ * client is held to a ceiling (MCP_CLIENT_MAX_ACCESS on the server), and files
+ * cross outside the tool calls that ceiling checks. Not about the relay's
+ * token, so it must not send anyone to look at the token files.
+ */
+const ceilingWords = (upstream: Upstream): string =>
+  `the upstream does not carry files for ${upstream.mode === "one" ? "this client" : upstream.client} (403): its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS on the server), and files cross outside the tool calls that ceiling checks, so file transfers are for clients with no ceiling; use a client with none for a tool that takes or returns a file`;
+
+/**
  * What an answer other than the one wanted says about the upstream, for a
  * person to read: `file` for the file endpoints, `call` for the MCP route.
- * 401 and 403 are always about the relay's token, never the client's.
+ * 401 is always about the relay's token, never the client's. So is a 403 from
+ * the route; from a file endpoint it is the client's ceiling.
  */
 export const statusWords = (status: number, upstream: Upstream, subject: "file" | "call" = "file"): string => {
+  if (status === 403 && subject === "file") return ceilingWords(upstream);
   if (status === 401 || status === 403) return refusedWords(status, upstream);
   if (status === 404) return subject === "file" ? "the upstream answered 404: its file endpoint is off, or the file is not there" : "the upstream answered 404: is MCP_RELAY_UPSTREAM the base URL of the server?";
   if (status === 413) return subject === "file" ? "the upstream refused the file as too large (413); its MCP_HTTP_FILES_MAX_BYTES is the limit" : "the upstream refused the request as too large (413)";

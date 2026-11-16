@@ -350,7 +350,8 @@ server or how a client uses it:
 - **File endpoints in the server's HTTP listener**, off unless you set
   `MCP_HTTP_FILES_OUTBOX` (clients may read files below it) or
   `MCP_HTTP_FILES_INBOX` (clients may write files below it). Same tokens and
-  `Host` check as the one route; paths confined to the folder
+  `Host` check as the one route; paths confined to the folder; a client with a
+  ceiling (`MCP_CLIENT_MAX_ACCESS`) is refused them
   ([configuration](configuration.md#files-to-and-from-another-machine)).
 - **A relay**, [`mcp-relay`](../packages/mcp-relay), which runs on the clients'
   machine, listens on a local port like the server does, and sends what it is
@@ -383,7 +384,8 @@ With more than one client behind the relay, give each its own token on the
 server and let the relay present it: a folder of `upstream-<client>` files
 instead of the one file. The server then sees each client under its own name
 and holds it to its own rights (`MCP_CLIENT_MAX_ACCESS=alice=read` keeps alice
-to reading, through the relay too).
+to reading, through the relay too; a client held so also moves no files, so
+give a tool that takes or returns a file to a client with no ceiling).
 
 ```bash
 # on the server's machine, in its tokens folder: token-alice and token-bob, one for each client

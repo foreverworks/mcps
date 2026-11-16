@@ -8,7 +8,7 @@ import { type NodeIncomingMessageLike, NodeStreamableHTTPServerTransport, toNode
 import { createMcpHandler, type Icon, isLegacyRequest, McpServer, type ProtocolEra } from "@modelcontextprotocol/server";
 import { serveStdio as serveStdioEntry } from "@modelcontextprotocol/server/stdio";
 
-import { describeSettings, type GuardSettings, guardSettingsFrom } from "./serve/confirm.js";
+import { describeSettings, type GuardSettings, guardSettingsFrom, hasClientCeiling } from "./serve/confirm.js";
 import { installEgress, installKeepAlive } from "./serve/egress.js";
 import { describeFiles, type FileEndpoints, fileRouteOf, FILES_VARIABLES, filesFrom } from "./serve/files.js";
 import { serveFile } from "./serve/filesServe.js";
@@ -465,7 +465,8 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
     if (files !== undefined && fileRoute !== undefined) {
       const turn = admit(buckets, caller.bucket, Date.now(), limits);
       if (!turn.allowed) return reply(res, 429, "too many requests", { ...early, "retry-after": String(turn.retryAfterSec) });
-      return serveFile({ files, service: options.name, client, log: runtime.log, reply, timeoutMs: limits.timeoutMs }, fileRoute, req, res);
+      const limited = hasClientCeiling(runtime.settings, client);
+      return serveFile({ files, service: options.name, client, limited, log: runtime.log, reply, timeoutMs: limits.timeoutMs }, fileRoute, req, res);
     }
     if (pathnameOf(req.url) !== MCP_PATH) return reply(res, 404, "not found", early);
     // Also a CORS preflight, answered with no CORS headers: ChatGPT and Claude call from their servers, never from a page.

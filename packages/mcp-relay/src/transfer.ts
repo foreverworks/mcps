@@ -115,6 +115,11 @@ export const downloadFile = async (transfer: Transfer, path: string, signal: Abo
   const names = namesBelow(outbox, path);
   const answer = await attempt(transfer, () => send(upstream, { method: "GET", path: filesUrlPath(FILES_OUTBOX_PATH, names.join("/")), signal }));
   if (typeof answer === "string") return failed(answer);
+  if (answer.status === 403) {
+    // The words already say why; the server's own, which say the same, would only repeat them.
+    discard(answer);
+    return failed(statusWords(answer.status, upstream));
+  }
   if (answer.status !== 200) {
     const note = await readAnswer(answer, 512);
     return failed(`${statusWords(answer.status, upstream)}${note === undefined || note.length === 0 ? "" : ` (${snippetOf(note, upstream)})`}`);
