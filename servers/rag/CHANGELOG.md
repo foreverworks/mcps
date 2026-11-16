@@ -1,5 +1,30 @@
 # @foreverworks/mcp-rag
 
+## 0.4.0
+
+### Minor Changes
+
+- 2017f2c: Use Cloudflare Clef-flash or Clef to score candidate passages for relevance on a fixed rubric, with the same local fallback and deadlines as the BGE reranker. Select the model through configuration or `search.reranker_model` to compare models on frozen collections. Provider metadata reports the chosen model and its input-token usage.
+- 308645f: `RAG_LOCAL_ONLY_COLLECTIONS` names collections, separated by commas, whose questions and passages never leave the machine, even when `RAG_QUERY_PROVIDER=cloudflare` is on. A `search` whose scope includes one embeds the question and reranks the candidates with the local servers only, ignoring `inference_timeout_ms` and `reranker_model`, and lists those collections under `local_only` in its reply; a scope that mixes one with regular collections runs entirely local. A `search` that names no collections now leaves them out, as it leaves out snapshots, and searches them only when they are named. They cannot be embedded at a remote provider: `create_collection` and `index_path` refuse that with an error naming the variable, and `snapshot_collections` refuses to copy one, since the copy would not be local-only. A search that leaves some out while others remain lists them under `left_out_local_only`. Names are lowercased; an entry that is not a collection name protects nothing, so `health` lists it under `local_only_invalid` and reports not ok. `health` lists the names under `local_only_collections`, and those that match no collection yet under `local_only_unknown`. The variable is read at startup, and listing a name does not undo text already embedded at a remote provider. Local inference is slower than Workers AI. With the variable unset or empty nothing changes except that `health` shows an empty list.
+- 9ead0c1: Optionally run query embedding and reranking on Cloudflare Workers AI, with vector compatibility probes, bounded requests, automatic local fallback and provider metadata. A single call can force local inference for a comparison. Indexing providers remain independent.
+  
+  `snapshot_collections` is a new `write` tool to freeze collections and their existing vectors locally for reproducible comparisons. Snapshots are excluded from default searches and cannot be indexed or pruned.
+- e5ec1c3: `similar` finds the documents in a collection that say most nearly the same thing as one of its documents: duplicates and near-duplicates to merge, related documents, or a document's closest neighbours before you write a new one. Give it the document's source as `list_sources` and `search` show it, and it returns the closest `limit` (10) documents, best first. Each has a `score`, the mean of `forward` and `backward` (how much of the named document is found in it, and how much of it in the named document): 1 for identical text, the same whichever of the two you start from, and in principle below 0 for opposite ones, which the default `min_score` of 0 leaves out. Each also has its `chunks` and the closest pair of passages by chunk id and location, which `expand` reads. `candidates` (10) sets how many nearest chunks each chunk of the named document contributes when the candidate documents are found. A document of more than 64 chunks, the named one or a result, is compared by 64 spread evenly through it, and the reply says which (`sampled`, on the reply and on each result). It compares the vectors already stored, in one query through the collection's own vector index, so no embedding model is called, and a call that runs past 15 seconds is cancelled with an error that suggests a smaller `candidates`. It is a `read` tool: it changes nothing.
+
+### Patch Changes
+
+- 6cabc5b: `index_path` says why it could not read a file. A file this server may not open, such as one with mode 0600 owned by another user, was reported in `failed_files` as `"error": "[object Object]"`, which hid the cause; it now reads `unreadable: <path> cannot be opened by this server (EACCES)`, with the system's own code, and the rest of the folder is still indexed. A file that is over the size limit, or that vanished while the folder was being read, is reported with its reason the same way.
+- c132159: The server's instructions, which your client hands the model at the start of every session, are about half as long, so every session costs less. They now say what the server reaches, the tool to start with, the flows that run across tools, and what the model must know before its first call (what spends money, sends, publishes or acts on something in a home, and what to do when a sign-in is needed). What a tool's own description already says is left to it. Nothing a tool does changes.
+  
+  porkbun: the vendor's paragraph on publishing a site is now one sentence, and `deploy_site`'s description carries its checks, adding that `list_hosting_files` shows what is already there before an upload replaces it.
+- Updated dependencies [75ea94a]
+- Updated dependencies [0834240]
+- Updated dependencies [64969a3]
+- Updated dependencies [4ef1bf8]
+- Updated dependencies [7b93f2f]
+- Updated dependencies [27f0094]
+  - @foreverworks/mcp-kit@0.3.0
+
 ## 0.3.0
 
 ### Minor Changes

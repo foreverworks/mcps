@@ -1,6 +1,6 @@
 {
   "name": "foreverworks-notion",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Search, read and write your Notion workspaces, with pages as Markdown and typed database queries.",
   "author": {
     "name": "Forever Works"

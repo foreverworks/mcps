@@ -1,5 +1,17 @@
 # @foreverworks/receipts
 
+## 0.1.2
+
+### Patch Changes
+
+- Updated dependencies [75ea94a]
+- Updated dependencies [0834240]
+- Updated dependencies [64969a3]
+- Updated dependencies [4ef1bf8]
+- Updated dependencies [7b93f2f]
+- Updated dependencies [27f0094]
+  - @foreverworks/mcp-kit@0.3.0
+
 ## 0.1.1
 
 ### Patch Changes

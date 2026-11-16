@@ -1,7 +1,7 @@
 {
   "name": "foreverworks-eas",
   "displayName": "Expo Application Services",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Find out why an Expo build, workflow run or store submission failed, and roll out updates.",
   "author": {
     "name": "Forever Works",

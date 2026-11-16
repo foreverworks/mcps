@@ -1,5 +1,28 @@
 # @foreverworks/mcp-devices
 
+## 0.2.0
+
+### Minor Changes
+
+- 887e1cd: An Android host no longer needs an `ssh` target. Leave it out of a host that has a `control` command, and the broker runs that command on its own machine (as a program and its arguments, with no shell), so emulators that run as containers behind an API can be brokered by a command that calls it. The control command gets a fourth call for such a host, `<control> probe`, which prints the host's available memory in KiB, its 1-minute load and what `status` prints, in three sections separated by a line holding `@@devices@@`. Every other host still needs `ssh`, and a catalog where every host has one behaves exactly as before. The README's control command section states the contract.
+  
+  An Android device whose `adb.serial` is `<IPv4>:<port>`, and that has no `probe`, is a network device: the broker connects it to its adb server while it waits for the emulator to boot (after clearing a stale entry), and disconnects it after it stops the emulator. Serials such as `emulator-5554` behave as before.
+- e7aaea9: A new platform, `server`: a throwaway Linux VM for testing what configures a machine (an Ansible play, cloud-init, an installer), started for each lease and thrown away after it, like a Batocera box. Its holder makes a key pair for the lease and passes the public half to `acquire` as `ssh_key`; the broker hands it to the host's control command as a third argument, `<control> start <instance> <key>` (`<type> <base64>`, its comment dropped), and the command authorises it on the server it starts, so only the holder gets in and the key opens nothing once the server is gone. A server lease without a key is refused, and so is a key on any other platform; a session that holds a server and asks again with another key is told to release it first. The lease's address is the server's ssh destination and port (`DEVICE_SSH`, `DEVICE_SSH_PORT`), as for the other devices reached over ssh. A server is always a spawn slot with probe `"unit"`: its control command reports it `active` once it can be reached. Catalogs without one behave as before.
+- 321632c: A device reached over ssh may have a second port in its catalog entry, `ssh.fallback_port`: the port the same machine answers on when `port` does not, such as a freshly installed server whose sshd listens on 22 until its configuration moves it to another port. A lease carries it as `DEVICE_SSH_FALLBACK_PORT` in `env` and as `fallbackPort` in the address, beside `DEVICE_SSH_PORT`, and the holder tries the first port and then this one. A fallback port outside 1 to 65535, or equal to the port (or to 22 when none is set), is refused when the catalog loads. Catalogs without one behave as before.
+
+### Patch Changes
+
+- c132159: The server's instructions, which your client hands the model at the start of every session, are about half as long, so every session costs less. They now say what the server reaches, the tool to start with, the flows that run across tools, and what the model must know before its first call (what spends money, sends, publishes or acts on something in a home, and what to do when a sign-in is needed). What a tool's own description already says is left to it. Nothing a tool does changes.
+  
+  porkbun: the vendor's paragraph on publishing a site is now one sentence, and `deploy_site`'s description carries its checks, adding that `list_hosting_files` shows what is already there before an upload replaces it.
+- Updated dependencies [75ea94a]
+- Updated dependencies [0834240]
+- Updated dependencies [64969a3]
+- Updated dependencies [4ef1bf8]
+- Updated dependencies [7b93f2f]
+- Updated dependencies [27f0094]
+  - @foreverworks/mcp-kit@0.3.0
+
 ## 0.1.1
 
 ### Patch Changes

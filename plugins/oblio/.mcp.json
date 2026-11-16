@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-oblio@0.1.1"
+        "@foreverworks/mcp-oblio@0.1.2"
       ],
       "env": {
         "OBLIO_CONFIG": "${user_config.oblio_config}"

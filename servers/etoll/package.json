@@ -67,7 +67,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.2.0",
+    "@foreverworks/mcp-kit": "^0.3.0",
     "zod": "^4.6.7"
   }
 }
