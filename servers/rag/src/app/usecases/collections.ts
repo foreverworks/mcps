@@ -101,7 +101,7 @@ export const refuseRemoteForLocalOnly = (deps: Deps, name: string, provider: Pro
   if (provider === "local" || !deps.localOnly.has(name)) return;
   fail(
     inputError(
-      `collection "${name}" is listed in RAG_LOCAL_ONLY_COLLECTIONS, so its text is never embedded at a remote provider (${provider}); create_collection with embedding_provider "local" embeds it here (and moves an existing one), or take the name out of RAG_LOCAL_ONLY_COLLECTIONS`,
+      `collection "${name}" is listed in RAG_LOCAL_ONLY_COLLECTIONS, so its text is never embedded at a remote provider (${provider}); use embedding_provider "local" (create_collection sets it for a new collection, and moves an existing one there without embedding what it holds again), or take the name out of RAG_LOCAL_ONLY_COLLECTIONS`,
     ),
   );
 };

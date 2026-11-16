@@ -69,6 +69,7 @@ const connected = async (
     readonly remote?: RemoteEmbedder;
     readonly models?: (first: EmbeddingModel) => readonly EmbeddingModel[];
     readonly localOnly?: ReadonlySet<string>;
+    readonly localOnlyInvalid?: readonly string[];
     readonly inference?: Deps["inference"];
     readonly inferenceForOptions?: Deps["inferenceForOptions"];
   } = {},
@@ -96,6 +97,7 @@ const connected = async (
   const models = over.models?.(first) ?? [first];
   const deps: Deps = {
     localOnly: over.localOnly ?? new Set(),
+    localOnlyInvalid: over.localOnlyInvalid ?? [],
     inference: over.inference,
     inferenceForOptions: over.inferenceForOptions,
     store: over.wrapStore === undefined ? store : over.wrapStore(store),
@@ -818,14 +820,52 @@ describe("local-only collections", () => {
     expect((await s.call("health")).local_only_collections).toEqual(["journal", "notes"]);
   });
 
+  it("reads a name as a collection name, lowercased, and sets aside what is not one", () => {
+    const parsed = localOnlyFrom({ RAG_LOCAL_ONLY_COLLECTIONS: "Journal, notes;old, journal notes ,archive_2,notes;old" });
+    expect(parsed).toEqual({ names: new Set(["journal", "archive_2"]), invalid: ["notes;old", "journal notes"] });
+    expect(buildDeps({ RAG_LOCAL_ONLY_COLLECTIONS: "Journal" }).localOnly).toEqual(new Set(["journal"]));
+    expect(buildDeps({ RAG_LOCAL_ONLY_COLLECTIONS: "journal;notes" }).localOnlyInvalid).toEqual(["journal;notes"]);
+  });
+
+  it("fails health on an entry that is not a collection name, and lists names that match no collection yet", async () => {
+    const parsed = localOnlyFrom({ RAG_LOCAL_ONLY_COLLECTIONS: "Journal,journal;notes,journal notes,later" });
+    const s = await connected({ localOnly: parsed.names, localOnlyInvalid: parsed.invalid });
+    await s.call("create_collection", { name: "journal" });
+    const health = await s.call("health");
+    expect(health.ok).toBe(false);
+    expect(health.local_only_collections).toEqual(["journal", "later"]);
+    expect(health.local_only_invalid).toEqual(["journal;notes", "journal notes"]);
+    expect(health.local_only_unknown).toEqual(["later"]);
+    expect(health.problems).toEqual([expect.stringContaining('RAG_LOCAL_ONLY_COLLECTIONS lists "journal;notes"'), expect.stringContaining('lists "journal notes"')]);
+    // A name with no collection yet is information, not a failure: the collection is covered once it exists.
+    const fine = await connected({ localOnly: new Set(["later"]) });
+    const ok = await fine.call("health");
+    expect(ok).toMatchObject({ ok: true, local_only_collections: ["later"], local_only_unknown: ["later"] });
+    expect(ok.local_only_invalid).toBeUndefined();
+    expect(ok.problems).toBeUndefined();
+    await fine.call("create_collection", { name: "later" });
+    expect((await fine.call("health")).local_only_unknown).toBeUndefined();
+  });
+
+  it("says which local-only collections a default search left out, when others remain", async () => {
+    const s = await withRemote();
+    const byDefault = await s.call("search", { query: QUESTION });
+    expect(byDefault).toMatchObject({ collections: ["docs"], left_out_local_only: ["journal"] });
+    expect((await s.call("search", { query: QUESTION, collections: ["docs"] })).left_out_local_only).toBeUndefined();
+    expect((await s.call("search", { query: QUESTION, collections: ["journal"] })).left_out_local_only).toBeUndefined();
+    const plain = await withRemote({ localOnly: new Set() });
+    expect((await plain.call("search", { query: QUESTION })).left_out_local_only).toBeUndefined();
+  });
+
   it("is off when the variable is unset or empty: every search uses the configured provider", async () => {
     const env = (value: string | undefined): NodeJS.ProcessEnv => (value === undefined ? {} : { RAG_LOCAL_ONLY_COLLECTIONS: value });
-    for (const value of [undefined, "", "  ", " , ,"]) expect(localOnlyFrom(env(value))).toEqual(new Set());
-    expect(localOnlyFrom(env(" journal, notes ,,journal"))).toEqual(new Set(["journal", "notes"]));
+    for (const value of [undefined, "", "  ", " , ,"]) expect(localOnlyFrom(env(value))).toEqual({ names: new Set(), invalid: [] });
+    expect(localOnlyFrom(env(" journal, notes ,,journal"))).toEqual({ names: new Set(["journal", "notes"]), invalid: [] });
     expect(buildDeps(env("notes,journal")).localOnly).toEqual(new Set(["journal", "notes"]));
     expect(buildDeps({}).localOnly.size).toBe(0);
+    expect(buildDeps({}).localOnlyInvalid).toEqual([]);
 
-    const s = await withRemote({ localOnly: localOnlyFrom(env("")) });
+    const s = await withRemote({ localOnly: localOnlyFrom(env("")).names });
     const found = await s.call("search", { query: QUESTION, limit: 10 });
     expect(found.collections).toEqual(["docs", "journal"]);
     expect(found.local_only).toBeUndefined();

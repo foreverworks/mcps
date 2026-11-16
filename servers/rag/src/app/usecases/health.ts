@@ -19,13 +19,17 @@ const part = async <T extends object>(read: () => Promise<T>): Promise<({ readon
  * problems, since only the files that need it fail.
  */
 export const checkHealth = async (deps: Deps) => {
-  const [database, models, rerank, tools, providers] = await Promise.all([
+  const [database, models, rerank, tools, providers, existing] = await Promise.all([
     part(() => deps.store.status()),
     part(async () => ({ list: await Promise.all(deps.models().map(async (m) => ({ m, described: await part(() => describeModel(m)) }))) })),
     part(() => deps.reranker.info()),
     deps.extractor.tools(),
     Promise.all(Object.entries(deps.providers).map(async ([name, p]) => ({ name, missing: await p.missing() }))),
+    part(async () => ({ names: (await deps.store.collectionInfos()).map((c) => c.name) })),
   ]);
+  const localOnly = [...deps.localOnly].sort();
+  // Informational: a collection can be created later and is covered from then on. Left out when the database did not answer.
+  const unknown = existing.ok ? localOnly.filter((name) => !existing.names.includes(name)) : [];
   const list = models.ok ? models.list : [];
   const embedding_models = list.map(({ m, described }) => ({
     ...(described.ok ? described : { name: m.name, ok: false, error: described.error }),
@@ -44,6 +48,7 @@ export const checkHealth = async (deps: Deps) => {
         : [],
     ),
     ...(rerank.ok ? [] : [`rerank: ${rerank.error}`]),
+    ...deps.localOnlyInvalid.map((entry) => `RAG_LOCAL_ONLY_COLLECTIONS lists "${entry}", which is not a collection name (lowercase letters, digits, - and _): it protects nothing`),
     ...(database.ok && database.unindexed.length > 0
       ? [`collections without a vector index of their own, searched through the shared one: ${database.unindexed.join(", ")}; create_collection with each name builds it`]
       : []),
@@ -51,7 +56,7 @@ export const checkHealth = async (deps: Deps) => {
       .filter(([, v]) => v.startsWith("missing"))
       .map(([name, v]) => `${name}: ${v}`),
   ];
-  const ok = database.ok && database.vector !== undefined && models.ok && list.every((x) => x.described.ok) && rerank.ok;
+  const ok = database.ok && database.vector !== undefined && models.ok && list.every((x) => x.described.ok) && rerank.ok && deps.localOnlyInvalid.length === 0;
   const first = embedding_models[0];
   return {
     ok,
@@ -66,7 +71,9 @@ export const checkHealth = async (deps: Deps) => {
     providers: Object.fromEntries(providers.map(({ name, missing }) => [name, { configured: missing.length === 0, ...(missing.length === 0 ? {} : { missing }) }])),
     ...(deps.inference === undefined ? {} : { query_inference: deps.inference.status() }),
     // Whose questions and passages stay on this machine even when a remote query provider is configured.
-    local_only_collections: [...deps.localOnly].sort(),
+    local_only_collections: localOnly,
+    ...(unknown.length === 0 ? {} : { local_only_unknown: unknown }),
+    ...(deps.localOnlyInvalid.length === 0 ? {} : { local_only_invalid: deps.localOnlyInvalid }),
     roots: deps.sources.roots,
     language: deps.settings.language,
   };

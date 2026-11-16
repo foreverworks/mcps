@@ -378,10 +378,22 @@ what it finds in them, on your machine, whatever else is configured:
   until `create_collection` with `embedding_provider: "local"` moves it, which
   does not embed again what it holds.
 - `snapshot_collections` refuses them: a copy has a name of its own and would
-  no longer be local-only.
-- `health.local_only_collections` lists the names, sorted. Names are matched
-  exactly as written, and a name applies as soon as a collection of that name
-  exists.
+  no longer be local-only. A snapshot made before you listed its source has a
+  name of its own too, so list that name as well (or drop it with
+  `drop_collection`).
+- `health.local_only_collections` lists the names, sorted. Names are lowercased
+  and a name applies as soon as a collection of that name exists, so
+  `health.local_only_unknown` lists the names that match none yet. An entry
+  that is not a collection name (a typo, a space or a semicolon inside it)
+  protects nothing: `health` lists it under `local_only_invalid` and reports
+  not ok, so check it after changing the setting.
+- A search that leaves local-only collections out while others remain says so
+  in `left_out_local_only`.
+
+The setting is not retroactive: text already embedded at a remote provider
+stays embedded there, and listing a name only stops further remote embedding
+and remote query inference for it. The variable is read when the server
+starts, so a change takes a restart.
 
 The cost is speed: local inference is slower than Workers AI, and a search that
 holds a local-only collection is as slow as `RAG_QUERY_PROVIDER=local`. Fewer

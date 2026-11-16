@@ -4,6 +4,7 @@ import { z } from "zod";
 
 import type { Deps, EmbeddingModel, QueryInference } from "./app/ports.js";
 import { makeQueryInference } from "./app/inference.js";
+import { COLLECTION_NAME } from "./app/usecases/collections.js";
 import { configError, fail } from "./domain/errors.js";
 import { makePool } from "./infra/database.js";
 import { makeExtractor } from "./infra/extract.js";
@@ -76,9 +77,21 @@ export const embeddingModelsFrom = (env: NodeJS.ProcessEnv): (() => readonly Emb
   return () => models;
 };
 
-/** RAG_LOCAL_ONLY_COLLECTIONS: collection names separated by commas, spaces around them and empty entries ignored. */
-export const localOnlyFrom = (env: NodeJS.ProcessEnv): ReadonlySet<string> =>
-  new Set((env["RAG_LOCAL_ONLY_COLLECTIONS"] ?? "").split(",").map((name) => name.trim()).filter((name) => name !== ""));
+/**
+ * RAG_LOCAL_ONLY_COLLECTIONS: collection names separated by commas, spaces
+ * around them and empty entries ignored, each lowercased as collection names
+ * are. An entry that is not a collection name (a typo, a space or a semicolon
+ * inside it) protects nothing, so it is set aside as written for health to
+ * report rather than silently dropped.
+ */
+export const localOnlyFrom = (env: NodeJS.ProcessEnv): { readonly names: ReadonlySet<string>; readonly invalid: readonly string[] } => {
+  const entries = (env["RAG_LOCAL_ONLY_COLLECTIONS"] ?? "").split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
+  const valid = (entry: string) => COLLECTION_NAME.test(entry.toLowerCase());
+  return {
+    names: new Set(entries.filter(valid).map((entry) => entry.toLowerCase())),
+    invalid: [...new Set(entries.filter((entry) => !valid(entry)))],
+  };
+};
 
 /**
  * The composition root: the only module naming both a port and what
@@ -121,6 +134,7 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
     return made;
   };
   const inference = inferenceForOptions({});
+  const localOnly = localOnlyFrom(env);
   return {
     inferenceForOptions,
     inference: provider === "local" || provider === "cloudflare" ? inference : {
@@ -128,7 +142,8 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
       embed: async () => fail(configError("RAG_QUERY_PROVIDER must be local or cloudflare", "RAG_QUERY_PROVIDER")),
       rerank: async () => fail(configError("RAG_QUERY_PROVIDER must be local or cloudflare", "RAG_QUERY_PROVIDER")),
     },
-    localOnly: localOnlyFrom(env),
+    localOnly: localOnly.names,
+    localOnlyInvalid: localOnly.invalid,
     store: makeStore(makePool(env)),
     models: embeddingModelsFrom(env),
     providers: { cloudflare: { missing: makeCloudflareEmbedder(env).missing } },

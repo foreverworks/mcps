@@ -275,6 +275,8 @@ export type Deps = {
    * inference whatever `inference` is, and none is embedded at a remote provider.
    */
   readonly localOnly: ReadonlySet<string>;
+  /** Entries of RAG_LOCAL_ONLY_COLLECTIONS that are not collection names, as written: they protect nothing, and health says so. */
+  readonly localOnlyInvalid: readonly string[];
   readonly store: Store;
   /** Every embedding model configured, the default first; a configuration error when there is none or it cannot be read. */
   readonly models: () => readonly EmbeddingModel[];
