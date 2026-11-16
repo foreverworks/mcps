@@ -1,0 +1,434 @@
+[
+  {
+    "name": "begin_login",
+    "title": "Begin login",
+    "description": "Sign in through the browser, for an account without a password configured here: answers with a URL the USER opens and signs in to eToll at (their password never reaches this conversation), and the address it ends on. Pass that address to complete_login. Open for 15 minutes; beginning again replaces it. Call this when a tool answers needs_login.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "cancel_order",
+    "title": "Cancel order",
+    "description": "Drop an unpaid order (one place_order made, or one eToll names as already open for the same vignette). Safe to call twice. A paid order is refused: refunds go through eToll.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The order's id."
+        }
+      },
+      "required": [
+        "order_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "complete_login",
+    "title": "Complete login",
+    "description": "Finish a begun browser sign-in from the address the browser landed on (it carries code=... and state=...). Exchanges the code and stores the session in the server's own state; answers with who signed in and when the session expires. The code dies within a minute of being issued, so pass it at once.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "redirect_url": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The whole address the browser landed on after signing in."
+        }
+      },
+      "required": [
+        "redirect_url"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "download_invoice",
+    "title": "Download invoice",
+    "description": "Save an invoice's PDF in this server's outbox; answers its path, SHA-256 and size, never the bytes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "invoice_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The invoice's id, from list_invoices."
+        }
+      },
+      "required": [
+        "invoice_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_order",
+    "title": "Get order",
+    "description": "An order placed by place_order: pending (not paid yet, with its payment page), paid, expired or cancelled, and its vignettes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "order_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The order_id place_order answered."
+        }
+      },
+      "required": [
+        "order_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether this server is configured: the eToll session it holds (none, present, expired), how it signed in, and where a password comes from if one is configured (never the password). No network. Run it before concluding the server is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_invoices",
+    "title": "List invoices",
+    "description": "The invoices eToll issued for what the account paid, in a window of days (the last year by default): series and number, date, buyer, total in RON. The id is what download_invoice takes.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "First day of the window, YYYY-MM-DD (Bucharest). Default: 365 days before `to`.",
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        },
+        "to": {
+          "description": "Last day of the window, YYYY-MM-DD (Bucharest). Default: today in Bucharest.",
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        },
+        "page": {
+          "default": 0,
+          "description": "Page, from 0.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_tolls",
+    "title": "List tolls",
+    "description": "The account's vignettes and other tolls (bridge passes), newest first, one page at a time: status, vehicle, period, price in RON, serial. Filter by status or plate; pass next_cursor back as cursor for the next page.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "status": {
+          "description": "Only tolls in this status: ACTIVE (valid now or later), EXPIRED, and so on. An unpaid order is not a toll yet; get_order reads one.",
+          "type": "string",
+          "enum": [
+            "ACTIVE",
+            "EXPIRED",
+            "CANCELLED",
+            "CONSUMED",
+            "REFUNDED",
+            "DRAFT"
+          ]
+        },
+        "plate": {
+          "description": "Only tolls for this plate number.",
+          "type": "string",
+          "minLength": 1
+        },
+        "cursor": {
+          "description": "next_cursor from the previous page.",
+          "type": "string",
+          "minLength": 1
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_vehicles",
+    "title": "List vehicles",
+    "description": "The cars on the eToll account, each with its rovinietă: valid until which day (Bucharest), how many days are left, and the periods eToll says a new one may cover. Start here for \"is my vignette still valid\" and before quote_vignette.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "logout",
+    "title": "Logout",
+    "description": "Forget the stored session and tell Keycloak it is over. The user's own browser sign-in is not touched. With a password configured, the next call signs in again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "notifications",
+    "title": "Notifications",
+    "description": "What eToll has told the account (a vignette about to end, a payment received), and how many are unread.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "place_order",
+    "title": "Place order",
+    "description": "Order the quoted vignette and hand over eToll's card payment page on euplatesc.ro; the USER pays there, nothing is paid here. The user confirms one line first (vehicle, duration, dates, price, who is billed). Refused if the price moved since the quote. Then get_order shows whether it was paid. Moves money or makes a legal document: the client asks the user to approve each call.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "quote_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "The option to buy: a quote_id from quote_vignette, at most 30 minutes old."
+        },
+        "billing_id": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 200,
+          "description": "Who the invoice is made out to, when the account has more than one billing entry (the refusal lists them). Default: the only one."
+        }
+      },
+      "required": [
+        "quote_id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "money",
+      "anthropic/requiresUserInteraction": true
+    }
+  },
+  {
+    "name": "quote_vignette",
+    "title": "Quote vignette",
+    "description": "What a rovinietă costs for one vehicle from a start date: one option per duration (1 day to 12 months), each with its exact price in RON and the period it covers, and a quote_id that place_order takes. Buys nothing. The start defaults to the first day eToll allows (the day after the current vignette ends).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "vehicle": {
+          "type": "string",
+          "minLength": 1,
+          "description": "The vehicle: its plate number as written on it (B123ABC; spaces and dashes do not matter), or its id from list_vehicles."
+        },
+        "start_date": {
+          "description": "First day of validity, YYYY-MM-DD (Bucharest), today or later. Default: the first day eToll allows.",
+          "type": "string",
+          "format": "date",
+          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))$"
+        }
+      },
+      "required": [
+        "vehicle"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "service_status",
+    "title": "Service status",
+    "description": "CNAIR's public status page for eToll: each component (the portal, payments, the API), open incidents and planned maintenance. Needs no account.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "session_status",
+    "title": "Session status",
+    "description": "Is an eToll account signed in through this server: who, when the tokens expire, and what to do if not. With probe, refreshes once (or signs in with the configured password) to prove the session works; after a refused password, probe is also how to try again at once. Never shows a token.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "probe": {
+          "default": false,
+          "description": "Refresh, or sign in with the password, once to prove the session works.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]

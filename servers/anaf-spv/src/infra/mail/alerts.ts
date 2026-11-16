@@ -4,7 +4,6 @@ import type { AlertMail, AlertsPort } from "../../app/ports.js";
 import { ALERT_QUERY } from "../../domain/alerts.js";
 import { configError, fail, upstreamError } from "../../domain/errors.js";
 import { decodeEntities } from "../portal/html.js";
-import { succeeded } from "../upstream/mcp.js";
 import { GOOGLE_TOOLS, looksLikeGoogle } from "./google.js";
 import type { MailConfig } from "./source.js";
 
@@ -58,7 +57,7 @@ export const makeAlertSource = (config: MailConfig): AlertsPort => ({
       let more = false;
       for (;;) {
         const args = { query, max_results: PAGE, account, ...(pageToken === "" ? {} : { page_token: pageToken }) };
-        const page = objectOr<SearchWire>(succeeded("mail", GOOGLE_TOOLS.search, await connection.call(GOOGLE_TOOLS.search, args)).json, GOOGLE_TOOLS.search);
+        const page = objectOr<SearchWire>((await connection.call(GOOGLE_TOOLS.search, args)).json, GOOGLE_TOOLS.search);
         threads.push(...(page.threads ?? []).filter((t) => t.id !== undefined));
         // Gmail's page tokens are per mailbox: follow one only when one mailbox is searched.
         const next = account === "*" ? undefined : page.accounts?.find((a) => a.nextPageToken)?.nextPageToken;
@@ -69,7 +68,7 @@ export const makeAlertSource = (config: MailConfig): AlertsPort => ({
       const mails: AlertMail[] = [];
       for (const t of threads.slice(0, limit)) {
         const args = { thread_id: t.id ?? "", detail: "raw_html", ...(t.account === undefined ? (account === "*" ? {} : { account }) : { account: t.account }) };
-        const thread = objectOr<ThreadBodyWire>(succeeded("mail", GOOGLE_TOOLS.read, await connection.call(GOOGLE_TOOLS.read, args)).json, GOOGLE_TOOLS.read);
+        const thread = objectOr<ThreadBodyWire>((await connection.call(GOOGLE_TOOLS.read, args)).json, GOOGLE_TOOLS.read);
         for (const m of thread.messages ?? []) {
           if (m.id === undefined || m.internalDate === undefined) continue;
           mails.push({ id: m.id, receivedAtMs: Number(m.internalDate), lines: bodyLines(m.body ?? "") });

@@ -1,11 +1,10 @@
 import { join } from "node:path";
 
-import { envPath, readSecret, stateDirOf } from "@foreverworks/mcp-kit";
+import { envPath, readSecret, stateDirOf, type UpstreamEndpoint } from "@foreverworks/mcp-kit";
 
 import { CODE_SENDER, CODE_SUBJECT } from "../domain/codes.js";
 import { configError, fail } from "../domain/errors.js";
 import type { MailDriver } from "./mail/source.js";
-import type { Endpoint } from "./upstream/mcp.js";
 
 /**
  * Settings, from the environment only (README, Configuration). Nothing here
@@ -56,7 +55,7 @@ export const childEnv = (env: NodeJS.ProcessEnv): Readonly<Record<string, string
 export type UpstreamSetting =
   | { readonly kind: "none" }
   | { readonly kind: "invalid"; readonly message: string }
-  | { readonly kind: "endpoint"; readonly endpoint: Endpoint; readonly transport: "http" | "stdio"; readonly label: string };
+  | { readonly kind: "endpoint"; readonly endpoint: UpstreamEndpoint; readonly transport: "http" | "stdio"; readonly label: string };
 
 const upstream = (env: NodeJS.ProcessEnv, names: { readonly url: string; readonly tokenFile: string; readonly token: string; readonly command: string }, url: string | undefined, command: string | undefined): UpstreamSetting => {
   if (url !== undefined) {

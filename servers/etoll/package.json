@@ -1,0 +1,71 @@
+{
+  "name": "@foreverworks/mcp-etoll",
+  "version": "0.1.0",
+  "private": true,
+  "description": "MCP server for a CNAIR eToll account (rovinietă): vehicles, vignette validity, invoices and notifications, and buying a vignette paid by card on the user's own payment page",
+  "mcp": {
+    "title": "eToll (rovinietă)",
+    "audience": "extras",
+    "maturity": "experimental",
+    "tagline": "Check your cars' rovinietă on eToll, read its invoices, and buy a vignette you pay by card yourself.",
+    "inputs": {
+      "ETOLL_USERNAME": {
+        "title": "eToll user name",
+        "type": "text",
+        "required": false,
+        "description": "The e-mail address or phone number you sign in to eToll with; leave empty to sign in through the browser instead."
+      },
+      "ETOLL_PASSWORD_FILE": {
+        "title": "eToll password file",
+        "type": "file",
+        "required": false,
+        "description": "Path of a file holding only your eToll password; leave empty to sign in through the browser instead."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "etoll",
+    "rovinieta",
+    "vignette",
+    "cnair"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://foreverworks.github.io/mcps/servers/etoll/",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/etoll"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-etoll": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.2.0",
+    "zod": "^4.6.7"
+  }
+}

@@ -1,6 +1,7 @@
+import { atPath, fillTemplate, type UpstreamConnect, usingUpstream } from "@foreverworks/mcp-kit";
+
 import type { CredentialInfo, CredentialSource, Credentials } from "../app/ports.js";
 import { configError, fail, upstreamError } from "../domain/errors.js";
-import { atPath, type Connect, fillTemplate, succeeded, using } from "./upstream/mcp.js";
 
 /**
  * Where the SPV user name and password come from, read at each sign-in and
@@ -20,7 +21,7 @@ export type VaultConfig =
   | { readonly kind: "static"; readonly from: "file" | "variable"; readonly username: string | undefined; readonly password: () => Promise<string | undefined> }
   | {
       readonly kind: "mcp";
-      readonly connect: Connect;
+      readonly connect: UpstreamConnect;
       readonly transport: "http" | "stdio";
       readonly tool: string;
       readonly argsTemplate: unknown;
@@ -54,7 +55,7 @@ export const makeCredentialSource = (config: VaultConfig): CredentialSource => {
         info,
         read: async (): Promise<Credentials> => {
           if (item === undefined) return fail(configError("ANAF_SPV_VAULT_ITEM is not set: which vault item holds the SPV login"));
-          const answer = await using(config.connect, async (c) => succeeded("vault", config.tool, await c.call(config.tool, asArgs(fillTemplate(config.argsTemplate, { item })))));
+          const answer = await usingUpstream(config.connect, (c) => c.call(config.tool, asArgs(fillTemplate(config.argsTemplate, { item }))));
           const body = answer.json ?? (config.passwordField === "." ? answer.text : undefined);
           if (body === undefined) fail(upstreamError("vault", `${config.tool} did not answer JSON; set ANAF_SPV_VAULT_PASSWORD_FIELD to "." if its whole answer is the password`));
           const password = text(atPath(body, config.passwordField)) ?? fail(upstreamError("vault", `${config.tool}'s answer has no "${config.passwordField}" (ANAF_SPV_VAULT_PASSWORD_FIELD)`));

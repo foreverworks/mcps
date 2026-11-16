@@ -6,7 +6,7 @@ import type { Minted } from "./tokens.js";
 
 /**
  * OAuth 2.0 token endpoints (RFC 6749), the first specialisation of the kit's
- * HTTP client: the three grants the servers here use, and bearer auth for the
+ * HTTP client: the four grants the servers here use, and bearer auth for the
  * requests that follow. What a grant MEANS (which remedy a refused one gets, a
  * refresh token that rotates and must be saved) stays with each server.
  *
@@ -51,6 +51,13 @@ export type OAuthClient = {
   readonly refresh: (refreshToken: string, scope?: string) => Promise<Granted>;
   readonly clientCredentials: (scope?: string) => Promise<Granted>;
   readonly authorizationCode: (code: string, redirectUri: string, codeVerifier?: string) => Promise<Granted>;
+  /**
+   * The resource owner's password (RFC 6749 4.3), for an endpoint that still
+   * offers it to its own public client. The caller reads the password at the
+   * moment of the call and keeps nothing; a refused one is `grant_refused`
+   * with `invalid_grant`, which is not worth sending again unchanged.
+   */
+  readonly password: (username: string, password: string, scope?: string) => Promise<Granted>;
 };
 
 const internal = makeErrorKit<HttpFailure>("mcp-kit.oauth.http");
@@ -104,6 +111,7 @@ export const makeOAuthClient = (options: OAuthClientOptions): OAuthClient => {
     clientCredentials: (scope) => grant({ grant_type: "client_credentials", ...(scope ? { scope } : {}) }),
     authorizationCode: (code, redirectUri, codeVerifier) =>
       grant({ grant_type: "authorization_code", code, redirect_uri: redirectUri, ...(codeVerifier ? { code_verifier: codeVerifier } : {}) }),
+    password: (username, password, scope) => grant({ grant_type: "password", username, password, ...(scope ? { scope } : {}) }),
   };
 };
 

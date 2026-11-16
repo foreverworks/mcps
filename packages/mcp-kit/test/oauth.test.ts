@@ -45,6 +45,19 @@ describe("makeOAuthClient", () => {
     expect(Object.fromEntries(new URLSearchParams(seen[0]!.body))).toMatchObject({ grant_type: "authorization_code", code: "c0de", redirect_uri: "http://localhost:1/cb", code_verifier: "verifier" });
   });
 
+  it("signs in with a resource owner's password, a public client sending client_id alone", async () => {
+    const { fetchImpl, seen } = endpoint(200, { access_token: "a", refresh_token: "r" });
+    const publicClient = makeOAuthClient({ tokenUri: "https://auth.test/token", clientId: "app", fail: kit.fail, fetch: fetchImpl, sleep: async () => undefined });
+    expect(await publicClient.password("ana@example.com", "p&ss word", "openid offline_access")).toMatchObject({ accessToken: "a", refreshToken: "r" });
+    expect(Object.fromEntries(new URLSearchParams(seen[0]!.body))).toEqual({
+      grant_type: "password",
+      username: "ana@example.com",
+      password: "p&ss word",
+      scope: "openid offline_access",
+      client_id: "app",
+    });
+  });
+
   it("names a refused grant by its RFC 6749 code, and an answer without a token as such", async () => {
     const refused = endpoint(400, { error: "invalid_grant", error_description: "Token has been expired or revoked." });
     await expect(client(refused.fetchImpl).refresh("r").catch((e: unknown) => kit.asAppError(e))).resolves.toEqual({

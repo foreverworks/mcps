@@ -1,5 +1,6 @@
+import type { UpstreamConnect } from "@foreverworks/mcp-kit";
+
 import type { CodeInfo, CodeSource } from "../../app/ports.js";
-import type { Connect } from "../upstream/mcp.js";
 import { looksLikeGoogle, watchGoogle } from "./google.js";
 import type { Poll } from "./poll.js";
 import { watchText } from "./text.js";
@@ -23,7 +24,7 @@ export type MailConfig =
   | { readonly driver: "manual"; readonly why: string }
   | {
       readonly driver: Exclude<MailDriver, "manual">;
-      readonly connect: Connect;
+      readonly connect: UpstreamConnect;
       readonly transport: "http" | "stdio";
       readonly endpoint: string;
       readonly query: string;
