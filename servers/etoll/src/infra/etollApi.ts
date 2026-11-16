@@ -1,7 +1,7 @@
 import { type HttpRequest, issuesText } from "@foreverworks/mcp-kit";
 
 import type { EtollPort } from "../app/ports.js";
-import { asAppError, drift, fail, statusOf } from "../domain/errors.js";
+import { asAppError, drift, fail, orderLeftOpen, statusOf } from "../domain/errors.js";
 import { nextCursorOf } from "../domain/paging.js";
 import {
   billingDetailsWire,
@@ -38,14 +38,17 @@ export const makeEtollApi = (http: HttpRequest, origin: string): EtollPort => {
   // Written by jsonText, not the kit's `json`: amounts go out as the exact digits quoted.
   const jsonPost = (request: unknown) => ({ method: "POST" as const, body: { contentType: "application/json; charset=UTF-8", data: jsonText(request) } });
 
-  // The portal takes 200 as deleted and 400 or 404 as an order that is no longer there to delete.
-  const deleteOrder = async (orderId: string): Promise<"deleted" | "gone"> => {
+  // The portal answers 200 to a delete, 404 to an order it does not know, and 400
+  // (ORDER_INVALID_STATE) to one it will not delete: one already cancelled, and
+  // as far as can be told from outside, one paid or expired too.
+  const deleteOrder = async (orderId: string): Promise<"deleted" | "gone" | "refused"> => {
     try {
       await http(`${base}/orders/${id(orderId)}`, { method: "DELETE" });
       return "deleted";
     } catch (thrown) {
       const status = statusOf(asAppError(thrown));
-      if (status === 400 || status === 404) return "gone";
+      if (status === 404) return "gone";
+      if (status === 400) return "refused";
       throw thrown;
     }
   };
@@ -85,8 +88,16 @@ export const makeEtollApi = (http: HttpRequest, origin: string): EtollPort => {
       if (checkout.success) return checkout.data;
       const made = orderIdWire.safeParse(answer);
       if (!made.success) return fail(drift(`orders: ${issuesText(checkout.error)}`));
-      await deleteOrder(made.data.orderId);
-      return fail(drift(`orders: ${issuesText(checkout.error)}; the order it made (${made.data.orderId}) was deleted, nothing was bought`));
+      const orderId = made.data.orderId;
+      const deleted = await deleteOrder(orderId).then(
+        (outcome) => outcome !== "refused",
+        () => false,
+      );
+      return fail(
+        deleted
+          ? drift(`orders: ${issuesText(checkout.error)}; the order it made (${orderId}) was deleted, nothing was bought`)
+          : orderLeftOpen(`orders: ${issuesText(checkout.error)}`, orderId),
+      );
     },
     pay: async (orderId, request) => parseOrDrift(paymentWire, await http(`${base}/orders/${id(orderId)}/payment`, jsonPost(request)), `orders/${orderId}/payment`),
     deleteOrder,

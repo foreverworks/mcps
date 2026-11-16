@@ -60,11 +60,29 @@ export const { fail, asAppError } = makeErrorKit<AppError>("etoll");
 /** The code this server gives a price that moved between the quote, the confirmation and the order. */
 export const PRICE_CHANGED = "PRICE_CHANGED";
 
+/** The code this server gives an order eToll would not delete, which may be paid. */
+export const ORDER_NOT_DELETABLE = "ORDER_NOT_DELETABLE";
+
+/**
+ * A step after eToll made an order failed, and the order could not be
+ * cancelled either: it is open and unpaid. The failure names it, because eToll
+ * lists an unpaid order nowhere and refuses another for the same vignette
+ * while it is open.
+ */
+export const orderLeftOpen = (what: string, orderId: string): AppError => ({
+  kind: "outcome_unknown",
+  message:
+    `${what}; eToll made order ${orderId}, which could not be cancelled: it is open and unpaid, and nothing is charged unless its payment page is paid. ` +
+    `cancel_order with order_id ${orderId} drops it; unpaid, it also expires by itself`,
+});
+
 /** What to do about a refusal, by eToll's code; the codes come from the portal's own messages. */
 const refusedRemedy = (error: Extract<AppError, { kind: "refused" }>): string => {
   switch (error.code) {
     case "PENDING_ORDER_SAME_PRODUCT":
-      return `an unpaid order for this vignette is already open${error.pendingOrderId ? ` (order ${error.pendingOrderId})` : ""}: pay it with the link place_order gave, or cancel_order it and order again`;
+      return `an unpaid order for this vignette is already open${error.pendingOrderId ? ` (order ${error.pendingOrderId})` : ""}: if place_order handed over its payment page, the user can still pay there; otherwise cancel_order it and order again`;
+    case ORDER_NOT_DELETABLE:
+      return "nothing was changed: get_order (for an order this server placed) or list_tolls shows whether it was paid; an unpaid order expires by itself, and nothing is charged unless its payment page is paid";
     case "VIGNETTE_OVERLAP":
       return "the vehicle already has a vignette for part of that period: quote again with a start date after it ends (list_vehicles shows the day it ends)";
     case "VIGNETTE_VALIDITY_DATE_OUT_OF_RANGE":

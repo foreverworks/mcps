@@ -29,7 +29,7 @@ export const registerReads: Registrar = (server, deps, handled) => {
         "Filter by status or plate; pass next_cursor back as cursor for the next page.",
       inputSchema: {
         status: z.enum(TOLL_STATUSES).optional().describe("Only tolls in this status: ACTIVE (valid now or later), EXPIRED, and so on. An unpaid order is not a toll yet; get_order reads one."),
-        plate: z.string().trim().min(1).optional().describe("Only tolls for this plate number."),
+        plate: z.string().trim().min(1).optional().describe("Only tolls for this plate number (spaces and dashes do not matter)."),
         cursor: z.string().trim().min(1).optional().describe("next_cursor from the previous page."),
         size,
       },

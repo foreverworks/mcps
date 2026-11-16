@@ -212,10 +212,17 @@ export const orderLine = (q: StoredQuote, billing: Billing): string => {
   return line.replace(/\s+/g, " ").slice(0, 290);
 };
 
-/** Whether a payment page is one the portal itself would open: https on euplatesc.ro. */
+/** Whether a payment page is one the portal itself would open: https on euplatesc.ro, on its default port, with no user name or password in it. */
 export const isPaymentUrl = (url: string): boolean => {
   const u = URL.parse(url);
-  return u !== null && u.protocol === "https:" && (u.hostname === PAYMENT_HOST || u.hostname.endsWith(`.${PAYMENT_HOST}`));
+  return (
+    u !== null &&
+    u.protocol === "https:" &&
+    u.port === "" &&
+    u.username === "" &&
+    u.password === "" &&
+    (u.hostname === PAYMENT_HOST || u.hostname.endsWith(`.${PAYMENT_HOST}`))
+  );
 };
 
 /** An order placed by this server, kept so get_order and cancel_order can find its vignettes. */

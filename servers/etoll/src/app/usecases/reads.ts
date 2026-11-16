@@ -1,6 +1,7 @@
 import { bucharestToday, edges, windowOf } from "../../domain/dates.js";
 import { drift, fail } from "../../domain/errors.js";
 import { collectAll } from "../../domain/paging.js";
+import { plateKey } from "../../domain/purchase.js";
 import { invoiceView, notificationView, statusView, tollView, vehicleView } from "../../domain/views.js";
 import type { Deps } from "../ports.js";
 
@@ -19,7 +20,7 @@ export const listVehicles = async (deps: Deps) => {
 /** One page of the account's tolls (vignettes, bridge passes), newest first as eToll lists them. */
 export const listTolls = async (deps: Deps, args: { readonly status?: string | undefined; readonly plate?: string | undefined; readonly cursor?: string | undefined; readonly size: number }) => {
   const today = bucharestToday(deps.now());
-  const page = await deps.etoll.tolls({ status: args.status, plate: args.plate }, args.cursor, args.size);
+  const page = await deps.etoll.tolls({ status: args.status, plate: args.plate === undefined ? undefined : plateKey(args.plate) }, args.cursor, args.size);
   return { ok: true as const, tolls: page.items.map((t) => tollView(t, today)), next_cursor: page.nextCursor ?? null };
 };
 

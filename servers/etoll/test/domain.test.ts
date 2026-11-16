@@ -210,6 +210,12 @@ describe("the purchase", () => {
     expect(isPaymentUrl("https://euplatesc.ro.example.com/x")).toBe(false);
     expect(isPaymentUrl("https://noteuplatesc.ro/x")).toBe(false);
     expect(isPaymentUrl("not a url")).toBe(false);
+    expect(isPaymentUrl("https://secure.euplatesc.ro:8443/x")).toBe(false);
+    const withUser = new URL("https://secure.euplatesc.ro/x");
+    withUser.username = "user";
+    withUser.password = "pw";
+    expect(isPaymentUrl(withUser.href)).toBe(false);
+    expect(isPaymentUrl("https://SECURE.EUPLATESC.RO/x")).toBe(true);
   });
 
   it("reads an order's state from its vignettes and its expiry", () => {

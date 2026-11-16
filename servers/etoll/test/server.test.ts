@@ -336,6 +336,8 @@ describe("the etoll server", () => {
     expect(tolls).toMatchObject({ next_cursor: "c-2" });
     expect(tolls.tolls[0]).toMatchObject({ id: "toll-0000", kind: "vignette", status: "ACTIVE", duration: "12 months", valid_until: UNTIL, price: { total: "139.41", currency: "RON" }, serial: "RO-TEST-0000" });
     expect(calls.find((c) => c.url.startsWith(`${API}/tolls?`))?.query).toEqual({ status: "ACTIVE", plateNumber: "B123ABC", size: "10" });
+    await call("list_tolls", { plate: "b 123-abc", size: 10 });
+    expect(calls.findLast((c) => c.url.startsWith(`${API}/tolls?`))?.query).toMatchObject({ plateNumber: "B123ABC" });
 
     const invoices = await call("list_invoices", { from: "2026-01-01", to: "2026-07-31" });
     expect(invoices).toMatchObject({ from: "2026-01-01", to: "2026-07-31", total: 1, last: true });
@@ -482,6 +484,61 @@ describe("buying a vignette", () => {
     expect((await call("get_order", { order_id: "ord-0001" })).state).toBe("cancelled");
   });
 
+  it("drops an order whose answer carries no total, and asks for no payment page", async () => {
+    const { calls, call, state, twelve } = await quoted();
+    state.checkout = { ...CHECKOUT, tolls: [{ ...ORDERED_TOLL, price: null }] };
+    const out = await call("place_order", { quote_id: twelve.quote_id });
+    expect(out.error).toMatchObject({ kind: "drift" });
+    expect(out.error.message).toContain("the order was cancelled and nothing was paid");
+    expect(state.deleted).toEqual(["ord-0001"]);
+    expect(calls.some((c) => c.url.endsWith("/payment"))).toBe(false);
+  });
+
+  it("drops an order whose total it cannot read exactly, once the order exists", async () => {
+    const { calls, call, state, twelve } = await quoted();
+    state.checkout = { ...CHECKOUT, tolls: [{ ...ORDERED_TOLL, price: { ...ORDERED_TOLL.price, totalPrice: 1e21 } }] };
+    const out = await call("place_order", { quote_id: twelve.quote_id });
+    expect(out.error).toMatchObject({ kind: "drift" });
+    expect(out.error.message).toContain("the order was cancelled and nothing was paid");
+    expect(state.deleted).toEqual(["ord-0001"]);
+    expect(calls.some((c) => c.url.endsWith("/payment"))).toBe(false);
+    expect((await call("get_order", { order_id: "ord-0001" })).state).toBe("cancelled");
+  });
+
+  it("names the order still open when the payment request fails and eToll will not delete it", async () => {
+    const { call, state, twelve } = await quoted();
+    state.payment = portalError(400, "INVALID_REQUEST", "Invalid request");
+    state.deleted = ["ord-0001"];
+    state.goneAnswer = () => portalError(400, "ORDER_INVALID_STATE", "Order cannot be deleted");
+    const out = await call("place_order", { quote_id: twelve.quote_id });
+    expect(out.error).toMatchObject({ kind: "outcome_unknown" });
+    expect(out.error.message).toContain("eToll made order ord-0001, which could not be cancelled");
+    expect(out.error.message).toContain("cancel_order with order_id ord-0001");
+    expect(out.error.message).not.toContain("nothing was paid;");
+    expect((await call("get_order", { order_id: "ord-0001" })).state).toBe("pending");
+  });
+
+  it("names the order still open when the payment page is off euplatesc.ro and the cancel fails", async () => {
+    const { call, state, twelve } = await quoted();
+    state.payment = { ...PAYMENT, paymentUrl: "https://pay.example.com/checkout?id=1" };
+    state.deleted = ["ord-0001"];
+    state.goneAnswer = () => portalError(400, "ORDER_INVALID_STATE", "Order cannot be deleted");
+    const out = await call("place_order", { quote_id: twelve.quote_id });
+    expect(out.error).toMatchObject({ kind: "outcome_unknown" });
+    expect(out.error.message).toContain("ord-0001");
+    expect(JSON.stringify(out)).not.toContain("pay.example.com");
+  });
+
+  it("names the order still open when its answer is unreadable and eToll will not delete it", async () => {
+    const { call, state, twelve } = await quoted();
+    state.checkout = { ...CHECKOUT, tolls: "not a list" };
+    state.deleted = ["ord-0001"];
+    state.goneAnswer = () => portalError(400, "ORDER_INVALID_STATE", "Order cannot be deleted");
+    const out = await call("place_order", { quote_id: twelve.quote_id });
+    expect(out.error).toMatchObject({ kind: "outcome_unknown" });
+    expect(out.error.message).toContain("cancel_order with order_id ord-0001");
+  });
+
   it("names the unpaid order eToll already has for the same vignette, and how to clear it", async () => {
     const { call, state, twelve } = await quoted();
     state.order = portalError(409, "PENDING_ORDER_SAME_PRODUCT", "You already have a pending order for this product.", "ord-0001");
@@ -527,6 +584,20 @@ describe("buying a vignette", () => {
     await call("place_order", { quote_id: twelve.quote_id });
     await call("cancel_order", { order_id: "ord-0001" });
     expect(await call("cancel_order", { order_id: "ord-0001" })).toMatchObject({ ok: true, cancelled: true, already_gone: true });
+  });
+
+  it("does not take a refused delete as cancelled for an order it never saw cancelled, which may be paid", async () => {
+    const { call, state, twelve } = await quoted();
+    await call("place_order", { quote_id: twelve.quote_id });
+    state.deleted = ["ord-0001"];
+    state.goneAnswer = () => portalError(400, "ORDER_INVALID_STATE", "Order cannot be deleted");
+    const out = await call("cancel_order", { order_id: "ord-0001" });
+    expect(out.error).toMatchObject({ kind: "refused", code: "ORDER_NOT_DELETABLE" });
+    expect(out.error.remedy).toContain("get_order");
+    expect((await call("get_order", { order_id: "ord-0001" })).state).toBe("pending");
+    // The vignette it was in fact paid for shows up later, and get_order still says so.
+    state.listed = [ACTIVE_TOLL];
+    expect((await call("get_order", { order_id: "ord-0001" })).state).toBe("paid");
   });
 
   it("refuses to cancel an order it sees paid", async () => {

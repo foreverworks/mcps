@@ -18,8 +18,8 @@
  * behind the sign-in: a `drift` here means the shapes in src/domain/schema.ts
  * need correcting.
  *
- * --order WRITES: it also places an order for the cheapest option quoted
- * (it never pays: the payment page is printed, not opened), reads it back, and
+ * --order WRITES: after "yes" at the terminal it also places an order for
+ * the cheapest option quoted (it never pays: the payment page is printed, not opened), reads it back, and
  * cancels it at once, then cancels again to show the second is harmless. Run
  * it only against an account where an unpaid order for a day's vignette is
  * acceptable for a few seconds.
@@ -117,8 +117,9 @@ const main = async (): Promise<void> => {
         console.log(`  (quote refused: ${quote.error?.kind} ${quote.error?.code ?? ""}; eToll may not sell this car a vignette now)`);
       }
 
-      if (ORDER && quote.ok === true) {
-        const cheapest = [...quote.options].sort((a, b) => Number(a.price.total) - Number(b.price.total))[0];
+      const cheapest = quote.ok === true ? [...quote.options].sort((a, b) => Number(a.price.total) - Number(b.price.total))[0] : undefined;
+      // A real order on the account, cancelled at once and never paid; asked first, like --buy, since a crash in between leaves it open.
+      if (ORDER && cheapest !== undefined && (await confirmed(`\nPlace a real ${cheapest.duration} order for ${car.plate} (${cheapest.price.total} RON) and cancel it at once? Nothing is paid.`))) {
         const placed = await call("place_order", { quote_id: cheapest.quote_id });
         show("\nplace_order", placed);
         check(placed.ok === true && typeof placed.order_id === "string", "place_order answers an order");

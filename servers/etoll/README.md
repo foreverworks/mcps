@@ -143,14 +143,19 @@ Then, in order, and stopping at the first that fails:
 
 1. The price is asked again, and must be the confirmed one to the last ban;
    otherwise `refused` with `PRICE_CHANGED`, and nothing is ordered.
-2. The order is created, and its total must be the confirmed one; otherwise
-   it is cancelled and the answer is `PRICE_CHANGED`. An order eToll makes
-   but answers in a shape the server cannot read is cancelled too, and the
-   answer is `drift`.
+2. The order is created, and its total must be there and be the confirmed
+   one; otherwise it is cancelled and the answer is `PRICE_CHANGED` (or
+   `drift`, when eToll gave no total). An order eToll makes but answers in a
+   shape the server cannot read is cancelled too, and the answer is `drift`.
 3. The payment page is asked for, and must be https on euplatesc.ro;
    otherwise the order is cancelled and the answer is `drift`. If eToll
    refuses or fails the request, the order is cancelled too, and the answer
    is eToll's error.
+
+From the moment the order exists, any failure cancels it, and the answer says
+so. If the cancel fails as well, the answer is `outcome_unknown` and names the
+order that is still open, so you can `cancel_order` it: eToll lists an unpaid
+order nowhere and refuses another for the same vignette while it is open.
 
 The answer is the payment page, which a client that shows links offers you
 directly. Nothing is paid until you pay there. An unpaid order expires by
@@ -174,8 +179,13 @@ ROeID, Google or eIDAS has no eToll password: use the browser sign-in.
 that it is reachable, and that it is unlocked.
 
 **`refused`, `PENDING_ORDER_SAME_PRODUCT`.** An unpaid order for the same
-vignette is already open; `pendingOrderId` names it. Pay it, or
-`cancel_order` it and order again.
+vignette is already open; `pendingOrderId` names it. Pay it on the page
+`place_order` handed over, or `cancel_order` it and order again.
+
+**`refused`, `ORDER_NOT_DELETABLE`.** eToll would not delete the order. It
+gives the same answer for an order that is paid, expired or already
+cancelled, so nothing is assumed: `get_order` or `list_tolls` shows whether
+it was paid.
 
 **`refused`, `VIGNETTE_OVERLAP` or `VIGNETTE_VALIDITY_DATE_OUT_OF_RANGE`.**
 The start date overlaps a vignette you have, or is further ahead than eToll
@@ -188,7 +198,8 @@ paid; quote again and confirm the new price.
 again.
 
 **`outcome_unknown`.** An order or payment request failed after eToll may have
-acted on it. It is never sent again by itself. eToll lists an order nowhere
+acted on it, or an order it made could not be cancelled (the message names
+it; `cancel_order` drops it). It is never sent again by itself. eToll lists an order nowhere
 until it is paid, so one that was created cannot be looked up; nothing is
 charged unless its payment page is paid, and it expires by itself within the
 hour.
@@ -268,3 +279,10 @@ MCP Registry and the web found:
 This one reaches your own account from any MCP client: the vignettes, the
 invoices and their PDFs, the notifications, and a purchase you confirm and pay
 for yourself.
+
+### Credits
+
+This server was built by Rareș Zamfiriu <!-- push-guard: allow: the credit the maintainer asked for -->
+([@rzamfiriu](https://github.com/rzamfiriu)), who mapped eToll's unpublished
+API, tested every tool against a live account, and bought and paid for a real
+vignette through it before proposing it here.

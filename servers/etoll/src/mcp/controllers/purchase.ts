@@ -63,7 +63,7 @@ export const registerPurchase: Registrar = (server, deps, handled) => {
     {
       title: "Cancel order",
       description:
-        "Drop an unpaid order (one place_order made, or one eToll names as already open for the same vignette). Safe to call twice. A paid order is refused: refunds go through eToll.",
+        "Drop an unpaid order (one place_order made, or one eToll names as already open for the same vignette). Safe to call twice. A paid order is refused: refunds go through eToll. An order eToll will not delete is refused with ORDER_NOT_DELETABLE, since it may be paid.",
       inputSchema: { order_id: id("The order's id.") },
     },
     handled((args) => cancelOrder(deps, { orderId: args.order_id })),

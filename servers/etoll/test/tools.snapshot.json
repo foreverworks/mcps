@@ -22,7 +22,7 @@
   {
     "name": "cancel_order",
     "title": "Cancel order",
-    "description": "Drop an unpaid order (one place_order made, or one eToll names as already open for the same vignette). Safe to call twice. A paid order is refused: refunds go through eToll.",
+    "description": "Drop an unpaid order (one place_order made, or one eToll names as already open for the same vignette). Safe to call twice. A paid order is refused: refunds go through eToll. An order eToll will not delete is refused with ORDER_NOT_DELETABLE, since it may be paid.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -224,7 +224,7 @@
           ]
         },
         "plate": {
-          "description": "Only tolls for this plate number.",
+          "description": "Only tolls for this plate number (spaces and dashes do not matter).",
           "type": "string",
           "minLength": 1
         },

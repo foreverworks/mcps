@@ -1,7 +1,7 @@
 import { offerLink } from "@foreverworks/mcp-kit";
 
 import { bucharestToday, localDateOf } from "../../domain/dates.js";
-import { asAppError, drift, fail, inputError, notFound, PRICE_CHANGED, refused } from "../../domain/errors.js";
+import { asAppError, drift, fail, inputError, notFound, ORDER_NOT_DELETABLE, orderLeftOpen, PRICE_CHANGED, refused } from "../../domain/errors.js";
 import { CURRENCY, priceOf, sameAmount, shownAmount } from "../../domain/money.js";
 import { collectAll } from "../../domain/paging.js";
 import {
@@ -93,44 +93,53 @@ const confirmPrice = async (deps: Deps, quote: StoredQuote): Promise<void> => {
   if (freshTotal === undefined || !sameAmount(freshTotal, quote.price.total)) return priceChanged(quote.price.total, freshTotal);
 };
 
-/** An order eToll made and this server noted, and how to undo it while it is unpaid. */
-type Placed = { readonly order: StoredOrder; readonly drop: () => Promise<void> };
-
-/** Creates the order and notes it at once; drops it again if its total is not the confirmed one. */
-const checkoutOrDrop = async (deps: Deps, quote: StoredQuote): Promise<Placed> => {
-  const checkout = await deps.etoll.createOrder(orderRequest(quote));
-  const order = storedOrderOf(checkout, quote, deps.now());
-  await deps.store.saveOrder(order);
-  const drop = async (): Promise<void> => {
-    await deps.etoll.deleteOrder(order.orderId);
-    await deps.store.saveOrder({ ...order, cancelled: true });
-  };
-  const total = checkoutTotalOf(checkout);
-  if (total !== undefined && !sameAmount(total, quote.price.total)) {
-    await drop();
-    return priceChanged(quote.price.total, total);
-  }
-  return { order, drop };
+/**
+ * Deletes an order this server made and notes it cancelled. An order eToll
+ * will not delete is a failure here, never "gone": the order was made moments
+ * ago, so a refusal means it is still there.
+ */
+const dropOrder = async (deps: Deps, orderId: string): Promise<void> => {
+  if ((await deps.etoll.deleteOrder(orderId)) === "refused") return fail(refused(ORDER_NOT_DELETABLE, `eToll would not delete order ${orderId}`));
+  const noted = await deps.store.order(orderId);
+  if (noted !== undefined) await deps.store.saveOrder({ ...noted, cancelled: true });
 };
 
-/** Asks for the payment page; any failure, or a page not on euplatesc.ro, drops the order. */
-const requestPayment = async (deps: Deps, { order, drop }: Placed, request: PaymentRequest): Promise<StoredOrder & { readonly paymentUrl: string }> => {
-  const payment = await deps.etoll.pay(order.orderId, request).catch(async (thrown: unknown) => {
-    const failure = asAppError(thrown);
-    const dropped = await drop().then(
-      () => true,
-      () => false,
-    );
-    if (failure === undefined || !dropped) throw thrown;
-    return fail({ ...failure, message: `${failure.message}; the order was cancelled and nothing was paid` });
-  });
-  if (!isPaymentUrl(payment.paymentUrl)) {
-    await drop();
-    return fail(drift(`eToll handed over a payment page that is not on ${PAYMENT_HOST}; the order was cancelled and nothing was paid`));
+/**
+ * Ends place_order after eToll made the order and a later step failed: the
+ * order is dropped and the failure says so, or, when it cannot be dropped, the
+ * failure names the order as still open and how to clear it. No failure after
+ * the order exists leaves it open without saying so.
+ */
+const failAfterOrder = async (deps: Deps, orderId: string, thrown: unknown): Promise<never> => {
+  const failure = asAppError(thrown) ?? drift(`placing order ${orderId} failed: ${thrown instanceof Error ? thrown.message : String(thrown)}`);
+  const dropped = await dropOrder(deps, orderId).then(
+    () => true,
+    () => false,
+  );
+  return fail(dropped ? { ...failure, message: `${failure.message}; the order was cancelled and nothing was paid` } : orderLeftOpen(failure.message, orderId));
+};
+
+/**
+ * Creates the order and, from the moment it exists, either hands back its
+ * payment page or drops it: it is noted in the state dir at once, its total
+ * must be there and be the confirmed one, and the payment page must be on
+ * euplatesc.ro.
+ */
+const checkoutAndPay = async (deps: Deps, quote: StoredQuote, request: PaymentRequest): Promise<StoredOrder & { readonly paymentUrl: string }> => {
+  const checkout = await deps.etoll.createOrder(orderRequest(quote));
+  try {
+    const order = storedOrderOf(checkout, quote, deps.now());
+    await deps.store.saveOrder(order);
+    const total = checkoutTotalOf(checkout) ?? fail(drift(`orders: the order eToll made carries no total to check against the confirmed ${shownAmount(quote.price.total)} ${CURRENCY}`));
+    if (!sameAmount(total, quote.price.total)) priceChanged(quote.price.total, total);
+    const payment = await deps.etoll.pay(order.orderId, request);
+    if (!isPaymentUrl(payment.paymentUrl)) fail(drift(`eToll handed over a payment page that is not https on ${PAYMENT_HOST}`));
+    const withPage = { ...order, paymentUrl: payment.paymentUrl };
+    await deps.store.saveOrder(withPage);
+    return withPage;
+  } catch (thrown) {
+    return failAfterOrder(deps, checkout.orderId, thrown);
   }
-  const withPage = { ...order, paymentUrl: payment.paymentUrl };
-  await deps.store.saveOrder(withPage);
-  return withPage;
 };
 
 /**
@@ -148,7 +157,7 @@ export const placeOrder = async (deps: Deps, args: { readonly quoteId: string; r
     return fail(refused(PRICE_CHANGED, `the order no longer reads as the user confirmed it; it now reads: ${line}`));
   }
   await confirmPrice(deps, quote);
-  const order = await requestPayment(deps, await checkoutOrDrop(deps, quote), paymentRequest(email, billing));
+  const order = await checkoutAndPay(deps, quote, paymentRequest(email, billing));
 
   const expires = localDateOf(order.expiresAt) === undefined ? "" : ` before ${order.expiresAt}`;
   offerLink({
@@ -218,6 +227,11 @@ export const cancelOrder = async (deps: Deps, args: { readonly orderId: string }
     if (seen.state === "paid") return fail(refused("ORDER_PAID", `order ${args.orderId} is paid; a paid vignette is refunded through eToll's support, not cancelled here`));
   }
   const outcome = await deps.etoll.deleteOrder(args.orderId);
+  // A refusal is "already gone" only for an order this server cancelled before:
+  // for any other it may be paid, with its vignette not listed yet.
+  if (outcome === "refused" && stored?.cancelled !== true) {
+    return fail(refused(ORDER_NOT_DELETABLE, `eToll would not delete order ${args.orderId}: it may be paid (its vignette is listed once eToll issues it), or have expired unpaid`));
+  }
   if (stored !== undefined) await deps.store.saveOrder({ ...stored, cancelled: true });
-  return { ok: true as const, order_id: args.orderId, cancelled: true as const, already_gone: outcome === "gone" };
+  return { ok: true as const, order_id: args.orderId, cancelled: true as const, already_gone: outcome !== "deleted" };
 };

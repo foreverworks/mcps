@@ -44,8 +44,13 @@ export type EtollPort = {
   readonly createOrder: (request: OrderRequest) => Promise<CheckoutWire>;
   /** Asks for the order's payment page. NOT idempotent, like createOrder. */
   readonly pay: (orderId: string, request: PaymentRequest) => Promise<PaymentWire>;
-  /** Drops an unpaid order; `gone` when eToll no longer has it. */
-  readonly deleteOrder: (orderId: string) => Promise<"deleted" | "gone">;
+  /**
+   * Drops an unpaid order: `deleted`, `gone` when eToll does not know it, or
+   * `refused` when eToll will not delete it. eToll gives the same refusal to an
+   * order already cancelled and to one it will not cancel (paid, or expired),
+   * so a refusal alone never proves the order is gone.
+   */
+  readonly deleteOrder: (orderId: string) => Promise<"deleted" | "gone" | "refused">;
 };
 
 /** CNAIR's public status page: no account, no session. */
