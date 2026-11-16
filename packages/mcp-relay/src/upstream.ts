@@ -134,7 +134,7 @@ const ceilingWords = (upstream: Upstream, direction: "upload" | "download"): str
   const held = `${upstream.mode === "one" ? "its" : `${who}'s`} calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS on the server), and files cross outside the tool calls that ceiling checks`;
   return direction === "upload"
     ? `the upstream takes no files from ${who} (403): ${held}, so uploads are for clients with no ceiling; use a client with none for a tool that takes a file`
-    : `the upstream does not give ${who} this file (403): ${held}; a client held so fetches only the files its own calls handed back, while the server remembers those calls: if this file came from one of them, the server has since restarted or let the record go with its outbox's retention, so call the tool again`;
+    : `the upstream does not give ${who} this file (403): ${held}; a client held so fetches only the files its own calls handed back, while the server remembers those calls: if this file came from one of them, the server has since restarted or let the record expire (MCP_HTTP_FILES_HELD_MAX_AGE_MIN on the server), so call the tool again`;
 };
 
 /** What a request was for: an upload to the file endpoints, a download from them, or the MCP route. */

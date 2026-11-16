@@ -1,5 +1,5 @@
 import { createHash } from "node:crypto";
-import { mkdir, mkdtemp, readdir, readFile, realpath, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises";
+import { link, mkdir, mkdtemp, readdir, readFile, realpath, rename, stat, symlink, unlink, utimes, writeFile } from "node:fs/promises";
 import { request } from "node:http";
 import { connect } from "node:net";
 import { tmpdir } from "node:os";
@@ -10,7 +10,17 @@ import { afterAll, afterEach, beforeAll, describe, expect, it, vi } from "vitest
 import { z } from "zod";
 
 import { guardSettingsFrom, hasClientCeiling } from "../src/serve/confirm.js";
-import { DEFAULT_FILES_MAX_BYTES, fileRouteOf, FILES_REFUSED_FOR_CEILING, filesFrom, filesUrlPath, segmentsOf } from "../src/serve/files.js";
+import {
+  DEFAULT_FILES_MAX_BYTES,
+  DEFAULT_HELD_FILES_MAX_AGE_MIN,
+  type FileEndpoints,
+  fileRouteOf,
+  FILES_REFUSED_FOR_CEILING,
+  filesFrom,
+  filesUrlPath,
+  heldMaxAgeMinOf,
+  segmentsOf,
+} from "../src/serve/files.js";
 import { makeHandled } from "../src/envelope.js";
 import { storeStream } from "../src/fileStream.js";
 import { saveToOutbox } from "../src/handedBack.js";
@@ -56,6 +66,24 @@ describe("filesFrom", () => {
     }
     expect(() => filesFrom({ MCP_HTTP_FILES_MAX_AGE_MIN: "60" })).toThrow(/MCP_HTTP_FILES_MAX_AGE_MIN is set without MCP_HTTP_FILES_INBOX or MCP_HTTP_FILES_OUTBOX/);
   });
+
+  it("reads how long a held client may fetch its own files: the setting, else the outbox's age, else a day", () => {
+    expect(filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out", MCP_HTTP_FILES_HELD_MAX_AGE_MIN: " 43200 " })).toEqual({ outbox: "/srv/out", maxBytes: DEFAULT_FILES_MAX_BYTES, heldMaxAgeMin: 43200 });
+    expect(filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out", MCP_HTTP_FILES_HELD_MAX_AGE_MIN: " " })).not.toHaveProperty("heldMaxAgeMin");
+    const of = (env: Record<string, string>): number => heldMaxAgeMinOf(filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out", ...env }) as FileEndpoints);
+    expect(of({ MCP_HTTP_FILES_HELD_MAX_AGE_MIN: "43200", MCP_HTTP_FILES_MAX_AGE_MIN: "60" })).toBe(43200);
+    expect(of({ MCP_HTTP_FILES_MAX_AGE_MIN: "60" })).toBe(60);
+    expect(of({})).toBe(24 * 60);
+    expect(DEFAULT_HELD_FILES_MAX_AGE_MIN).toBe(24 * 60);
+  });
+
+  it("refuses a held client's age that is not a whole number of minutes above zero, and one with no outbox", () => {
+    for (const bad of ["0", "-5", "1.5", "a day", "30m"]) {
+      expect(() => filesFrom({ MCP_HTTP_FILES_OUTBOX: "/srv/out", MCP_HTTP_FILES_HELD_MAX_AGE_MIN: bad })).toThrow(/MCP_HTTP_FILES_HELD_MAX_AGE_MIN ".*" is not a number of minutes/);
+    }
+    expect(() => filesFrom({ MCP_HTTP_FILES_INBOX: "/srv/in", MCP_HTTP_FILES_HELD_MAX_AGE_MIN: "60" })).toThrow(/MCP_HTTP_FILES_HELD_MAX_AGE_MIN is set without MCP_HTTP_FILES_OUTBOX/);
+    expect(() => filesFrom({ MCP_HTTP_FILES_HELD_MAX_AGE_MIN: "60" })).toThrow(/without MCP_HTTP_FILES_OUTBOX/);
+  });
 });
 
 describe("listenFrom, with the file endpoints", () => {
@@ -77,7 +105,7 @@ describe("listenFrom, with the file endpoints", () => {
   });
 
   it("stops the start for any of the variables without a port, and for a server that is open to anyone", () => {
-    for (const name of ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES", "MCP_HTTP_FILES_MAX_AGE_MIN"]) {
+    for (const name of ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES", "MCP_HTTP_FILES_MAX_AGE_MIN", "MCP_HTTP_FILES_HELD_MAX_AGE_MIN"]) {
       expect(() => listenFrom({ [name]: "/srv/x" })).toThrow(new RegExp(`${name} is set without MCP_HTTP_PORT`));
       expect(listenFrom({ [name]: " " })).toEqual({ kind: "stdio" });
     }
@@ -726,12 +754,46 @@ const savingTools =
       }),
     );
     server.registerTool(
+      "fetch_and_hold",
+      { description: "saves a document, then waits at a gate the test opens", inputSchema: { name: z.string(), text: z.string(), gate: z.string() } },
+      handled(async ({ name, text, gate }: { name: string; text: string; gate: string }) => {
+        const saved = await saveToOutbox(outbox, name, text);
+        const held = gateOf(gate);
+        held.reached();
+        await held.opened;
+        return { saved: saved.path, sha256: saved.sha256 };
+      }),
+    );
+    server.registerTool("echo_link", { description: "answers with a link to whatever it is given", inputSchema: { uri: z.string() } }, async ({ uri }: { uri: string }) => ({
+      content: [{ type: "text" as const, text: "linked" }, { type: "resource_link" as const, uri, name: "linked" }],
+    }));
+    server.registerTool(
       "save_elsewhere",
       { description: "saves a document outside the outbox", inputSchema: { name: z.string() } },
       handled(async ({ name }: { name: string }) => (await saveToOutbox(elsewhere, name, "outside the outbox")).path),
     );
   };
-const SAVING_POLICY = { fetch_document: { access: "read" }, fetch_then_fail: { access: "read" }, save_elsewhere: { access: "read" } } as const;
+const SAVING_POLICY = {
+  fetch_document: { access: "read" },
+  fetch_then_fail: { access: "read" },
+  fetch_and_hold: { access: "read" },
+  echo_link: { access: "read" },
+  save_elsewhere: { access: "read" },
+} as const;
+
+/** A point a tool call waits at: `reached` once the call is there, `opened` once the test lets it go on. */
+type Gate = { readonly reached: () => void; readonly whenReached: Promise<void>; readonly open: () => void; readonly opened: Promise<void> };
+const gates = new Map<string, Gate>();
+const gateOf = (name: string): Gate => {
+  const known = gates.get(name);
+  if (known !== undefined) return known;
+  const flags: { reached?: () => void; open?: () => void } = {};
+  const whenReached = new Promise<void>((resolve) => (flags.reached = resolve));
+  const opened = new Promise<void>((resolve) => (flags.open = resolve));
+  const gate: Gate = { reached: () => flags.reached?.(), whenReached, open: () => flags.open?.(), opened };
+  gates.set(name, gate);
+  return gate;
+};
 
 type Saving = { readonly served: Served; readonly dir: string; readonly outbox: string; readonly inbox: string; readonly elsewhere: string; readonly env: Record<string, string> };
 
@@ -865,6 +927,68 @@ describe("a client held to a ceiling, and the files its own calls handed back", 
     expect(up.status).toBe(200);
   });
 
+  it("keeps two held clients' calls apart while both are in flight at once: each gets its own file, and not the other's", async () => {
+    const calls = Promise.all([
+      callAs(world.served, "reader", "fetch_and_hold", { name: "reader-at-once.txt", text: "reader, at once", gate: "both-reader" }),
+      callAs(world.served, "other", "fetch_and_hold", { name: "other-at-once.txt", text: "other, at once", gate: "both-other" }),
+    ]);
+    // Both calls have saved their file and neither has answered.
+    await Promise.all([gateOf("both-reader").whenReached, gateOf("both-other").whenReached]);
+    gateOf("both-reader").open();
+    gateOf("both-other").open();
+    await calls;
+    expect((await fetched(world.served, "reader", "reader-at-once.txt")).body.toString()).toBe("reader, at once");
+    expect((await fetched(world.served, "other", "other-at-once.txt")).body.toString()).toBe("other, at once");
+    refusedAsHeld(await fetched(world.served, "reader", "other-at-once.txt"));
+    refusedAsHeld(await fetched(world.served, "other", "reader-at-once.txt"));
+  });
+
+  it("is refused a file another client puts at the same path while its own call is still running, even of the same size", async () => {
+    const call = callAs(world.served, "reader", "fetch_and_hold", { name: "x.txt", text: "mine", gate: "overwrite" });
+    await gateOf("overwrite").whenReached;
+    await callAs(world.served, "open", "fetch_document", { name: "x.txt", text: "THEM" });
+    gateOf("overwrite").open();
+    const result = await call;
+    expect(result.content[1]).toMatchObject({ type: "resource_link" });
+    refusedAsHeld(await fetched(world.served, "reader", "x.txt"));
+    expect((await fetched(world.served, "open", "x.txt")).body.toString()).toBe("THEM");
+  });
+
+  it("is refused a file a tool merely links, its own result's link included", async () => {
+    await callAs(world.served, "open", "fetch_document", { name: "echoed.pdf", text: "open's document" });
+    const result = await callAs(world.served, "reader", "echo_link", { uri: `file://${join(world.outbox, "echoed.pdf")}` });
+    expect(result.content[1]).toMatchObject({ type: "resource_link", uri: `file://${join(world.outbox, "echoed.pdf")}` });
+    refusedAsHeld(await fetched(world.served, "reader", "echoed.pdf"));
+  });
+
+  it("is refused its file through a linked folder, and a folder on its path swapped for a link to another", async () => {
+    await callAs(world.served, "reader", "fetch_document", { name: "f.txt", text: "in real", folder: "tree/real" });
+    await symlink(join(world.outbox, "tree", "real"), join(world.outbox, "tree", "alias"));
+    refusedAsHeld(await fetched(world.served, "reader", "tree/alias/f.txt"));
+    expect((await fetched(world.served, "reader", "tree/real/f.txt")).status).toBe(200);
+
+    await callAs(world.served, "open", "fetch_document", { name: "f.txt", text: "in fake", folder: "tree/fake" });
+    await rename(join(world.outbox, "tree", "real"), join(world.outbox, "tree", "was-real"));
+    await symlink(join(world.outbox, "tree", "fake"), join(world.outbox, "tree", "real"));
+    refusedAsHeld(await fetched(world.served, "reader", "tree/real/f.txt"));
+  });
+
+  it("is refused a hard link put at its path, and its own file once a hard link to it is made, which fails closed", async () => {
+    await callAs(world.served, "reader", "fetch_document", { name: "linked.txt", text: "my bytes" });
+    await callAs(world.served, "open", "fetch_document", { name: "theirs-linked.txt", text: "their bytes" });
+    await unlink(join(world.outbox, "linked.txt"));
+    await link(join(world.outbox, "theirs-linked.txt"), join(world.outbox, "linked.txt"));
+    refusedAsHeld(await fetched(world.served, "reader", "linked.txt"));
+
+    await callAs(world.served, "reader", "fetch_document", { name: "pinned.txt", text: "pinned" });
+    expect((await fetched(world.served, "reader", "pinned.txt")).status).toBe(200);
+    // The kernel keeps a file's times at its coarse clock (a few ms): wait past one tick, so the link moves the change time for sure.
+    await new Promise((resolve) => setTimeout(resolve, 25));
+    await link(join(world.outbox, "pinned.txt"), join(world.outbox, "pinned-copy.txt"));
+    refusedAsHeld(await fetched(world.served, "reader", "pinned.txt"));
+    refusedAsHeld(await fetched(world.served, "reader", "pinned-copy.txt"));
+  });
+
   it("forgets every record when the server restarts: the same fetch is refused until the tool is called again", async () => {
     await world.served.close();
     world = await startSaving({}, world.dir);
@@ -898,6 +1022,21 @@ describe("how long a held client's record of its own files is kept", () => {
       expect(await fetchAfter(world, [0, 29, 31])).toEqual([200, 200, 403]);
     } finally {
       await world.served.close();
+    }
+  });
+
+  it("for MCP_HTTP_FILES_HELD_MAX_AGE_MIN when set, longer than the outbox's own age or shorter", async () => {
+    for (const [env, minutes, expected] of [
+      [{ MCP_HTTP_FILES_HELD_MAX_AGE_MIN: "120" }, [119, 121], [200, 403]],
+      [{ MCP_HTTP_FILES_HELD_MAX_AGE_MIN: "10", MCP_HTTP_FILES_MAX_AGE_MIN: "30" }, [9, 11], [200, 403]],
+    ] as const) {
+      const world = await startSaving(env);
+      try {
+        expect(await fetchAfter(world, minutes)).toEqual(expected);
+      } finally {
+        vi.useRealTimers();
+        await world.served.close();
+      }
     }
   });
 

@@ -146,6 +146,42 @@ describe("clients the server tells apart, through the relay", () => {
   });
 });
 
+/**
+ * A relay with one token for the server, which is held to read: every client
+ * of the relay is, and since the server sees one client they also share the
+ * files their calls save. This pins that, as the warning and the docs say.
+ */
+describe("clients of a relay that share one upstream token held to a ceiling", () => {
+  it("get back their own calls' files, and each other's too, because to the server they are one client", async () => {
+    const world = await startWorld({ sharing: ["alice", "bob"], serverEnv: { MCP_CLIENT_MAX_ACCESS: "relay=read" } });
+    const as = (name: "alice" | "bob") => connectTo({ relayUrl: world.relayUrl, relayToken: world.clients[name]?.relayToken as string });
+    const exists = (path: string): Promise<boolean> => access(path).then(() => true, () => false);
+    const alice = await as("alice");
+    const bob = await as("bob");
+    try {
+      await alice.callTool({ name: "fetch_document", arguments: { name: "alice-shared.pdf", text: "alice's document" } });
+      expect(await readFile(join(world.localOut, "alice-shared.pdf"), "utf8")).toBe("alice's document");
+      await rm(join(world.localOut, "alice-shared.pdf"));
+
+      // Bob's call links alice's file, and the relay brings it: the server's record is the shared client's.
+      const echoed = (await bob.callTool({ name: "link_to", arguments: { uris: [`file://${join(world.localOut, "alice-shared.pdf")}`] } })) as { content: { text?: string }[] };
+      expect(echoed.content).toHaveLength(2);
+      expect(await readFile(join(world.localOut, "alice-shared.pdf"), "utf8")).toBe("alice's document");
+
+      // A file no call of theirs saved stays out of reach of both.
+      await writeFile(join(world.remoteOut, "nobody.pdf"), "saved by nobody here");
+      const refused = (await alice.callTool({ name: "link_to", arguments: { uris: [`file://${join(world.localOut, "nobody.pdf")}`] } })) as { content: { text?: string }[] };
+      expect(refused.content.at(-1)?.text).toContain("the upstream does not give this client this file (403)");
+      expect(await exists(join(world.localOut, "nobody.pdf"))).toBe(false);
+      expect(world.relayLog.find((line) => line.includes("WARNING"))).toContain("they share each other's saved files");
+    } finally {
+      await alice.close();
+      await bob.close();
+      await world.close();
+    }
+  });
+});
+
 /** A relay with one token for the server, which is held to read: every client of the relay is. */
 describe("a relay whose one upstream token is held to a ceiling", () => {
   it("says that the client has no files, in words that do not point at the token file", async () => {

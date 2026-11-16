@@ -49,7 +49,7 @@ export { AMOUNT_SCALE, asAmount, computable, documentTotal, lineAmount, reversal
 export { readJsonFile, withFileLock, writeJsonFile, type JsonFileOptions, type LockOptions } from "./jsonFile.js";
 export { storedFile, type DiskSchema, type StoredFile, type StoredFileOptions } from "./storedFile.js";
 export { pendingAuthorizationFile, pendingPkceAuthorizationFile, type PendingAuthorization, type PendingPkceAuthorization } from "./pendingAuthorization.js";
-export { writeFileAtomic } from "./files.js";
+export { writeFileAtomic, writeFileAtomicWithStats } from "./files.js";
 export { run, type RunOptions, type RunResult } from "./run.js";
 export { csvOf } from "./csv.js";
 export { envPath, stateDirOf, timeZoneOf, unsetPath } from "./env.js";

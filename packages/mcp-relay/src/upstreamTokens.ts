@@ -62,7 +62,7 @@ export const duplicateRefusalFor = (dir: string, groups: readonly (readonly stri
 /** The line a relay writes at start when every one of several clients reaches the server with the same token: they are one client to it, with one client's rights. Undefined when that is no news. */
 export const sharedTokenWarning = ({ mode, byClient }: UpstreamTokens): string | undefined =>
   mode === "one" && byClient.size > 1
-    ? `WARNING: MCP_RELAY_UPSTREAM_TOKEN_FILE gives every client of this relay (${[...byClient.keys()].join(", ")}) the same token upstream, so they all reach the server with the same rights and the server cannot tell them apart; ` +
+    ? `WARNING: MCP_RELAY_UPSTREAM_TOKEN_FILE gives every client of this relay (${[...byClient.keys()].join(", ")}) the same token upstream, so they all reach the server with the same rights and the server cannot tell them apart, and they share each other's saved files: a file one client's call saved, any of them can have the relay fetch; ` +
       "to hold each to its own, use MCP_RELAY_UPSTREAM_TOKENS_DIR, with an upstream-<client> file for each"
     : undefined;
 

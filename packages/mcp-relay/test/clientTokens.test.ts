@@ -312,6 +312,7 @@ describe("a relay with one token for all its clients", () => {
       expect(warnings).toHaveLength(1);
       expect(warnings[0]).toContain("every client of this relay (alice, bob) the same token upstream");
       expect(warnings[0]).toContain("same rights");
+      expect(warnings[0]).toContain("they share each other's saved files");
       expect(warnings[0]).toContain("MCP_RELAY_UPSTREAM_TOKENS_DIR");
       expect(log.join("\n")).not.toContain(up.alice);
     } finally {

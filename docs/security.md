@@ -212,14 +212,19 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
   what the call's code saved through the kit's outbox writer (`noteHandedBack`,
   which the guard watches per call), never a link a result merely carries, so
   a tool that echoes a link it was given opens nothing. Each record holds the
-  file as it was when the call ended (device, inode, size, modification and
-  change time), so a file written later at the same path by another client's
-  call, or a link put there, is refused too. A client held to `read` cannot put
-  a file in the server's inbox or fetch another client's file from its outbox.
-  The records live in memory, at most 10,000 per client, for the outbox's
-  retention (`MCP_HTTP_FILES_MAX_AGE_MIN`) or 24 hours without one, and a
-  restart forgets them. There is no setting to lift this; a held client that
-  needs to send files needs a server of its own.
+  file as it was written (device, inode, size, modification and change time,
+  read from the written file itself), so a file put at the same path later,
+  even by another client's call while this one runs, or a link put there, is
+  refused too; so is the file after a later change of its mode, owner, ACL or
+  label, or a hard link to it, which fails closed. A client held to `read`
+  cannot put a file in the server's inbox or fetch another client's file from
+  its outbox. A client here is a token: clients that share one (behind a relay
+  with `MCP_RELAY_UPSTREAM_TOKEN_FILE`, say) are one client to the server, and
+  so also share each other's saved files. The records live in memory, at most
+  10,000 per client, for `MCP_HTTP_FILES_HELD_MAX_AGE_MIN` (the outbox's
+  retention, or 24 hours, unless set), and a restart forgets them. There is no
+  setting to lift this; a held client that needs to send files needs a server
+  of its own.
 - **A path stays inside its folder.** It is percent-decoded once, must hold no
   empty name, `.`, `..`, NUL, backslash or name too long for a file system,
   and is resolved with its links followed; only a regular file whose real path
@@ -258,7 +263,8 @@ through two routes of its HTTP listener, `GET /files/outbox/<path>` and
   really called; it refuses to start when a client would have no token of its own or
   two would share one, and never sends one client's token for another's. With
   `MCP_RELAY_UPSTREAM_TOKEN_FILE` every client shares one token and one
-  client's rights upstream, and the relay warns at start when it has more than
+  client's rights upstream, and so each other's saved files when that client
+  is held to a ceiling, and the relay warns at start when it has more than
   one. The log has a line per file (direction, path, size, the start of the
   hash) and never bytes, tokens or arguments.
   Plain `http://` to an upstream that is not on this machine would carry the

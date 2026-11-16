@@ -1,5 +1,6 @@
 import { randomUUID } from "node:crypto";
-import { mkdir, rename, rm, writeFile } from "node:fs/promises";
+import type { BigIntStats } from "node:fs";
+import { type FileHandle, mkdir, open, rename, rm } from "node:fs/promises";
 import { join } from "node:path";
 
 /**
@@ -25,21 +26,34 @@ export const isTempName = (name: string): boolean => /\.\d+\.[0-9a-f]{8}-[0-9a-f
  *
  * Returns the path written.
  */
-export const writeFileAtomic = async (
+export const writeFileAtomic = async (dir: string, name: string, data: string | Uint8Array, options: { readonly mode?: number } = {}): Promise<string> =>
+  (await writeFileAtomicWithStats(dir, name, data, options)).path;
+
+/**
+ * `writeFileAtomic`, also answering what the file written is: its stats, read
+ * from the open file after the rename, so they are this write's file whatever
+ * has been put at the path since (the outbox writer records them for a client
+ * held to a ceiling: serve/ownFiles.ts).
+ */
+export const writeFileAtomicWithStats = async (
   dir: string,
   name: string,
   data: string | Uint8Array,
   { mode }: { readonly mode?: number } = {},
-): Promise<string> => {
+): Promise<{ readonly path: string; readonly stats: BigIntStats }> => {
   await mkdir(dir, { recursive: true });
   const path = join(dir, name);
   const tmp = `${path}${tempSuffix()}`;
+  let handle: FileHandle | undefined;
   try {
-    await writeFile(tmp, data, mode === undefined ? {} : { mode });
+    handle = await open(tmp, "w", mode);
+    await handle.writeFile(data);
     await rename(tmp, path);
+    return { path, stats: await handle.stat({ bigint: true }) };
   } catch (cause) {
     await rm(tmp, { force: true });
     throw cause;
+  } finally {
+    await handle?.close();
   }
-  return path;
 };

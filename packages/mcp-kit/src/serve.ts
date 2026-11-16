@@ -10,16 +10,17 @@ import { serveStdio as serveStdioEntry } from "@modelcontextprotocol/server/stdi
 
 import { describeSettings, type GuardSettings, guardSettingsFrom, hasClientCeiling } from "./serve/confirm.js";
 import { installEgress, installKeepAlive } from "./serve/egress.js";
-import { describeFiles, type FileEndpoints, fileRouteOf, FILES_VARIABLES, filesFrom } from "./serve/files.js";
+import { describeFiles, type FileEndpoints, fileRouteOf, FILES_VARIABLES, filesFrom, heldMaxAgeMinOf } from "./serve/files.js";
 import { serveFile } from "./serve/filesServe.js";
 import { startSweeping } from "./serve/filesSweep.js";
-import { DEFAULT_OWN_FILES_MAX_AGE_MIN, makeOwnFiles, type OwnFiles } from "./serve/ownFiles.js";
+import { makeOwnFiles, type OwnFiles } from "./serve/ownFiles.js";
 import { guard, registeredNames, requestContext, type ServerVocabulary } from "./serve/guard.js";
 import { toolIconsOf, type Product } from "./serve/icons.js";
 import { admit, egressFrom, limitsFrom, type Bucket, type Limits } from "./serve/limits.js";
 import { allowedHostsFrom, allowedHostText, bindHostFrom, isLoopbackAddress, LOOPBACK_ADDRESS, urlHost } from "./serve/bind.js";
 import { type AllowedHost, callerKey, checkPublic, clientIpHeaderFrom, hostAccepted, PUBLIC_CLIENT, publicHostsFrom, type PublicHost } from "./serve/public.js";
 import { shareClientRoots, shareRootsOf } from "./clientRoots.js";
+import type { HandedBack } from "./handedBack.js";
 import { unclassified, type ToolPolicy } from "./policy.js";
 
 /**
@@ -338,7 +339,7 @@ const fresh = ({ options, toolIcons, settings, log }: Runtime, era: ProtocolEra,
       midCall,
       icons: toolIcons,
       ...(options.vocabulary === undefined ? {} : { vocabulary: options.vocabulary }),
-      ...(ownFiles === undefined ? {} : { handedBack: (client: string, files: ReadonlyMap<string, number>) => (hasClientCeiling(settings, client) ? ownFiles.record(client, files) : Promise.resolve()) }),
+      ...(ownFiles === undefined ? {} : { handedBack: (client: string, files: ReadonlyMap<string, HandedBack>) => (hasClientCeiling(settings, client) ? ownFiles.record(client, files) : undefined) }),
     }),
   );
   return server;
@@ -430,13 +431,13 @@ const publicDoor = (hosts: readonly PublicHost[], clientIpHeader: string | undef
 /**
  * The record of the outbox files each held client's calls handed back, which
  * the file endpoints serve it and nothing else (serve/ownFiles.ts): kept only
- * where there is an outbox and a client with a ceiling of its own, for as
- * long as the outbox keeps its files, or a day where it keeps them for ever.
+ * where there is an outbox and a client with a ceiling of its own, for
+ * MCP_HTTP_FILES_HELD_MAX_AGE_MIN (`heldMaxAgeMinOf`).
  */
 const ownFilesFor = (files: FileEndpoints | undefined, settings: GuardSettings): OwnFiles | undefined =>
   files?.outbox === undefined || Object.keys(settings.clientMaxAccess ?? {}).length === 0
     ? undefined
-    : makeOwnFiles({ outbox: files.outbox, maxAgeMs: (files.maxAgeMin ?? DEFAULT_OWN_FILES_MAX_AGE_MIN) * 60_000 });
+    : makeOwnFiles({ outbox: files.outbox, maxAgeMs: heldMaxAgeMinOf(files) * 60_000 });
 
 /**
  * Stateless: no session id, and a fresh server per request. Nothing about a

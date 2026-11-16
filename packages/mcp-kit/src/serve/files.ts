@@ -29,6 +29,14 @@ export const SHA256_HEADER = "x-content-sha256";
 export const DEFAULT_FILES_MAX_BYTES = 256 * 1024 * 1024;
 
 /**
+ * How long a held client may fetch a file its own call handed back
+ * (serve/ownFiles.ts) when neither MCP_HTTP_FILES_HELD_MAX_AGE_MIN nor
+ * MCP_HTTP_FILES_MAX_AGE_MIN says: a day, for a person who comes back to a
+ * file later that day.
+ */
+export const DEFAULT_HELD_FILES_MAX_AGE_MIN = 24 * 60;
+
+/**
  * Which directions are on, and the folders they serve. A key is absent when
  * its variable is unset.
  */
@@ -41,7 +49,12 @@ export type FileEndpoints = {
   readonly maxBytes: number;
   /** Whole minutes after which a file in either folder is deleted (serve/filesSweep.ts). The key is absent when MCP_HTTP_FILES_MAX_AGE_MIN is unset: files are kept. */
   readonly maxAgeMin?: number;
+  /** Whole minutes a held client may fetch a file its own call handed back (MCP_HTTP_FILES_HELD_MAX_AGE_MIN); absent when unset (`heldMaxAgeMinOf`). */
+  readonly heldMaxAgeMin?: number;
 };
+
+/** How long a held client may fetch its own call's file: MCP_HTTP_FILES_HELD_MAX_AGE_MIN, else as long as the outbox keeps it, else a day. */
+export const heldMaxAgeMinOf = (files: FileEndpoints): number => files.heldMaxAgeMin ?? files.maxAgeMin ?? DEFAULT_HELD_FILES_MAX_AGE_MIN;
 
 /**
  * A folder named by a variable, as an absolute path; undefined when the
@@ -59,15 +72,17 @@ export const folderFrom = (env: NodeJS.ProcessEnv, name: string): string | undef
 };
 
 /** The names that switch the endpoints on, or configure them; each one needs MCP_HTTP_PORT and tokens. */
-export const FILES_VARIABLES = ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES", "MCP_HTTP_FILES_MAX_AGE_MIN"] as const;
+export const FILES_VARIABLES = ["MCP_HTTP_FILES_OUTBOX", "MCP_HTTP_FILES_INBOX", "MCP_HTTP_FILES_MAX_BYTES", "MCP_HTTP_FILES_MAX_AGE_MIN", "MCP_HTTP_FILES_HELD_MAX_AGE_MIN"] as const;
 
 /**
  * MCP_HTTP_FILES_OUTBOX and MCP_HTTP_FILES_INBOX, each a folder that switches
- * its direction on, MCP_HTTP_FILES_MAX_BYTES for the inbox, and
- * MCP_HTTP_FILES_MAX_AGE_MIN for how long a file stays in either. Undefined
- * when neither folder is set. A size without an inbox to cap, or an age
- * without a folder to clear, is a mistake worth stopping for, like a bind
- * address without the hosts.
+ * its direction on, MCP_HTTP_FILES_MAX_BYTES for the inbox,
+ * MCP_HTTP_FILES_MAX_AGE_MIN for how long a file stays in either, and
+ * MCP_HTTP_FILES_HELD_MAX_AGE_MIN for how long a held client may fetch a file
+ * its own call handed back. Undefined when neither folder is set. A size
+ * without an inbox to cap, an age without a folder to clear, or a held
+ * client's age without an outbox, is a mistake worth stopping for, like a
+ * bind address without the hosts.
  *
  * A plain throw, not a tagged failure: this is a process that must not start.
  */
@@ -77,22 +92,31 @@ export const filesFrom = (env: NodeJS.ProcessEnv): FileEndpoints | undefined => 
   const max = env["MCP_HTTP_FILES_MAX_BYTES"]?.trim();
   if (inbox === undefined && max) throw new Error("MCP_HTTP_FILES_MAX_BYTES is set without MCP_HTTP_FILES_INBOX: only a file put into the inbox has a size limit");
   const age = env["MCP_HTTP_FILES_MAX_AGE_MIN"]?.trim();
+  const held = env["MCP_HTTP_FILES_HELD_MAX_AGE_MIN"]?.trim();
+  if (outbox === undefined && held) throw new Error("MCP_HTTP_FILES_HELD_MAX_AGE_MIN is set without MCP_HTTP_FILES_OUTBOX: a held client fetches only from the outbox");
   if (outbox === undefined && inbox === undefined) {
     if (age) throw new Error("MCP_HTTP_FILES_MAX_AGE_MIN is set without MCP_HTTP_FILES_INBOX or MCP_HTTP_FILES_OUTBOX: there is no folder whose files it could delete");
     return undefined;
   }
   const maxBytes = max ? Number(max) : DEFAULT_FILES_MAX_BYTES;
   if (!Number.isSafeInteger(maxBytes) || maxBytes <= 0) throw new Error(`MCP_HTTP_FILES_MAX_BYTES "${max}" is not a number of bytes`);
-  const maxAgeMin = age ? Number(age) : undefined;
-  if (age && (!/^\d+$/.test(age) || !Number.isSafeInteger(maxAgeMin) || maxAgeMin === 0)) {
-    throw new Error(`MCP_HTTP_FILES_MAX_AGE_MIN "${age}" is not a number of minutes: write a whole number above zero, or leave it unset to keep files`);
-  }
+  const maxAgeMin = minutesFrom("MCP_HTTP_FILES_MAX_AGE_MIN", age, "or leave it unset to keep files");
+  const heldMaxAgeMin = minutesFrom("MCP_HTTP_FILES_HELD_MAX_AGE_MIN", held, "or leave it unset for the outbox's own age, or a day");
   return {
     ...(outbox === undefined ? {} : { outbox }),
     ...(inbox === undefined ? {} : { inbox }),
     maxBytes,
     ...(maxAgeMin === undefined ? {} : { maxAgeMin }),
+    ...(heldMaxAgeMin === undefined ? {} : { heldMaxAgeMin }),
   };
+};
+
+/** A whole number of minutes above zero, or undefined when the variable is unset or blank. */
+const minutesFrom = (name: string, value: string | undefined, otherwise: string): number | undefined => {
+  if (!value) return undefined;
+  const minutes = Number(value);
+  if (!/^\d+$/.test(value) || !Number.isSafeInteger(minutes) || minutes === 0) throw new Error(`${name} "${value}" is not a number of minutes: write a whole number above zero, ${otherwise}`);
+  return minutes;
 };
 
 /**
@@ -134,7 +158,7 @@ export const fileRouteOf = (target: string | undefined, files: FileEndpoints): F
  * alike (an upload, another client's file, a record forgotten).
  */
 export const FILES_REFUSED_FOR_CEILING =
-  "this file is not available to this client: its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS), and files cross outside the tool calls that ceiling checks, so it may only fetch a file one of its own calls handed back, while the server still remembers that call (a restart forgets it, and so does the outbox's retention: call the tool again); uploads, and every other file, are for clients with no ceiling";
+  "this file is not available to this client: its calls are limited by a ceiling (MCP_CLIENT_MAX_ACCESS), and files cross outside the tool calls that ceiling checks, so it may only fetch a file one of its own calls handed back, while the server still remembers that call (for MCP_HTTP_FILES_HELD_MAX_AGE_MIN, and never across a restart: call the tool again); uploads, and every other file, are for clients with no ceiling";
 
 /** The longest name a file system takes (ext4, xfs, zfs and the rest of what servers run on). */
 const MAX_NAME_BYTES = 255;

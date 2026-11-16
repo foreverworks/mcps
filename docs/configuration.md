@@ -145,6 +145,7 @@ On the server (`MCP_HTTP_PORT` and tokens needed; not with
 | `MCP_HTTP_FILES_OUTBOX` | unset: off | An absolute folder. Switches on `GET /files/outbox/<path>`, which streams a file below it with `Content-Length`, `Content-Type` and `X-Content-SHA256`. Set it to the folder the server's tools save to. |
 | `MCP_HTTP_FILES_INBOX` | unset: off | An absolute folder. Switches on `PUT /files/inbox/<path>`, which writes a file below it, whole or not at all, with mode 0640, making the folders on the way, and answers `{ "path", "size", "sha256" }`. A request that carries `X-Content-SHA256` is refused (422) when the bytes differ, and nothing is kept. Set it to a folder in `MCP_FILE_ROOTS`. |
 | `MCP_HTTP_FILES_MAX_BYTES` | `268435456` (256 MiB) | The largest file the inbox takes; a larger one gets a 413. Needs `MCP_HTTP_FILES_INBOX`. |
+| `MCP_HTTP_FILES_HELD_MAX_AGE_MIN` | `MCP_HTTP_FILES_MAX_AGE_MIN`, else `1440` (24 hours) | A whole number of minutes above zero: how long a client held to a ceiling (`MCP_CLIENT_MAX_ACCESS`) may fetch a file one of its own calls handed back ([below](#files-to-and-from-another-machine)). Needs `MCP_HTTP_FILES_OUTBOX`; does nothing while no client has a ceiling. |
 | `MCP_HTTP_FILES_MAX_AGE_MIN` | unset: files stay | A whole number of minutes above zero. A file below either folder that was last written longer ago than this is deleted, and so is a folder it leaves empty (never the folder itself). Needs `MCP_HTTP_FILES_INBOX` or `MCP_HTTP_FILES_OUTBOX`. |
 
 With neither folder set these routes do not exist: a request for one gets the
@@ -186,10 +187,18 @@ once another file or a link is there. The refusal says nothing of what the
 folders hold, and an upload it refuses is read and thrown away, never stored.
 
 The server remembers which files each held client's calls handed back, in
-memory: at most 10,000 per client (the oldest go first), each for as long as
-`MCP_HTTP_FILES_MAX_AGE_MIN` keeps the files, or for 24 hours when it is unset.
-A record names the file as it was when the call ended, so a file written later
-at the same path is not the one recorded. A restart forgets every record:
+memory: at most 10,000 per client (the oldest go first), each for
+`MCP_HTTP_FILES_HELD_MAX_AGE_MIN` minutes. Unset, that is as long as
+`MCP_HTTP_FILES_MAX_AGE_MIN` keeps the files, or 24 hours when that is unset
+too; an outbox that keeps its files for 30 days can keep the records as long
+without a sweep deleting anything. A record names the file as it was written
+(device, inode, size, modification and change time), so a file put at the
+same path later, even by another client's call while this one runs, is not
+the one recorded. The change time is part of it on purpose: a deployment step
+that later changes the file's mode, group, ACL or security label, or makes a
+hard link to it, makes it unfetchable for the held client, which fails
+closed; run such a step on the folder before the server writes, or not on
+these files. A restart forgets every record:
 a held client that fetches a file its call made before the restart gets the
 403, and the way on is to call the tool again. Behind a relay that fetch
 happens right after the call, so only a restart in that moment costs

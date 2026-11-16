@@ -81,8 +81,9 @@ their icons. `servers/oblio` is a complete example.
   ceiling (`MCP_CLIENT_MAX_ACCESS`) may fetch only the files its own calls
   handed back, and is refused everything else with a 403: files cross outside
   the tool calls a ceiling checks, so the rest is for clients with none. The
-  server remembers those files in memory, for the outbox's retention or a
-  day, and forgets them on a restart (the client then calls the tool again).
+  server remembers those files in memory, for
+  `MCP_HTTP_FILES_HELD_MAX_AGE_MIN` (the outbox's retention or a day unless
+  set), and forgets them on a restart (the client then calls the tool again).
   `MCP_HTTP_FILES_MAX_AGE_MIN` deletes files from the two folders after that
   many minutes, for a container whose folders are tmpfs: nothing else clears
   them there, and the client keeps its own copy.

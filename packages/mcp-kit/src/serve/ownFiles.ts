@@ -1,7 +1,7 @@
 import type { BigIntStats } from "node:fs";
-import { lstat } from "node:fs/promises";
 import { resolve } from "node:path";
 
+import type { HandedBack } from "../handedBack.js";
 import { isInside } from "../inputFile/roots.js";
 
 /**
@@ -17,19 +17,18 @@ import { isInside } from "../inputFile/roots.js";
  * `resource_link` a result merely carries: a tool that echoes a link it was
  * given would otherwise open another client's file to a held one.
  *
- * Each record is the file as it was when the call ended (device, inode, size,
- * modification and change time), so a file written later at the same path,
- * by another client's call or anything else, is not the one recorded, and
- * neither is a link put in its place. Records are kept in memory, per client,
- * at most `maxPerClient` each (the oldest go first), and for `maxAgeMs`: the
- * outbox's own retention (MCP_HTTP_FILES_MAX_AGE_MIN) when it has one,
- * `DEFAULT_OWN_FILES_MAX_AGE_MIN` otherwise. A restart forgets them all: a
- * held client that fetches a file after one is refused, and calls the tool
- * again.
+ * Each record is the file as it was written (device, inode, size,
+ * modification and change time, read from the written file itself, or from
+ * the path the moment the write is noted), so a file put at the same path
+ * later, by another client's call during this one or anything else, is not
+ * the one recorded, and neither is a link put in its place. The change time
+ * is part of it, so a later chmod, chgrp, ACL, relabel or hard link of the
+ * file makes it unfetchable too: that fails closed. Records are kept in
+ * memory, per client, at most `maxPerClient` each (the oldest go first), and
+ * for `maxAgeMs` (MCP_HTTP_FILES_HELD_MAX_AGE_MIN, serve/files.ts). A restart
+ * forgets them all: a held client that fetches a file after one is refused,
+ * and calls the tool again.
  */
-
-/** How long a record is kept when the outbox keeps its files for ever: a day, for a person who comes back to a file later that day. */
-export const DEFAULT_OWN_FILES_MAX_AGE_MIN = 24 * 60;
 
 /** The most records kept for one client: well above what one call hands back, and a few MB of memory at most. */
 export const OWN_FILES_PER_CLIENT = 10_000;
@@ -39,11 +38,11 @@ const identityOf = (stats: BigIntStats): string => `${stats.dev}:${stats.ino}:${
 
 export type OwnFiles = {
   /**
-   * Records, for `client`, the files one of its calls handed back (`path` to
-   * the size noted). Only regular files inside the outbox, still of the size
-   * noted, are recorded. Never throws.
+   * Records, for `client`, the files one of its calls handed back, as they
+   * were written. Only regular files inside the outbox, of the size noted,
+   * are recorded.
    */
-  readonly record: (client: string, handedBack: ReadonlyMap<string, number>) => Promise<void>;
+  readonly record: (client: string, handedBack: ReadonlyMap<string, HandedBack>) => void;
   /** Whether the file `stats` describes, opened at `path` below the outbox, is one `client`'s own calls handed back, in a record still kept. */
   readonly holds: (client: string, path: string, stats: BigIntStats) => boolean;
   /** Whether `client` has a record for `path` still kept, whatever is there now. */
@@ -78,12 +77,11 @@ export const makeOwnFiles = ({ outbox, maxAgeMs, maxPerClient = OWN_FILES_PER_CL
     return own.size === 0 ? undefined : own;
   };
 
-  const record = async (client: string, handedBack: ReadonlyMap<string, number>): Promise<void> => {
+  const record = (client: string, handedBack: ReadonlyMap<string, HandedBack>): void => {
     const found: [string, string][] = [];
-    for (const [noted, size] of handedBack) {
+    for (const [noted, { size, stats }] of handedBack) {
       const path = resolve(noted);
       if (path === root || !isInside(root, path)) continue;
-      const stats = await lstat(path, { bigint: true }).catch(() => undefined);
       if (stats === undefined || !stats.isFile() || stats.size !== BigInt(size)) continue;
       found.push([path, identityOf(stats)]);
     }

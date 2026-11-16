@@ -184,12 +184,17 @@ calls handed back. Through the relay, alice (held to `read`) can call a `read`
 tool that saves a file and links it (an e-mail attachment, an invoice archive,
 a downloaded document), and the relay brings that file to her machine as it
 does for bob. A call whose arguments name a file in the relay's inbox is not
-made for her, and a link to a file another client's call saved is not
-followed, even when a result of hers carries it; each says why in words of
-its own, not as a refused token. Bob, with no ceiling, moves files as before.
+made for her, and with a token for each client
+(`MCP_RELAY_UPSTREAM_TOKENS_DIR`) a link to a file another client's call
+saved is not followed, even when a result of hers carries it; each says why
+in words of its own, not as a refused token. Bob, with no ceiling, moves
+files as before. With one token for everyone the server sees one client, so
+clients that share a token also share each other's saved files: a file one
+of them saved, any of them can have the relay fetch when a result links it.
 
 The server remembers which files were alice's in memory, for as long as its
-outbox keeps them (`MCP_HTTP_FILES_MAX_AGE_MIN`, or 24 hours without it), and
+outbox keeps them (`MCP_HTTP_FILES_HELD_MAX_AGE_MIN`, which follows
+`MCP_HTTP_FILES_MAX_AGE_MIN` unless set, or 24 hours without either), and
 forgets them when it restarts. The relay fetches a linked file right after the
 call, so only a restart in that moment shows: the result carries a note that
 names the file and says the server no longer remembers the call, and calling
@@ -287,13 +292,15 @@ The relay listens as a server does, so the kit's HTTP variables apply to it
 | `MCP_RELAY_MAX_FILE_BYTES` | `268435456` (256 MiB) | The largest file the relay moves, either way. |
 | `MCP_RELAY_ALLOW_PLAIN_HTTP` | unset: refused | Set to `1` to allow an `http://` upstream on a host that is not this machine. The relay's token and the files then cross the network as they are written, so use it only on a network that is encrypted already (a VPN or an overlay). An `https://` upstream, or `http://` to this machine, needs nothing. |
 
-On the server, the kit's file endpoints take four variables
+On the server, the kit's file endpoints take five variables
 ([configuration](../../docs/configuration.md#files-to-and-from-another-machine)):
-`MCP_HTTP_FILES_OUTBOX`, `MCP_HTTP_FILES_INBOX`, `MCP_HTTP_FILES_MAX_BYTES` and
-`MCP_HTTP_FILES_MAX_AGE_MIN`. The last one deletes the files from both folders
-after that many minutes: set it when the server's folders are tmpfs in a
-container, where nothing else clears them, since your machine keeps the real
-copy of every file the relay moves.
+`MCP_HTTP_FILES_OUTBOX`, `MCP_HTTP_FILES_INBOX`, `MCP_HTTP_FILES_MAX_BYTES`,
+`MCP_HTTP_FILES_MAX_AGE_MIN` and `MCP_HTTP_FILES_HELD_MAX_AGE_MIN`.
+`MCP_HTTP_FILES_MAX_AGE_MIN` deletes the files from both folders after that
+many minutes: set it when the server's folders are tmpfs in a container, where
+nothing else clears them, since your machine keeps the real copy of every file
+the relay moves. `MCP_HTTP_FILES_HELD_MAX_AGE_MIN` is how long a client held to
+a ceiling may fetch a file its own call saved.
 
 ## Security
 
@@ -312,8 +319,9 @@ copy of every file the relay moves.
   refused (403) and the relay says so. The relay cannot lift a client above its upstream token, and it has
   no fallback: a client without a token of its own is a relay that does not
   start. With the single `MCP_RELAY_UPSTREAM_TOKEN_FILE` your clients share
-  one identity and one set of rights, the highest any of them needs, which is
-  why the relay warns when it has more than one.
+  one identity and one set of rights, the highest any of them needs, and,
+  where the server holds that identity to a ceiling, each other's saved
+  files, which is why the relay warns when it has more than one.
 - **A session is not bound to a client by the relay.** The relay passes
   `Mcp-Session-Id` and the other `Mcp-*` headers on as they come, and signs
   each request with the token of the client that sent it. It does not remember

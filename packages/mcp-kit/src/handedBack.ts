@@ -1,6 +1,7 @@
 import { AsyncLocalStorage } from "node:async_hooks";
+import { type BigIntStats, lstatSync } from "node:fs";
 
-import { writeFileAtomic } from "./files.js";
+import { writeFileAtomicWithStats } from "./files.js";
 import { sha256Of } from "./inputFile/bytes.js";
 import { type ResourceLink, resourceLinkTo } from "./outbox.js";
 
@@ -20,21 +21,42 @@ import { type ResourceLink, resourceLinkTo } from "./outbox.js";
  * The guard watches the same notes for the whole call (`watchHandedBack`),
  * envelope or not, since it alone knows which client made the call: over HTTP
  * that is how a client held to a ceiling may fetch the files its own calls
- * handed back, and nothing else (serve/ownFiles.ts).
+ * handed back, and nothing else (serve/ownFiles.ts). What it is told is which
+ * file was written, not only where: the stats of the file itself, so a file
+ * another call puts at the same path before this one ends is not taken for it.
  */
 const calls = new AsyncLocalStorage<Map<string, ResourceLink>>();
 
-/** The guard's view of one call: the path and size of every file handed back inside it. */
-const watched = new AsyncLocalStorage<Map<string, number>>();
+/** A file a call handed back, as the guard sees it: the size noted, and the file's stats as it was written (undefined when it could not be read). */
+export type HandedBack = { readonly size: number; readonly stats: BigIntStats | undefined };
 
-/** A file this call saved to its outbox, at an absolute path, of `size` bytes. One link per path, the last size noted. */
-export const noteHandedBack = (path: string, size: number): void => {
-  calls.getStore()?.set(path, resourceLinkTo(path, size));
-  watched.getStore()?.set(path, size);
+/** The guard's view of one call: every file handed back inside it. */
+const watched = new AsyncLocalStorage<Map<string, HandedBack>>();
+
+/** The file at `path` now, not through a link; undefined when there is none. */
+const statNow = (path: string): BigIntStats | undefined => {
+  try {
+    return lstatSync(path, { bigint: true });
+  } catch {
+    return undefined;
+  }
 };
 
-/** Runs one call, noting in `into` the path and size of every file it hands back, whichever envelope links them. */
-export const watchHandedBack = <T>(into: Map<string, number>, run: () => Promise<T>): Promise<T> => watched.run(into, run);
+/**
+ * A file this call saved to its outbox, at an absolute path, of `size` bytes.
+ * One link per path, the last size noted. Call it right after the write: when
+ * the guard is watching and `stats` (the written file's, as
+ * `writeFileAtomicWithStats` answers them) is not given, the file at the path
+ * is read now, with nothing awaited in between.
+ */
+export const noteHandedBack = (path: string, size: number, stats?: BigIntStats): void => {
+  calls.getStore()?.set(path, resourceLinkTo(path, size));
+  const watching = watched.getStore();
+  if (watching !== undefined) watching.set(path, { size, stats: stats ?? statNow(path) });
+};
+
+/** Runs one call, noting in `into` every file it hands back, whichever envelope links them. */
+export const watchHandedBack = <T>(into: Map<string, HandedBack>, run: () => Promise<T>): Promise<T> => watched.run(into, run);
 
 /** Runs one call, and answers what it returned with the links to the files it handed back, in the order first noted. */
 export const collectHandedBack = async <T>(run: () => Promise<T>): Promise<{ readonly value: T; readonly links: readonly ResourceLink[] }> => {
@@ -54,7 +76,7 @@ export type SavedFile = { readonly path: string; readonly sha256: string; readon
  */
 export const saveToOutbox = async (dir: string, name: string, data: string | Uint8Array, { mode = 0o640 }: { readonly mode?: number } = {}): Promise<SavedFile> => {
   const bytes = typeof data === "string" ? Buffer.from(data, "utf8") : data;
-  const path = await writeFileAtomic(dir, name, bytes, { mode });
-  noteHandedBack(path, bytes.length);
+  const { path, stats } = await writeFileAtomicWithStats(dir, name, bytes, { mode });
+  noteHandedBack(path, bytes.length, stats);
   return { path, sha256: sha256Of(bytes), size: bytes.length };
 };

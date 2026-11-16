@@ -76,6 +76,12 @@ export type WorldOptions = {
   readonly clients?: readonly string[];
   /** Extra settings for the server, over the usual ones (MCP_CLIENT_MAX_ACCESS, for one). */
   readonly serverEnv?: Record<string, string>;
+  /**
+   * Without `clients`: the clients of the relay, instead of the one `alice`,
+   * all presenting the one upstream token (MCP_RELAY_UPSTREAM_TOKEN_FILE), so
+   * the server sees them as its one client `relay`.
+   */
+  readonly sharing?: readonly string[];
 };
 
 const text = (value: unknown) => ({ content: [{ type: "text" as const, text: JSON.stringify(value) }] });
@@ -84,10 +90,14 @@ export const startWorld = async (options: WorldOptions = {}): Promise<World> => 
   const dir = await mkdtemp(join(tmpdir(), "mcp-relay-world-"));
   const [remoteIn, remoteOut, localIn, localOut, upstreamTokens, relayTokens, perClient] = ["remote/in", "remote/out", "local/in", "local/out", "remote/tokens", "local/tokens", "local/upstream-tokens"].map((name) => join(dir, name));
   for (const folder of [remoteIn, remoteOut, localIn, localOut, upstreamTokens, relayTokens]) await mkdir(folder as string, { recursive: true });
-  const clients = Object.fromEntries((options.clients ?? []).map((name) => [name, { relayToken: `relay-token-of-${name}-0123456789abcdef`, upstreamToken: `server-token-of-${name}-0123456789abcdef` }]));
+  const clients: Record<string, ClientTokens> = Object.fromEntries([
+    ...(options.clients ?? []).map((name) => [name, { relayToken: `relay-token-of-${name}-0123456789abcdef`, upstreamToken: `server-token-of-${name}-0123456789abcdef` }] as const),
+    ...(options.clients === undefined ? (options.sharing ?? []) : []).map((name) => [name, { relayToken: `relay-token-of-${name}-0123456789abcdef`, upstreamToken }] as const),
+  ]);
   if (options.clients === undefined) {
     await writeFile(join(upstreamTokens as string, "token-relay"), `${upstreamToken}\n`);
-    await writeFile(join(relayTokens as string, "token-alice"), `${relayToken}\n`);
+    if (options.sharing === undefined) await writeFile(join(relayTokens as string, "token-alice"), `${relayToken}\n`);
+    for (const name of options.sharing ?? []) await writeFile(join(relayTokens as string, `token-${name}`), `${clients[name]?.relayToken as string}\n`);
     await writeFile(join(dir, "upstream-token"), `${options.presentedToken ?? upstreamToken}\n`);
   } else {
     await mkdir(perClient as string, { recursive: true });

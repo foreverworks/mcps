@@ -7,7 +7,7 @@ import { z } from "zod";
 import { inCall, type LinkForPerson, type Progress, progressSender } from "../call.js";
 import { failGuard } from "../guardErrors.js";
 import { asFailure, failure, outcomeOf } from "../envelope.js";
-import { watchHandedBack } from "../handedBack.js";
+import { type HandedBack, watchHandedBack } from "../handedBack.js";
 import { type Access, type ConfirmedRule, isIdempotent, needsPerson, type ToolArgs, type ToolPolicy, type ToolRule } from "../policy.js";
 import { ceilingRefusing, DEFAULT_SETTINGS, type GuardSettings, within } from "./confirm.js";
 import { answering, answerTo, canOpenLink, canShowForm, clientCapabilities, digestOf, stateFor } from "./asking.js";
@@ -219,12 +219,12 @@ export type GuardOptions = {
   readonly icons?: ReadonlyMap<string, readonly Icon[]>;
   /**
    * Told, before the result goes out, which files a call that succeeded
-   * handed back (`noteHandedBack`: path to size), and for which client: over
+   * handed back (`noteHandedBack`: each as it was written), and for which client: over
    * HTTP with an outbox, this is how a client held to a ceiling may fetch
    * the files its own calls made (serve/ownFiles.ts). Absent, nothing is
    * watched.
    */
-  readonly handedBack?: (client: string, files: ReadonlyMap<string, number>) => Promise<void>;
+  readonly handedBack?: (client: string, files: ReadonlyMap<string, HandedBack>) => void;
 };
 
 /**
@@ -404,7 +404,7 @@ const wrapCallback = (
     const call = callOf(ctx);
     const asking: Asking = { server, ctx, tool: name, client, midCall: options.midCall !== false };
     const offered: { link?: LinkForPerson } = {};
-    const saved = new Map<string, number>();
+    const saved = new Map<string, HandedBack>();
     const watching = (running: () => Promise<Ran>): Promise<Ran> => (options.handedBack === undefined ? running() : watchHandedBack(saved, running));
     const outcome = await watching(() => inCall({ ...call, offer: (link) => (offered.link = link) }, async (): Promise<Ran> => {
       const refused = ceilingRefusing(rule.access, options.settings, client);
@@ -429,7 +429,7 @@ const wrapCallback = (
       .catch((thrown: unknown): Ran => ({ result: asFailure(thrown, options.vocabulary ?? UNKNOWN_VOCABULARY) }));
     // A failure links nothing, so it hands nothing back; a link offered to the person carries the call's own successful result.
     if (options.handedBack !== undefined && saved.size > 0 && (outcome.asked === "link" || (outcome.asked === undefined && outcomeOf(outcome.result) === "ok"))) {
-      await options.handedBack(client, saved);
+      options.handedBack(client, saved);
     }
     options.log(
       auditText({
