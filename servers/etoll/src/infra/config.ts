@@ -35,14 +35,14 @@ const trimmed = (value: string | undefined): string | undefined => {
 
 const noSlash = (url: string): string => url.replace(/\/+$/, "");
 
-/** A JSON value from a variable: absent, parsed, or the reason it is not JSON. */
+/** A JSON value from a variable: absent, parsed, or the reason it is not JSON. The reason never repeats the value, which can hold a secret. */
 export type Parsed = { readonly ok: true; readonly value: unknown } | { readonly ok: false; readonly message: string };
 
 const json = (name: string, raw: string): Parsed => {
   try {
     return { ok: true, value: JSON.parse(raw) };
   } catch {
-    return { ok: false, message: `${name} is not JSON: ${raw.slice(0, 80)}` };
+    return { ok: false, message: `${name} is not JSON (its value is not repeated here, since it can hold a secret)` };
   }
 };
 

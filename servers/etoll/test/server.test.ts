@@ -294,6 +294,16 @@ describe("the etoll server", () => {
     expect(out.error.message).toContain("ETOLL_VAULT_MCP_TOKEN_FILE");
   });
 
+  it("answers vault arguments that are not JSON as config, without repeating them", async () => {
+    world();
+    const env = { ETOLL_STATE_DIR: stateDir(), ETOLL_VAULT_MCP_COMMAND: "fake-vault", ETOLL_VAULT_ITEM: "item-1", ETOLL_VAULT_ARGS: '{"id": "item-1", "session": "not-a-real-secret' };
+    const { call } = await connected(env);
+    const out = await call("list_vehicles");
+    expect(out.error).toMatchObject({ kind: "config" });
+    expect(out.error.message).toContain("ETOLL_VAULT_ARGS is not JSON");
+    expect(JSON.stringify(out)).not.toContain("not-a-real-secret");
+  });
+
   it("lists the cars with their vignette in Bucharest days, as the portal's own screen asks for them", async () => {
     const { calls } = world();
     const { call } = await connected({ ETOLL_STATE_DIR: stateDir() });
