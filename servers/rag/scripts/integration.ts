@@ -48,6 +48,7 @@ const main = async (): Promise<void> => {
     },
   ];
   const deps: Deps = {
+    localOnly: new Set(),
     store: makeStore(pool),
     models: () => models,
     providers: { cloudflare: { missing: remote.missing } },
@@ -87,7 +88,7 @@ const main = async (): Promise<void> => {
     const copy = await search(deps, { query: "who pays major repairs structure", collections: [frozen], limit: 3, candidates: 10, rerank: true, maxChars: 400 });
     assert.deepEqual(copy.results.map((r) => r.id), repairs.results.map((r) => r.id));
     assert.ok((await deps.store.collectionInfos()).find((r) => r.name === frozen)?.snapshot);
-    assert.ok(!repairs.collections?.includes(frozen));
+    assert.ok(!("collections" in repairs && repairs.collections.includes(frozen)));
     await assert.rejects(snapshotCollections(deps, [{ from: name, name: `${name}-rollback` }, { from: name, name: `${name}-rollback` }]));
     assert.ok(!(await deps.store.collectionInfos()).some((r) => r.name === `${name}-rollback`));
     await assert.rejects(deps.store.snapshotCollections([{ from: name, name: `${name}-rollback` }, { from: `${name}-missing`, name: `${name}-rollback-other` }]));

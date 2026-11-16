@@ -92,6 +92,20 @@ export const listCollections = async (deps: Deps) => {
   return { count: rows.length, collections: rows };
 };
 
+/**
+ * A local-only collection's text is never embedded at a remote provider:
+ * refuses `provider` for such a collection, naming the setting, and does
+ * nothing for any other collection or for the local provider.
+ */
+export const refuseRemoteForLocalOnly = (deps: Deps, name: string, provider: Provider): void => {
+  if (provider === "local" || !deps.localOnly.has(name)) return;
+  fail(
+    inputError(
+      `collection "${name}" is listed in RAG_LOCAL_ONLY_COLLECTIONS, so its text is never embedded at a remote provider (${provider}); create_collection with embedding_provider "local" embeds it here (and moves an existing one), or take the name out of RAG_LOCAL_ONLY_COLLECTIONS`,
+    ),
+  );
+};
+
 /** A single database snapshot for all copies; stored vectors and lexical text stay local. */
 export const snapshotCollections = async (deps: Deps, copies: readonly { readonly from: string; readonly name: string }[]) => {
   const names = copies.map((c) => c.name);
@@ -99,6 +113,8 @@ export const snapshotCollections = async (deps: Deps, copies: readonly { readonl
   const rows = await deps.store.collectionInfos();
   for (const copy of copies) {
     if (!rows.some((r) => r.name === copy.from)) return fail(notFound("snapshot source collection does not exist"));
+    // The copy has a name of its own, which RAG_LOCAL_ONLY_COLLECTIONS does not list: it would be searched remotely.
+    if (deps.localOnly.has(copy.from)) return fail(inputError(`collection "${copy.from}" is listed in RAG_LOCAL_ONLY_COLLECTIONS, so it cannot be snapshotted: the copy would not be local-only`));
     if (rows.some((r) => r.name === copy.name)) return fail(inputError("snapshot destination already exists"));
   }
   await deps.store.snapshotCollections(copies);
@@ -112,7 +128,8 @@ export const snapshotCollections = async (deps: Deps, copies: readonly { readonl
  * embedding provider when one is named. A remote provider is probed first and
  * refused unless it embeds as the model's local endpoint does, so chunks from
  * either provider sit in one index and every question, embedded locally,
- * finds both.
+ * finds both. A local-only collection (RAG_LOCAL_ONLY_COLLECTIONS) is refused
+ * any remote provider, before the provider is probed.
  */
 export const createCollection = async (
   deps: Deps,
@@ -123,12 +140,13 @@ export const createCollection = async (
   if (existing?.snapshot) return fail(inputError("a snapshot is frozen; create a new collection to index or change providers"));
   if (existing !== undefined && args.description !== undefined && existing.description !== args.description)
     return fail(inputError(`collection "${args.name}" exists with another description ("${existing.description}"); drop it first or keep its description`));
+  const wanted = args.provider ?? existing?.provider ?? "local";
+  refuseRemoteForLocalOnly(deps, args.name, wanted);
   const embedding = existing !== undefined && args.embeddingModel === undefined ? await modelFor(deps, existing) : modelNamed(deps, args.embeddingModel);
   const model = await describeModel(embedding);
   if (existing !== undefined && existing.model !== model.model)
     return fail(inputError(`collection "${args.name}" was embedded with ${existing.model}, and ${embedding.name} serves ${model.model}: a collection keeps its model, so make another one for this model`));
   await deps.store.ensureSchema(model.dimension);
-  const wanted = args.provider ?? existing?.provider ?? "local";
   const switching = existing !== undefined && existing.provider !== wanted;
   const setting = existing === undefined || switching ? await settingFor(deps, embedding, wanted, model) : undefined;
   const created =

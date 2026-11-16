@@ -269,6 +269,12 @@ export type Deps = {
   readonly inference?: QueryInference | undefined;
   /** A per-call remote deadline, without changing the primary provider or future calls. */
   readonly inferenceForOptions?: ((options: { readonly timeoutMs?: number | undefined; readonly rerankModel?: string | undefined }) => QueryInference) | undefined;
+  /**
+   * Collections whose questions and passages never leave the machine
+   * (RAG_LOCAL_ONLY_COLLECTIONS): searches that include one run local query
+   * inference whatever `inference` is, and none is embedded at a remote provider.
+   */
+  readonly localOnly: ReadonlySet<string>;
   readonly store: Store;
   /** Every embedding model configured, the default first; a configuration error when there is none or it cannot be read. */
   readonly models: () => readonly EmbeddingModel[];

@@ -8,7 +8,7 @@ import { kindOf, SUPPORTED_EXTENSIONS } from "../../domain/kinds.js";
 import { addUsage, batches, NO_USAGE, type Usage } from "../../domain/provider.js";
 import { normaliseText } from "../../domain/text.js";
 import type { CollectionInfo, Deps, DocumentToStore, EmbeddingModel, RemoteEmbedder } from "../ports.js";
-import { findCollection, modelFor, remoteFor } from "./collections.js";
+import { findCollection, modelFor, refuseRemoteForLocalOnly, remoteFor } from "./collections.js";
 
 /** How many entries each list in a reply shows; the counts always cover everything. */
 const LISTED = 25;
@@ -170,6 +170,7 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
   const started = deps.now().getTime();
   const collection = await findCollection(deps, args.collection);
   if (collection.snapshot) return fail(inputError("a snapshot is frozen; index into a regular collection"));
+  refuseRemoteForLocalOnly(deps, collection.name, collection.provider);
   const model = await modelFor(deps, collection);
   const target: Target = { collection, model, remote: remoteFor(collection, model) };
   const language = args.language?.trim() || deps.settings.language;

@@ -128,7 +128,7 @@
   {
     "name": "health",
     "title": "Health",
-    "description": "Whether search and indexing can work: the database (its vector and unaccent extensions, the tables and their vector dimension, how many collections, and any without a vector index of its own), each embedding model by name with its endpoint's model, revision and dimension, the prompt its questions get and its counterpart at each remote provider (the first is the default), the rerank endpoint (model), and the text extractors found on PATH (pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from, and whether each remote embedding provider is configured (read from the settings, without calling it). Run this before concluding the server is broken.",
+    "description": "Whether search and indexing can work: the database (its vector and unaccent extensions, the tables and their vector dimension, how many collections, and any without a vector index of its own), each embedding model by name with its endpoint's model, revision and dimension, the prompt its questions get and its counterpart at each remote provider (the first is the default), the rerank endpoint (model), and the text extractors found on PATH (pdftotext, ocrmypdf, tesseract with its languages, pandoc), plus the folders it may index from, the local-only collections (searched and indexed on this machine only), and whether each remote embedding provider is configured (read from the settings, without calling it). Run this before concluding the server is broken.",
     "inputSchema": {
       "type": "object",
       "properties": {},
@@ -387,7 +387,7 @@
           }
         },
         "collections": {
-          "description": "Where to search. Default: every regular collection, excluding snapshots.",
+          "description": "Where to search. Default: every regular collection, excluding snapshots and local-only collections (health lists those); name a collection to search it. A scope that holds a local-only collection is always searched with local inference, whatever local_inference, inference_timeout_ms and reranker_model say, and the reply lists those under local_only.",
           "maxItems": 50,
           "type": "array",
           "items": {

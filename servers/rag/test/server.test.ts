@@ -9,10 +9,11 @@ import { join } from "node:path";
 import { checkPolicy, connectInMemory, guard, idempotentWrites, McpServer } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
-import type { Deps, EmbeddingModel, RemoteEmbedder, Reranker, Store } from "../src/app/ports.js";
+import { makeQueryInference } from "../src/app/inference.js";
+import type { Deps, EmbeddingModel, RemoteEmbedder, RemoteReranker, Reranker, Store } from "../src/app/ports.js";
 import { asAppError, fail } from "../src/domain/errors.js";
-import { PROBE_TEXTS } from "../src/domain/provider.js";
-import { buildDeps, embeddingModelsFrom } from "../src/composition.js";
+import { NO_USAGE, PROBE_TEXTS } from "../src/domain/provider.js";
+import { buildDeps, embeddingModelsFrom, localOnlyFrom } from "../src/composition.js";
 import { makeExtractor } from "../src/infra/extract.js";
 import { makeSources } from "../src/infra/sources.js";
 import { POLICY } from "../src/mcp/policy.js";
@@ -67,6 +68,9 @@ const connected = async (
     readonly wrapStore?: (store: Store) => Store;
     readonly remote?: RemoteEmbedder;
     readonly models?: (first: EmbeddingModel) => readonly EmbeddingModel[];
+    readonly localOnly?: ReadonlySet<string>;
+    readonly inference?: Deps["inference"];
+    readonly inferenceForOptions?: Deps["inferenceForOptions"];
   } = {},
 ) => {
   const inbox = await mkdtemp(join(tmpdir(), "rag-inbox-"));
@@ -91,6 +95,9 @@ const connected = async (
   };
   const models = over.models?.(first) ?? [first];
   const deps: Deps = {
+    localOnly: over.localOnly ?? new Set(),
+    inference: over.inference,
+    inferenceForOptions: over.inferenceForOptions,
     store: over.wrapStore === undefined ? store : over.wrapStore(store),
     models: () => models,
     providers: { cloudflare: { missing: remote.missing } },
@@ -687,5 +694,145 @@ describe("embedding settings", () => {
     expect(failure({ RAG_EMBED_MODELS: JSON.stringify({ b: { url: "http://b", prefix: "x" } }) })).toMatchObject({ variable: "RAG_EMBED_MODELS" });
     expect(failure({ RAG_EMBED_URL: "http://a", RAG_EMBED_MODELS: JSON.stringify({ default: { url: "http://b" } }) })?.message).toContain("RAG_EMBED_NAME");
     expect(failure({ RAG_EMBED_URL: "http://a", RAG_EMBED_NAME: "Bad Name" })).toMatchObject({ variable: "RAG_EMBED_NAME" });
+  });
+});
+
+/** Query inference at a remote provider that answers as the local fakes do, keeping every request it was sent. */
+const remoteQueryInference = () => {
+  const seen = { embed: [] as (readonly string[])[], rerank: [] as (readonly string[])[] };
+  const embedder = fakeRemote({
+    embed: async (texts) => {
+      seen.embed.push(texts);
+      return { vectors: texts.map((t) => fakeEmbed(t)), usage: NO_USAGE };
+    },
+  });
+  const remoteReranker: RemoteReranker = {
+    model: "@cf/test/rerank",
+    rerank: async (query, texts) => {
+      seen.rerank.push(texts);
+      return { scores: texts.map((t, index) => ({ index, score: fakeRerankScore(query, t) })), usage: NO_USAGE };
+    },
+  };
+  const localReranker: Reranker = { info: async () => ({ model: "test/rerank" }), rerank: async (query, texts) => texts.map((t, index) => ({ index, score: fakeRerankScore(query, t) })).sort((a, b) => b.score - a.score) };
+  const make = (timeoutMs = 2000) => makeQueryInference({ provider: "cloudflare", remote: () => embedder, remoteReranker, localReranker, batch: 2, timeoutMs });
+  return { seen, inference: make(), inferenceForOptions: (options: { readonly timeoutMs?: number | undefined }) => make(options.timeoutMs) };
+};
+
+describe("local-only collections", () => {
+  const QUESTION = "Who pays for major repairs to the building structure?";
+
+  /** A local-only "journal" and a regular "docs", both holding the same files, with a remote query provider configured. */
+  const withRemote = async (over: { readonly localOnly?: ReadonlySet<string> } = {}) => {
+    const remote = remoteQueryInference();
+    const s = await connected({ localOnly: over.localOnly ?? new Set(["journal"]), inference: remote.inference, inferenceForOptions: remote.inferenceForOptions });
+    for (const name of ["journal", "docs"]) {
+      await s.call("create_collection", { name });
+      await s.call("index_path", { collection: name, path: "." });
+    }
+    return { ...s, seen: remote.seen };
+  };
+
+  it("keeps the questions and passages of a local-only collection off the remote provider, whatever the call asks", async () => {
+    const s = await withRemote();
+    const asks = [{}, { reranker_model: "@cf/cloudflare/clef-flash" }, { inference_timeout_ms: 5000 }, { reranker_model: "@cf/cloudflare/clef", inference_timeout_ms: 1 }];
+    for (const options of asks) {
+      const found = await s.call("search", { query: QUESTION, collections: ["journal"], ...options });
+      expect(found).toMatchObject({ collections: ["journal"], local_only: ["journal"], reranked: true });
+      expect(found.inference).toBeUndefined();
+      expect(found.results[0].text).toContain("paid by the landlord");
+    }
+    expect(s.seen).toEqual({ embed: [], rerank: [] });
+    // A scope that mixes it with a regular collection runs entirely local, the regular one's passages included.
+    const mixed = await s.call("search", { query: QUESTION, collections: ["docs", "journal"], also: ["landlord repairs"], limit: 10 });
+    expect(mixed).toMatchObject({ collections: ["docs", "journal"], local_only: ["journal"], reranked: true });
+    expect(new Set(mixed.results.map((r: { collection: string }) => r.collection))).toEqual(new Set(["docs", "journal"]));
+    expect(mixed.inference).toBeUndefined();
+    expect(s.seen).toEqual({ embed: [], rerank: [] });
+    // The stubs are live: a regular collection alone does reach the remote provider.
+    const regular = await s.call("search", { query: QUESTION, collections: ["docs"] });
+    expect(regular.local_only).toBeUndefined();
+    expect(regular.inference.map((i: { provider: string }) => i.provider)).toEqual(["cloudflare", "cloudflare"]);
+    expect(s.seen.embed.length).toBeGreaterThan(0);
+    expect(s.seen.rerank.length).toBeGreaterThan(0);
+  });
+
+  it("leaves local-only collections out of a search that names none, and searches them when named", async () => {
+    const s = await withRemote();
+    const byDefault = await s.call("search", { query: QUESTION, limit: 10 });
+    expect(byDefault.collections).toEqual(["docs"]);
+    expect(byDefault.local_only).toBeUndefined();
+    expect(byDefault.results.every((r: { collection: string }) => r.collection === "docs")).toBe(true);
+    expect((await s.call("search", { query: QUESTION, collections: [] })).collections).toEqual(["docs"]);
+    expect((await s.call("search", { query: QUESTION, collections: ["journal"] })).results[0].collection).toBe("journal");
+    // With nothing else to search, the default says why it found nothing.
+    const only = await connected({ localOnly: new Set(["journal"]) });
+    await only.call("create_collection", { name: "journal" });
+    await only.call("index_path", { collection: "journal", path: "." });
+    expect(await only.call("search", { query: QUESTION })).toMatchObject({ results: [], note: expect.stringContaining("RAG_LOCAL_ONLY_COLLECTIONS") });
+  });
+
+  it("refuses to embed a local-only collection at a remote provider, creating, moving or indexing it", async () => {
+    const sent: string[] = [];
+    const localOnly = new Set(["journal"]);
+    const s = await connected({ localOnly, remote: fakeRemote({ sent }) });
+    const refused = await s.call("create_collection", { name: "journal", embedding_provider: "cloudflare" });
+    expect(refused.error).toMatchObject({ kind: "input" });
+    expect(refused.error.message).toContain("RAG_LOCAL_ONLY_COLLECTIONS");
+    expect((await s.call("list_collections")).count).toBe(0);
+    expect(sent).toEqual([]);
+    // Another name is not affected.
+    expect(await s.call("create_collection", { name: "docs", embedding_provider: "cloudflare" })).toMatchObject({ created: true });
+    // A collection made remote before its name was listed: refused until it is moved here.
+    await s.call("create_collection", { name: "notes", embedding_provider: "cloudflare" });
+    localOnly.add("notes");
+    const probed = [...sent];
+    const embeddedBefore = s.embedded.length;
+    const indexed = await s.call("index_path", { collection: "notes", path: "." });
+    expect(indexed.error).toMatchObject({ kind: "input" });
+    expect(indexed.error.message).toContain("RAG_LOCAL_ONLY_COLLECTIONS");
+    expect(await s.call("create_collection", { name: "notes" })).toMatchObject({ error: { kind: "input" } });
+    expect(s.embedded.length).toBe(embeddedBefore);
+    expect(await s.call("create_collection", { name: "notes", embedding_provider: "local" })).toMatchObject({ switched: { from: "cloudflare", to: "local" } });
+    expect(await s.call("index_path", { collection: "notes", path: "." })).toMatchObject({ indexed: 3, embedding: { provider: "local" } });
+    // Nothing but the probes of the two remote collections made before it was listed ever reached the provider.
+    expect(sent).toEqual(probed);
+  });
+
+  it("refuses a snapshot of a local-only collection, whose copy would be searched remotely", async () => {
+    const s = await withRemote();
+    const refused = await s.call("snapshot_collections", { copies: [{ from: "journal", name: "journal-frozen" }] });
+    expect(refused.error).toMatchObject({ kind: "input" });
+    expect(refused.error.message).toContain("RAG_LOCAL_ONLY_COLLECTIONS");
+    expect((await s.call("list_collections")).collections.map((c: { name: string }) => c.name)).toEqual(["docs", "journal"]);
+    expect(await s.call("snapshot_collections", { copies: [{ from: "docs", name: "docs-frozen" }] })).toMatchObject({ snapshots: [{ name: "docs-frozen" }] });
+  });
+
+  it("changes nothing else: the other tools answer as before, and health lists the names sorted", async () => {
+    const s = await withRemote({ localOnly: new Set(["notes", "journal"]) });
+    const source = join(s.inbox, "lease/contract.md");
+    const found = await s.call("search", { query: QUESTION, collections: ["journal"] });
+    expect((await s.call("expand", { collection: "journal", id: found.results[0].id })).chunks.length).toBeGreaterThan(0);
+    expect((await s.call("read_document", { collection: "journal", source })).chunks.length).toBeGreaterThan(0);
+    expect((await s.call("list_sources", { collection: "journal" })).total).toBe(3);
+    expect((await s.call("similar", { collection: "journal", source })).error).toBeUndefined();
+    expect((await s.call("health")).local_only_collections).toEqual(["journal", "notes"]);
+  });
+
+  it("is off when the variable is unset or empty: every search uses the configured provider", async () => {
+    const env = (value: string | undefined): NodeJS.ProcessEnv => (value === undefined ? {} : { RAG_LOCAL_ONLY_COLLECTIONS: value });
+    for (const value of [undefined, "", "  ", " , ,"]) expect(localOnlyFrom(env(value))).toEqual(new Set());
+    expect(localOnlyFrom(env(" journal, notes ,,journal"))).toEqual(new Set(["journal", "notes"]));
+    expect(buildDeps(env("notes,journal")).localOnly).toEqual(new Set(["journal", "notes"]));
+    expect(buildDeps({}).localOnly.size).toBe(0);
+
+    const s = await withRemote({ localOnly: localOnlyFrom(env("")) });
+    const found = await s.call("search", { query: QUESTION, limit: 10 });
+    expect(found.collections).toEqual(["docs", "journal"]);
+    expect(found.local_only).toBeUndefined();
+    expect(found.inference.map((i: { provider: string }) => i.provider)).toEqual(["cloudflare", "cloudflare"]);
+    expect(s.seen.embed.length).toBeGreaterThan(0);
+    expect(await s.call("snapshot_collections", { copies: [{ from: "journal", name: "journal-frozen" }] })).toMatchObject({ snapshots: [{ name: "journal-frozen" }] });
+    expect(await s.call("create_collection", { name: "remote", embedding_provider: "cloudflare" })).toMatchObject({ created: true });
+    expect((await s.call("health")).local_only_collections).toEqual([]);
   });
 });

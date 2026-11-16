@@ -82,6 +82,7 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_RERANK_URL` | yes | Base URL of a text-embeddings-inference server with a reranker model, such as `http://127.0.0.1:8531`. |
 | `RAG_QUERY_PROVIDER` | no | Query embedding and reranking: `local` (default), or `cloudflare` with automatic local fallback. Independent of a collection's indexing provider. |
 | `RAG_QUERY_TIMEOUT_MS` | no | Deadline per remote inference request during search. Default 2000 ms, one attempt. |
+| `RAG_LOCAL_ONLY_COLLECTIONS` | no | Collection names, separated by commas, whose questions and passages never leave this machine, even with `RAG_QUERY_PROVIDER=cloudflare`. A search that names no collections leaves them out. See [Local-only collections](#local-only-collections). |
 | `RAG_SOURCE_ROOTS` | no | Folders, separated by `:`, the server may index from in place, besides `MCP_FILE_ROOTS`. Links inside them are never followed. |
 | `RAG_OCR_LANGUAGE` | no | Tesseract language code(s) for OCR when a call names none. Default `eng`. |
 | `RAG_MAX_FILE_BYTES` | no | Largest file it reads. Default 200 MiB. |
@@ -343,7 +344,8 @@ reported usage and a closed fallback category. The same metadata goes to stderr
 when Cloudflare is selected; it never includes queries, passages or API errors.
 `health.query_inference` reports configuration and successful compatibility
 probes, without making a remote request. `search.local_inference=true` forces
-local inference for a single comparison or a private query.
+local inference for a single comparison or a private query; collections in
+`RAG_LOCAL_ONLY_COLLECTIONS` always get it ([below](#local-only-collections)).
 `search.inference_timeout_ms` sets a remote deadline for one call, including a
 very short budget to verify fallback and recovery without disrupting the service.
 `search.reranker_model` selects a remote relevance model for one comparison.
@@ -352,6 +354,40 @@ fixed rubric, from unrelated to directly answering the central question. All
 scores must be present, finite and inside the rubric; otherwise every candidate
 falls back to the local reranker. Clef reports input tokens rather than neurons;
 an absent neuron count is unknown, not evidence that an inference was free.
+
+### Local-only collections
+
+Some collections should never be sent anywhere: a journal, notes you would not
+paste into a web form. List their names in `RAG_LOCAL_ONLY_COLLECTIONS` (for
+example `private,journal`) and the server keeps what you ask about them, and
+what it finds in them, on your machine, whatever else is configured:
+
+- A search whose scope includes one embeds the question and reranks the
+  candidates with your own embed and rerank servers only, even when
+  `RAG_QUERY_PROVIDER=cloudflare`. A caller cannot turn this off:
+  `inference_timeout_ms` and `reranker_model` are ignored for such a search,
+  and the reply lists the collections under `local_only`. A scope that mixes
+  one with regular collections runs entirely local too, since the question and
+  the candidates of every collection are processed together.
+- A search that names no collections leaves them out, as it leaves out
+  snapshots, so a broad question does not surface them by accident. They are
+  searched when named in `collections`.
+- Their chunks are never embedded at a remote provider. `create_collection`
+  and `index_path` refuse a collection that would be, with an error naming the
+  variable; one embedded at a remote provider before you listed it is refused
+  until `create_collection` with `embedding_provider: "local"` moves it, which
+  does not embed again what it holds.
+- `snapshot_collections` refuses them: a copy has a name of its own and would
+  no longer be local-only.
+- `health.local_only_collections` lists the names, sorted. Names are matched
+  exactly as written, and a name applies as soon as a collection of that name
+  exists.
+
+The cost is speed: local inference is slower than Workers AI, and a search that
+holds a local-only collection is as slow as `RAG_QUERY_PROVIDER=local`. Fewer
+`candidates`, or `rerank: false`, shortens it. This protects what the server
+sends to a remote provider; anyone who can call the server's tools can still
+read these collections.
 
 For reproducible comparisons, `snapshot_collections` (write) freezes several
 collections in one database snapshot, copying their existing vectors locally.

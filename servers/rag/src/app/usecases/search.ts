@@ -89,6 +89,10 @@ const listsFor = async (deps: Deps, groups: Awaited<ReturnType<typeof byModel>>,
  * parallel; their fused lists are fused again, the query's first on ties, and
  * the reranker reads those candidates against the query as asked.
  * If the reranker fails the fused order stands and the reply says so.
+ * A search leaves the collections in `deps.localOnly` out unless it names them,
+ * and when its scope holds one, the question, the passages and the candidates
+ * go through the local models only (the reply says `local_only`), whatever
+ * `deps.inference` is: a caller cannot choose otherwise.
  */
 export const search = async (deps: Deps, args: SearchArgs) => {
   const start = performance.now();
@@ -97,17 +101,27 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   if (query.length === 0) return fail(inputError("the query is empty"));
   const also = [...new Set((args.also ?? []).map((a) => a.trim()).filter((a) => a.length > 0 && a !== query))];
   const all = await deps.store.collections();
-  const names = args.collections === undefined || args.collections.length === 0 ? all.filter((c) => !c.snapshot).map((c) => c.name) : [...new Set(args.collections)];
-  if (names.length === 0) return { query, results: [], note: "there are no collections yet" };
-  const groups = await byModel(deps, await Promise.all(names.map((name) => findCollection(deps, name))));
-  const perPhrasing = await Promise.all([query, ...also].map((p) => listsFor(deps, groups, names, args.sourcePrefix, p, inference)));
+  // Local-only collections are searched when named, like snapshots.
+  const regular = all.filter((c) => !c.snapshot && !deps.localOnly.has(c.name));
+  const names = args.collections === undefined || args.collections.length === 0 ? regular.map((c) => c.name) : [...new Set(args.collections)];
+  if (names.length === 0) {
+    const hidden = all.some((c) => !c.snapshot && deps.localOnly.has(c.name));
+    return { query, results: [], note: hidden ? "every collection is local-only (RAG_LOCAL_ONLY_COLLECTIONS) and a search leaves those out unless it names them" : "there are no collections yet" };
+  }
+  // Any local-only collection in scope keeps the whole search on this machine: the question, the
+  // other collections' passages and the rerank candidates all go through the local models only,
+  // whatever the query provider or the call's options say.
+  const localOnly = names.filter((name) => deps.localOnly.has(name));
+  const local = localOnly.length === 0 ? deps : { ...deps, inference: undefined, inferenceForOptions: undefined };
+  const groups = await byModel(local, await Promise.all(names.map((name) => findCollection(local, name))));
+  const perPhrasing = await Promise.all([query, ...also].map((p) => listsFor(local, groups, names, args.sourcePrefix, p, inference)));
   const textNote = perPhrasing.some((p) => p.textTimedOut) ? "the full-text half ran past its time bound and was left out; results come from the vector half" : undefined;
   const keep = Math.max(args.candidates, args.limit);
   // One ranked list per model, then the full-text one: a chunk is in at most one of the first.
   const fusedEach = perPhrasing.map(({ nearest, matching }) => fuse([...nearest, matching].map((hits) => hits.map(keyOf))));
   const merged = fusedEach.length === 1 ? (fusedEach[0] ?? []) : fuseInOrder(fusedEach.map((f) => f.slice(0, RETRIEVE).map((x) => x.key)));
   const fused = merged.slice(0, keep);
-  if (fused.length === 0) return { query, collections: names, results: [] };
+  if (fused.length === 0) return { query, collections: names, ...(localOnly.length === 0 ? {} : { local_only: localOnly }), results: [] };
   // Scores shown come from the query's own lists (and the first phrasing that found a chunk the query did not).
   const { nearest } = perPhrasing[0] ?? { nearest: [] };
   const textList = nearest.length;
@@ -125,9 +139,9 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   if (args.rerank && candidates.length > 1) {
     try {
       const texts = candidates.map((c) => c.chunk.body);
-      const ranked = deps.inference === undefined ? undefined : await deps.inference.rerank(query, texts);
+      const ranked = local.inference === undefined ? undefined : await local.inference.rerank(query, texts);
       if (ranked !== undefined) inference.push(ranked.trace);
-      const scores = ranked?.scores ?? await rerankAll(deps, query, texts);
+      const scores = ranked?.scores ?? await rerankAll(local, query, texts);
       order = scores.flatMap((s) => { const c = candidates[s.index]; return c === undefined ? [] : [{ ...c, rerank: s.score, i: s.index }]; });
     } catch (thrown) {
       rerankNote = `the reranker failed (${describeFailure(thrown)}); results are in fused order`;
@@ -152,6 +166,7 @@ export const search = async (deps: Deps, args: SearchArgs) => {
     ...(inference.length === 0 ? {} : { inference, elapsed_ms: Math.round(performance.now() - start) }),
     ...(also.length === 0 ? {} : { also }),
     collections: names,
+    ...(localOnly.length === 0 ? {} : { local_only: localOnly }),
     ...(groups.length > 1 ? { embedding_models: groups.map((g) => ({ name: g.model.name, collections: g.collections.map((c) => c.name) })) } : {}),
     candidates: candidates.length,
     reranked: args.rerank && rerankNote === undefined && candidates.length > 1,

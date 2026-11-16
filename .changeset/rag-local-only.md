@@ -1,0 +1,5 @@
+---
+"@foreverworks/mcp-rag": minor
+---
+
+`RAG_LOCAL_ONLY_COLLECTIONS` names collections, separated by commas, whose questions and passages never leave the machine, even when `RAG_QUERY_PROVIDER=cloudflare` is on. A `search` whose scope includes one embeds the question and reranks the candidates with the local servers only, ignoring `inference_timeout_ms` and `reranker_model`, and lists those collections under `local_only` in its reply; a scope that mixes one with regular collections runs entirely local. A `search` that names no collections now leaves them out, as it leaves out snapshots, and searches them only when they are named. They cannot be embedded at a remote provider: `create_collection` and `index_path` refuse that with an error naming the variable, and `snapshot_collections` refuses to copy one, since the copy would not be local-only. `health` lists them under `local_only_collections`. Local inference is slower than Workers AI. With the variable unset or empty nothing changes except that `health` shows an empty list.

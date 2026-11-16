@@ -76,6 +76,10 @@ export const embeddingModelsFrom = (env: NodeJS.ProcessEnv): (() => readonly Emb
   return () => models;
 };
 
+/** RAG_LOCAL_ONLY_COLLECTIONS: collection names separated by commas, spaces around them and empty entries ignored. */
+export const localOnlyFrom = (env: NodeJS.ProcessEnv): ReadonlySet<string> =>
+  new Set((env["RAG_LOCAL_ONLY_COLLECTIONS"] ?? "").split(",").map((name) => name.trim()).filter((name) => name !== ""));
+
 /**
  * The composition root: the only module naming both a port and what
  * implements it. Nothing is opened here: the database pool, the model
@@ -124,6 +128,7 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
       embed: async () => fail(configError("RAG_QUERY_PROVIDER must be local or cloudflare", "RAG_QUERY_PROVIDER")),
       rerank: async () => fail(configError("RAG_QUERY_PROVIDER must be local or cloudflare", "RAG_QUERY_PROVIDER")),
     },
+    localOnly: localOnlyFrom(env),
     store: makeStore(makePool(env)),
     models: embeddingModelsFrom(env),
     providers: { cloudflare: { missing: makeCloudflareEmbedder(env).missing } },
