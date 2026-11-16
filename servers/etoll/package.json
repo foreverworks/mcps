@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-etoll",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "MCP server for a CNAIR eToll account (rovinietă): vehicles, vignette validity, invoices and notifications, and buying a vignette paid by card on the user's own payment page",
   "mcpName": "com.foreverworks/etoll",
   "mcp": {
@@ -67,7 +67,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.3.0",
+    "@foreverworks/mcp-kit": "^0.3.1",
     "zod": "^4.6.7"
   }
 }

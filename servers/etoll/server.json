@@ -3,7 +3,7 @@
   "name": "com.foreverworks/etoll",
   "title": "eToll (rovinietă)",
   "description": "Check your cars' rovinietă on eToll, read its invoices, and buy a vignette you pay by card yourself.",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/etoll/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-etoll",
-      "version": "0.1.0",
+      "version": "0.1.1",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

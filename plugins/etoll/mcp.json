@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-etoll@0.1.0"
+        "@foreverworks/mcp-etoll@0.1.1"
       ],
       "env": {
         "ETOLL_USERNAME": "${ETOLL_USERNAME}",
