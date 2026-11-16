@@ -180,10 +180,14 @@ and the guard in more depth.
      anywhere; `extras` is for a server that runs from a clone and is not
      published to npm, the MCP Registry or as a desktop bundle. Choose
      `extras` for a server that needs hardware or a service its user sets up
-     first (a printer, a device host, model servers), for one that relies on
-     an API its owner does not document for third parties, or when the
-     repository's GitHub topics (at most 20, `TOPICS_MAX` in
-     `scripts/packaging.ts`) have no room for another published server.
+     first (a printer, a device host, model servers), or for one that relies
+     on an API its owner does not document for third parties. The maintainer
+     may still publish one of the latter, as `experimental`, when people
+     outside this repository would want it (the eToll server is one): its
+     README then says that the API is unofficial and can change under it.
+     A published server names its service in the repository's GitHub topics
+     while GitHub's 20 leave room, stable ones first (`topicsOf` in
+     `scripts/packaging.ts`); one without a topic ships all the same.
    - `maturity`: `stable` (in daily use, and its tools keep their shape),
      `beta` (in use, and new or still growing, or reading web pages its
      service may change) or `experimental` (rests on an interface its owner

@@ -158,14 +158,18 @@ export const TOPICS_MAX = 20;
 /**
  * The repository's GitHub topics, which is how a stranger finds it there: the
  * base keywords, every published audience's, then each published server's
- * first own keyword, the one that names its service. Extras are left out, as
- * they are from every listing.
+ * first own keyword, the one that names its service, as many as GitHub's
+ * TOPICS_MAX leaves room for. The servers take their turn by maturity
+ * (stable, then beta, then experimental), each in audience order, so the ones
+ * a stranger can rely on are found first; a server left without a topic
+ * still ships. Extras are left out, as they are from every listing.
  */
-export const topicsOf = (manifests: readonly Pick<Manifest, "audience" | "keywords">[]): readonly string[] => {
+export const topicsOf = (manifests: readonly Pick<Manifest, "audience" | "maturity" | "keywords">[]): readonly string[] => {
   const generated = new Set<string>([...BASE_KEYWORDS, ...AUDIENCES.flatMap((a) => AUDIENCE[a].keywords)]);
   const published = AUDIENCES.filter((a) => AUDIENCE[a].ships);
-  const own = published.flatMap((a) => manifests.filter((m) => m.audience === a).flatMap((m) => m.keywords.filter((k) => !generated.has(k)).slice(0, 1)));
-  return [...new Set([...BASE_KEYWORDS, ...published.flatMap((a) => AUDIENCE[a].keywords), ...own])];
+  const inTurn = MATURITIES.flatMap((maturity) => published.flatMap((a) => manifests.filter((m) => m.audience === a && m.maturity === maturity)));
+  const own = inTurn.flatMap((m) => m.keywords.filter((k) => !generated.has(k)).slice(0, 1));
+  return [...new Set([...BASE_KEYWORDS, ...published.flatMap((a) => AUDIENCE[a].keywords), ...own])].slice(0, TOPICS_MAX);
 };
 
 /** Words a tagline does without (CONTRIBUTING.md, "How we write"). */

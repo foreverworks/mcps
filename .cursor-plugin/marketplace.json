@@ -37,6 +37,10 @@
       "source": "enable-banking"
     },
     {
+      "name": "foreverworks-etoll",
+      "source": "etoll"
+    },
+    {
       "name": "foreverworks-google",
       "source": "google"
     },

@@ -169,11 +169,25 @@ describe("the built site's own links", () => {
 describe("the repository's GitHub topics", () => {
   it("are the base keywords, every published audience's, then each published server's first own keyword", () => {
     const servers = [
-      { audience: "romania", keywords: ["mcp", "model-context-protocol", "mcp-server", "romania", "romanian", "e-factura", "anaf"] },
-      { audience: "romania", keywords: ["mcp", "romania", "anaf", "spv"] },
-      { audience: "general", keywords: ["mcp", "notion"] },
-      { audience: "extras", keywords: ["mcp", "glovo"] },
+      { audience: "romania", maturity: "stable", keywords: ["mcp", "model-context-protocol", "mcp-server", "romania", "romanian", "e-factura", "anaf"] },
+      { audience: "romania", maturity: "stable", keywords: ["mcp", "romania", "anaf", "spv"] },
+      { audience: "general", maturity: "stable", keywords: ["mcp", "notion"] },
+      { audience: "extras", maturity: "stable", keywords: ["mcp", "glovo"] },
     ] as const;
     expect(topicsOf(servers)).toEqual(["mcp", "model-context-protocol", "mcp-server", "romania", "romanian", "e-factura", "anaf", "notion"]);
+  });
+
+  it("stop at GitHub's 20, leaving out experimental servers before beta ones and beta ones before stable ones", () => {
+    const servers = [
+      { audience: "romania", maturity: "experimental", keywords: ["etoll"] },
+      ...Array.from({ length: 10 }, (_, i) => ({ audience: "general", maturity: "beta", keywords: [`beta-${i}`] }) as const),
+      ...Array.from({ length: 10 }, (_, i) => ({ audience: "general", maturity: "stable", keywords: [`stable-${i}`] }) as const),
+    ] as const;
+    const topics = topicsOf(servers);
+    expect(topics).toHaveLength(20);
+    expect(topics.slice(0, 5)).toEqual(["mcp", "model-context-protocol", "mcp-server", "romania", "romanian"]);
+    expect(topics.filter((t) => t.startsWith("stable-"))).toHaveLength(10);
+    expect(topics.filter((t) => t.startsWith("beta-"))).toHaveLength(5);
+    expect(topics).not.toContain("etoll");
   });
 });

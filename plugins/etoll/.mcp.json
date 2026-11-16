@@ -1,0 +1,15 @@
+{
+  "mcpServers": {
+    "etoll": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-etoll@0.1.0"
+      ],
+      "env": {
+        "ETOLL_USERNAME": "${user_config.etoll_username}",
+        "ETOLL_PASSWORD_FILE": "${user_config.etoll_password_file}"
+      }
+    }
+  }
+}

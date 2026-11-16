@@ -1,0 +1,56 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/etoll",
+  "title": "eToll (rovinietă)",
+  "description": "Check your cars' rovinietă on eToll, read its invoices, and buy a vignette you pay by card yourself.",
+  "version": "0.1.0",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/etoll/",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/etoll"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/etoll/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/etoll/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-etoll",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ETOLL_USERNAME",
+          "description": "The e-mail address or phone number you sign in to eToll with; leave empty to sign in through the browser instead.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "ETOLL_PASSWORD_FILE",
+          "description": "Path of a file holding only your eToll password; leave empty to sign in through the browser instead.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

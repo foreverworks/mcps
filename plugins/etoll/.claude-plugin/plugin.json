@@ -1,0 +1,42 @@
+{
+  "name": "foreverworks-etoll",
+  "displayName": "eToll (rovinietă)",
+  "version": "0.1.0",
+  "description": "Check your cars' rovinietă on eToll, read its invoices, and buy a vignette you pay by card yourself.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/etoll/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "etoll",
+    "rovinieta",
+    "vignette",
+    "cnair"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/etoll/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "etoll_username": {
+      "type": "string",
+      "title": "eToll user name",
+      "description": "The e-mail address or phone number you sign in to eToll with; leave empty to sign in through the browser instead.",
+      "required": false
+    },
+    "etoll_password_file": {
+      "type": "file",
+      "title": "eToll password file",
+      "description": "Path of a file holding only your eToll password; leave empty to sign in through the browser instead.",
+      "required": false
+    }
+  }
+}

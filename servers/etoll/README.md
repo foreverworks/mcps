@@ -27,10 +27,30 @@ of the API the portal itself uses, so it can break when eToll changes it.
 ## Install
 
 <!-- install:begin -->
-> [!NOTE]
-> eToll (rovinietă) is one of this repository's [extras](../../README.md#extras), which run from a clone and are not published to npm, the MCP Registry or as desktop bundles. Run it on Node 22.19 or newer.
+[![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=etoll&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22etoll_username%22%2C%22description%22%3A%22Optional.%20The%20e-mail%20address%20or%20phone%20number%20you%20sign%20in%20to%20eToll%20with%3B%20leave%20empty%20to%20sign%20in%20through%20the%20browser%20instead.%22%7D%2C%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22etoll_password_file%22%2C%22description%22%3A%22Optional.%20Path%20of%20a%20file%20holding%20only%20your%20eToll%20password%3B%20leave%20empty%20to%20sign%20in%20through%20the%20browser%20instead.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-etoll%22%5D%2C%22env%22%3A%7B%22ETOLL_USERNAME%22%3A%22%24%7Binput%3Aetoll_username%7D%22%2C%22ETOLL_PASSWORD_FILE%22%3A%22%24%7Binput%3Aetoll_password_file%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=etoll&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWV0b2xsIl0sImVudiI6eyJFVE9MTF9VU0VSTkFNRSI6IiR7ZW52OkVUT0xMX1VTRVJOQU1FfSIsIkVUT0xMX1BBU1NXT1JEX0ZJTEUiOiIke2VudjpFVE9MTF9QQVNTV09SRF9GSUxFfSJ9fQ%3D%3D) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-etoll.mcpb)
 
 With Claude Code:
+
+```bash
+claude mcp add etoll -- npx -y @foreverworks/mcp-etoll
+```
+
+Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON:
+
+```json
+{
+  "mcpServers": {
+    "etoll": {
+      "command": "npx",
+      "args": ["-y", "@foreverworks/mcp-etoll"]
+    }
+  }
+}
+```
+
+Each runs the published package on Node 22.19 or newer. VS Code and the Claude Desktop bundle ask for each setting as they add the server; leave an optional one empty. Cursor reads each from your environment instead (`${env:ETOLL_USERNAME}` and so on), so set them before you start Cursor. Every setting is optional; [Configuration](#configuration) says which ones you need for which tools.
+
+### From a clone
 
 ```bash
 git clone https://github.com/foreverworks/mcps.git && cd mcps
@@ -38,20 +58,7 @@ npm ci && npm run build
 claude mcp add etoll -- node "$PWD/servers/etoll/dist/index.js"
 ```
 
-Claude Desktop (Settings, Developer, Edit Config) and most other clients read the same command as JSON, with the full path of `servers/etoll/dist/index.js` in your clone:
-
-```json
-{
-  "mcpServers": {
-    "etoll": {
-      "command": "node",
-      "args": ["<path to the clone>/servers/etoll/dist/index.js"]
-    }
-  }
-}
-```
-
-Every setting is optional; [Configuration](#configuration) says which ones you need for which tools. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
+In a JSON configuration, the command is `node` and its one argument the full path of `servers/etoll/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
 
 ## Configuration

@@ -56,6 +56,13 @@
       "version": "0.1.1"
     },
     {
+      "name": "foreverworks-etoll",
+      "displayName": "eToll (rovinietă)",
+      "source": "./plugins/etoll",
+      "description": "Check your cars' rovinietă on eToll, read its invoices, and buy a vignette you pay by card yourself.",
+      "version": "0.1.0"
+    },
+    {
       "name": "foreverworks-google",
       "displayName": "Google Workspace",
       "source": "./plugins/google",

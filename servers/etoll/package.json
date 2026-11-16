@@ -1,11 +1,11 @@
 {
   "name": "@foreverworks/mcp-etoll",
   "version": "0.1.0",
-  "private": true,
   "description": "MCP server for a CNAIR eToll account (rovinietă): vehicles, vignette validity, invoices and notifications, and buying a vignette paid by card on the user's own payment page",
+  "mcpName": "com.foreverworks/etoll",
   "mcp": {
     "title": "eToll (rovinietă)",
-    "audience": "extras",
+    "audience": "romania",
     "maturity": "experimental",
     "tagline": "Check your cars' rovinietă on eToll, read its invoices, and buy a vignette you pay by card yourself.",
     "inputs": {
@@ -27,6 +27,8 @@
     "mcp",
     "model-context-protocol",
     "mcp-server",
+    "romania",
+    "romanian",
     "etoll",
     "rovinieta",
     "vignette",

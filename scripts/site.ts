@@ -18,7 +18,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath, pathToFileURL } from "node:url";
 
 import { INK, SITE_GLYPH, TILE, iconSvg } from "./icons.js";
-import { AUDIENCE, AUDIENCES, publisherOf, readManifest, SITE, TOPICS_MAX, topicsOf, type Manifest } from "./packaging.js";
+import { AUDIENCE, AUDIENCES, publisherOf, readManifest, SITE, topicsOf, type Manifest } from "./packaging.js";
 import { reachLine } from "./readme.js";
 import { checkSite, resolveHref, type Layout } from "./site/links.js";
 import { githubSlug } from "./site/markdown.js";
@@ -110,7 +110,6 @@ export const build = (): Built => {
     if (problem !== undefined) problems.push(`${source === "" ? "" : `${source}/`}README.md: ${problem}`);
     return url;
   };
-  if (repository.topics.length > TOPICS_MAX) problems.push(`the repository would have ${repository.topics.length} GitHub topics; GitHub allows ${TOPICS_MAX} (topicsOf, scripts/packaging.ts)`);
   try {
     const pages = [
       landingPage(servers, repository, SITE, resolvers),
