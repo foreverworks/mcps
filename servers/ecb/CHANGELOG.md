@@ -1,5 +1,11 @@
 # @foreverworks/mcp-ecb
 
+## 0.1.1
+
+### Patch Changes
+
+- Published through npm's trusted publishing: from this version on, each release names GitHub Actions as its publisher, with a provenance statement that ties the package to the commit it was built from.
+
 ## 0.1.0
 
 The first release. The European Central Bank's euro foreign exchange reference rates: the rate in force on any day since 1999 with the date of the fixing it is, every currency on a day or a window of fixings, and amounts converted between any two currencies, cross rates through the euro included. Rates are the ECB's exact value, and every conversion is computed in exact decimals, rounded once by the rule you name, and answers the rate or rates and the fixing it used. A weekend, a holiday or the hours before the ECB publishes (around 16:00 CET) take the last working day's fixing, and the answer says so.

@@ -53,7 +53,7 @@
       "displayName": "ECB exchange rates",
       "source": "./plugins/ecb",
       "description": "Look up the European Central Bank's euro rate for any day, and convert between any two currencies.",
-      "version": "0.1.0"
+      "version": "0.1.1"
     },
     {
       "name": "foreverworks-enable-banking",
@@ -109,7 +109,7 @@
       "displayName": "Porkbun",
       "source": "./plugins/porkbun",
       "description": "Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.",
-      "version": "0.1.3"
+      "version": "0.1.4"
     },
     {
       "name": "foreverworks-trademarks",

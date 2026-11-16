@@ -1,7 +1,7 @@
 {
   "name": "foreverworks-ecb",
   "displayName": "ECB exchange rates",
-  "version": "0.1.0",
+  "version": "0.1.1",
   "description": "Look up the European Central Bank's euro rate for any day, and convert between any two currencies.",
   "author": {
     "name": "Forever Works",
