@@ -387,7 +387,7 @@
           }
         },
         "collections": {
-          "description": "Where to search. Default: every regular collection, excluding snapshots and local-only collections (health lists those); name a collection to search it. A scope that holds a local-only collection is always searched with local inference, whatever local_inference, inference_timeout_ms and reranker_model say, and the reply lists those under local_only.",
+          "description": "Where to search. Default: every regular collection, excluding snapshots, local-only collections and collections searched only when named (health lists both); name a collection to search it. A scope that holds a local-only collection is always searched with local inference, whatever local_inference, inference_timeout_ms and reranker_model say, and the reply lists those under local_only.",
           "maxItems": 50,
           "type": "array",
           "items": {

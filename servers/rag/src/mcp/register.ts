@@ -182,7 +182,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
               "and for a question in another language than the documents a translation into theirs. Each is retrieved like the query, " +
               "the candidates merged, and the reranker reads them against the query. Finds passages the query's own words miss; no answer guesses.",
           ),
-        collections: z.array(collection).max(50).optional().describe("Where to search. Default: every regular collection, excluding snapshots and local-only collections (health lists those); name a collection to search it. A scope that holds a local-only collection is always searched with local inference, whatever local_inference, inference_timeout_ms and reranker_model say, and the reply lists those under local_only."),
+        collections: z.array(collection).max(50).optional().describe("Where to search. Default: every regular collection, excluding snapshots, local-only collections and collections searched only when named (health lists both); name a collection to search it. A scope that holds a local-only collection is always searched with local inference, whatever local_inference, inference_timeout_ms and reranker_model say, and the reply lists those under local_only."),
         source_prefix: z.string().optional().describe("Only sources whose path starts with this; end a folder with /."),
         limit: z.number().int().min(1).max(50).default(5).describe("Results returned."),
         candidates: z.number().int().min(1).max(50).default(20).describe("Fused candidates the reranker reads; more finds more and costs time."),

@@ -13,7 +13,7 @@ import { makeQueryInference } from "../src/app/inference.js";
 import type { Deps, EmbeddingModel, RemoteEmbedder, RemoteReranker, Reranker, Store } from "../src/app/ports.js";
 import { asAppError, fail } from "../src/domain/errors.js";
 import { NO_USAGE, PROBE_TEXTS } from "../src/domain/provider.js";
-import { buildDeps, embeddingModelsFrom, localOnlyFrom } from "../src/composition.js";
+import { buildDeps, embeddingModelsFrom, localOnlyFrom, namedOnlyFrom } from "../src/composition.js";
 import { makeExtractor } from "../src/infra/extract.js";
 import { makeSources } from "../src/infra/sources.js";
 import { POLICY } from "../src/mcp/policy.js";
@@ -70,6 +70,8 @@ const connected = async (
     readonly models?: (first: EmbeddingModel) => readonly EmbeddingModel[];
     readonly localOnly?: ReadonlySet<string>;
     readonly localOnlyInvalid?: readonly string[];
+    readonly namedOnly?: ReadonlySet<string>;
+    readonly namedOnlyInvalid?: readonly string[];
     readonly inference?: Deps["inference"];
     readonly inferenceForOptions?: Deps["inferenceForOptions"];
   } = {},
@@ -98,6 +100,8 @@ const connected = async (
   const deps: Deps = {
     localOnly: over.localOnly ?? new Set(),
     localOnlyInvalid: over.localOnlyInvalid ?? [],
+    namedOnly: over.namedOnly ?? new Set(),
+    namedOnlyInvalid: over.namedOnlyInvalid ?? [],
     inference: over.inference,
     inferenceForOptions: over.inferenceForOptions,
     store: over.wrapStore === undefined ? store : over.wrapStore(store),
@@ -876,5 +880,73 @@ describe("local-only collections", () => {
     expect(await s.call("snapshot_collections", { copies: [{ from: "journal", name: "journal-frozen" }] })).toMatchObject({ snapshots: [{ name: "journal-frozen" }] });
     expect(await s.call("create_collection", { name: "remote", embedding_provider: "cloudflare" })).toMatchObject({ created: true });
     expect((await s.call("health")).local_only_collections).toEqual([]);
+  });
+});
+
+describe("named-only collections", () => {
+  const QUESTION = "Who pays for major repairs to the building structure?";
+
+  /** A named-only "journal" and a regular "docs", both holding the same files, with a remote query provider configured. */
+  const withRemote = async (over: { readonly namedOnly?: ReadonlySet<string>; readonly localOnly?: ReadonlySet<string> } = {}) => {
+    const remote = remoteQueryInference();
+    const s = await connected({ namedOnly: over.namedOnly ?? new Set(["journal"]), localOnly: over.localOnly ?? new Set(), inference: remote.inference, inferenceForOptions: remote.inferenceForOptions });
+    for (const name of ["journal", "docs"]) {
+      await s.call("create_collection", { name });
+      await s.call("index_path", { collection: name, path: "." });
+    }
+    return { ...s, seen: remote.seen };
+  };
+
+  it("leaves them out of a search that names none and says so, and searches them when named, with the configured provider", async () => {
+    const s = await withRemote();
+    const byDefault = await s.call("search", { query: QUESTION, limit: 10 });
+    expect(byDefault).toMatchObject({ collections: ["docs"], left_out_named_only: ["journal"] });
+    expect(byDefault.left_out_local_only).toBeUndefined();
+    expect(byDefault.results.every((r: { collection: string }) => r.collection === "docs")).toBe(true);
+    expect((await s.call("search", { query: QUESTION, collections: [] })).collections).toEqual(["docs"]);
+    // Named, it is an ordinary collection: the remote provider embeds and reranks, and nothing is reported left out.
+    const named = await s.call("search", { query: QUESTION, collections: ["journal"] });
+    expect(named.results[0].collection).toBe("journal");
+    expect(named.local_only).toBeUndefined();
+    expect(named.left_out_named_only).toBeUndefined();
+    expect(named.inference.map((i: { provider: string }) => i.provider)).toEqual(["cloudflare", "cloudflare"]);
+    // Indexing at a remote provider and snapshots are not refused.
+    expect(await s.call("create_collection", { name: "journal-remote", embedding_provider: "cloudflare" })).toMatchObject({ created: true });
+    expect(await s.call("snapshot_collections", { copies: [{ from: "journal", name: "journal-frozen" }] })).toMatchObject({ snapshots: [{ name: "journal-frozen" }] });
+    // With nothing else to search, the default says why it found nothing.
+    const only = await connected({ namedOnly: new Set(["journal"]) });
+    await only.call("create_collection", { name: "journal" });
+    await only.call("index_path", { collection: "journal", path: "." });
+    expect(await only.call("search", { query: QUESTION })).toMatchObject({ results: [], left_out_named_only: ["journal"], note: expect.stringContaining("RAG_NAMED_ONLY_COLLECTIONS") });
+  });
+
+  it("reports a collection on both lists as local-only, and keeps it local", async () => {
+    const s = await withRemote({ localOnly: new Set(["journal"]) });
+    const byDefault = await s.call("search", { query: QUESTION });
+    expect(byDefault).toMatchObject({ collections: ["docs"], left_out_local_only: ["journal"] });
+    expect(byDefault.left_out_named_only).toBeUndefined();
+    expect((await s.call("search", { query: QUESTION, collections: ["journal"] })).local_only).toEqual(["journal"]);
+  });
+
+  it("reads the variable like the local-only one, and health lists the names, the unknown and the invalid", async () => {
+    const env = (value: string | undefined): NodeJS.ProcessEnv => (value === undefined ? {} : { RAG_NAMED_ONLY_COLLECTIONS: value });
+    for (const value of [undefined, "", " , ,"]) expect(namedOnlyFrom(env(value))).toEqual({ names: new Set(), invalid: [] });
+    expect(namedOnlyFrom(env("Journal, notes;old ,journal"))).toEqual({ names: new Set(["journal"]), invalid: ["notes;old"] });
+    expect(buildDeps(env("notes,Journal")).namedOnly).toEqual(new Set(["journal", "notes"]));
+    expect(buildDeps(env("notes,Journal")).localOnly.size).toBe(0);
+    expect(buildDeps({}).namedOnlyInvalid).toEqual([]);
+
+    const parsed = namedOnlyFrom(env("journal,later,journal;notes"));
+    const s = await connected({ namedOnly: parsed.names, namedOnlyInvalid: parsed.invalid });
+    await s.call("create_collection", { name: "journal" });
+    const health = await s.call("health");
+    expect(health.ok).toBe(false);
+    expect(health).toMatchObject({ named_only_collections: ["journal", "later"], named_only_unknown: ["later"], named_only_invalid: ["journal;notes"], local_only_collections: [] });
+    expect((health.problems ?? []).filter((p: string) => p.startsWith("RAG_NAMED_ONLY_COLLECTIONS"))).toEqual([expect.stringContaining('lists "journal;notes"')]);
+    const plain = await connected();
+    const fine = await plain.call("health");
+    expect(fine.named_only_collections).toEqual([]);
+    expect(fine.named_only_unknown).toBeUndefined();
+    expect(fine.named_only_invalid).toBeUndefined();
   });
 });

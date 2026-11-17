@@ -89,10 +89,11 @@ const listsFor = async (deps: Deps, groups: Awaited<ReturnType<typeof byModel>>,
  * parallel; their fused lists are fused again, the query's first on ties, and
  * the reranker reads those candidates against the query as asked.
  * If the reranker fails the fused order stands and the reply says so.
- * A search leaves the collections in `deps.localOnly` out unless it names them,
- * and when its scope holds one, the question, the passages and the candidates
- * go through the local models only (the reply says `local_only`), whatever
- * `deps.inference` is: a caller cannot choose otherwise.
+ * A search leaves the collections in `deps.localOnly` and `deps.namedOnly` out
+ * unless it names them, and when its scope holds a local-only one, the
+ * question, the passages and the candidates go through the local models only
+ * (the reply says `local_only`), whatever `deps.inference` is: a caller cannot
+ * choose otherwise.
  */
 export const search = async (deps: Deps, args: SearchArgs) => {
   const start = performance.now();
@@ -101,13 +102,22 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   if (query.length === 0) return fail(inputError("the query is empty"));
   const also = [...new Set((args.also ?? []).map((a) => a.trim()).filter((a) => a.length > 0 && a !== query))];
   const all = await deps.store.collections();
-  // Local-only collections are searched when named, like snapshots.
-  const regular = all.filter((c) => !c.snapshot && !deps.localOnly.has(c.name));
+  // Local-only and named-only collections are searched when named, like snapshots.
+  const regular = all.filter((c) => !c.snapshot && !deps.localOnly.has(c.name) && !deps.namedOnly.has(c.name));
   const byDefault = args.collections === undefined || args.collections.length === 0;
   const names = byDefault ? regular.map((c) => c.name) : [...new Set(args.collections ?? [])];
   const leftOut = byDefault ? all.filter((c) => !c.snapshot && deps.localOnly.has(c.name)).map((c) => c.name) : [];
+  const leftOutNamed = byDefault ? all.filter((c) => !c.snapshot && !deps.localOnly.has(c.name) && deps.namedOnly.has(c.name)).map((c) => c.name) : [];
+  const leftOutReply = { ...(leftOut.length === 0 ? {} : { left_out_local_only: leftOut }), ...(leftOutNamed.length === 0 ? {} : { left_out_named_only: leftOutNamed }) };
   if (names.length === 0) {
-    return { query, results: [], note: leftOut.length > 0 ? "every collection is local-only (RAG_LOCAL_ONLY_COLLECTIONS) and a search leaves those out unless it names them" : "there are no collections yet" };
+    return {
+      query,
+      results: [],
+      ...leftOutReply,
+      note: leftOut.length + leftOutNamed.length > 0
+        ? "every collection is local-only (RAG_LOCAL_ONLY_COLLECTIONS) or searched only when named (RAG_NAMED_ONLY_COLLECTIONS), and a search leaves those out unless it names them"
+        : "there are no collections yet",
+    };
   }
   // Any local-only collection in scope keeps the whole search on this machine: the question, the
   // other collections' passages and the rerank candidates all go through the local models only,
@@ -122,7 +132,7 @@ export const search = async (deps: Deps, args: SearchArgs) => {
   const fusedEach = perPhrasing.map(({ nearest, matching }) => fuse([...nearest, matching].map((hits) => hits.map(keyOf))));
   const merged = fusedEach.length === 1 ? (fusedEach[0] ?? []) : fuseInOrder(fusedEach.map((f) => f.slice(0, RETRIEVE).map((x) => x.key)));
   const fused = merged.slice(0, keep);
-  if (fused.length === 0) return { query, collections: names, ...(localOnly.length === 0 ? {} : { local_only: localOnly }), ...(leftOut.length === 0 ? {} : { left_out_local_only: leftOut }), results: [] };
+  if (fused.length === 0) return { query, collections: names, ...(localOnly.length === 0 ? {} : { local_only: localOnly }), ...leftOutReply, results: [] };
   // Scores shown come from the query's own lists (and the first phrasing that found a chunk the query did not).
   const { nearest } = perPhrasing[0] ?? { nearest: [] };
   const textList = nearest.length;
@@ -168,7 +178,7 @@ export const search = async (deps: Deps, args: SearchArgs) => {
     ...(also.length === 0 ? {} : { also }),
     collections: names,
     ...(localOnly.length === 0 ? {} : { local_only: localOnly }),
-    ...(leftOut.length === 0 ? {} : { left_out_local_only: leftOut }),
+    ...leftOutReply,
     ...(groups.length > 1 ? { embedding_models: groups.map((g) => ({ name: g.model.name, collections: g.collections.map((c) => c.name) })) } : {}),
     candidates: candidates.length,
     reranked: args.rerank && rerankNote === undefined && candidates.length > 1,

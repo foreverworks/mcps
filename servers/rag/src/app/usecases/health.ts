@@ -30,6 +30,8 @@ export const checkHealth = async (deps: Deps) => {
   const localOnly = [...deps.localOnly].sort();
   // Informational: a collection can be created later and is covered from then on. Left out when the database did not answer.
   const unknown = existing.ok ? localOnly.filter((name) => !existing.names.includes(name)) : [];
+  const namedOnly = [...deps.namedOnly].sort();
+  const namedUnknown = existing.ok ? namedOnly.filter((name) => !existing.names.includes(name)) : [];
   const list = models.ok ? models.list : [];
   const embedding_models = list.map(({ m, described }) => ({
     ...(described.ok ? described : { name: m.name, ok: false, error: described.error }),
@@ -49,6 +51,7 @@ export const checkHealth = async (deps: Deps) => {
     ),
     ...(rerank.ok ? [] : [`rerank: ${rerank.error}`]),
     ...deps.localOnlyInvalid.map((entry) => `RAG_LOCAL_ONLY_COLLECTIONS lists "${entry}", which is not a collection name (lowercase letters, digits, - and _): it protects nothing`),
+    ...deps.namedOnlyInvalid.map((entry) => `RAG_NAMED_ONLY_COLLECTIONS lists "${entry}", which is not a collection name (lowercase letters, digits, - and _): it matches nothing`),
     ...(database.ok && database.unindexed.length > 0
       ? [`collections without a vector index of their own, searched through the shared one: ${database.unindexed.join(", ")}; create_collection with each name builds it`]
       : []),
@@ -56,7 +59,7 @@ export const checkHealth = async (deps: Deps) => {
       .filter(([, v]) => v.startsWith("missing"))
       .map(([name, v]) => `${name}: ${v}`),
   ];
-  const ok = database.ok && database.vector !== undefined && models.ok && list.every((x) => x.described.ok) && rerank.ok && deps.localOnlyInvalid.length === 0;
+  const ok = database.ok && database.vector !== undefined && models.ok && list.every((x) => x.described.ok) && rerank.ok && deps.localOnlyInvalid.length === 0 && deps.namedOnlyInvalid.length === 0;
   const first = embedding_models[0];
   return {
     ok,
@@ -74,6 +77,10 @@ export const checkHealth = async (deps: Deps) => {
     local_only_collections: localOnly,
     ...(unknown.length === 0 ? {} : { local_only_unknown: unknown }),
     ...(deps.localOnlyInvalid.length === 0 ? {} : { local_only_invalid: deps.localOnlyInvalid }),
+    // Which a search reads only when it names them.
+    named_only_collections: namedOnly,
+    ...(namedUnknown.length === 0 ? {} : { named_only_unknown: namedUnknown }),
+    ...(deps.namedOnlyInvalid.length === 0 ? {} : { named_only_invalid: deps.namedOnlyInvalid }),
     roots: deps.sources.roots,
     language: deps.settings.language,
   };

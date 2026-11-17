@@ -277,6 +277,14 @@ export type Deps = {
   readonly localOnly: ReadonlySet<string>;
   /** Entries of RAG_LOCAL_ONLY_COLLECTIONS that are not collection names, as written: they protect nothing, and health says so. */
   readonly localOnlyInvalid: readonly string[];
+  /**
+   * Collections a search reads only when it names them (RAG_NAMED_ONLY_COLLECTIONS),
+   * like snapshots and local-only collections: a large or specialised corpus that would
+   * crowd a broad question's results. Nothing else about them changes.
+   */
+  readonly namedOnly: ReadonlySet<string>;
+  /** Entries of RAG_NAMED_ONLY_COLLECTIONS that are not collection names, as written: they match nothing, and health says so. */
+  readonly namedOnlyInvalid: readonly string[];
   readonly store: Store;
   /** Every embedding model configured, the default first; a configuration error when there is none or it cannot be read. */
   readonly models: () => readonly EmbeddingModel[];

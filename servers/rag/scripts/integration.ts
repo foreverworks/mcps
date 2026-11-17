@@ -50,6 +50,8 @@ const main = async (): Promise<void> => {
   const deps: Deps = {
     localOnly: new Set(),
     localOnlyInvalid: [],
+    namedOnly: new Set(),
+    namedOnlyInvalid: [],
     store: makeStore(pool),
     models: () => models,
     providers: { cloudflare: { missing: remote.missing } },

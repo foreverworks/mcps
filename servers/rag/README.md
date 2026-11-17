@@ -83,6 +83,7 @@ The commands above set only what is required; [Configuration](#configuration) ha
 | `RAG_QUERY_PROVIDER` | no | Query embedding and reranking: `local` (default), or `cloudflare` with automatic local fallback. Independent of a collection's indexing provider. |
 | `RAG_QUERY_TIMEOUT_MS` | no | Deadline per remote inference request during search. Default 2000 ms, one attempt. |
 | `RAG_LOCAL_ONLY_COLLECTIONS` | no | Collection names, separated by commas, whose questions and passages never leave this machine, even with `RAG_QUERY_PROVIDER=cloudflare`. A search that names no collections leaves them out. See [Local-only collections](#local-only-collections). |
+| `RAG_NAMED_ONLY_COLLECTIONS` | no | Collection names, separated by commas, that a search reads only when it names them. Nothing else about them changes. See [Collections searched only when named](#collections-searched-only-when-named). |
 | `RAG_SOURCE_ROOTS` | no | Folders, separated by `:`, the server may index from in place, besides `MCP_FILE_ROOTS`. Links inside them are never followed. |
 | `RAG_OCR_LANGUAGE` | no | Tesseract language code(s) for OCR when a call names none. Default `eng`. |
 | `RAG_MAX_FILE_BYTES` | no | Largest file it reads. Default 200 MiB. |
@@ -405,6 +406,24 @@ For reproducible comparisons, `snapshot_collections` (write) freezes several
 collections in one database snapshot, copying their existing vectors locally.
 Snapshots cannot be indexed or pruned, and default searches exclude them.
 Name them explicitly in `search.collections`; remove them with `drop_collection`.
+
+
+### Collections searched only when named
+
+Some collections are worth keeping but would crowd a broad question: a large
+archive of past conversations next to a short list of facts, say. List their
+names in `RAG_NAMED_ONLY_COLLECTIONS` (for example `archive,transcripts`) and a
+search that names no collections leaves them out, as it leaves out snapshots.
+Name one in `collections` and it is searched like any other, with the
+configured query provider.
+
+That is the whole difference: they are indexed, embedded, snapshotted and read
+as usual. A search that leaves some out while others remain lists them under
+`left_out_named_only`, and `health.named_only_collections` lists the names,
+sorted, with `named_only_unknown` for names that match no collection yet and
+`named_only_invalid` (health not ok) for entries that are not collection names.
+A collection on both lists is local-only, and its replies say so. The variable
+is read when the server starts.
 
 ## Limitations
 

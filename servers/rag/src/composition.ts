@@ -78,20 +78,26 @@ export const embeddingModelsFrom = (env: NodeJS.ProcessEnv): (() => readonly Emb
 };
 
 /**
- * RAG_LOCAL_ONLY_COLLECTIONS: collection names separated by commas, spaces
+ * A list of collection names in one variable: separated by commas, spaces
  * around them and empty entries ignored, each lowercased as collection names
  * are. An entry that is not a collection name (a typo, a space or a semicolon
- * inside it) protects nothing, so it is set aside as written for health to
+ * inside it) matches nothing, so it is set aside as written for health to
  * report rather than silently dropped.
  */
-export const localOnlyFrom = (env: NodeJS.ProcessEnv): { readonly names: ReadonlySet<string>; readonly invalid: readonly string[] } => {
-  const entries = (env["RAG_LOCAL_ONLY_COLLECTIONS"] ?? "").split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
+const collectionNamesFrom = (env: NodeJS.ProcessEnv, variable: string): { readonly names: ReadonlySet<string>; readonly invalid: readonly string[] } => {
+  const entries = (env[variable] ?? "").split(",").map((entry) => entry.trim()).filter((entry) => entry !== "");
   const valid = (entry: string) => COLLECTION_NAME.test(entry.toLowerCase());
   return {
     names: new Set(entries.filter(valid).map((entry) => entry.toLowerCase())),
     invalid: [...new Set(entries.filter((entry) => !valid(entry)))],
   };
 };
+
+/** RAG_LOCAL_ONLY_COLLECTIONS: collections whose questions and passages never leave the machine. */
+export const localOnlyFrom = (env: NodeJS.ProcessEnv) => collectionNamesFrom(env, "RAG_LOCAL_ONLY_COLLECTIONS");
+
+/** RAG_NAMED_ONLY_COLLECTIONS: collections a search reads only when it names them. */
+export const namedOnlyFrom = (env: NodeJS.ProcessEnv) => collectionNamesFrom(env, "RAG_NAMED_ONLY_COLLECTIONS");
 
 /**
  * The composition root: the only module naming both a port and what
@@ -135,6 +141,7 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
   };
   const inference = inferenceForOptions({});
   const localOnly = localOnlyFrom(env);
+  const namedOnly = namedOnlyFrom(env);
   return {
     inferenceForOptions,
     inference: provider === "local" || provider === "cloudflare" ? inference : {
@@ -144,6 +151,8 @@ export const buildDeps = (env: NodeJS.ProcessEnv = process.env): Deps => {
     },
     localOnly: localOnly.names,
     localOnlyInvalid: localOnly.invalid,
+    namedOnly: namedOnly.names,
+    namedOnlyInvalid: namedOnly.invalid,
     store: makeStore(makePool(env)),
     models: embeddingModelsFrom(env),
     providers: { cloudflare: { missing: makeCloudflareEmbedder(env).missing } },
