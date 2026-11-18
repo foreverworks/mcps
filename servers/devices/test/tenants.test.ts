@@ -64,6 +64,18 @@ describe("pool slots", () => {
     expect(world.calls).toEqual(["start pool1", "clear door 16000", "stop pool1"]);
   });
 
+  it("stops a dirty guest's slot without clearing it, and says only that: its door is the guest's alone", async () => {
+    const { world, guest } = pool();
+    await guest.acquire({ want: android, session: G, purpose: "look" });
+    bootAll(world);
+    await guest.tick();
+    expect(await guest.acquire({ want: android, session: G, purpose: "look" })).toMatchObject({ status: "held", state: "ready" });
+    // A slot read through its unit keeps its tenant's data, which no other tenant is handed: nothing clears, and the text does not claim it.
+    expect(await guest.release({ session: G, want: android, state: "dirty" })).toMatchObject({ resource: "acmephone", then: "stopped" });
+    await settled();
+    expect(world.calls).toEqual(["start acmephone", "stop acmephone"]);
+  });
+
   it("gives four sessions the default tenant's four slots and queues the fifth: never the guest's slot", async () => {
     const { world, ours } = pool();
     const got = [];

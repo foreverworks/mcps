@@ -86,8 +86,8 @@ LABEL org.opencontainers.image.title="MCP servers" \
 ENTRYPOINT ["/usr/local/bin/mcp-server"]
 
 # What a server needs besides Node and its npm packages (a PDF toolkit for
-# printer and rag, a Java runtime for anaf-spv's declarations; the list is in
-# docs/deploying.md) is not in the image: most servers need nothing, and every
+# printer and rag, a Java runtime for anaf-spv's declarations, an ssh client and
+# the Incus client for devices; the list is in docs/deploying.md) is not in the image: most servers need nothing, and every
 # package is attack surface in every container. A server that needs one gets a
 # stage of its own, after `runtime` and before `image`, built with
 # `docker build --target <server> .`:
@@ -122,6 +122,25 @@ RUN apt-get update \
  && rm -rf /var/lib/apt/lists/*
 USER 10001:10001
 LABEL org.opencontainers.image.description="The MCP servers of foreverworks/mcps with a Java runtime and fonts added, for the anaf-spv server; MCP_SERVER chooses the one a container runs"
+
+FROM runtime AS devices
+# The devices broker reaches a host with `ssh` (openssh-client), and a host with
+# no ssh target by running that host's control command on the broker's own
+# machine, which is a shell script: bash runs it, and it calls the Incus client
+# (incus-client is the `incus` command only, without the daemon), jq to read
+# Incus's JSON, awk to cut its lists and setsid to leave a slow step running
+# after the command returns. bash, awk (mawk) and util-linux (setsid) are in the
+# base image already, and are named here so that the stage still holds them if
+# the base ever stops carrying them. Installed without recommends, so no
+# daemon, no desktop client and no virtual machine viewer comes with them.
+# The Incus client reads its remotes and keys from $HOME/.config/incus, or from
+# INCUS_CONF: nothing of them is baked in.
+USER root
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends openssh-client bash incus-client jq mawk util-linux \
+ && rm -rf /var/lib/apt/lists/*
+USER 10001:10001
+LABEL org.opencontainers.image.description="The MCP servers of foreverworks/mcps with an ssh client, bash, the Incus client, jq, awk and setsid added, for the devices server; MCP_SERVER chooses the one a container runs"
 
 # The last stage is the one a plain `docker build .` builds, and the image
 # workflow names it too (`target: image`): keep it last, and nothing above is

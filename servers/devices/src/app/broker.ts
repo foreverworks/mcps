@@ -156,7 +156,8 @@ export const makeBroker = (deps: Deps) => {
     return adb === undefined || device.probe !== undefined || !isNetworkSerial(adb.serial) ? [] : [() => deps.adb.disconnect(adb.port, adb.serial).catch(() => undefined)];
   };
 
-  type Work = { readonly what: "stopping" | "resetting"; readonly steps: readonly (() => Promise<unknown>)[]; readonly stops: boolean };
+  /** `then` is what the steps do, in the words `release` tells the holder: it is derived from the steps chosen, so it never claims one that was not. */
+  type Work = { readonly what: "stopping" | "resetting"; readonly steps: readonly (() => Promise<unknown>)[]; readonly stops: boolean; readonly then: string };
 
   /** What a device needs after a lease ends, if anything: one rule for the busy mark and for the work. */
   const workFor = (s: BrokerState, ended: Ended): Work | undefined => {
@@ -167,7 +168,12 @@ export const makeBroker = (deps: Deps) => {
     if (device.platform === "ios" && udid !== undefined) {
       const reset = ended.state === "clean" ? [] : [() => deps.hosts.resetSimulator(host, udid)];
       // Always shut it down: a booted simulator costs its Mac gigabytes of memory, and a CI job beside it starves.
-      return { what: reset.length > 0 ? "resetting" : "stopping", steps: [...reset, () => deps.hosts.shutdownSimulator(host, udid)], stops: false };
+      return {
+        what: reset.length > 0 ? "resetting" : "stopping",
+        steps: [...reset, () => deps.hosts.shutdownSimulator(host, udid)],
+        stops: false,
+        then: reset.length > 0 ? "apps uninstalled, privacy reset, then shut down" : "shut down",
+      };
     }
     const instance = leaseVariant(device, ended.lease).instance;
     if (isStartedSlot(device) && instance !== undefined) {
@@ -181,11 +187,16 @@ export const makeBroker = (deps: Deps) => {
       const wipe =
         adb === undefined ? undefined : probe === undefined ? () => deps.adb.clearUserApps(adb.port, adb.serial) : probe.kind === "door" ? () => deps.door.clearUserApps(probe.port) : undefined;
       const clear = ended.state === "dirty" && s.marks[device.id]?.readyAt !== undefined && wipe !== undefined ? [wipe] : [];
-      return { what: clear.length > 0 ? "resetting" : "stopping", steps: [...clear, () => deps.hosts.stopEmulator(host, instance), ...detach(device)], stops: true };
+      return {
+        what: clear.length > 0 ? "resetting" : "stopping",
+        steps: [...clear, () => deps.hosts.stopEmulator(host, instance), ...detach(device)],
+        stops: true,
+        then: clear.length > 0 ? "app data cleared, then stopped" : "stopped",
+      };
     }
     if (device.platform === "android" && device.mode === "fixed" && device.adb !== undefined && ended.state !== "clean") {
       const { port, serial } = device.adb;
-      return { what: "resetting", steps: [() => deps.adb.clearUserApps(port, serial)], stops: false };
+      return { what: "resetting", steps: [() => deps.adb.clearUserApps(port, serial)], stops: false, then: "app data cleared" };
     }
     return undefined;
   };
@@ -356,7 +367,7 @@ export const makeBroker = (deps: Deps) => {
         return { state: withEvent({ ...st, marks: { ...st.marks, [d.id]: { ...mk, busy: { since: now, what: "stopping" } } } }, now, `${d.id} was running with no lease: stopping it`, d.tenant), value: true };
       });
       if (!claimed) continue;
-      void runWork(d.id, { what: "stopping", steps: [...instances.map((i) => () => deps.hosts.stopEmulator(host, i)), ...detach(d)], stops: true }, "stop failed; the broker tries again within a minute (status)");
+      void runWork(d.id, { what: "stopping", steps: [...instances.map((i) => () => deps.hosts.stopEmulator(host, i)), ...detach(d)], stops: true, then: "stopped" }, "stop failed; the broker tries again within a minute (status)");
     }
   };
 
@@ -716,26 +727,17 @@ export const makeBroker = (deps: Deps) => {
       const found = findLease(s, input, input.lease, input.want);
       const reason = input.note === undefined ? "released" : `released: ${input.note}`;
       const r = endLease(s, found, input.state, reason, now);
-      return { state: serveQueue(endMarks(r.state, [r.ended], now), now), value: { ended: [...ended, r.ended], lease: found } };
+      // The work the lease's end starts is read once, here, and the holder is told what it will do (endMarks derives the busy mark from the same rule).
+      return { state: serveQueue(endMarks(r.state, [r.ended], now), now), value: { ended: [...ended, r.ended], lease: found, work: workFor(r.state, r.ended) } };
     });
     settle(out.ended);
-    const device = deviceOf(catalog, out.lease.resource);
+    // Only what the work does is said: a device with nothing to do is left as it is, and a quarantine is added to whatever was done.
     const then =
       input.state === "broken"
-        ? device !== undefined && isStartedSlot(device)
-          ? "stopped, and quarantined until someone checks it and clears it"
-          : "quarantined until someone checks it and clears it"
-        : device?.platform === "ios"
-          ? input.state === "dirty"
-            ? "apps uninstalled, privacy reset, then shut down"
-            : "shut down"
-          : device !== undefined && isStartedSlot(device)
-            ? input.state === "dirty" && device.adb !== undefined
-              ? "app data cleared, then stopped"
-              : "stopped"
-            : input.state === "dirty" && device?.platform === "android" && device.mode === "fixed"
-              ? "app data cleared"
-              : "left as it is";
+        ? out.work === undefined
+          ? "quarantined until someone checks it and clears it"
+          : `${out.work.then}, and quarantined until someone checks it and clears it`
+        : (out.work?.then ?? "left as it is");
     return { status: "released" as const, lease: out.lease.id, resource: out.lease.resource, then };
   };
 

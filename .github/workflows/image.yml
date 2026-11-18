@@ -3,11 +3,14 @@ name: image
 # Builds the container image (the Dockerfile at the root: every server, one per
 # container) and publishes it to GitHub's registry as ghcr.io/<repository>,
 # tagged with the full commit and, while the commit is still the head of main,
-# `main`. Beside it, into the same package, go two more builds of the same
+# `main`. Beside it, into the same package, go three more builds of the same
 # Dockerfile: `printer` (the image plus poppler, which the printer server runs),
 # tagged `<full commit>-printer`, after pdftoppm and pdfinfo have been run in it,
-# and `anafspv` (the image plus a Java runtime, which the anaf-spv server runs),
-# tagged `<full commit>-anafspv`, after `java -version` has been run in it.
+# `anafspv` (the image plus a Java runtime, which the anaf-spv server runs),
+# tagged `<full commit>-anafspv`, after `java -version` has been run in it, and
+# `devices` (the image plus an ssh client, bash, the Incus client, jq, awk and
+# setsid, which the devices server and its hosts' control commands run), tagged
+# `<full commit>-devices`, after each of them has been run in it.
 # docs/deploying.md, "In a container", says how they are used.
 #
 # It runs when `ci` has finished on a push to main and passed, so a main that
@@ -70,6 +73,7 @@ jobs:
           { echo 'list<<TAGS'; echo "$tags"; echo 'TAGS'; } >> "$GITHUB_OUTPUT"
           echo "printer=$IMAGE:$SHA-printer" >> "$GITHUB_OUTPUT"
           echo "anafspv=$IMAGE:$SHA-anafspv" >> "$GITHUB_OUTPUT"
+          echo "devices=$IMAGE:$SHA-devices" >> "$GITHUB_OUTPUT"
 
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
@@ -148,6 +152,39 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ env.SHA }}
 
+      # The same for the devices build: a program the server or a control
+      # command runs that is missing from it fails the job, and nothing is
+      # pushed under its tag.
+      - name: Build the devices image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: devices
+          load: true
+          tags: mcps-devices-check
+          labels: |
+            org.opencontainers.image.revision=${{ env.SHA }}
+
+      - name: Check that the devices image has what the server runs
+        run: |
+          docker run --rm --entrypoint ssh mcps-devices-check -V
+          docker run --rm --entrypoint incus mcps-devices-check --version
+          docker run --rm --entrypoint jq mcps-devices-check --version
+          docker run --rm --entrypoint bash mcps-devices-check --version
+          docker run --rm --entrypoint setsid mcps-devices-check --version
+          docker run --rm --entrypoint awk mcps-devices-check -W version
+
+      - name: Push the devices image
+        id: build-devices
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: devices
+          push: true
+          tags: ${{ steps.tags.outputs.devices }}
+          labels: |
+            org.opencontainers.image.revision=${{ env.SHA }}
+
       - name: Say what was published
         env:
           DIGEST: ${{ steps.build.outputs.digest }}
@@ -156,6 +193,8 @@ jobs:
           PRINTER_TAG: ${{ steps.tags.outputs.printer }}
           ANAFSPV_DIGEST: ${{ steps.build-anafspv.outputs.digest }}
           ANAFSPV_TAG: ${{ steps.tags.outputs.anafspv }}
+          DEVICES_DIGEST: ${{ steps.build-devices.outputs.digest }}
+          DEVICES_TAG: ${{ steps.tags.outputs.devices }}
         run: |
           {
             echo "### Image published"
@@ -182,4 +221,12 @@ jobs:
             echo "Pull it pinned: \`$IMAGE@$ANAFSPV_DIGEST\`"
             echo
             echo "Tag: \`$ANAFSPV_TAG\`"
+            echo
+            echo "### devices image published"
+            echo
+            echo "Digest: \`$DEVICES_DIGEST\`"
+            echo
+            echo "Pull it pinned: \`$IMAGE@$DEVICES_DIGEST\`"
+            echo
+            echo "Tag: \`$DEVICES_TAG\`"
           } >> "$GITHUB_STEP_SUMMARY"

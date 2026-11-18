@@ -329,7 +329,7 @@ servers need nothing more; these start a program that is not in the image:
 | `printer` | `pdfinfo`, `pdftoppm` (Debian: `poppler-utils`); the image's `printer` build has them ([below](#the-printer-image)) | printing a PDF |
 | `rag` | `pdftotext` (`poppler-utils`), `ocrmypdf`, `tesseract` and the language packs you use, `pandoc` | reading PDFs, scans, images and documents; it also needs a PostgreSQL with pgvector and its embedding endpoints |
 | `anaf-spv` | `java`, 8 or newer (`ANAF_SPV_JAVA`; the image's `anafspv` build has Java 21, [below](#the-anaf-spv-image)); and the command `ANAF_SPV_MAIL_MCP_COMMAND` names, if it is set | validating and filing declarations with ANAF's DUKIntegrator; reading a sign-in code through a mail server it starts over stdio |
-| `devices` | `ssh` (`openssh-client`); the program of a host's control command, for a host with no ssh target | reaching the machines it leases devices on (it speaks adb's protocol itself, and needs no `adb` binary) |
+| `devices` | `ssh` (`openssh-client`); the program of a host's control command, for a host with no ssh target; the image's `devices` build has `ssh` and what a shell-script control command usually calls ([below](#the-devices-image)) | reaching the machines it leases devices on (it speaks adb's protocol itself, and needs no `adb` binary) |
 | `google` | `gcloud` and a browser opener | its interactive `setup` command only, which runs on a person's computer, not in a container |
 
 `bitwarden` runs the Bitwarden command-line client, which is one of its npm
@@ -338,7 +338,7 @@ dependencies and runs on the image's own Node. To add a program, build
 --no-install-recommends poppler-utils && rm -rf /var/lib/apt/lists/*`, run as
 root (`USER root`), then `USER 10001:10001` again. The Dockerfile says where a
 stage for one server belongs in it, to build with `--target`; `printer` is the
-first, `anafspv` the second.
+first, `anafspv` the second, `devices` the third.
 
 ### The printer image
 
@@ -412,6 +412,52 @@ packages so that nothing else comes along:
 
 To build it yourself, from a checkout:
 `docker build --target anafspv -t mcps-anafspv .`
+
+### The devices image
+
+The devices server reaches a machine that carries devices over `ssh`, and a
+machine with no ssh target by running its control command on the server's own
+host ([the README](../servers/devices/README.md) has the contract). The plain
+image has no `ssh`, and a control command is usually a shell script that calls
+a few more programs, so the Dockerfile has a stage called `devices` for it: the
+plain image with those added. Each push to `main` publishes it beside the plain
+image, in the same package, tagged `:<full sha>-devices` (the same commit as the
+plain image's `:<full sha>`), after each program has been run in it. It is only
+that one image with more in it: everything above applies to it, and
+`MCP_SERVER=devices` runs the server.
+
+```bash
+docker run --rm --name devices \
+  -e MCP_SERVER=devices -e DEVICES_CATALOG_FILE=/etc/devices/catalog.json \
+  -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0 \
+  -e MCP_HTTP_ALLOWED_HOSTS=localhost -e MCP_HTTP_TOKENS_DIR=/run/tokens \
+  -v "$PWD/catalog.json:/etc/devices/catalog.json:ro" \
+  -v "$PWD/tokens:/run/tokens:ro" -p 127.0.0.1:8080:8080 \
+  ghcr.io/foreverworks/mcps:<full sha>-devices
+```
+
+What it adds, over the plain image, installed without Debian's recommended
+packages so that nothing else comes along:
+
+- **`openssh-client`**, for a host with an ssh target. The server keeps the
+  host keys it has seen under its state directory, and ssh must get in without
+  a prompt, so mount a key (owned by user `10001`, mode 0400) and an ssh
+  configuration that names it.
+- **`incus-client`**, the `incus` command for a control command that drives
+  containers or virtual machines on an [Incus](https://linuxcontainers.org/incus/)
+  server, without the server or any desktop client. It reads its remotes and
+  keys from `~/.config/incus` (`/home/mcp/.config/incus`), or from the folder
+  `INCUS_CONF` names: mount the client certificate and key there, and a
+  `config.yml` that lists the remote. Nothing of them is in the image.
+- **`bash`, `jq`, `awk` (mawk) and `setsid`** (from `util-linux`), which a
+  control command uses to run, to read Incus's JSON and tables, and to leave a
+  slow step running after the command has answered. `bash`, `awk` and `setsid`
+  are already in the base image; the stage names them so that it keeps them if
+  the base ever stops carrying them.
+
+The control command itself is not in the image, as it is the deployment's:
+mount it, and name its path in the host's `control` field of the catalog. To build it yourself,
+from a checkout: `docker build --target devices -t mcps-devices .`
 
 ## A server on another machine
 

@@ -326,6 +326,16 @@ describe("emulators run only while leased", () => {
     expect(world.calls).toEqual(["start phone1", "clear emulator-5554", "stop phone1"]);
   });
 
+  it("says app data cleared only when a clear ran: a dirty emulator that never booted had none to clear", async () => {
+    const world = makeWorld();
+    const broker = brokerFor(world);
+    await broker.acquire({ want: android, session: A, purpose: "a" });
+    // Released while it boots: adb has nothing to clear on, so the work is a stop, and the holder is told only that.
+    expect(await broker.release({ session: A, want: android, state: "dirty" })).toMatchObject({ then: "stopped" });
+    await settled();
+    expect(world.calls).toEqual(["start phone1", "stop phone1"]);
+  });
+
   it("stops every emulator it finds running with no lease, and leaves leased ones alone", async () => {
     const world = makeWorld();
     world.emulators = { phone1: "device", phone2: "device", phone3: "stopped", phone4: "stopped" };
@@ -810,6 +820,17 @@ describe("desktops: a Mac's desktop session and a Windows VM", () => {
     expect((g as { address: { env: Record<string, string> } }).address.env).not.toHaveProperty("DEVICE_SSH_PORT");
     // Nothing starts or stops a desktop session, and a release leaves it as it is.
     expect(await broker.release({ session: A, want: macos, state: "dirty" })).toMatchObject({ status: "released", then: "left as it is" });
+    await settled();
+    expect(world.calls).toEqual([]);
+  });
+
+  it("tells a holder whose device had nothing to do that it was left as it is, quarantine included", async () => {
+    const { world, broker } = desktops();
+    world.mac = { onAc: true, ciBusy: false, load: 2, desktop: true };
+    world.clock += 61_000;
+    await broker.tick();
+    await broker.acquire({ want: macos, session: A, purpose: "a desktop app" });
+    expect(await broker.release({ session: A, want: macos, state: "broken", note: "frozen" })).toMatchObject({ then: "quarantined until someone checks it and clears it" });
     await settled();
     expect(world.calls).toEqual([]);
   });
