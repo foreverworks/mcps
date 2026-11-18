@@ -1,7 +1,7 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { asAppError } from "../src/domain/errors.js";
-import { makeGlovoApi } from "../src/infra/glovoApi.js";
+import { DEFAULT_APP_VERSION, makeGlovoApi, resolveAppVersion } from "../src/infra/glovoApi.js";
 import { details, row } from "./fixtures.js";
 
 const creds = async () => ({ refreshToken: "refresh-jwt", deviceUrn: "glv:device:test" });
@@ -30,7 +30,9 @@ const fakeFetch = (routes: Record<string, (init: RequestInit, n: number, url: UR
 const REFRESH = "/oauth/refresh";
 const LIST = "/v3/customer/orders-list";
 const DETAIL = "/v3/customer/orders/:id";
-const headersOf = (init: RequestInit) => init.headers as Record<string, string>;
+/** Header names are case-insensitive: the kit writes Content-Type, this server its own in lower case. */
+const headersOf = (init: RequestInit) =>
+  Object.fromEntries(Object.entries(init.headers as Record<string, string>).map(([name, value]) => [name.toLowerCase(), value]));
 
 describe("makeGlovoApi", () => {
   it("mints once, then sends the RAW access token and the web app's headers", async () => {
@@ -40,29 +42,84 @@ describe("makeGlovoApi", () => {
     await api.historyPage(undefined);
     expect(f.calls.filter((c) => c.path === REFRESH)).toHaveLength(1);
     const refresh = f.calls.find((c) => c.path === REFRESH);
+    expect(refresh?.init.method).toBe("POST");
     expect(JSON.parse(String(refresh?.init.body))).toEqual({ refreshToken: "refresh-jwt" });
-    const refreshHeaders = headersOf(refresh?.init ?? {});
-    expect(refreshHeaders["glovo-device-urn"]).toBe("glv:device:test");
-    // Glovo answers 403 to a refresh without any one of these (measured 2026-11-07).
-    for (const name of [
-      "glovo-app-version",
-      "glovo-client-info",
-      "glovo-language-code",
-      "glovo-perseus-client-id",
-      "glovo-perseus-session-id",
-      "glovo-perseus-session-timestamp",
-      "glovo-request-id",
-    ]) {
-      expect(refreshHeaders[name], name).toBeTruthy();
-    }
-    expect(headersOf(f.calls.find((c) => c.path === LIST)?.init ?? {})).toMatchObject({
-      authorization: "access-jwt",
-      "glovo-app-platform": "web",
-      "glovo-app-type": "customer",
-      "glovo-api-version": "14",
-      "glovo-language-code": "en",
-      "glovo-device-urn": "glv:device:test",
+    expect(headersOf(refresh?.init ?? {})).not.toHaveProperty("authorization");
+    expect(headersOf(f.calls.find((c) => c.path === LIST)?.init ?? {})).toMatchObject({ authorization: "access-jwt" });
+  });
+
+  // Glovo answers 403 to /oauth/refresh when this set differs from the web app's (2026-11-07 and again 2026-11-18).
+  const APP_SET = {
+    accept: "application/json, text/plain, */*",
+    "accept-language": "en",
+    origin: "https://glovoapp.com",
+    referer: "https://glovoapp.com/",
+    "glovo-api-version": "14",
+    "glovo-app-context": "web",
+    "glovo-app-development-state": "prod",
+    "glovo-app-platform": "web",
+    "glovo-app-type": "customer",
+    "glovo-app-version": DEFAULT_APP_VERSION,
+    "glovo-client-info": `web-customer-web-react/${DEFAULT_APP_VERSION} project:customer-web`,
+    "glovo-language-code": "en",
+    "glovo-device-urn": "glv:device:test",
+    "glovo-perseus-consent": "essential",
+    "glovo-request-ttl": "7500",
+  };
+  const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/;
+
+  /** What a request must carry besides the fixed set: ids that are fresh per request or per process. */
+  const checkSession = (headers: Record<string, string>, at: number) => {
+    expect(headers["user-agent"]).toMatch(/^Mozilla\/5\.0 .* Chrome\/\d+\.0\.0\.0 Safari\/537\.36$/);
+    expect(headers["glovo-request-id"]).toMatch(UUID);
+    expect(headers["glovo-perseus-client-id"]).toMatch(UUID);
+    expect(headers["glovo-perseus-session-id"]).toMatch(UUID);
+    // The app sends one session id under two names.
+    expect(headers["glovo-dynamic-session-id"]).toBe(headers["glovo-perseus-session-id"]);
+    expect(headers["glovo-perseus-session-timestamp"]).toBe(String(at));
+  };
+
+  it("sends the web app's full header set on the refresh", async () => {
+    const f = fakeFetch({ [REFRESH]: () => minted() });
+    await makeGlovoApi(creds, { fetch: f.fetch, sleep: noSleep, now: () => 1_700_000_000_000 }).probe();
+    const headers = headersOf(f.calls[0]?.init ?? {});
+    expect(headers).toMatchObject({ ...APP_SET, "content-type": "application/json" });
+    checkSession(headers, 1_700_000_000_000);
+  });
+
+  it("sends the same set on a GET, with the access token, and one session for the whole process", async () => {
+    const f = fakeFetch({
+      [REFRESH]: () => minted(),
+      [LIST]: () => json({ orders: [] }),
+      [DETAIL]: () => json(details()),
     });
+    const api = makeGlovoApi(creds, { fetch: f.fetch, sleep: noSleep, callGapMs: 0, now: () => 1_700_000_000_000 });
+    await api.historyPage(undefined);
+    await api.orderDetails(1001);
+    const [list, detail] = [LIST, DETAIL].map((path) => headersOf(f.calls.find((c) => c.path === path)?.init ?? {}));
+    for (const headers of [list, detail]) {
+      expect(headers).toMatchObject({ ...APP_SET, authorization: "access-jwt" });
+      checkSession(headers ?? {}, 1_700_000_000_000);
+    }
+    const refresh = headersOf(f.calls.find((c) => c.path === REFRESH)?.init ?? {});
+    for (const name of ["glovo-perseus-client-id", "glovo-perseus-session-id", "glovo-dynamic-session-id"]) {
+      expect(list?.[name], name).toBe(refresh[name]);
+      expect(detail?.[name], name).toBe(refresh[name]);
+    }
+    // A request id belongs to one request.
+    expect(new Set([refresh["glovo-request-id"], list?.["glovo-request-id"], detail?.["glovo-request-id"]]).size).toBe(3);
+  });
+
+  it("sends the app version it is given, in both headers that carry it", async () => {
+    const f = fakeFetch({ [REFRESH]: () => minted(), [LIST]: () => json({ orders: [] }) });
+    const api = makeGlovoApi(creds, { fetch: f.fetch, sleep: noSleep, callGapMs: 0, appVersion: "v9.9.9" });
+    await api.historyPage(undefined);
+    for (const call of f.calls) {
+      expect(headersOf(call.init)).toMatchObject({
+        "glovo-app-version": "v9.9.9",
+        "glovo-client-info": "web-customer-web-react/v9.9.9 project:customer-web",
+      });
+    }
   });
 
   it("never calls /oauth/revoke, which would sign the user out", async () => {
@@ -199,5 +256,18 @@ describe("makeGlovoApi", () => {
       sleep: noSleep,
     });
     expect(await api.probe().catch((e: unknown) => asAppError(e))).toMatchObject({ kind: "auth", status: 0, permanent: false });
+  });
+});
+
+describe("resolveAppVersion", () => {
+  it("is the built-in release unless GLOVO_APP_VERSION names another", () => {
+    expect(resolveAppVersion({})).toBe(DEFAULT_APP_VERSION);
+    expect(resolveAppVersion({ GLOVO_APP_VERSION: "  " })).toBe(DEFAULT_APP_VERSION);
+    expect(resolveAppVersion({ GLOVO_APP_VERSION: " v1.3000.2 " })).toBe("v1.3000.2");
+  });
+
+  it("refuses a value that could not be a header, naming the variable", () => {
+    expect(() => resolveAppVersion({ GLOVO_APP_VERSION: "v1.0\r\nx-evil: 1" })).toThrow(/GLOVO_APP_VERSION/);
+    expect(() => resolveAppVersion({ GLOVO_APP_VERSION: "has space" })).toThrow(/GLOVO_APP_VERSION/);
   });
 });

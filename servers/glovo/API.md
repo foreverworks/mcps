@@ -1,7 +1,7 @@
 # Glovo: notes on the web app's API
 
 Glovo documents none of this. These notes come from watching the signed-in web
-app at https://glovoapp.com (version 1.2718.0, API version 14) and the orders
+app at https://glovoapp.com (version 1.2718.0 when first captured, 1.2989.0 when the headers were last checked on 2026-11-18, API version 14) and the orders
 it returned. Glovo can change any of it without notice.
 
 ## Client
@@ -13,9 +13,11 @@ Every call goes to one host:
 ## Auth
 
 - `POST /oauth/refresh`, with the body `{"refreshToken": "<refresh token>"}`
-  and the headers `content-type: application/json`, `glovo-app-platform: web`,
-  `glovo-app-type: customer` and `glovo-device-urn: <urn>`. It answers
+  and the same headers as every other call (below), `content-type:
+  application/json` among them. It answers
   `{accessToken, expiresIn: 1198, refreshToken, tokenType: "bearer"}`.
+  **A request whose headers differ from the web app's is answered 403 whatever
+  the token.** Glovo tightened this on 2026-11-07 and again on 2026-11-18.
 - **The refresh token does not rotate**: the answer carries the same one, still
   valid, so refreshing is safe to repeat and does not sign the browser out. The
   answer is a credential: never log it.
@@ -28,11 +30,32 @@ Every call goes to one host:
   `401 {"errorCode": "invalid_token"}`.
 - `/oauth/revoke` is the sign-out. Never call it.
 
-Every API call carries `accept: application/json`,
-`authorization: <access token>`, `glovo-app-platform: web`,
-`glovo-app-type: customer`, `glovo-api-version: 14`,
-`glovo-language-code: en` and `glovo-device-urn: <urn>`. The language sets the
-wording of every display string; the parsers read English and accept Romanian.
+Every API call, the refresh included, carries what the web app's axios
+instance sends (read from its public JavaScript on 2026-11-18):
+
+| Header | Value |
+|---|---|
+| `accept` | `application/json, text/plain, */*` |
+| `accept-language`, `glovo-language-code` | `en` |
+| `origin`, `referer` | `https://glovoapp.com`, `https://glovoapp.com/` |
+| `user-agent` | a Chrome user agent |
+| `glovo-api-version` | `14` (`NEXT_PUBLIC_API_VERSION`) |
+| `glovo-app-platform`, `glovo-app-context` | `web` |
+| `glovo-app-type` | `customer` |
+| `glovo-app-development-state` | `prod` (`NEXT_PUBLIC_DEVELOPMENT_STATE`) |
+| `glovo-app-version` | the release, such as `v1.2989.0` (`NEXT_PUBLIC_APP_VERSION`, in the HTML of `https://glovoapp.com/en`) |
+| `glovo-client-info` | `web-customer-web-react/<release> project:customer-web` |
+| `glovo-request-ttl` | `7500` (`NEXT_PUBLIC_REQUEST_TTL`) |
+| `glovo-request-id` | a new UUID per request |
+| `glovo-perseus-client-id` | a UUID, kept for a long time |
+| `glovo-perseus-session-id`, `glovo-dynamic-session-id` | one UUID per page load, the same value under both names |
+| `glovo-perseus-session-timestamp` | when that session began, in milliseconds |
+| `glovo-perseus-consent` | `essential` |
+| `glovo-device-urn` | `<urn>` from the credentials |
+
+A call after the refresh also carries `authorization: <access token>`. The
+language sets the wording of every display string; the parsers read English and
+accept Romanian.
 
 ## The two endpoints that matter
 

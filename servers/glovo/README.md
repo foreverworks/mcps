@@ -76,6 +76,7 @@ orders land on the right day: with Claude Code, add
 |---|---|---|
 | `GLOVO_CREDS` | yes | Path of `credentials.json` (below). There is no default: unset, the server still starts and lists its tools, and each tool answers a `config` error naming the variable. |
 | `GLOVO_TIME_ZONE` | no, but set it | The IANA zone dates are read in, such as `Europe/Bucharest`. Use the zone your bank books in: an order delivered at 00:30 local time belongs to that day, not to the UTC one. Unset, it is the process's zone (`TZ`, else the system's). A name that is not a zone stops the server at start. |
+| `GLOVO_APP_VERSION` | no | The release of Glovo's web app the server says it is, such as `v1.2989.0`. Glovo checks the headers of every sign-in against its own web app's, the version among them, and the app's release number moves with each of its releases. The server ships with the one it was last tested against; set this to the number your signed-in browser's app uses only when sign-in starts answering `403` ("the refresh token was refused" with a fresh token). It is in the page's source: search the HTML of `https://glovoapp.com/en` for `NEXT_PUBLIC_APP_VERSION`. A value that is not a version stops the server at start. |
 | `GLOVO_STATE_DIR` | no | Where order details are stored (`orders/`); the default is in [docs/configuration.md](../../docs/configuration.md). |
 | `GLOVO_EXPORTS_DIR` | no | Where `export_items` writes; the default is `exports/` in the state folder. Point it at a folder you can read when the server runs as another user. |
 
@@ -159,6 +160,10 @@ Every tool is **read**: none changes anything in your Glovo account.
 **`auth` with `permanent: true`: "the refresh token was refused".** The
 session ended, or Glovo stopped accepting the token. Copy the credentials again
 ([steps](#getting-the-credentials)); no restart is needed.
+If a token you have just copied is refused too, Glovo has probably changed what
+it expects of the web app's requests: set `GLOVO_APP_VERSION` to the release the
+web app reports now, restart the server, and if that does not help
+[open an issue](https://github.com/foreverworks/mcps/issues).
 
 **`auth` with `permanent: false` ("transient; retry later"), or `api` with
 `status: 429` ("Glovo is throttling").** The server's retries ran out, and a
