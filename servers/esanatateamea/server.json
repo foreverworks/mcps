@@ -1,0 +1,63 @@
+{
+  "$schema": "https://static.modelcontextprotocol.io/schemas/2025-12-11/server.schema.json",
+  "name": "com.foreverworks/esanatateamea",
+  "title": "eSănătateaMea",
+  "description": "Read your Romanian health records: insurance, prescriptions, paid care, documents and appointments.",
+  "version": "0.1.0",
+  "websiteUrl": "https://foreverworks.github.io/mcps/servers/esanatateamea/",
+  "repository": {
+    "url": "https://github.com/foreverworks/mcps",
+    "source": "github",
+    "subfolder": "servers/esanatateamea"
+  },
+  "icons": [
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/esanatateamea/icons/icon.svg",
+      "mimeType": "image/svg+xml",
+      "sizes": [
+        "any"
+      ]
+    },
+    {
+      "src": "https://raw.githubusercontent.com/foreverworks/mcps/main/servers/esanatateamea/icons/icon-512.png",
+      "mimeType": "image/png",
+      "sizes": [
+        "512x512"
+      ]
+    }
+  ],
+  "packages": [
+    {
+      "registryType": "npm",
+      "registryBaseUrl": "https://registry.npmjs.org",
+      "identifier": "@foreverworks/mcp-esanatateamea",
+      "version": "0.1.0",
+      "runtimeHint": "npx",
+      "transport": {
+        "type": "stdio"
+      },
+      "environmentVariables": [
+        {
+          "name": "ESANATATEAMEA_USERNAME",
+          "description": "The e-mail address you sign in to eSănătateaMea with; leave empty to sign in with ROeID instead.",
+          "isRequired": false,
+          "isSecret": false
+        },
+        {
+          "name": "ESANATATEAMEA_PASSWORD_FILE",
+          "description": "Path of a file holding only your eSănătateaMea password; leave empty to sign in with ROeID instead.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        },
+        {
+          "name": "ESANATATEAMEA_TOTP_SECRET_FILE",
+          "description": "Path of a file holding the authenticator app's key for the account, so the server types the six-digit code itself; leave empty to be asked for the code.",
+          "isRequired": false,
+          "isSecret": false,
+          "format": "filepath"
+        }
+      ]
+    }
+  ]
+}

@@ -1,0 +1,50 @@
+{
+  "name": "foreverworks-esanatateamea",
+  "displayName": "eSănătateaMea",
+  "version": "0.1.0",
+  "description": "Read your Romanian health records: insurance, prescriptions, paid care, documents and appointments.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/esanatateamea/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "esanatateamea",
+    "cnas",
+    "health",
+    "health-insurance",
+    "prescriptions",
+    "roeid"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/esanatateamea/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "esanatateamea_username": {
+      "type": "string",
+      "title": "eSănătateaMea e-mail",
+      "description": "The e-mail address you sign in to eSănătateaMea with; leave empty to sign in with ROeID instead.",
+      "required": false
+    },
+    "esanatateamea_password_file": {
+      "type": "file",
+      "title": "eSănătateaMea password file",
+      "description": "Path of a file holding only your eSănătateaMea password; leave empty to sign in with ROeID instead.",
+      "required": false
+    },
+    "esanatateamea_totp_secret_file": {
+      "type": "file",
+      "title": "Authenticator key file",
+      "description": "Path of a file holding the authenticator app's key for the account, so the server types the six-digit code itself; leave empty to be asked for the code.",
+      "required": false
+    }
+  }
+}

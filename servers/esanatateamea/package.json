@@ -1,0 +1,81 @@
+{
+  "name": "@foreverworks/mcp-esanatateamea",
+  "version": "0.1.0",
+  "description": "MCP server for eSănătateaMea, the Romanian health insurance house's patient portal: insurance status, prescriptions, reimbursed services, medical documents, the emergency summary and appointments",
+  "mcpName": "com.foreverworks/esanatateamea",
+  "mcp": {
+    "title": "eSănătateaMea",
+    "audience": "romania",
+    "maturity": "experimental",
+    "tagline": "Read your Romanian health records: insurance, prescriptions, paid care, documents and appointments.",
+    "inputs": {
+      "ESANATATEAMEA_USERNAME": {
+        "title": "eSănătateaMea e-mail",
+        "type": "text",
+        "required": false,
+        "description": "The e-mail address you sign in to eSănătateaMea with; leave empty to sign in with ROeID instead."
+      },
+      "ESANATATEAMEA_PASSWORD_FILE": {
+        "title": "eSănătateaMea password file",
+        "type": "file",
+        "required": false,
+        "description": "Path of a file holding only your eSănătateaMea password; leave empty to sign in with ROeID instead."
+      },
+      "ESANATATEAMEA_TOTP_SECRET_FILE": {
+        "title": "Authenticator key file",
+        "type": "file",
+        "required": false,
+        "description": "Path of a file holding the authenticator app's key for the account, so the server types the six-digit code itself; leave empty to be asked for the code."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "romania",
+    "romanian",
+    "esanatateamea",
+    "cnas",
+    "health",
+    "health-insurance",
+    "prescriptions",
+    "roeid"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://foreverworks.github.io/mcps/servers/esanatateamea/",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/esanatateamea"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-esanatateamea": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.3.0",
+    "zod": "^4.6.7"
+  }
+}

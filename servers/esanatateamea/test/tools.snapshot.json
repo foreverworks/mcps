@@ -1,0 +1,395 @@
+[
+  {
+    "name": "begin_login",
+    "title": "Begin login",
+    "description": "Sign in. method \"password\": the server fills the portal's own form with the configured e-mail and password and, when it can read the authenticator code (a vault, a TOTP secret), finishes by itself; otherwise it answers needs_code: ask the user for the six digits and call complete_login with otp. method \"roeid\": answers with a URL the USER opens in a real browser, signs in with ROeID and approves on their phone; the address the browser lands on goes to complete_login as redirect_url. Call this when a tool answers needs_login.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "method": {
+          "default": "password",
+          "description": "password: the portal's own form; roeid: ROeID, in the user's browser.",
+          "type": "string",
+          "enum": [
+            "password",
+            "roeid"
+          ]
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "complete_login",
+    "title": "Complete login",
+    "description": "Finish a begun login, with exactly one of: otp, the six digits of the authenticator app after a password sign-in answered needs_code (within 5 minutes); or redirect_url, the whole address the browser landed on after ROeID (it carries code=... and state=...; the code dies within a minute). Stores the session in the server's own state and answers who signed in.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "otp": {
+          "description": "The authenticator app's six digits, after begin_login answered needs_code.",
+          "type": "string",
+          "minLength": 1
+        },
+        "redirect_url": {
+          "description": "The whole address the browser landed on after a ROeID sign-in.",
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "download_medical_document",
+    "title": "Download medical document",
+    "description": "Saves one medical document as the portal's PDF into this server's outbox, and answers its path, SHA-256 and size.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "description": "The document's id, from list_medical_documents."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_emergency_summary",
+    "title": "Emergency summary",
+    "description": "\"Sumar de urgență\": what a doctor should know in an emergency (conditions, allergies, treatments, as the person or a doctor entered them), the emergency contacts and the advance directives. With pdf, also saves the portal's PDF of it into the outbox.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "pdf": {
+          "default": false,
+          "description": "Also save the portal's PDF of the summary.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_insurance",
+    "title": "Insurance",
+    "description": "\"Starea mea\" and \"Pachetul meu\": whether the person is insured now (CNAS's word, such as \"Asigurat\"), the insured categories with their validity and the house that reported them, the statuses, the service package and the kinds of care it covers, the family doctor's unit codes, and the history of insured statuses.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "get_medical_document",
+    "title": "Medical document",
+    "description": "One medical document's contents, section by section, as the portal's preview shows them (the issuer, the patient's details, the diagnosis, what was prescribed or recommended).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_-]{1,80}$",
+          "description": "The document's id, from list_medical_documents."
+        }
+      },
+      "required": [
+        "id"
+      ],
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "health",
+    "title": "Health",
+    "description": "Whether this server is configured and holds a portal session (none, present, expired), how it signed in, and where the password and the authenticator code come from. No network. Run it before concluding the server is broken.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_appointments",
+    "title": "Appointments",
+    "description": "\"Programările mele\": appointments made through the portal at providers that take them, by tab (upcoming: confirmed; waiting: not yet confirmed; past; cancelled), with the date, the service, the doctor, the provider and its address, and how many each tab holds.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "tab": {
+          "default": "upcoming",
+          "type": "string",
+          "enum": [
+            "upcoming",
+            "waiting",
+            "past",
+            "cancelled"
+          ]
+        },
+        "page": {
+          "default": 0,
+          "description": "Page, from 0, newest first.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_medical_documents",
+    "title": "Medical documents",
+    "description": "\"Formulare medicale\": referrals (bilete de trimitere), medical letters, certificates and other forms providers issued, newest first, with their status (Consumat: used at a provider). No window unless one is given. get_medical_document reads one; download_medical_document saves its PDF.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "First day of the window, YYYY-MM-DD (Bucharest). Default: 365 days before `to`.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last day of the window, YYYY-MM-DD (Bucharest). Default: today.",
+          "type": "string"
+        },
+        "search": {
+          "description": "Words to look for, as the portal's own search box.",
+          "type": "string",
+          "minLength": 1
+        },
+        "page": {
+          "default": 0,
+          "description": "Page, from 0, newest first.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_prescriptions",
+    "title": "Prescriptions",
+    "description": "\"Istoric rețete\": the electronic prescriptions in a window, as prescribed (drugs, doses, quantities, the doctor's stencil, the diagnosis code) and as released at a pharmacy (drug names, quantities released, the pharmacy, the day, the copayment in lei).",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "First day of the window, YYYY-MM-DD (Bucharest). Default: 365 days before `to`.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last day of the window, YYYY-MM-DD (Bucharest). Default: today.",
+          "type": "string"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "list_reimbursed_services",
+    "title": "Reimbursed services",
+    "description": "\"Istoric decontări\": the medical services CNAS paid a provider for on the person's behalf (consultations, tests, hospital stays), newest first, with the provider, the doctor, the diagnosis and the amount, and the window's total and top providers.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "from": {
+          "description": "First day of the window, YYYY-MM-DD (Bucharest). Default: 365 days before `to`.",
+          "type": "string"
+        },
+        "to": {
+          "description": "Last day of the window, YYYY-MM-DD (Bucharest). Default: today.",
+          "type": "string"
+        },
+        "page": {
+          "default": 0,
+          "description": "Page, from 0, newest first.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "size": {
+          "default": 20,
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 100
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  },
+  {
+    "name": "logout",
+    "title": "Logout",
+    "description": "Forget the stored session and tell Keycloak it is over. The user's own browser sign-in is not touched. With a password configured, the next call that needs the portal signs in again.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {},
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": false,
+      "destructiveHint": true,
+      "idempotentHint": false,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "write"
+    }
+  },
+  {
+    "name": "session_status",
+    "title": "Session status",
+    "description": "Is an account signed in: who, when the tokens expire, and what to do if not. With probe, mints once to prove the session works: a refresh, or a sign-in with the configured password, which also lifts the pause after a refused one. Never shows a token.",
+    "inputSchema": {
+      "type": "object",
+      "properties": {
+        "probe": {
+          "default": false,
+          "description": "Refresh (or sign in) once to prove the session works.",
+          "type": "boolean"
+        }
+      },
+      "$schema": "https://json-schema.org/draft/2020-12/schema",
+      "additionalProperties": false
+    },
+    "annotations": {
+      "readOnlyHint": true,
+      "destructiveHint": false,
+      "idempotentHint": true,
+      "openWorldHint": true
+    },
+    "_meta": {
+      "foreverworks.com/access": "read"
+    }
+  }
+]
