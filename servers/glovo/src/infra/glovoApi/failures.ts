@@ -33,6 +33,10 @@ export const asApiFailure = (failure: HttpFailure): never => {
   }
 };
 
+const BAD_REQUEST = "bad_request";
+/** Measured 2026-11-18: a made-up plain token gets 401 invalid_token, one still wrapped in quotes gets 400 bad_request. */
+const BAD_REQUEST_HINT = " (Glovo answers this to a token that is not a plain JWT, such as one copied with its surrounding quotes)";
+
 /**
  * A failed /oauth/refresh. A refusal (400/401/403) is a dead refresh token;
  * throttling, a 5xx or the network going away is transient. Only Glovo's error
@@ -48,7 +52,8 @@ export const asRefreshFailure = (path: string) => (failure: HttpFailure): never 
     case "rejected": {
       const transient = failure.status === TOO_MANY_REQUESTS || failure.status >= 500;
       const code = errorCodeOf(failure.body) ?? `HTTP ${failure.status}`;
-      return fail(authError(failure.status, `${path} ${transient ? "failed" : "refused"}: ${code}`, !transient));
+      const hint = failure.status === 400 && code === BAD_REQUEST ? BAD_REQUEST_HINT : "";
+      return fail(authError(failure.status, `${path} ${transient ? "failed" : "refused"}: ${code}${hint}`, !transient));
     }
   }
 };

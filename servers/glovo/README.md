@@ -101,13 +101,17 @@ and any missing field, never a value. The variables every server shares
    first, type it and paste again.
 
    ```js
+   const raw = localStorage.glovo_refresh_token;
    console.log(JSON.stringify({
-     refresh_token: localStorage.glovo_refresh_token,
+     refresh_token: raw && raw.startsWith('"') ? JSON.parse(raw) : raw,
      device_urn: JSON.parse(localStorage.glv_device).urn,
    }));
    ```
 
-   It prints one line of JSON.
+   It prints one line of JSON. The web app stores the token JSON-encoded, so
+   the raw value comes with literal double quotes around it, and Glovo refuses
+   a token that still has them (`bad_request`); the snippet removes them. The
+   server also removes them from a `credentials.json` that already has them.
 4. Save that line as `credentials.json`, outside any git repository, readable
    only by you (`chmod 600 credentials.json` on macOS and Linux).
 5. Set `GLOVO_CREDS` to the file's full path.
@@ -160,6 +164,9 @@ Every tool is **read**: none changes anything in your Glovo account.
 **`auth` with `permanent: true`: "the refresh token was refused".** The
 session ended, or Glovo stopped accepting the token. Copy the credentials again
 ([steps](#getting-the-credentials)); no restart is needed.
+If the code in the message is `bad_request` rather than `invalid_token`, what
+the file holds is probably not a plain JWT, for example a token copied with
+its surrounding quotes and stray characters beside them.
 If a token you have just copied is refused too, Glovo has probably changed what
 it expects of the web app's requests: set `GLOVO_APP_VERSION` to the release the
 web app reports now, restart the server, and if that does not help

@@ -190,6 +190,15 @@ describe("makeGlovoApi", () => {
     expect(JSON.stringify(error)).not.toContain("refresh-jwt");
   });
 
+  it("hints at a quoted token when the refresh answers 400 bad_request, without quoting any token", async () => {
+    const f = fakeFetch({ [REFRESH]: () => json({ statusCode: 400, errorCode: "bad_request" }, 400) });
+    const error = await makeGlovoApi(creds, { fetch: f.fetch, sleep: noSleep })
+      .probe()
+      .catch((e: unknown) => asAppError(e));
+    expect(error).toMatchObject({ kind: "auth", status: 400, permanent: true, message: expect.stringContaining("surrounding quotes") });
+    expect(JSON.stringify(error)).not.toContain("refresh-jwt");
+  });
+
   it("treats a throttled or failing refresh as transient", async () => {
     const f = fakeFetch({ [REFRESH]: () => json({ errorCode: "too_many_requests" }, 429) });
     const error = await makeGlovoApi(creds, { fetch: f.fetch, sleep: noSleep })
