@@ -53,7 +53,8 @@ const beginRoeid = async (deps: Deps) => {
   offerLink({
     url,
     message:
-      "Open this, sign in with ROeID and approve the request in the ROeID app on your phone. It ends on a page of plain text (one of the portal's files): " +
+      "Open this, sign in with ROeID and approve the request in the ROeID app on your phone; the first time, ROeID asks to share your details with eSănătateaMea: choose Acceptă. " +
+      "It ends on a page of plain text (one of the portal's files): " +
       "copy that page's whole address and paste it into this conversation at once, as the code in it dies within a minute.",
     next:
       "the user has the ROeID sign-in open; ask them for the whole address of the page it ends on " +
@@ -65,7 +66,8 @@ const beginRoeid = async (deps: Deps) => {
     redirect_uri: login.redirectUri,
     expires_at: isoOf(expiresAtEpoch(pending)),
     next:
-      "the USER opens url in a real browser, signs in with ROeID (their password never reaches this conversation) and approves the push in the ROeID app. " +
+      "the USER opens url in a real browser, signs in with ROeID (their password never reaches this conversation) and approves the push in the ROeID app; " +
+      "the first time ROeID asks their consent to share their details with eSănătateaMea, which they must accept (Acceptă), or the sign-in ends without a code. " +
       `The browser then lands on ${login.redirectUri}?...code=...&state=... (a page of plain text). Pass that whole address to complete_login as redirect_url ` +
       "within a minute: Keycloak's code dies quickly.",
   };

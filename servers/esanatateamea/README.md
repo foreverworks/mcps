@@ -127,8 +127,11 @@ digits each time it has to sign in again.
    `needs_login`.
 3. For ROeID: the assistant calls `begin_login` with method `roeid` and gives
    you a link (a client that shows links itself offers you the page). Sign in
-   with ROeID and approve the request in the ROeID app on your phone. The
-   browser ends on a page of plain text, one of the portal's files: copy its
+   with ROeID and approve the request in the ROeID app on your phone. The first
+   time, ROeID then asks whether eSănătateaMea may receive your details (name,
+   personal numeric code, address, identity document): choose Acceptă, or the
+   sign-in ends there without a code. The browser then lands on a page of
+   plain text, one of the portal's files: copy its
    whole address (it holds `code=` and `state=`) and paste it into the
    conversation at once, as its code dies within a minute.
 
