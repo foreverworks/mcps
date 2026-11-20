@@ -12,8 +12,8 @@ export type Field = { readonly name: string; readonly value: string | null; read
 /**
  * A login, or a secure note: a note is read the way a login is (its notes and
  * custom fields, where a person may keep a licence key or a token), but it has
- * no password, authenticator key or URLs. This server creates notes and edits
- * logins only.
+ * no password, authenticator key or URLs. This server creates notes, and
+ * changes a note's name and notes (never its fields).
  */
 export type ItemKind = "login" | "note";
 
@@ -103,6 +103,12 @@ export type NoteDraft = {
   readonly collectionIds: readonly string[];
   readonly notes: string | null;
   readonly fields: readonly Field[];
+};
+
+/** What an edit changes on a secure note: its name and its notes. Its custom fields stay exactly as stored. */
+export type NoteChange = {
+  readonly name: string;
+  readonly notes: string | null;
 };
 
 export type LoginFilter = { readonly search?: string; readonly url?: string };

@@ -73,12 +73,40 @@ describe("the bitwarden tools", () => {
     expect((await call("get_field", { id: NOTE, field: "key" })).error).toMatchObject({ kind: "input", message: expect.stringContaining("its fields: License") });
   });
 
-  it("refuses a password, a code or an edit for a secure note, and leaves it as it was", async () => {
+  it("refuses a password, a code or a login-only edit for a secure note, naming the argument, and leaves it as it was", async () => {
     const { call, items } = await connected();
-    for (const [tool, args] of [["get_password", {}], ["totp", {}], ["update_login", { name: "renamed" }]] as const) {
-      expect((await call(tool, { id: NOTE, ...args })).error).toMatchObject({ kind: "input", message: expect.stringContaining("secure note") });
+    for (const [tool, args, named] of [
+      ["get_password", {}, "a password"],
+      ["totp", {}, "an authenticator key"],
+      ["update_login", { name: "renamed", password: "x" }, "password"],
+      ["update_login", { rotate_password: true }, "rotate_password"],
+      ["update_login", { url: "https://example.com", username: "u", totp_secret: "JBSWY3DPEHPK3PXP", replace_totp: true }, "url, username, totp_secret, replace_totp"],
+    ] as const) {
+      expect((await call(tool, { id: NOTE, ...args })).error).toMatchObject({
+        kind: "input",
+        message: expect.stringContaining(`is a secure note, which has no ${named}`),
+      });
     }
     expect(items.get(NOTE)).toEqual(note());
+  });
+
+  it("renames a secure note, keeping its notes and its hidden field", async () => {
+    const { call, items } = await connected();
+    const renamed = await call("update_login", { id: NOTE, name: "TO DELETE: Editor licence" });
+    expect(renamed).toMatchObject({ id: NOTE, kind: "note", name: "TO DELETE: Editor licence", hasPassword: false, hasTotp: false, collections: ["Agents"] });
+    expect(JSON.stringify(renamed)).not.toContain("AAAAA");
+    expect(items.get(NOTE)).toEqual({ ...note(), name: "TO DELETE: Editor licence", revisionDate: "renamed" });
+    expect((await call("find_logins", { search: "to delete" })).logins).toEqual([expect.objectContaining({ id: NOTE, name: "TO DELETE: Editor licence" })]);
+  });
+
+  it("adds to a secure note's notes on a new line, or replaces them, as asked, and refuses both at once", async () => {
+    const { call, items } = await connected();
+    await call("update_login", { id: NOTE, append_notes: "the licence was cancelled" });
+    expect(items.get(NOTE)).toMatchObject({ name: "Editor licence", notes: "See license field\nthe licence was cancelled", fields: note().fields });
+    await call("update_login", { id: NOTE, name: "Old licence", notes: "replaced" });
+    expect(items.get(NOTE)).toMatchObject({ name: "Old licence", notes: "replaced", fields: note().fields });
+    expect((await call("update_login", { id: NOTE, notes: "x", append_notes: "y" })).error.kind).toBe("input");
+    expect(items.get(NOTE)?.notes).toBe("replaced");
   });
 
   it("computes the TOTP code from the stored key", async () => {

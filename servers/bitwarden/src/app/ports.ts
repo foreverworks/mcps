@@ -5,7 +5,7 @@
 import type { InputFiles } from "@foreverworks/mcp-kit";
 
 import type { RandomInt } from "../domain/password.js";
-import type { Collection, Login, LoginDraft, LoginFilter, NoteDraft, Organization, Passkey, VaultStatus } from "../domain/schema.js";
+import type { Collection, Login, LoginDraft, LoginFilter, NoteChange, NoteDraft, Organization, Passkey, VaultStatus } from "../domain/schema.js";
 import type { Hmac } from "../domain/totp.js";
 
 export type VaultPort = {
@@ -19,6 +19,8 @@ export type VaultPort = {
   readonly editLogin: (id: string, draft: LoginDraft) => Promise<Login>;
   /** A new secure note, read back as the vault stored it. */
   readonly createNote: (draft: NoteDraft) => Promise<Login>;
+  /** Rename a secure note or replace its notes, everything else as stored (its fields included), read back as the vault holds it. A login is refused. */
+  readonly editNote: (id: string, change: NoteChange) => Promise<Login>;
   /**
    * Replace an organization item's collections with these, all of its own
    * organization. Bitwarden refuses an item outside any organization. Read the

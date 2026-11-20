@@ -4,7 +4,7 @@ Give your AI assistant a [Bitwarden](https://bitwarden.com) account of its own
 to sign up and sign in with. It finds, creates and updates logins, generates
 passwords and hands one out only to type it, computes 2FA codes, keeps other
 secrets (an API token, a key file) in secure notes, moves items between an
-organization's collections, and checks passwords against Have I Been Pwned. It
+organization's collections, renames items (secure notes too), and checks passwords against Have I Been Pwned. It
 is also a passkey authenticator: it registers passkeys and signs WebAuthn
 sign-ins with them, stored the way Bitwarden's own apps store passkeys, so
 either can use the other's. `create_login`, `update_login`, `create_note`,
@@ -30,6 +30,8 @@ your own passkeys belong on your own devices.
 - "Store the key in example-key.json as a secure note called 'Example Cloud
   deploy key'."
 - "Move the Example Shop login into the Shared collection."
+- "Put 'TO DELETE: ' in front of the name of the 'Example Cloud deploy key'
+  note, and add a line saying why."
 - "Which passkeys does the vault hold for example.com?"
 - "Import the passkeys in example-export.json, then delete the file."
 
@@ -148,7 +150,7 @@ Only `delete_passkey` removes anything: one passkey, from a login that stays.
 | `check_exposed` | read | Whether a login's password is in Have I Been Pwned's breach list, and how often; only five characters of its SHA-1 leave the server. |
 | `sync` | read | Pull the vault now. Every read already syncs first when the last sync is older than 30 seconds. |
 | `create_login` | write | A new login; the password is generated here (24 characters with symbols, by default) unless given, typed or from a file. |
-| `update_login` | write | Change what is named: `rotate_password` generates a new password, `append_notes` adds to the notes, `replace_totp` allows replacing a different key. |
+| `update_login` | write | Change what is named: `rotate_password` generates a new password, `append_notes` adds to the notes, `replace_totp` allows replacing a different key. A secure note takes a new `name`, `notes` or `append_notes` (its custom fields stay as they are) and refuses the login-only arguments. |
 | `create_note` | write | A new secure note for secrets that are not a login, each in a hidden field, typed or read whole from a file; the result gives lengths and a file's SHA-256, never a value. |
 | `move_item` | write | Put a login or secure note in exactly one collection of its own organization, by name or id; the result gives its collections before and after. |
 
@@ -188,8 +190,8 @@ ids the other tools take.
 message says why. Most often: a login that already has a different
 authenticator key (pass `replace_totp: true`, and the old key is kept), a
 Steam key (not standard TOTP), a collection the account does not have
-(`health` lists them), an edit to a secure note (notes are never edited), or
-a `move_item` that would take an item out of its organization or out of the
+(`health` lists them), a login-only argument (a password, a URL, an
+authenticator key) on a secure note, or a `move_item` that would take an item out of its organization or out of the
 account's own vault (the message says what to do instead).
 
 **`cli`.** The CLI ran and said no: a network failure, a refused edit, or a
@@ -348,8 +350,8 @@ so remove them in the web vault afterwards.
   no move from one organization to another. `move_item` refuses both and says
   what to do in the web vault instead.
 - **Logins and secure notes only**; cards and identities are not read. A
-  secure note is created and read, never edited: a changed secret is a new
-  note.
+  secure note can be renamed and its notes replaced or added to, but its
+  custom fields are never edited: a changed secret is a new note.
 - **Steam's authenticator codes** are not standard TOTP and are refused.
 - **Seconds, not milliseconds.** Every call waits for the CLI: the first after
   a start logs in, unlocks and syncs, and a tool that runs it several times

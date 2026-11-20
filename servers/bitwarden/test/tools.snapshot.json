@@ -828,8 +828,8 @@
   },
   {
     "name": "update_login",
-    "title": "Update login",
-    "description": "Change a login: only what is named changes. `rotate_password` generates a new password and stores it at once; change it on the site right after, with get_password, and if the site refuses, get_password with previous: true still has the old one. `url` becomes the first URL and the others stay. `append_notes` adds to the notes (recovery codes, answers) where `notes` replaces them. Set `totp_secret` when you turn on 2FA at a site, before confirming it there: the result carries the current code from the stored key. A different key already on the login is replaced only with `replace_totp`, and kept in a hidden field.",
+    "title": "Update login or secure note",
+    "description": "Change a login: only what is named changes. `rotate_password` generates a new password and stores it at once; change it on the site right after, with get_password, and if the site refuses, get_password with previous: true still has the old one. `url` becomes the first URL and the others stay. `append_notes` adds to the notes (recovery codes, answers) where `notes` replaces them. Set `totp_secret` when you turn on 2FA at a site, before confirming it there: the result carries the current code from the stored key. A different key already on the login is replaced only with `replace_totp`, and kept in a hidden field. A secure note takes `name`, `notes` and `append_notes` (to rename one, or mark it for clean-up) and keeps its custom fields exactly as they are; a login-only argument on a note is refused, naming it.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -838,7 +838,7 @@
           "description": "The item id, from find_logins."
         },
         "name": {
-          "description": "A new name.",
+          "description": "A new name, for a login or a secure note.",
           "type": "string",
           "minLength": 1,
           "maxLength": 200
@@ -893,7 +893,7 @@
           "description": "Whether a generated password contains symbols (!@#$%^&*-_=+). Default true; turn off for sites that refuse them."
         },
         "notes": {
-          "description": "Replaces the notes.",
+          "description": "Replaces the notes (a login's or a secure note's).",
           "type": "string",
           "maxLength": 10000
         },

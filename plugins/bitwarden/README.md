@@ -16,6 +16,8 @@ Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/)
 - "Store the key in example-key.json as a secure note called 'Example Cloud
   deploy key'."
 - "Move the Example Shop login into the Shared collection."
+- "Put 'TO DELETE: ' in front of the name of the 'Example Cloud deploy key'
+  note, and add a line saying why."
 - "Which passkeys does the vault hold for example.com?"
 - "Import the passkeys in example-export.json, then delete the file."
 

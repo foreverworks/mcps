@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { passkeyFromExport } from "../../domain/passkey/exportFile.js";
-import type { Collection, Field, Login, LoginDraft, NoteDraft, Organization, Passkey, VaultStatus } from "../../domain/schema.js";
+import type { Collection, Field, Login, LoginDraft, NoteChange, NoteDraft, Organization, Passkey, VaultStatus } from "../../domain/schema.js";
 
 /**
  * The CLI's JSON, the parts this server reads. Loose objects: the CLI adds
@@ -51,7 +51,7 @@ export const organizationWire = z.looseObject({ id: z.string(), name: z.string()
 
 /** Bitwarden's field types: 0 text, 1 hidden, 2 boolean, 3 linked. */
 const HIDDEN = 1;
-/** Bitwarden's item types: a login, and a secure note (created and read, never edited, here). */
+/** Bitwarden's item types: a login, and a secure note (created and read here; an edit changes its name and notes only). */
 export const LOGIN_TYPE = 1;
 export const SECURE_NOTE_TYPE = 2;
 
@@ -162,6 +162,18 @@ export const itemPayload = (draft: LoginDraft, base: Record<string, unknown> = {
     uris: draft.uris.map((u) => ({ uri: u.uri, match: null })),
     ...(draft.passkeys === undefined ? {} : { fido2Credentials: draft.passkeys.map(passkeyPayload) }),
   },
+});
+
+/**
+ * The item JSON `bw edit item` takes to rename a secure note or change its
+ * notes: the item as read with only those two replaced, so its custom fields
+ * (a hidden one included, whatever its type), attachments and every other key
+ * go back exactly as stored.
+ */
+export const noteEditPayload = (base: Record<string, unknown>, change: NoteChange): Record<string, unknown> => ({
+  ...base,
+  name: change.name,
+  notes: change.notes,
 });
 
 /** The item JSON `bw create item` takes for a secure note. */

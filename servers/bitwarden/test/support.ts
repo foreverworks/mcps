@@ -115,6 +115,14 @@ export const fakeVault = () => {
       items.set(created.id, created);
       return created;
     },
+    // As the CLI does with a payload built from the item as read: only the name and notes change, the fields stay.
+    editNote: async (id, change) => {
+      const before = items.get(id) ?? fail(notFound(`no item ${id}`));
+      if (before.kind !== "note") throw new Error(`${id} is not a secure note`);
+      const edited = { ...before, name: change.name, notes: change.notes, revisionDate: "renamed" };
+      items.set(id, edited);
+      return edited;
+    },
     setPasskeys: async (id, passkeys) => {
       const before = items.get(id) ?? fail(notFound(`no item ${id}`));
       const edited = { ...before, passkeys: [...passkeys], revisionDate: "passkeys" };

@@ -14,6 +14,7 @@ import {
   LOGIN_TYPE,
   SECURE_NOTE_TYPE,
   loginOf,
+  noteEditPayload,
   notePayload,
   organizationOf,
   organizationWire,
@@ -115,14 +116,17 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
       (result) => result.code !== 0 && SESSION_GONE.test(bwMessage(result)),
     );
 
-  /** A login or a secure note to read; a login only, to edit. */
-  const getItem = async (id: string, use: "read" | "edit" = "read") => {
+  /** A login or a secure note to read; to edit, the kind its edit works on (`login`: passkeys and logins; `note`: a note's name and notes). */
+  const getItem = async (id: string, use: "read" | "login" | "note" = "read") => {
     checkId(id);
     const result = await withSession(["get", "item", id]);
     if (result.code !== 0 && /not found/i.test(bwMessage(result))) return fail(notFound(`no item ${id}`));
     const item = parsed(result, itemWire);
-    if (item.type === LOGIN_TYPE || (use === "read" && item.type === SECURE_NOTE_TYPE)) return item;
-    if (item.type === SECURE_NOTE_TYPE) return fail(inputError(`item ${id} is a secure note: this server reads notes and edits logins only`));
+    if (use === "read" && (item.type === LOGIN_TYPE || item.type === SECURE_NOTE_TYPE)) return item;
+    if (use === "login" && item.type === LOGIN_TYPE) return item;
+    if (use === "note" && item.type === SECURE_NOTE_TYPE) return item;
+    if (use === "login" && item.type === SECURE_NOTE_TYPE) return fail(inputError(`item ${id} is a secure note: a login's edit does not apply to it`));
+    if (use === "note" && item.type === LOGIN_TYPE) return fail(inputError(`item ${id} is a login, not a secure note`));
     return fail(notFound(`item ${id} is not a login or a secure note`));
   };
 
@@ -158,10 +162,14 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
     getLogin: async (id) => loginOf(await getItem(id)),
     createLogin: async (draft: LoginDraft) => loginOf(parsed(await withSession(["create", "item"], encoded(itemPayload(draft))), itemWire)),
     editLogin: async (id, draft) => {
-      const base = await getItem(id, "edit");
+      const base = await getItem(id, "login");
       return loginOf(parsed(await withSession(["edit", "item", id], encoded(itemPayload(draft, base))), itemWire));
     },
     createNote: async (draft: NoteDraft) => loginOf(parsed(await withSession(["create", "item"], encoded(notePayload(draft))), itemWire)),
+    editNote: async (id, change) => {
+      const base = await getItem(id, "note");
+      return loginOf(parsed(await withSession(["edit", "item", id], encoded(noteEditPayload(base, change))), itemWire));
+    },
     // `bw edit item-collections <id>` takes a JSON array of collection ids and no --organizationid (CLI 2026.10.0
     // reads that option for org-collection only). It prints the item, but goes through the SDK and clears the CLI's
     // cache on the way, so the use case reads the item back after a forced sync rather than trusting that answer.
@@ -174,7 +182,7 @@ export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions
     // `bw edit item` replaces the login with what it is given (CipherExport.toView builds a new LoginView), so a
     // payload without `fido2Credentials` would drop every passkey: the edit starts from the item as read.
     setPasskeys: async (id, passkeys) => {
-      const base = await getItem(id, "edit");
+      const base = await getItem(id, "login");
       const login = (base.login ?? {}) as Record<string, unknown>;
       const stored = Array.isArray(login["fido2Credentials"]) ? (login["fido2Credentials"] as unknown[]) : [];
       const payload = { ...base, login: { ...login, fido2Credentials: passkeysAfter(stored, passkeys) } };

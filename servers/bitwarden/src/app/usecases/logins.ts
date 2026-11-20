@@ -202,14 +202,42 @@ const totpAfter = (current: LoginDraft, args: LoginChange, nowMs: number): Pick<
   return { totp: args.totpSecret, fields: [...current.fields, { name: replacedKeyField(nowMs), value: old, hidden: true }] };
 };
 
-/** Changes what is named and keeps the rest; Bitwarden keeps the replaced password in the item's history. */
+/** The arguments only a login has a place for, by the names the tool gives them, in the order it lists them. */
+const loginOnlyGiven = (args: LoginChange): string[] =>
+  [
+    ["url", args.url],
+    ["username", args.username],
+    ["password", args.password],
+    ["password_file", args.passwordFile],
+    ["rotate_password", args.rotate],
+    ["totp_secret", args.totpSecret],
+    ["replace_totp", args.replaceTotp === true ? true : undefined],
+  ].flatMap(([name, value]) => (value === undefined ? [] : [name as string]));
+
+/** A secure note takes a new name and notes (replaced or added to); its custom fields stay as stored. */
+const updateNote = async (deps: Deps, note: Login, args: LoginChange) => {
+  const refused = loginOnlyGiven(args);
+  if (refused.length > 0) {
+    return fail(inputError(`${note.name} is a secure note, which has no ${refused.join(", ")}: on a note only name, notes and append_notes change`));
+  }
+  const edited = await deps.vault.editNote(note.id, { name: args.name ?? note.name, notes: notesAfter(note.notes, args) });
+  return collectionsSummary(edited, await deps.vault.collections());
+};
+
+/**
+ * Changes what is named and keeps the rest; Bitwarden keeps the replaced
+ * password in the item's history. On a secure note only the name and the notes
+ * change.
+ */
 export const updateLogin = async (deps: Deps, args: LoginChange) => {
+  const item = await deps.vault.getLogin(args.id);
+  if (item.kind === "note") return updateNote(deps, item, args);
   checkTotp(args.totpSecret);
   if (args.url !== undefined && hostOf(args.url) === undefined) fail(inputError(`url ${args.url} is not a URL`));
   const given = await givenPassword(deps, args);
   if (given !== undefined && args.rotate !== undefined) fail(inputError("pass a password (password or password_file) or rotate_password, not both"));
   if (args.replaceTotp === true && args.totpSecret === undefined) fail(inputError("replace_totp goes with the new totp_secret"));
-  const current = draftOf(loginOnly(await deps.vault.getLogin(args.id), "login fields to change (this server edits logins only)"));
+  const current = draftOf(item);
   const password = args.rotate !== undefined ? generatePassword(args.rotate, deps.randomInt) : (given ?? current.password);
   const notes = notesAfter(current.notes, args);
   const key = totpAfter(current, args, deps.now());

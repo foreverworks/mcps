@@ -239,17 +239,18 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
   server.registerTool(
     "update_login",
     {
-      title: "Update login",
+      title: "Update login or secure note",
       description:
         "Change a login: only what is named changes. `rotate_password` generates a new password and stores it at once; change it " +
         "on the site right after, with get_password, and if the site refuses, get_password with previous: true still has the old " +
         "one. `url` becomes the first URL and the others stay. `append_notes` adds to the notes (recovery codes, answers) where " +
         "`notes` replaces them. Set `totp_secret` when you turn on 2FA at a site, before confirming it there: the result carries " +
         "the current code from the stored key. A different key already on the login is replaced only with `replace_totp`, and " +
-        "kept in a hidden field.",
+        "kept in a hidden field. A secure note takes `name`, `notes` and `append_notes` (to rename one, or mark it for clean-up) " +
+        "and keeps its custom fields exactly as they are; a login-only argument on a note is refused, naming it.",
       inputSchema: {
         id,
-        name: z.string().trim().min(1).max(200).optional().describe("A new name."),
+        name: z.string().trim().min(1).max(200).optional().describe("A new name, for a login or a secure note."),
         url: url.optional(),
         username: username.optional(),
         password: password.optional(),
@@ -257,7 +258,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         rotate_password: z.boolean().optional().describe("Generate a new password (with `length` and `symbols`)."),
         length: length.optional(),
         symbols: symbols.optional(),
-        notes: notes.optional().describe("Replaces the notes."),
+        notes: notes.optional().describe("Replaces the notes (a login's or a secure note's)."),
         append_notes: z.string().min(1).max(10_000).optional().describe("Added after the current notes on a new line; nothing is lost."),
         totp_secret: totpSecret.optional(),
         replace_totp: z.boolean().optional().describe("Replace a DIFFERENT authenticator key the login already has (or clear it with an empty totp_secret)."),
