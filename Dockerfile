@@ -10,13 +10,13 @@
 # MCP_SERVER=relay runs the relay (packages/mcp-relay), which is not a server: it
 # stands in, on a client's machine, for one that runs on another.
 
-# The base image: Node 22 (package.json asks for >=22.19) on Debian 13, pinned by
+# The base image: Node 26 (the packages still accept >=22.19) on Debian 13, pinned by
 # the digest of its multi-platform index, so a build never moves under you.
 # To bump it, read the new digest and Node version of the tag, and write both
 # here, in the one place the image is named:
-#   docker buildx imagetools inspect node:22-trixie-slim
-#   docker run --rm node:22-trixie-slim node --version
-FROM node:22.23.5-trixie-slim@sha256:68c76cfad89921b927eae28ba21407475e29d0ce450afcdbe70c1532db042b64 AS base
+#   docker buildx imagetools inspect node:26-trixie-slim
+#   docker run --rm node:26-trixie-slim node --version
+FROM node:26.13.1-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS base
 
 # Only the package.json files and the lockfile, so that the install below is
 # reused until a dependency changes, whatever else in the tree does.

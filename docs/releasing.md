@@ -200,7 +200,7 @@ are `.github/actions/prepare-release`, which the rehearsal runs too. In order,
 it:
 
 1. installs npm 12.2.1, runs `npm ci` and `npm run check` (the personal-data
-   check, typecheck, tests, build, the docs, pack and site checks) on Node 24;
+   check, typecheck, tests, build, the docs, pack and site checks) on Node 26;
 2. runs the access check, `npx tsx scripts/access-changes.ts --check`
    ([.changeset/README.md](../.changeset/README.md));
 3. installs `mcp-publisher` 1.8.1, checked against its SHA-256, and runs
