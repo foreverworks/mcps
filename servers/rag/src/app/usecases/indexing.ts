@@ -182,7 +182,7 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
   let stopped = false;
   // A remote provider answers each request in a fraction of a second and takes many at once, so its
   // files are read, embedded and saved several at a time; the local endpoint takes them one by one.
-  const parallel = collection.provider === "local" ? 1 : deps.settings.remoteConcurrency;
+  const parallel = target.remote === undefined ? 1 : deps.settings.remoteConcurrency;
   for (let i = 0; i < listing.files.length; ) {
     if (cancelled()) {
       stopped = true;
@@ -241,13 +241,14 @@ export const indexPath = async (deps: Deps, args: IndexArgs) => {
     chunks_embedded: indexed.reduce((n, o) => n + o.added, 0),
     chunks_kept: indexed.reduce((n, o) => n + o.kept, 0),
     chunks_removed: indexed.reduce((n, o) => n + o.removed, 0),
+    // Where the chunks were embedded, which is the collection's provider unless the model has no local endpoint.
     embedding: {
       embedding_model: model.name,
-      provider: collection.provider,
-      model: collection.provider_model,
+      provider: target.remote?.provider ?? collection.provider,
+      model: target.remote?.model ?? collection.provider_model,
       requests: usage.requests,
       texts: usage.texts,
-      ...(collection.provider === "local" ? {} : { tokens: usage.tokens, neurons: usage.neurons }),
+      ...(target.remote === undefined ? {} : { tokens: usage.tokens, neurons: usage.neurons }),
     },
     seconds: Math.round((deps.now().getTime() - started) / 100) / 10,
     ...(args.prune ? { sources_pruned: pruned, ...(pruneSkipped === undefined ? {} : { prune_skipped: pruneSkipped }) } : {}),

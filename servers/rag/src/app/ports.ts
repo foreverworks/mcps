@@ -9,8 +9,12 @@ import type { Kind } from "../domain/kinds.js";
 import type { Provider, ProbeResult, RemoteProvider, Usage } from "../domain/provider.js";
 import type { Compared } from "../domain/similar.js";
 
-/** What a model endpoint says it serves. */
-export type ModelInfo = { readonly model: string; readonly revision?: string | undefined };
+/**
+ * What a model endpoint says it serves. `dimension` is the length of its vectors when the endpoint knows
+ * it without being asked to embed something (a hosted model's configuration does); a local endpoint does
+ * not say, and the dimension is learned by embedding one word.
+ */
+export type ModelInfo = { readonly model: string; readonly revision?: string | undefined; readonly dimension?: number | undefined };
 
 export type Embedder = {
   readonly info: () => Promise<ModelInfo>;
@@ -41,11 +45,19 @@ export type RemoteEmbedder = {
  * An embedding model the server is configured with: its local endpoint, which
  * embeds every question for the collections it built, the prompt a question
  * gets, and the same model at each remote provider that serves it.
+ *
+ * A model with no local endpoint at all (`remoteOnly`) is served by a remote
+ * provider alone: its `embedder` is that provider's own client, so every
+ * embedding, of a chunk or of a question, goes there, there is nothing local to
+ * compare it with or to fall back on, and a collection built by a local twin of
+ * the model is searched and grown through it.
  */
 export type EmbeddingModel = {
   /** The name a configuration gives it, which create_collection takes. */
   readonly name: string;
   readonly embedder: Embedder;
+  /** The provider that serves this model with no local endpoint, when it has none. */
+  readonly remoteOnly?: RemoteProvider | undefined;
   /** The prompt questions are embedded with (documents never get one), as the model's configuration names it. */
   readonly queryPrompt?: string | undefined;
   readonly remote: Readonly<Partial<Record<RemoteProvider, RemoteEmbedder>>>;
@@ -291,6 +303,11 @@ export type Deps = {
   /** What each remote provider lacks to be called, from the settings every model there shares. */
   readonly providers: Readonly<Record<RemoteProvider, { readonly missing: () => Promise<readonly string[]> }>>;
   readonly reranker: Reranker;
+  /**
+   * The relevance model that reranks when no local rerank endpoint is configured: at a remote provider alone,
+   * with nothing to fall back on. health describes it from this, without calling it.
+   */
+  readonly hostedRerank?: { readonly provider: RemoteProvider; readonly model: string } | undefined;
   readonly extractor: Extractor;
   readonly sources: Sources;
   readonly settings: Settings;

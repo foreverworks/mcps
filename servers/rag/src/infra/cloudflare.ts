@@ -32,6 +32,16 @@ const API = "https://api.cloudflare.com/client/v4";
 const TOKEN = { file: "RAG_CLOUDFLARE_API_TOKEN_FILE", value: "RAG_CLOUDFLARE_API_TOKEN" } as const;
 
 /**
+ * The settings Workers AI needs that the environment does not name at all. Nothing is read or called: a
+ * token file that is empty or unreadable is what `missing` reports when a call needs it. This is what
+ * decides, at startup, whether the server can run with Workers AI alone.
+ */
+export const cloudflareUnset = (env: NodeJS.ProcessEnv): readonly string[] => [
+  ...(env["RAG_CLOUDFLARE_ACCOUNT_ID"]?.trim() ? [] : ["RAG_CLOUDFLARE_ACCOUNT_ID"]),
+  ...(env[TOKEN.file]?.trim() || env[TOKEN.value]?.trim() ? [] : [TOKEN.file]),
+];
+
+/**
  * Workers AI's error codes that matter here. 3036 is the documented "daily free allocation used up"
  * (developers.cloudflare.com/workers-ai/platform/errors); 4006 is what a Workers Free account was
  * actually answered, HTTP 429, once it had spent its allocation (2026-10-29: every request from

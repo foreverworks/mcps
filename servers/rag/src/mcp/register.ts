@@ -58,7 +58,8 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         "embedding_provider says where its chunks are embedded when indexed: local (the server's own embed endpoint, the default) or a remote " +
         `service running the same model, which is faster for a large corpus and sends the documents' text there. A remote provider is accepted only after it ` +
         `embeds probe texts as the local endpoint does (cosine at least ${MIN_PROBE_COSINE}). Naming another ` +
-        "provider for an existing collection moves it there, with the same probe; chunks already embedded stay, as both providers' vectors are alike.",
+        "provider for an existing collection moves it there, with the same probe; chunks already embedded stay, as both providers' vectors are alike. " +
+        "A server with no local embed endpoint embeds everything at the remote service: there it is the default for a new collection, and recorded without a probe, as nothing local exists to compare it with.",
       inputSchema: {
         name: z.string().trim().describe("Lowercase letters, digits, - and _, at most 63 characters."),
         description: z.string().max(500).optional().describe("What the collection holds, for whoever lists it later."),
@@ -72,7 +73,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
         embedding_provider: z
           .enum(PROVIDERS)
           .optional()
-          .describe("Where indexing embeds this collection's chunks. Default: local for a new collection, unchanged for an existing one."),
+          .describe("Where indexing embeds this collection's chunks. Default: local for a new collection (the remote service on a server with no local embed endpoint), unchanged for an existing one."),
       },
     },
     handled((a) => createCollection(deps, { name: a.name, description: a.description, provider: a.embedding_provider, embeddingModel: a.embedding_model })),

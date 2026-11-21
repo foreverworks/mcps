@@ -11,11 +11,14 @@ reranking run on servers you host, so documents and questions stay on your
 machine. For a corpus too large to embed on a CPU, a collection can be
 indexed at Cloudflare Workers AI instead, which runs the same model; its
 documents' text then goes to Cloudflare, and questions are still embedded on
-your machine.
+your machine. With no machine to spare for the models at all, it can also run
+on [Workers AI alone](#workers-ai-alone): no embedding or rerank server to
+host, and every embedding and rerank done at Cloudflare.
 
 **You need** Postgres with the [pgvector](https://github.com/pgvector/pgvector)
 extension, two [text-embeddings-inference](https://github.com/huggingface/text-embeddings-inference)
-servers (one with an embedding model, one with a reranker), and for anything
+servers (one with an embedding model, one with a reranker; or a Cloudflare
+account instead of both, see [Workers AI alone](#workers-ai-alone)), and for anything
 beyond plain text: poppler's `pdftotext`, `ocrmypdf` and `tesseract` with the
 languages you need, and `pandoc`.
 
@@ -75,23 +78,25 @@ The commands above set only what is required; [Configuration](#configuration) ha
 |---|---|---|
 | `RAG_DATABASE_URL` | yes | `postgresql://user@host:port/database` of a database where the `vector` extension exists (or that the user may create). The password may be left out and given by the next variable. |
 | `RAG_DATABASE_PASSWORD_FILE` | no | File holding the database password. For a local run, `RAG_DATABASE_PASSWORD` may hold it instead. |
-| `RAG_EMBED_URL` | yes | Base URL of a text-embeddings-inference server with an embedding model, such as `http://127.0.0.1:8530`: the default model. Not needed when `RAG_EMBED_MODELS` names one. |
-| `RAG_EMBED_NAME` | no | The name of that model, which `create_collection` and `health` use. Default `default`. |
+| `RAG_EMBED_URL` | yes, unless `RAG_EMBED_MODELS` names a model or the server runs on [Workers AI alone](#workers-ai-alone) | Base URL of a text-embeddings-inference server with an embedding model, such as `http://127.0.0.1:8530`: the default model. Leave it and `RAG_EMBED_MODELS` unset, with the Cloudflare account and token set, to embed everything at Workers AI. |
+| `RAG_EMBED_NAME` | no | The name of that model, which `create_collection` and `health` use. Default `default`. Applies to the Workers AI model too. |
+| `RAG_EMBED_IDENTITY` | no, Workers AI alone only | The model identity (`model@revision`) the Workers AI model reports, which is what a collection records and is searched by. Set it to the `model` that `list_collections` shows for collections a local embedding server built, so this server finds them. Default: the Workers AI model's own id (`RAG_CLOUDFLARE_MODEL`). Ignored when `RAG_EMBED_URL` or `RAG_EMBED_MODELS` is set. |
+| `RAG_EMBED_DIMENSION` | no, Workers AI alone with another model than the default | The length of the vectors the Workers AI model makes: a whole positive number. Default 1024, only for `@cf/baai/bge-m3`; any other `RAG_CLOUDFLARE_MODEL` needs it. Ignored when `RAG_EMBED_URL` or `RAG_EMBED_MODELS` is set. |
 | `RAG_EMBED_QUERY_PROMPT` | no | The prompt questions get with that model, by the name its own configuration gives it (text-embeddings-inference's `prompt_name`), for a model trained with one. Documents never get it. |
 | `RAG_EMBED_MODELS` | no | More embedding models, as a JSON object by name: `{"<name>": {"url": "...", "query_prompt": "...", "cloudflare_model": "...", "cloudflare_batch": 32}}`, only `url` required. See [Several embedding models](#several-embedding-models). |
-| `RAG_RERANK_URL` | yes | Base URL of a text-embeddings-inference server with a reranker model, such as `http://127.0.0.1:8531`. |
-| `RAG_QUERY_PROVIDER` | no | Query embedding and reranking: `local` (default), or `cloudflare` with automatic local fallback. Independent of a collection's indexing provider. |
-| `RAG_QUERY_TIMEOUT_MS` | no | Deadline per remote inference request during search. Default 2000 ms, one attempt. |
-| `RAG_LOCAL_ONLY_COLLECTIONS` | no | Collection names, separated by commas, whose questions and passages never leave this machine, even with `RAG_QUERY_PROVIDER=cloudflare`. A search that names no collections leaves them out. See [Local-only collections](#local-only-collections). |
+| `RAG_RERANK_URL` | yes, unless `RAG_QUERY_PROVIDER` is `cloudflare` and Workers AI is configured | Base URL of a text-embeddings-inference server with a reranker model, such as `http://127.0.0.1:8531`. With it unset, remote query inference on and Workers AI configured, candidates are scored at Workers AI alone, with no local fallback ([Workers AI alone](#workers-ai-alone)). |
+| `RAG_QUERY_PROVIDER` | no | Query embedding and reranking: `local` (default), or `cloudflare` with automatic local fallback. Independent of a collection's indexing provider. With no embedding endpoint ([Workers AI alone](#workers-ai-alone)) the default is `cloudflare`, there is nothing to fall back on, and `local` fails every question, naming `RAG_EMBED_URL`. |
+| `RAG_QUERY_TIMEOUT_MS` | no | Deadline per remote inference request during search. Default 2000 ms, one attempt. With no local fallback, a slow answer is an error, so raise it if searches time out. |
+| `RAG_LOCAL_ONLY_COLLECTIONS` | no | Collection names, separated by commas, whose questions and passages never leave this machine, even with `RAG_QUERY_PROVIDER=cloudflare`. A search that names no collections leaves them out. See [Local-only collections](#local-only-collections). Not possible with [Workers AI alone](#workers-ai-alone): every call that embeds fails, naming it. |
 | `RAG_NAMED_ONLY_COLLECTIONS` | no | Collection names, separated by commas, that a search reads only when it names them. Nothing else about them changes. See [Collections searched only when named](#collections-searched-only-when-named). |
 | `RAG_SOURCE_ROOTS` | no | Folders, separated by `:`, the server may index from in place, besides `MCP_FILE_ROOTS`. Links inside them are never followed. |
 | `RAG_OCR_LANGUAGE` | no | Tesseract language code(s) for OCR when a call names none. Default `eng`. |
 | `RAG_MAX_FILE_BYTES` | no | Largest file it reads. Default 200 MiB. |
 | `RAG_EMBED_BATCH` | no | Texts per embed request. Default 32, text-embeddings-inference's default limit. |
 | `RAG_RERANK_BATCH` | no | Passages per rerank request; a search with more candidates sends several. Default 32, text-embeddings-inference's default `--max-client-batch-size`. |
-| `RAG_CLOUDFLARE_ACCOUNT_ID` | no | The Cloudflare account that runs Workers AI, for collections indexed there. |
-| `RAG_CLOUDFLARE_API_TOKEN_FILE` | no | File holding a Cloudflare API token that may run Workers AI on that account: the account permission Workers AI Read is enough. For a local run, `RAG_CLOUDFLARE_API_TOKEN` may hold it instead. |
-| `RAG_CLOUDFLARE_MODEL` | no | The Workers AI model that matches the default embedding model. Default `@cf/baai/bge-m3`, which is `BAAI/bge-m3`. |
+| `RAG_CLOUDFLARE_ACCOUNT_ID` | no, yes for [Workers AI alone](#workers-ai-alone) | The Cloudflare account that runs Workers AI, for collections indexed there. |
+| `RAG_CLOUDFLARE_API_TOKEN_FILE` | no, yes for [Workers AI alone](#workers-ai-alone) | File holding a Cloudflare API token that may run Workers AI on that account: the account permission Workers AI Read is enough. For a local run, `RAG_CLOUDFLARE_API_TOKEN` may hold it instead. |
+| `RAG_CLOUDFLARE_MODEL` | no | The Workers AI model that matches the default embedding model, or, with [Workers AI alone](#workers-ai-alone), the embedding model itself. Default `@cf/baai/bge-m3`, which is `BAAI/bge-m3`. |
 | `RAG_CLOUDFLARE_BATCH` | no | Texts per Workers AI request. Default 64. |
 | `RAG_CLOUDFLARE_RERANK_MODEL` | no | Remote relevance model: `@cf/baai/bge-reranker-base` (default), `@cf/cloudflare/clef-flash`, or `@cf/cloudflare/clef`. Decision models score each passage on a fixed five-level rubric. |
 | `RAG_REMOTE_CONCURRENCY` | no | Files indexed at once for a collection embedded at a remote provider. Default 8; the local endpoint always takes one at a time. |
@@ -355,6 +360,73 @@ fixed rubric, from unrelated to directly answering the central question. All
 scores must be present, finite and inside the rubric; otherwise every candidate
 falls back to the local reranker. Clef reports input tokens rather than neurons;
 an absent neuron count is unknown, not evidence that an inference was free.
+
+### Workers AI alone
+
+You do not have to host a model server. Leave `RAG_EMBED_URL`,
+`RAG_EMBED_MODELS` and `RAG_RERANK_URL` unset and name a Cloudflare account and
+token, and every embedding and every rerank goes to Workers AI: chunks while
+indexing, questions while searching, candidate passages while reranking. It
+suits a small box with no room for two model servers, or a first try before you
+decide to host them. The price is privacy and a dependency: the text of every
+document, question and candidate passage goes to Cloudflare, and a search
+needs Workers AI to be up and within its daily allocation.
+
+| Mode | Set | Leave unset |
+|---|---|---|
+| Local | `RAG_DATABASE_URL`, `RAG_EMBED_URL`, `RAG_RERANK_URL` | The Cloudflare settings (optional: they add indexing and query inference at Workers AI) |
+| Workers AI alone | `RAG_DATABASE_URL`, `RAG_CLOUDFLARE_ACCOUNT_ID`, `RAG_CLOUDFLARE_API_TOKEN_FILE` | `RAG_EMBED_URL`, `RAG_EMBED_MODELS`, `RAG_RERANK_URL`, `RAG_LOCAL_ONLY_COLLECTIONS` |
+
+With those three set, the model is `@cf/baai/bge-m3` (1,024 dimensions) and the
+reranker is `@cf/baai/bge-reranker-base`; `RAG_CLOUDFLARE_MODEL`,
+`RAG_CLOUDFLARE_BATCH` and `RAG_CLOUDFLARE_RERANK_MODEL` change them, and a
+Clef model works as the reranker like anywhere else. Another embedding model
+needs `RAG_EMBED_DIMENSION`, the length of its vectors, because nothing local
+can be asked. If only one of the account and the token is set, the error says
+which is missing; if neither is, it is the usual one about `RAG_EMBED_URL`.
+
+What changes from a server with local endpoints:
+
+- **Nothing is asked of Workers AI to describe the model.** The server reports
+  the identity and dimension from its settings, so `health`, `create_collection`
+  and finding a collection's model spend no tokens and no neurons. `health`
+  says `ok` when the database answers and the Cloudflare settings are all
+  there, and lists the model and reranker from configuration (`remote_only`
+  on the model).
+- **`create_collection` makes a Workers AI collection.** A new one is recorded
+  at `cloudflare` with the model's identity and no probe: there is no local
+  copy of the model to compare it with. `embedding_provider: "local"` is
+  refused, naming `RAG_EMBED_URL`.
+- **Collections a local server built still work**, if this one reports the same
+  model identity. A collection records the model and revision its local
+  endpoint reported (`list_collections` shows it as `model`), and is searched
+  only by a model that reports exactly that. Set `RAG_EMBED_IDENTITY` to it,
+  for example `BAAI/bge-m3@<revision>`. This server cannot check that the
+  model embeds as Workers AI's does, since it has no local copy to compare
+  with: set it only for a model already checked, which a server with both
+  endpoints does when `create_collection` sets a collection to
+  `embedding_provider: "cloudflare"` (cosine of at least 0.999 on probe
+  texts). Collections recorded as `local` and as `cloudflare` are then both
+  indexed at Workers AI, and `index_path` reports where each was embedded.
+  Without the setting such a collection is refused, and the error names both
+  identities.
+- **No probe, no fallback.** With a local twin the server compares Workers AI's
+  vectors with it once an hour and falls back to it when Workers AI fails.
+  Here there is nothing to compare with or fall back on, so a failed request
+  is the answer: `search` fails with Workers AI's own error (a spent daily
+  allocation, a timeout), and a failed rerank leaves the fused order with the
+  note it always had, saying why. `RAG_QUERY_TIMEOUT_MS` (2 seconds, one
+  attempt) is then the time a question has: raise it if searches time out.
+- **`local_inference` is refused**, since nothing can answer locally, and
+  `RAG_QUERY_PROVIDER=local` fails every question, naming `RAG_EMBED_URL`.
+  Unset it: it defaults to `cloudflare` here.
+- **Local-only collections are not possible.** They promise their text never
+  leaves the machine, and everything here does. Listing any in
+  `RAG_LOCAL_ONLY_COLLECTIONS` fails every call that embeds, and `health`, with
+  that reason, rather than breaking the promise quietly.
+- A server with a local embedding endpoint and no `RAG_RERANK_URL` scores
+  candidates at Workers AI the same way when `RAG_QUERY_PROVIDER=cloudflare`,
+  and has no local reranker to fall back on.
 
 ### Local-only collections
 

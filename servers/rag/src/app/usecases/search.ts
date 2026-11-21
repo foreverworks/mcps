@@ -57,6 +57,9 @@ const listsFor = async (deps: Deps, groups: Awaited<ReturnType<typeof byModel>>,
   const [nearest, matching] = await Promise.all([
     Promise.all(
       groups.map(async ({ model, collections }) => {
+        // Local inference was asked for (or required): a model with no local endpoint cannot give it, and must not quietly go to its provider.
+        if (deps.inference === undefined && model.remoteOnly !== undefined)
+          return fail(inputError(`the ${model.name} model has no local endpoint (RAG_EMBED_URL is not set): it embeds at ${model.remoteOnly} only, so this search cannot run with local inference; leave local_inference off`));
         const embedded = deps.inference === undefined ? undefined : await deps.inference.embed(model, [phrasing], collections[0]?.dimension ?? 0);
         if (embedded !== undefined) inference.push(embedded.trace);
         const [vector] = embedded?.vectors ?? await model.embedder.embed([phrasing], { prompt: model.queryPrompt });

@@ -8,7 +8,10 @@ type Options = {
   readonly provider: "local" | "cloudflare";
   readonly remote: (model: EmbeddingModel) => RemoteEmbedder | undefined;
   readonly remoteReranker: RemoteReranker;
-  readonly localReranker: Reranker;
+  /** The local rerank endpoint; absent when none is configured, and a remote rerank then has nothing to fall back on. */
+  readonly localReranker: Reranker | undefined;
+  /** What `status` says a failed remote call falls back to: "none" when no stage has a local endpoint to go to. Default "local". */
+  readonly fallback?: "local" | "none";
   readonly batch: number;
   readonly timeoutMs: number;
   readonly now?: () => number;
@@ -32,6 +35,13 @@ const validVectors = (vectors: readonly (readonly number[])[], count: number, di
  * equivalence probe lives for an hour, keyed by the local model and revision and
  * its remote counterpart. Failures are never cached: the next call tries remote
  * again. A rerank failure redoes ALL candidates locally, so models' scores never mix.
+ *
+ * A stage with no local endpoint has no probe and no fallback. A model with no
+ * local endpoint (`remoteOnly`) has nothing to compare its remote vectors with,
+ * so they are not probed (that would compare the provider with itself and spend
+ * its units every hour), and nothing to embed a question with when the provider
+ * fails. Likewise a rerank with no local rerank endpoint. In both the provider's
+ * own error (a spent quota, a timeout) is what the call fails with.
  */
 export const makeQueryInference = (options: Options): QueryInference => {
   const now = options.now ?? Date.now;
@@ -56,10 +66,16 @@ export const makeQueryInference = (options: Options): QueryInference => {
   };
   const complete = (trace: InferenceTrace): InferenceTrace => { options.observe?.(trace); return trace; };
   return {
-    status: () => ({ primary: options.provider, fallback: "local", remote_rerank_model: options.remoteReranker.model, remote_timeout_ms: options.timeoutMs, probes: [...probes.values()].filter((p) => p.until > now()).map((p) => p.probe) }),
+    status: () => ({ primary: options.provider, fallback: options.fallback ?? "local", remote_rerank_model: options.remoteReranker.model, remote_timeout_ms: options.timeoutMs, probes: [...probes.values()].filter((p) => p.until > now()).map((p) => p.probe) }),
     embed: async (model, texts, dimension) => {
       const start = now();
       let fallback: InferenceTrace["fallback"];
+      if (model.remoteOnly !== undefined) {
+        const remote = options.remote(model) ?? fail({ kind: "config", message: "no remote counterpart for this embedding model" });
+        const out = await remote.embed(texts);
+        if (!validVectors(out.vectors, texts.length, dimension)) return fail({ kind: "provider", provider: remote.provider, reason: "rejected", message: "invalid query vectors" });
+        return { vectors: out.vectors, trace: complete({ stage: "embed", provider: remote.provider, model: remote.model, elapsed_ms: now() - start, usage: out.usage }) };
+      }
       if (options.provider === "cloudflare") {
         try {
           const remote = options.remote(model);
@@ -80,6 +96,7 @@ export const makeQueryInference = (options: Options): QueryInference => {
     rerank: async (query, texts) => {
       const start = now();
       let fallback: InferenceTrace["fallback"];
+      const local = options.localReranker;
       if (options.provider === "cloudflare") {
         try {
           const scores: { index: number; score: number }[] = [];
@@ -91,16 +108,17 @@ export const makeQueryInference = (options: Options): QueryInference => {
           }
           return { scores: scores.sort((a, b) => b.score - a.score), trace: complete({ stage: "rerank", provider: "cloudflare", model: options.remoteReranker.model, elapsed_ms: now() - start, usage }) };
         } catch (thrown) {
-          if (callSignal()?.aborted) throw thrown;
+          if (local === undefined || callSignal()?.aborted) throw thrown;
           fallback = fallbackOf(thrown);
         }
       }
+      if (local === undefined) return fail({ kind: "config", variable: "RAG_RERANK_URL", message: "no rerank endpoint is configured to rerank locally: RAG_RERANK_URL is not set" });
       const scores: { index: number; score: number }[] = [];
       for (const [at, batch] of batches(texts, options.batch).entries()) {
-        const out = await options.localReranker.rerank(query, batch);
+        const out = await local.rerank(query, batch);
         scores.push(...out.map((s) => ({ index: s.index + at * options.batch, score: s.score })));
       }
-      const info = await options.localReranker.info();
+      const info = await local.info();
       return { scores: scores.sort((a, b) => b.score - a.score), trace: complete({ stage: "rerank", provider: "local", model: info.model, elapsed_ms: now() - start, ...(fallback === undefined ? {} : { fallback }) }) };
     },
   };

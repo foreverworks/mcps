@@ -1,4 +1,5 @@
-import { describeFailure } from "../../domain/errors.js";
+import { configError, describeFailure, fail } from "../../domain/errors.js";
+import { CLOUDFLARE_RERANK_MODELS } from "../../domain/provider.js";
 import type { Deps } from "../ports.js";
 import { describeModel } from "./collections.js";
 
@@ -17,12 +18,22 @@ const part = async <T extends object>(read: () => Promise<T>): Promise<({ readon
  * endpoint, and the text extractors on PATH. ok means the database, every
  * embedding model and the reranker answer; a missing extractor is listed under
  * problems, since only the files that need it fail.
+ *
+ * A model or a reranker that only a remote provider serves (no local endpoint
+ * is configured) is described from its configuration and answers nothing: ok
+ * then also means the provider's settings are all there, which is read without
+ * calling it, so health spends none of the provider's units.
  */
 export const checkHealth = async (deps: Deps) => {
   const [database, models, rerank, tools, providers, existing] = await Promise.all([
     part(() => deps.store.status()),
     part(async () => ({ list: await Promise.all(deps.models().map(async (m) => ({ m, described: await part(() => describeModel(m)) }))) })),
-    part(() => deps.reranker.info()),
+    part(async () => {
+      if (deps.hostedRerank === undefined) return deps.reranker.info();
+      const { provider, model } = deps.hostedRerank;
+      if (!(CLOUDFLARE_RERANK_MODELS as readonly string[]).includes(model)) return fail(configError(`RAG_CLOUDFLARE_RERANK_MODEL "${model}" is not a supported relevance model: ${CLOUDFLARE_RERANK_MODELS.join(", ")}`, "RAG_CLOUDFLARE_RERANK_MODEL"));
+      return { model, provider };
+    }),
     deps.extractor.tools(),
     Promise.all(Object.entries(deps.providers).map(async ([name, p]) => ({ name, missing: await p.missing() }))),
     part(async () => ({ names: (await deps.store.collectionInfos()).map((c) => c.name) })),
@@ -36,9 +47,13 @@ export const checkHealth = async (deps: Deps) => {
   const embedding_models = list.map(({ m, described }) => ({
     ...(described.ok ? described : { name: m.name, ok: false, error: described.error }),
     ...(m.queryPrompt === undefined ? {} : { query_prompt: m.queryPrompt }),
+    ...(m.remoteOnly === undefined ? {} : { remote_only: m.remoteOnly }),
     remote: Object.fromEntries(Object.entries(m.remote).map(([provider, r]) => [provider, r.model])),
   }));
   const dimension = database.ok ? database.dimension : undefined;
+  // The providers that something here is served by alone: they must be configured, as there is no local endpoint to use instead.
+  const needed = new Set([...list.flatMap(({ m }) => (m.remoteOnly === undefined ? [] : [m.remoteOnly])), ...(deps.hostedRerank === undefined ? [] : [deps.hostedRerank.provider])]);
+  const unconfigured = providers.filter(({ name, missing }) => (needed as ReadonlySet<string>).has(name) && missing.length > 0);
   const problems = [
     ...(database.ok ? [] : [`database: ${database.error}`]),
     ...(database.ok && database.vector === undefined ? ["database: the vector extension is not installed in this database"] : []),
@@ -50,6 +65,7 @@ export const checkHealth = async (deps: Deps) => {
         : [],
     ),
     ...(rerank.ok ? [] : [`rerank: ${rerank.error}`]),
+    ...unconfigured.map(({ name, missing }) => `${name}: ${missing.join(", ")} not set, and it is the only provider here that embeds or reranks`),
     ...deps.localOnlyInvalid.map((entry) => `RAG_LOCAL_ONLY_COLLECTIONS lists "${entry}", which is not a collection name (lowercase letters, digits, - and _): it protects nothing`),
     ...deps.namedOnlyInvalid.map((entry) => `RAG_NAMED_ONLY_COLLECTIONS lists "${entry}", which is not a collection name (lowercase letters, digits, - and _): it matches nothing`),
     ...(database.ok && database.unindexed.length > 0
@@ -59,7 +75,7 @@ export const checkHealth = async (deps: Deps) => {
       .filter(([, v]) => v.startsWith("missing"))
       .map(([name, v]) => `${name}: ${v}`),
   ];
-  const ok = database.ok && database.vector !== undefined && models.ok && list.every((x) => x.described.ok) && rerank.ok && deps.localOnlyInvalid.length === 0 && deps.namedOnlyInvalid.length === 0;
+  const ok = database.ok && database.vector !== undefined && models.ok && list.every((x) => x.described.ok) && rerank.ok && unconfigured.length === 0 && deps.localOnlyInvalid.length === 0 && deps.namedOnlyInvalid.length === 0;
   const first = embedding_models[0];
   return {
     ok,

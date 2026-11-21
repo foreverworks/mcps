@@ -8,9 +8,14 @@ export const COLLECTION_NAME = /^[a-z0-9][a-z0-9_-]{0,62}$/u;
 /** A model as a collection records it: its id and the revision its endpoint serves. */
 const idOf = (info: ModelInfo): string => (info.revision === undefined ? info.model : `${info.model}@${info.revision}`);
 
-/** The model an endpoint serves and the length of its vectors, learned by embedding one word. */
+/**
+ * The model an endpoint serves and the length of its vectors: as the model reports it when it knows (a
+ * hosted model's configuration does, and nothing is embedded), else learned by embedding one word.
+ */
 export const describeModel = async (model: EmbeddingModel): Promise<{ readonly name: string; readonly model: string; readonly dimension: number }> => {
-  const [info, vectors] = await Promise.all([model.embedder.info(), model.embedder.embed(["dimension"])]);
+  const info = await model.embedder.info();
+  if (info.dimension !== undefined) return { name: model.name, model: idOf(info), dimension: info.dimension };
+  const vectors = await model.embedder.embed(["dimension"]);
   const dimension = vectors[0]?.length ?? 0;
   if (dimension === 0) return fail({ kind: "model", endpoint: "embed", message: `the ${model.name} embed endpoint answered with an empty vector` });
   return { name: model.name, model: idOf(info), dimension };
@@ -47,19 +52,31 @@ export const modelFor = async (deps: Deps, collection: CollectionInfo): Promise<
 
 /**
  * Where indexing embeds a collection's chunks: its model's local endpoint, or
- * that model at the remote provider the collection was probed with.
+ * that model at the remote provider the collection was probed with. A model
+ * with no local endpoint (`remoteOnly`) embeds every collection at its
+ * provider, whichever one the collection recorded: a collection recorded as
+ * local was built by a local twin of the model, which is how it is found by
+ * this one (the same model identity), and has no provider model to hold the
+ * server to.
  */
 export const remoteFor = (collection: CollectionInfo, model: EmbeddingModel): RemoteEmbedder | undefined => {
-  if (collection.provider === "local") return undefined;
-  const remote = model.remote[collection.provider];
+  const provider = collection.provider === "local" ? model.remoteOnly : collection.provider;
+  if (provider === undefined) return undefined;
+  const remote = model.remote[provider];
   if (remote === undefined)
     return fail(configError(`collection "${collection.name}" is embedded at ${collection.provider}, and the ${model.name} model has no ${collection.provider} counterpart configured`, "RAG_EMBED_MODELS"));
-  if (remote.model !== collection.provider_model)
+  if (collection.provider !== "local" && remote.model !== collection.provider_model)
     fail({
       kind: "mismatch",
       message: `collection "${collection.name}" is embedded at ${collection.provider} with ${collection.provider_model}; the server is set to ask it for ${remote.model}. create_collection with that provider probes the new model`,
     });
   return remote;
+};
+
+/** Refuses a remote provider that lacks a setting, naming it; health reports the same without calling the provider. */
+const requireConfigured = async (deps: Deps, provider: RemoteProvider): Promise<void> => {
+  const missing = await deps.providers[provider].missing();
+  if (missing.length > 0) fail({ kind: "config", variable: missing[0] ?? "", message: `the ${provider} provider is not configured: ${missing.join(", ")} not set` });
 };
 
 /**
@@ -68,8 +85,7 @@ export const remoteFor = (collection: CollectionInfo, model: EmbeddingModel): Re
  * Refuses the provider otherwise, saying how far apart they were.
  */
 export const probeProvider = async (deps: Deps, model: EmbeddingModel, provider: RemoteProvider, local: { readonly model: string }): Promise<ProbeResult> => {
-  const missing = await deps.providers[provider].missing();
-  if (missing.length > 0) return fail({ kind: "config", variable: missing[0] ?? "", message: `the ${provider} provider is not configured: ${missing.join(", ")} not set` });
+  await requireConfigured(deps, provider);
   const remote = model.remote[provider] ?? fail(configError(`the ${model.name} model has no ${provider} counterpart configured (cloudflare_model in RAG_EMBED_MODELS)`, "RAG_EMBED_MODELS"));
   const [mine, theirs] = await Promise.all([model.embedder.embed(PROBE_TEXTS), remote.embed(PROBE_TEXTS)]);
   const probe = compareProbe(mine, theirs.vectors);
@@ -81,11 +97,19 @@ export const probeProvider = async (deps: Deps, model: EmbeddingModel, provider:
   return probe;
 };
 
-/** Where a collection's chunks will be embedded: the local model, or a remote provider that passed the probe. */
-const settingFor = async (deps: Deps, model: EmbeddingModel, provider: Provider, local: { readonly model: string }): Promise<ProviderSetting> =>
-  provider === "local"
-    ? { provider: "local", provider_model: local.model }
-    : { provider, provider_model: model.remote[provider]?.model ?? "", provider_probe: await probeProvider(deps, model, provider, local) };
+/**
+ * Where a collection's chunks will be embedded: the local model, or a remote provider that passed the probe.
+ * A model that only that provider serves has no local twin to probe it against: its own configuration is
+ * the identity, so it is recorded without a probe.
+ */
+const settingFor = async (deps: Deps, model: EmbeddingModel, provider: Provider, local: { readonly model: string }): Promise<ProviderSetting> => {
+  if (provider === "local") return { provider: "local", provider_model: local.model };
+  if (model.remoteOnly === provider) {
+    await requireConfigured(deps, provider);
+    return { provider, provider_model: model.remote[provider]?.model ?? "" };
+  }
+  return { provider, provider_model: model.remote[provider]?.model ?? "", provider_probe: await probeProvider(deps, model, provider, local) };
+};
 
 export const listCollections = async (deps: Deps) => {
   const rows = await deps.store.collections();
@@ -130,6 +154,11 @@ export const snapshotCollections = async (deps: Deps, copies: readonly { readonl
  * either provider sit in one index and every question, embedded locally,
  * finds both. A local-only collection (RAG_LOCAL_ONLY_COLLECTIONS) is refused
  * any remote provider, before the provider is probed.
+ *
+ * A model with no local endpoint (`remoteOnly`) needs no embedding call to
+ * describe it, has no local twin to probe its provider against, and gives a
+ * new collection its provider by default; "local" is refused for it, as there
+ * is nothing local to embed with.
  */
 export const createCollection = async (
   deps: Deps,
@@ -146,9 +175,13 @@ export const createCollection = async (
   const model = await describeModel(embedding);
   if (existing !== undefined && existing.model !== model.model)
     return fail(inputError(`collection "${args.name}" was embedded with ${existing.model}, and ${embedding.name} serves ${model.model}: a collection keeps its model, so make another one for this model`));
+  // A collection already recorded as local stays as it is; making or moving one there needs something local.
+  if (embedding.remoteOnly !== undefined && args.provider === "local" && existing?.provider !== "local")
+    return fail(configError(`the ${embedding.name} model has no local endpoint (RAG_EMBED_URL is not set): its chunks are embedded at ${embedding.remoteOnly}, so embedding_provider "local" is not possible`, "RAG_EMBED_URL"));
+  const provider: Provider = existing === undefined && args.provider === undefined && embedding.remoteOnly !== undefined ? embedding.remoteOnly : wanted;
   await deps.store.ensureSchema(model.dimension);
-  const switching = existing !== undefined && existing.provider !== wanted;
-  const setting = existing === undefined || switching ? await settingFor(deps, embedding, wanted, model) : undefined;
+  const switching = existing !== undefined && existing.provider !== provider;
+  const setting = existing === undefined || switching ? await settingFor(deps, embedding, provider, model) : undefined;
   const created =
     existing === undefined && setting !== undefined
       ? await deps.store.createCollection({ name: args.name, description: args.description ?? "", model: model.model, dimension: model.dimension, ...setting })
@@ -159,7 +192,7 @@ export const createCollection = async (
   return {
     created,
     embedding_model: embedding.name,
-    ...(switching ? { switched: { from: existing.provider, to: wanted } } : {}),
+    ...(switching ? { switched: { from: existing.provider, to: provider } } : {}),
     ...(indexed ? { vector_index: "built: the collection had none of its own" } : {}),
     collection: row,
   };
