@@ -36,7 +36,7 @@ official server on one side and an ordinary MCP server on the other.
 
 ## What it can change
 
-It has 6 tools. Some of them change things in your account, and none moves money.
+It has 7 tools. Some of them change things in your account, and none moves money.
 
 ## Install
 

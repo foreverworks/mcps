@@ -30,8 +30,23 @@ export type RotatingGrantOptions = {
   /** The state file's path, which names the directory the lock lives in. */
   readonly path: string;
   readonly lockName: string;
-  /** The refresh-token exchange; the server's own failure when the provider refuses. */
+  /**
+   * The refresh-token exchange. It must be sent ONCE (a resend after a lost
+   * answer would spend a token the provider already rotated). It throws the
+   * server's own failure when the provider refuses; `isRevoked` says which of
+   * those failures mean the refresh token is dead for good.
+   */
   readonly refresh: (refreshToken: string) => Promise<Granted>;
+  /**
+   * Whether a failure of `refresh` is the provider saying the grant is over
+   * (RFC 6749 `invalid_grant` or `invalid_client`). Only then is the stored
+   * grant dropped. A 429, a 5xx, `temporarily_unavailable`, a network error or
+   * any other refusal must answer false: the grant is still good and the next
+   * call tries again. Default: never drop.
+   */
+  readonly isRevoked?: (thrown: unknown) => boolean;
+  /** Where an error that loses the grant is reported; stderr by default. */
+  readonly log?: (line: string) => void;
   /** The server's failure for "there is no grant". Must throw. */
   readonly missing: () => never;
   /** Refresh this many seconds before the stated expiry. */
@@ -54,7 +69,7 @@ export const grantAfterRefresh = (previous: RotatingGrant, granted: Granted, now
   ...(granted.scope === undefined ? previous.scope === undefined ? {} : { scope: previous.scope } : { scope: granted.scope }),
 });
 
-export const makeGrantSource = ({ store, path, lockName, refresh, missing, skewSeconds = 60, nowEpoch = epochNow }: RotatingGrantOptions): GrantSource => {
+export const makeGrantSource = ({ store, path, lockName, refresh, isRevoked = () => false, log = (line) => console.error(line), missing, skewSeconds = 60, nowEpoch = epochNow }: RotatingGrantOptions): GrantSource => {
   const fresh = (grant: RotatingGrant | undefined): grant is RotatingGrant => grant !== undefined && grant.expiresAtEpoch - nowEpoch() > skewSeconds;
   const state: { inflight?: Promise<string> | undefined } = {};
 
@@ -64,8 +79,17 @@ export const makeGrantSource = ({ store, path, lockName, refresh, missing, skewS
       if (stored === undefined) return missing();
       // A rival process may have refreshed while this one waited for the lock.
       if (fresh(stored) && stored.accessToken !== discard) return stored.accessToken;
-      const next = grantAfterRefresh(stored, await refresh(stored.refreshToken), nowEpoch());
-      await store.write(next);
+      const granted = await refresh(stored.refreshToken).catch(async (thrown: unknown) => {
+        if (isRevoked(thrown)) await store.clear();
+        throw thrown;
+      });
+      const next = grantAfterRefresh(stored, granted, nowEpoch());
+      // DANGER: the provider has already rotated the refresh token. If this write fails, the only
+      // working refresh token exists nowhere on disk and the grant is lost: a person must sign in again.
+      await store.write(next).catch((thrown: unknown) => {
+        log("rotating grant: the refreshed tokens could NOT be saved and the grant is lost; free the state directory (space, permissions) and sign in again");
+        throw thrown;
+      });
       return next.accessToken;
     }).finally(() => {
       state.inflight = undefined;

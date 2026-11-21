@@ -10,7 +10,7 @@ import { grantAfterRefresh, makeGrantSource, type RotatingGrant } from "../src/r
 import { storedFile } from "../src/storedFile.js";
 
 const onDisk = z.object({ access: z.string(), refresh: z.string(), exp: z.number() });
-const setup = async (initial: RotatingGrant | undefined, refresh: (token: string) => Promise<Granted>, clock = { t: 1000 }) => {
+const setup = async (initial: RotatingGrant | undefined, refresh: (token: string) => Promise<Granted>, clock = { t: 1000 }, extra: { isRevoked?: (t: unknown) => boolean; log?: (l: string) => void } = {}) => {
   const path = join(await mkdtemp(join(tmpdir(), "kit-rotating-")), "grant.json");
   const store = storedFile<RotatingGrant, z.infer<typeof onDisk>>(path, {
     schema: onDisk,
@@ -23,6 +23,7 @@ const setup = async (initial: RotatingGrant | undefined, refresh: (token: string
     path,
     lockName: "grant.lock",
     refresh,
+    ...extra,
     missing: () => {
       throw new Error("no grant");
     },
@@ -80,5 +81,47 @@ describe("makeGrantSource", () => {
     });
     await expect(source.get()).rejects.toThrow("invalid_grant");
     expect((await store.read())?.refreshToken).toBe("r1");
+  });
+});
+
+describe("a refresh that fails", () => {
+  const stale: RotatingGrant = { accessToken: "a1", refreshToken: "r1", expiresAtEpoch: 900 };
+
+  it("drops the grant only when the failure is the provider ending it", async () => {
+    const dead = await setup(stale, async () => {
+      throw new Error("invalid_grant");
+    }, { t: 1000 }, { isRevoked: (t) => String(t).includes("invalid_grant") });
+    await expect(dead.source.get()).rejects.toThrow("invalid_grant");
+    expect(await dead.store.read()).toBeUndefined();
+
+    const busy = await setup(stale, async () => {
+      throw new Error("http_503");
+    }, { t: 1000 }, { isRevoked: (t) => String(t).includes("invalid_grant") });
+    await expect(busy.source.get()).rejects.toThrow("http_503");
+    expect((await busy.store.read())?.refreshToken).toBe("r1");
+  });
+
+  it("reports loudly when the rotated tokens cannot be saved", async () => {
+    const lines: string[] = [];
+    const store = {
+      read: async () => stale,
+      write: async () => {
+        throw new Error("disk full");
+      },
+      clear: async () => undefined,
+    };
+    const source = makeGrantSource({
+      store,
+      path: join(await mkdtemp(join(tmpdir(), "kit-rg-")), "g.json"),
+      lockName: "g.lock",
+      refresh: async () => granted("a2", "r2"),
+      missing: () => {
+        throw new Error("none");
+      },
+      log: (l) => lines.push(l),
+      nowEpoch: () => 1000,
+    });
+    await expect(source.get()).rejects.toThrow("disk full");
+    expect(lines.join("\n")).toContain("grant is lost");
   });
 });

@@ -75,11 +75,12 @@ describe("begin_authorization", () => {
     const pending = JSON.parse(await readFile(join(s.stateDir, "pending.json"), "utf8"));
     expect(createHash("sha256").update(pending.verifier).digest("base64url")).toBe(url.searchParams.get("code_challenge"));
     expect((await stat(join(s.stateDir, "pending.json"))).mode & 0o777).toBe(0o600);
-    expect((await stat(join(s.stateDir, "client.json"))).mode & 0o777).toBe(0o600);
+    expect((await stat(join(s.stateDir, "candidate.json"))).mode & 0o777).toBe(0o600);
   });
 
   it("reuses the registered client, with a new state each time", async () => {
     const s = await setup();
+    await (await s.signIn()).done();
     const first = await s.call("begin_authorization");
     const second = await s.call("begin_authorization");
     expect(s.fake.registrations).toHaveLength(1);
@@ -114,12 +115,12 @@ describe("complete_authorization", () => {
     const flow = await s.signIn();
     expect((await s.call("complete_authorization", { redirect_url: `${flow.begun.redirect_uri}?error=access_denied&error_description=nope` })).error).toMatchObject({ kind: "authorization", message: expect.stringContaining("access_denied") });
     expect((await s.call("complete_authorization", { redirect_url: "not an address" })).error).toMatchObject({ kind: "input" });
-    expect((await s.call("complete_authorization", {})).error).toMatchObject({ kind: "input" });
     s.clock.t += 601;
     expect((await flow.done()).error).toMatchObject({ kind: "authorization", message: expect.stringContaining("ten minutes") });
-    // A code alone works for a sign-in still open: the verifier binds it.
+    // A bare code is not taken: the state is always checked.
     const again = await s.signIn();
-    expect(await s.call("complete_authorization", { code: again.code })).toMatchObject({ ok: true });
+    expect((await (await s.connect()).callTool({ name: "complete_authorization", arguments: { code: again.code } })).isError).toBe(true);
+    expect(await again.done()).toMatchObject({ ok: true });
   });
 
   it("refuses a grant that came without a refresh token, which would end within the hour", async () => {
@@ -129,6 +130,32 @@ describe("complete_authorization", () => {
     const done = await flow.done();
     expect(done.error).toMatchObject({ kind: "authorization", message: expect.stringContaining("no refresh token") });
     expect(await s.call("health")).toMatchObject({ ok: false, grant: { present: false } });
+  });
+
+  it("keeps a working grant when a later sign-in comes back without a refresh token", async () => {
+    const s = await setup();
+    await (await s.signIn()).done();
+    s.fake.behaviour.omitRefreshToken = true;
+    expect((await (await s.signIn()).done()).error).toMatchObject({ kind: "authorization" });
+    expect(JSON.parse(await readFile(join(s.stateDir, "grant.json"), "utf8")).refresh_token).toBe("refresh-1");
+  });
+
+  it("leaves the working client alone until the new sign-in completes", async () => {
+    const s = await setup();
+    await (await s.signIn()).done();
+    const before = await readFile(join(s.stateDir, "client.json"), "utf8");
+    const other = await buildDeps({}, { config: { upstreamUrl: s.fake.mcpUrl, redirectUri: "http://127.0.0.1:9999/cb" }, stateDir: s.stateDir, now: () => s.clock.t });
+    const server = new McpServer({ name: "mobbin", version: "test" });
+    registerAll(guard(server, { service: "mobbin", policy: POLICY, log: () => undefined }), other);
+    const client = await connectInMemory(server);
+    await client.callTool({ name: "begin_authorization", arguments: {} });
+    expect(s.fake.registrations).toHaveLength(2);
+    expect(await readFile(join(s.stateDir, "client.json"), "utf8")).toBe(before);
+    expect(JSON.parse(await readFile(join(s.stateDir, "candidate.json"), "utf8")).client_id).toBe("client-2");
+    // The old grant still refreshes with the old client.
+    s.clock.t += 3_600;
+    expect(await s.call("search_screens", { query: "q" })).toMatchObject({ screens: ["q (standard)"] });
+    expect(s.fake.tokenRequests.at(-1)?.get("client_id")).toBe("client-1");
   });
 });
 
@@ -149,7 +176,7 @@ describe("Mobbin's tools", () => {
     await (await s.signIn()).done();
     const client = await s.connect();
     const names = (await client.listTools()).tools.map((t) => t.name).sort();
-    expect(names).toEqual(["begin_authorization", "complete_authorization", "health", "search_flows", "search_screens", "search_sections"]);
+    expect(names).toEqual(["begin_authorization", "complete_authorization", "health", "refresh_grant", "search_flows", "search_screens", "search_sections"]);
     expect(await s.call("health")).toMatchObject({ tools: { exposed: ["search_flows", "search_screens", "search_sections"], hidden: ["delete_everything"], missing: [] } });
     const refused = await client.callTool({ name: "delete_everything", arguments: {} }).catch((e: unknown) => e);
     expect(String(refused)).toMatch(/not found/i);
@@ -213,6 +240,22 @@ describe("refresh", () => {
     expect(s.fake.callTokens).toEqual(["access-2"]);
   });
 
+  it("keeps the grant, and sends the refresh once, when the token endpoint is busy or limits requests", async () => {
+    const s = await setup();
+    await (await s.signIn()).done();
+    s.clock.t += 3_600;
+    for (const status of [503, 429]) {
+      s.fake.behaviour.refreshStatus = status;
+      const before = s.fake.tokenRequests.length;
+      const answer = await s.call("search_screens", { query: "z" });
+      expect(answer.error).toMatchObject({ kind: expect.stringMatching(/^(unreachable|upstream)$/), message: expect.stringContaining("grant is kept") });
+      expect(s.fake.tokenRequests.length - before).toBe(1);
+      expect(JSON.parse(await readFile(join(s.stateDir, "grant.json"), "utf8")).refresh_token).toBe("refresh-1");
+    }
+    s.fake.behaviour.refreshStatus = undefined;
+    expect(await s.call("search_screens", { query: "z" })).toMatchObject({ screens: ["z (standard)"] });
+  });
+
   it("answers not_authorized with the way back when the refresh token is refused, and forgets the dead grant", async () => {
     const s = await setup();
     await (await s.signIn()).done();
@@ -231,26 +274,35 @@ describe("refresh", () => {
   });
 });
 
-describe("health", () => {
-  it("says what is missing when there is no grant, and never prints a token", async () => {
+describe("health and refresh_grant", () => {
+  it("says what is missing when there is no grant", async () => {
     const s = await setup();
-    const h = await s.call("health");
-    expect(h).toMatchObject({ ok: false, grant: { present: false }, client_registered: false, next: expect.stringContaining("begin_authorization") });
+    expect(await s.call("health")).toMatchObject({ ok: false, grant: { present: false }, client_registered: false, next: expect.stringContaining("begin_authorization") });
   });
 
-  it("reports the grant, a refresh that worked, Mobbin's tools and the classified ones it no longer lists", async () => {
+  it("reports the grant and Mobbin's tools without ever refreshing or printing a token", async () => {
     const s = await setup();
     await (await s.signIn()).done();
-    const quiet = await s.call("health");
-    expect(quiet).toMatchObject({ ok: true, grant: { present: true, access_expires_in_seconds: 3600 }, refresh: expect.stringContaining("not needed"), upstream_reachable: true, upstream_tool_count: 4 });
-    const tried = await s.call("health", { test_refresh: true });
-    expect(tried).toMatchObject({ ok: true, refresh: "worked" });
-    for (const secret of ["access-1", "access-2", "refresh-1", "refresh-2"]) {
-      expect(quiet.__raw).not.toContain(secret);
-      expect(tried.__raw).not.toContain(secret);
-    }
+    const h = await s.call("health");
+    expect(h).toMatchObject({ ok: true, grant: { present: true, access_expires_in_seconds: 3600 }, upstream_reachable: true, upstream_tool_count: 4 });
+    s.clock.t += 3_600;
+    const due = await s.call("health");
+    expect(due).toMatchObject({ ok: true, next: expect.stringContaining("refresh_grant") });
+    expect(s.fake.tokenRequests.filter((r) => r.get("grant_type") === "refresh_token")).toHaveLength(0);
+    for (const secret of ["access-1", "refresh-1"]) expect(h.__raw + due.__raw).not.toContain(secret);
+  });
+
+  it("refresh_grant proves the refresh works, and says when the grant is gone", async () => {
+    const s = await setup();
+    await (await s.signIn()).done();
+    expect(await s.call("refresh_grant")).toMatchObject({ ok: true, refreshed: true });
     s.fake.behaviour.refuseRefresh = true;
-    const broken = await s.call("health", { test_refresh: true });
-    expect(broken).toMatchObject({ ok: false, refresh: { failed: { kind: "not_authorized" } }, next: expect.stringContaining("begin_authorization") });
+    expect((await s.call("refresh_grant")).error).toMatchObject({ kind: "not_authorized", remedy: expect.stringContaining("begin_authorization") });
+  });
+
+  it("refuses an unsafe redirect address at startup", async () => {
+    const { configFrom } = await import("../src/infra/config.js");
+    expect(() => configFrom({ MOBBIN_REDIRECT_URI: "http://evil.example.com/cb" })).toThrow("MOBBIN_REDIRECT_URI");
+    expect(configFrom({ MOBBIN_REDIRECT_URI: "https://app.example.com/cb" }).redirectUri).toBe("https://app.example.com/cb");
   });
 });

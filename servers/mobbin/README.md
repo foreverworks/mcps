@@ -85,7 +85,7 @@ In a JSON configuration, the command is `node` and its one argument the full pat
 | Variable | Required | Meaning |
 |---|---|---|
 | `MOBBIN_MCP_URL` | no | Mobbin's MCP server. Default `https://api.mobbin.com/mcp`. The sign-in service is found from this address at run time, never hard-coded. |
-| `MOBBIN_REDIRECT_URI` | no | Where the browser lands after you sign in. It need not be listening: you copy the address from the browser. Default `http://127.0.0.1:8976/callback`. Changing it registers a new client at the next `begin_authorization`. |
+| `MOBBIN_REDIRECT_URI` | no | Where the browser lands after you sign in. It need not be listening: you copy the address from the browser. Default `http://127.0.0.1:8976/callback`. It must be https, or http on a loopback host, or the server does not start. Changing it registers a new client at the next `begin_authorization`. |
 | `MOBBIN_SCOPE` | no | The scopes to ask for, separated by spaces. Default: what Mobbin's server asks for, plus `offline_access` when the sign-in service offers it, which is what returns a refresh token. |
 | `MOBBIN_STATE_DIR` | no | Where the grant, the registered client and the last tool list are kept. Default: the unit's `StateDirectory`, else `$XDG_STATE_HOME/mcps/mobbin`. |
 
@@ -107,6 +107,7 @@ You do this once per deployment, from any client of this server.
    nothing listens there: that is expected.
 3. Copy the whole address from the browser's address bar and give it to the
    assistant, which passes it to `complete_authorization` as `redirect_url`.
+   The whole address is needed, not just the code: its `state` is checked.
    You have ten minutes from step 1.
 4. Call `health`. It should say `ok: true`, when the access token ends, and
    the tools Mobbin offers.
@@ -124,15 +125,16 @@ You do this once per deployment, from any client of this server.
 ## Tools
 
 Every tool is **read** or **write**; none is `money`. Mobbin's tools keep their
-own names, descriptions and input fields, as Mobbin publishes them.
+own names, descriptions and input fields: this server takes them from Mobbin's own tool list, caches that list in `tools.json` in the state directory, and serves them as given, so what you see is what Mobbin published when the list was last read.
 
 ### This server's
 
 | Tool | Access | What it does |
 |---|---|---|
-| `health` | read | Whether a grant exists and when its access token ends, whether a refresh works (tried when due, or with `test_refresh`), whether Mobbin answers, how many tools it lists, which are offered here, which Mobbin lists that are not classified (hidden), and which classified ones it no longer lists. Never prints a token. |
+| `health` | read | Whether a grant exists and when its access token ends, whether Mobbin answers, how many tools it lists, which are offered here, which Mobbin lists that are not classified (hidden), and which classified ones it no longer lists. Never refreshes the grant and never prints a token. |
+| `refresh_grant` | write | Refreshes the grant now, to prove the refresh token works. Calls refresh a due token by themselves; this is a check, and it rotates the grant. |
 | `begin_authorization` | write | Registers this server as a client of Mobbin's sign-in service when needed, and returns the link to open in a browser signed in to Mobbin. |
-| `complete_authorization` | write | Takes the address the browser landed on (or just its code), checks it belongs to the sign-in begun, exchanges it once, and stores the grant. |
+| `complete_authorization` | write | Takes the whole address the browser landed on, checks its state belongs to the sign-in begun, exchanges its code once, and stores the grant. A new client registration and the new grant replace the old ones only now. |
 
 ### Mobbin's, forwarded
 
@@ -150,9 +152,10 @@ whatever Mobbin lists would hand a client a tool nobody here has read.
 ## Troubleshooting
 
 **`not_authorized`**. There is no grant, or Mobbin refused the refresh token
-(its message gives Mobbin's own error, usually `invalid_grant`: the account
-revoked access, or the token had not been used for a long time). The dead grant
-is dropped, so the next calls say "no Mobbin account" at once. Connect the
+with `invalid_grant` or `invalid_client` (the account revoked access, or the
+token had not been used for a long time). Only those two end a grant: a busy or
+failing Mobbin (429, 5xx) answers `unreachable` or `upstream`, keeps the grant
+and is worth retrying. The dead grant is dropped, so the next calls say "no Mobbin account" at once. Connect the
 account again as above.
 
 **`authorization`: "no sign-in is open" or "closed"**. The address was used
@@ -193,7 +196,7 @@ authorization-code flow and PKCE (S256). The verifier and the state wait in
 the state directory between the two calls, so a restart in between loses
 nothing.
 
-**Rotating refresh tokens.** Refreshing is one exchange at a time, in this
+**Rotating refresh tokens.** A refresh, like a code exchange, is sent once and never resent: a resend after a lost answer would present a token Mobbin already rotated. Refreshing is one exchange at a time, in this
 process and across processes (a lock in the state directory). The new access
 and refresh tokens are written, atomically, before the access token is used;
 a write that fails fails the refresh, and a crash after it loses nothing. A
@@ -209,7 +212,7 @@ the description and input fields Mobbin last published, kept in
 
 **State.** `grant.json` (the tokens), `client.json` (the registered client and
 the endpoints it signs in at), `pending.json` (the sign-in in progress) and
-`tools.json` (Mobbin's last tool list), in `MOBBIN_STATE_DIR`, each written
+`tools.json` (Mobbin's last tool list) and `candidate.json` (a new client registration, kept apart until its sign-in completes), in `MOBBIN_STATE_DIR`, each written
 whole at mode 0600.
 
 ## Limitations

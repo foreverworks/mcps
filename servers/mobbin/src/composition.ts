@@ -39,14 +39,12 @@ export const buildDeps = async (env: NodeJS.ProcessEnv, overrides: Overrides = {
     refresh: async (refreshToken) => {
       const client = await stores.client.read();
       if (client === undefined) return fail(notAuthorized("no Mobbin account is connected to this server yet"));
-      try {
-        return await oauth.refresh(client, refreshToken);
-      } catch (thrown) {
-        // Mobbin said no: the refresh token is spent or revoked, and only a new sign-in replaces it.
-        // Dropping it makes every later call answer "not connected" at once instead of asking Mobbin again.
-        if (asAppError(thrown)?.kind === "not_authorized") await stores.grant.clear();
-        throw thrown;
-      }
+      return oauth.refresh(client, refreshToken);
+    },
+    // Only invalid_grant and invalid_client end a grant; a busy or failing Mobbin never does.
+    isRevoked: (thrown) => {
+      const known = asAppError(thrown);
+      return known?.kind === "not_authorized" && known.revoked === true;
     },
   });
 

@@ -17,6 +17,22 @@ const endpoint = (status: number, body: unknown) => {
 const client = (fetchImpl: typeof fetch, clientAuth: "form" | "basic" = "form", extraForm?: Record<string, string>) =>
   makeOAuthClient({ tokenUri: "https://auth.test/token", clientId: "id", clientSecret: "s3", clientAuth, fail: kit.fail, fetch: fetchImpl, sleep: async () => undefined, ...(extraForm ? { extraForm } : {}) });
 
+describe("makeOAuthClient singleUse", () => {
+  it("sends a refresh and a code once even on a 5xx, but still retries the other grants", async () => {
+    let n = 0;
+    const fetchImpl = (async () => {
+      n += 1;
+      return new Response(JSON.stringify({ error: "temporarily_unavailable" }), { status: 503 });
+    }) as unknown as typeof fetch;
+    const c = makeOAuthClient({ tokenUri: "https://auth.test/token", clientId: "id", fail: kit.fail, fetch: fetchImpl, sleep: async () => undefined, singleUse: true });
+    await expect(c.refresh("r")).rejects.toBeDefined();
+    await expect(c.authorizationCode("c", "https://x/cb", "v")).rejects.toBeDefined();
+    expect(n).toBe(2);
+    await expect(c.clientCredentials()).rejects.toBeDefined();
+    expect(n).toBe(5);
+  });
+});
+
 describe("makeOAuthClient", () => {
   it("refreshes with the client in the form, and reports scope and a rotated refresh token", async () => {
     const { fetchImpl, seen } = endpoint(200, { access_token: "a1", expires_in: 1200, scope: "x y", refresh_token: "r2", refresh_token_expires_in: 9 });

@@ -39,6 +39,13 @@ export type OAuthClientOptions = {
   /** The server's own tagged failure. Must throw. */
   readonly fail: (failure: OAuthFailure) => never;
   readonly timeoutMs?: number;
+  /**
+   * Send the refresh_token and authorization_code grants once, never again. Both spend a
+   * single-use credential (a rotating refresh token, a code): if the first request got through and
+   * its answer was lost, a resend would present a credential already spent. Off by default, which
+   * keeps the retry of 5xx answers for the grants where it is harmless.
+   */
+  readonly singleUse?: boolean;
   /** Sent with every grant, for an endpoint that wants more than RFC 6749 (ANAF: token_content_type=jwt). */
   readonly extraForm?: Readonly<Record<string, string>>;
   /** Seconds assumed when the endpoint omits expires_in. */
@@ -64,7 +71,16 @@ const internal = makeErrorKit<HttpFailure>("mcp-kit.oauth.http");
 
 export const makeOAuthClient = (options: OAuthClientOptions): OAuthClient => {
   const { tokenUri, clientId, clientSecret, clientAuth = "form", fail, timeoutMs = 15_000, defaultExpiresIn = 3600, extraForm = {} } = options;
-  const http = makeHttp({
+  const once = makeHttp({
+    service: "token endpoint",
+    isRetryable: () => false,
+    fail: internal.fail,
+    attempts: 1,
+    timeoutMs,
+    ...(options.sleep ? { sleep: options.sleep } : {}),
+    ...(options.fetch ? { fetch: options.fetch } : {}),
+  });
+  const retrying = makeHttp({
     service: "token endpoint",
     // A grant request mints a token and changes nothing else, so resending it is harmless.
     isRetryable: (status) => status >= 500,
@@ -76,6 +92,7 @@ export const makeOAuthClient = (options: OAuthClientOptions): OAuthClient => {
   });
 
   const grant = async (form: Readonly<Record<string, string>>): Promise<Granted> => {
+    const http = options.singleUse === true && (form["grant_type"] === "refresh_token" || form["grant_type"] === "authorization_code") ? once : retrying;
     const client = clientAuth === "basic" ? {} : { client_id: clientId, ...(clientSecret === undefined ? {} : { client_secret: clientSecret }) };
     const headers = clientAuth === "basic" ? { Authorization: `Basic ${Buffer.from(`${encodeURIComponent(clientId)}:${encodeURIComponent(clientSecret ?? "")}`).toString("base64")}` } : {};
     const raw = await http<Record<string, unknown>>(tokenUri, { method: "POST", idempotent: true, form: { ...form, ...extraForm, ...client }, headers }).catch((thrown: unknown) => {

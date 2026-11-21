@@ -35,6 +35,8 @@ export type UpstreamPort = {
 
 export type Stores = {
   readonly client: StoredFile<ClientRegistration>;
+  /** A registration made by a sign-in that has not completed: promoted to `client` only when it does, so a working grant keeps its client. */
+  readonly candidate: StoredFile<ClientRegistration>;
   readonly pending: StoredFile<PendingPkceAuthorization>;
   readonly grant: StoredFile<RotatingGrant>;
   readonly tools: StoredFile<ToolCache>;

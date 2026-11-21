@@ -28,7 +28,7 @@ export type Fake = {
   /** Bearer tokens seen on tools/call requests, in order. */
   readonly callTokens: string[];
   readonly calls: { readonly name: string; readonly args: unknown }[];
-  readonly behaviour: { refuseRefresh: boolean; refreshDelayMs: number; onMcp?: (token: string) => Promise<void> | void; omitRefreshToken: boolean };
+  readonly behaviour: { refreshStatus?: number | undefined; refuseRefresh: boolean; refreshDelayMs: number; onMcp?: (token: string) => Promise<void> | void; omitRefreshToken: boolean };
   readonly close: () => Promise<void>;
 };
 
@@ -130,6 +130,7 @@ export const startFake = async (): Promise<Fake> => {
           return issue();
         }
         if (fake.behaviour.refreshDelayMs > 0) await new Promise((r) => setTimeout(r, fake.behaviour.refreshDelayMs));
+        if (fake.behaviour.refreshStatus !== undefined) return json(res, fake.behaviour.refreshStatus, { error: "temporarily_unavailable" });
         const presented = form.get("refresh_token") ?? "";
         if (fake.behaviour.refuseRefresh || !fake.validRefresh.has(presented)) return json(res, 400, { error: "invalid_grant", error_description: "refresh token is not valid" });
         fake.validRefresh.delete(presented);

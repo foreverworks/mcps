@@ -13,6 +13,8 @@ const clientFor = (client: ClientRegistration, failure: (f: OAuthFailure) => nev
     ...(client.clientSecret === undefined ? {} : { clientSecret: client.clientSecret }),
     fail: failure,
     fetch: fetchImpl,
+    // A code and a rotating refresh token are single-use: never resend after a lost answer.
+    singleUse: true,
   });
 
 /** The sign-in service: discovered at run time, registered with once, and its token endpoint for the code and for refreshes. */
@@ -41,8 +43,11 @@ export const makeOAuth = (fetchImpl: typeof fetch = liveFetch): OAuthPort => ({
       client,
       (failure) =>
         failure.kind === "unreachable"
-          ? fail({ kind: "unreachable", message: `Mobbin's sign-in service could not be reached: ${failure.message}` })
-          : fail(notAuthorized(`Mobbin refused the refresh token (${failure.error}): ${failure.description}`)),
+          ? fail({ kind: "unreachable", message: `Mobbin's sign-in service could not be reached or is busy: ${failure.message}; the grant is kept, retry later` })
+          : failure.error === "invalid_grant" || failure.error === "invalid_client"
+            ? fail(notAuthorized(`Mobbin refused the refresh token (${failure.error}): ${failure.description}`, true))
+            : // Anything else (429, 5xx, temporarily_unavailable) is Mobbin being unwell: the grant is still good.
+              fail({ kind: "upstream", message: `Mobbin's sign-in service did not accept the refresh (${failure.error}, status ${String(failure.status)}); the grant is kept, retry later` }),
       fetchImpl,
     ).refresh(refreshToken),
 });

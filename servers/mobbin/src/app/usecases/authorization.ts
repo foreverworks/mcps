@@ -14,19 +14,21 @@ import type { Deps } from "../ports.js";
  */
 export const beginAuthorization = async (deps: Deps) => {
   const { config, oauth, stores, now } = deps;
-  try {
-    new URL(config.redirectUri);
-  } catch {
-    fail(inputError("MOBBIN_REDIRECT_URI is not an address"));
-  }
   const endpoints = await oauth.discover(config.upstreamUrl);
   const scope = scopeFor(endpoints, config.scope);
   const held = await stores.client.read();
-  const reusable = held !== undefined && held.issuer === endpoints.issuer && held.redirectUri === config.redirectUri && held.scope === scope;
-  const client: ClientRegistration = reusable
-    ? { ...held, authorizationEndpoint: endpoints.authorizationEndpoint, tokenEndpoint: endpoints.tokenEndpoint }
-    : await register(deps, endpoints, scope);
-  if (!reusable || held.authorizationEndpoint !== client.authorizationEndpoint || held.tokenEndpoint !== client.tokenEndpoint) await stores.client.write(client);
+  const reusable =
+    held !== undefined &&
+    held.issuer === endpoints.issuer &&
+    held.redirectUri === config.redirectUri &&
+    held.scope === scope &&
+    held.authorizationEndpoint === endpoints.authorizationEndpoint &&
+    held.tokenEndpoint === endpoints.tokenEndpoint;
+  // A new registration waits in `candidate` until the sign-in completes: client.json is what the
+  // working grant refreshes with, so it is not touched before then.
+  const client: ClientRegistration = reusable ? held : await register(deps, endpoints, scope);
+  if (reusable) await stores.candidate.clear();
+  else await stores.candidate.write(client);
 
   const pkce = newPkce();
   const state = newState();
@@ -72,32 +74,28 @@ const register = async (deps: Deps, endpoints: Awaited<ReturnType<Deps["oauth"][
  * straight to the state directory; the caller learns when the access token
  * ends and whether a refresh token came with it.
  */
-export const completeAuthorization = async (deps: Deps, args: { readonly redirectUrl?: string | undefined; readonly code?: string | undefined }) => {
+export const completeAuthorization = async (deps: Deps, args: { readonly redirectUrl: string }) => {
   const { stores, oauth, now } = deps;
-  if ((args.redirectUrl === undefined) === (args.code === undefined)) fail(inputError("pass either redirect_url (the whole address) or code, not both and not neither"));
-  let code: string;
-  let state: string | undefined;
-  if (args.redirectUrl !== undefined) {
-    const redirect = parseRedirect(args.redirectUrl);
-    if (redirect.kind === "invalid") return fail(inputError(`that is not the address the browser landed on: ${redirect.message}`));
-    if (redirect.kind === "refused") return fail(authorizationError(`Mobbin refused the sign-in: ${redirect.error}${redirect.description === undefined ? "" : ` (${redirect.description})`}`));
-    ({ code, state } = redirect);
-  } else {
-    code = (args.code ?? "").trim();
-    if (code === "") return fail(inputError("the code is empty"));
-  }
-  const pending = matchPending(await stores.pending.read(), state, now());
-  const client = await stores.client.read();
+  const redirect = parseRedirect(args.redirectUrl);
+  if (redirect.kind === "invalid") return fail(inputError(`that is not the address the browser landed on: ${redirect.message}`));
+  if (redirect.kind === "refused") return fail(authorizationError(`Mobbin refused the sign-in: ${redirect.error}${redirect.description === undefined ? "" : ` (${redirect.description})`}`));
+  const pending = matchPending(await stores.pending.read(), redirect.state, now());
+  const candidate = await stores.candidate.read();
+  const client = candidate ?? (await stores.client.read());
   if (client === undefined) return fail(authorizationError("no client is registered: call begin_authorization first"));
 
-  const granted = await oauth.exchange(client, code, pending.verifier);
-  const refreshToken = granted.refreshToken;
+  const granted = await oauth.exchange(client, redirect.code, pending.verifier);
   await stores.pending.clear();
-  const expiresAtEpoch = now() + granted.expiresInSeconds;
+  const refreshToken = granted.refreshToken;
   if (refreshToken === undefined) {
-    // Without a refresh token the grant ends with the access token: say so rather than store half of one.
-    await stores.grant.clear();
-    return fail(authorizationError("Mobbin granted access but no refresh token, so the grant would end within the hour; call begin_authorization again, and if this repeats MOBBIN_SCOPE must include offline_access"));
+    // Without a refresh token the grant would end within the hour. A grant that works already is left as it is.
+    return fail(authorizationError("Mobbin granted access but no refresh token, so the grant would end within the hour and was not stored (any earlier grant is kept); call begin_authorization again, and if this repeats MOBBIN_SCOPE must include offline_access"));
+  }
+  const expiresAtEpoch = now() + granted.expiresInSeconds;
+  // The new client is promoted with the new grant, never before: the old grant refreshes with the old one.
+  if (candidate !== undefined) {
+    await stores.client.write(candidate);
+    await stores.candidate.clear();
   }
   await stores.grant.write({ accessToken: granted.accessToken, refreshToken, expiresAtEpoch, ...(granted.scope === undefined ? {} : { scope: granted.scope }) });
   const tools = await deps.upstream.listTools().then(

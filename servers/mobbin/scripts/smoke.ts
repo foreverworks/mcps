@@ -40,7 +40,7 @@ const main = async (): Promise<void> => {
 
   const { tools } = await client.listTools();
   console.log("tools:", tools.map((t) => t.name).join(", "));
-  check(["health", "begin_authorization", "complete_authorization", "search_screens", "search_flows", "search_sections"].every((n) => tools.some((t) => t.name === n)), "every tool is listed");
+  check(["health", "refresh_grant", "begin_authorization", "complete_authorization", "search_screens", "search_flows", "search_sections"].every((n) => tools.some((t) => t.name === n)), "every tool is listed");
 
   const health = await call("health");
   console.log("health:", JSON.stringify(health));

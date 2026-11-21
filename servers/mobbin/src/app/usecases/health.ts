@@ -10,19 +10,17 @@ const reason = (thrown: unknown): { readonly kind: string; readonly message: str
 
 /**
  * Whether this server can serve Mobbin now, and what is missing: the grant
- * and when its access token ends, whether a refresh works (tried when the
- * access token is due, or when asked), whether Mobbin answers and which of its
- * tools are offered here. Never prints a token, and never fails: a failure is
- * the answer.
+ * and when its access token ends, whether Mobbin answers and which of its
+ * tools are offered here. Read-only: it never refreshes, so it never rotates
+ * the grant (refresh_grant does that, and a call refreshes a due token by
+ * itself). Never prints a token, and never fails: a failure is the answer.
  */
-export const health = async (deps: Deps, args: { readonly testRefresh: boolean }) => {
+export const health = async (deps: Deps) => {
   const { stores, config, now } = deps;
   const grant = await stores.grant.read();
-  const client = await stores.client.read();
-  const pending = await stores.pending.read();
   const base = {
-    client_registered: client !== undefined,
-    sign_in_open: pending !== undefined,
+    client_registered: (await stores.client.read()) !== undefined,
+    sign_in_open: (await stores.pending.read()) !== undefined,
     upstream: config.upstreamUrl,
   };
   if (grant === undefined) {
@@ -34,16 +32,23 @@ export const health = async (deps: Deps, args: { readonly testRefresh: boolean }
     };
   }
   const due = grant.expiresAtEpoch - now() <= 60;
-  const refresh = await (due || args.testRefresh ? deps.access.force().then(() => ({ ok: true as const, tried: true }), (thrown: unknown) => ({ ok: false as const, tried: true, error: reason(thrown) })) : Promise.resolve({ ok: true as const, tried: false }));
-  const after = (await stores.grant.read()) ?? grant;
-  const seen = refresh.ok ? await deps.upstream.listTools().then((tools) => ({ tools }), (thrown: unknown) => ({ error: reason(thrown) })) : undefined;
-  if (seen !== undefined && "tools" in seen) await deps.rememberTools(seen.tools);
+  const summary = { present: true, access_expires_at: isoOf(grant.expiresAtEpoch), access_expires_in_seconds: Math.max(0, grant.expiresAtEpoch - now()), ...(grant.scope === undefined ? {} : { scope: grant.scope }) };
+  if (due) {
+    return { ok: true, grant: summary, ...base, next: "The access token is due; the next call refreshes it. Call refresh_grant to prove the refresh works now." };
+  }
+  const seen = await deps.upstream.listTools().then((tools) => ({ tools }), (thrown: unknown) => ({ error: reason(thrown) }));
+  if ("tools" in seen) await deps.rememberTools(seen.tools);
   return {
-    ok: refresh.ok && seen !== undefined && "tools" in seen,
-    grant: { present: true, access_expires_at: isoOf(after.expiresAtEpoch), access_expires_in_seconds: Math.max(0, after.expiresAtEpoch - now()), ...(after.scope === undefined ? {} : { scope: after.scope }) },
-    refresh: refresh.tried ? (refresh.ok ? "worked" : { failed: refresh.error }) : "not needed yet (the access token is still good); pass test_refresh to try it now",
+    ok: "tools" in seen,
+    grant: summary,
     ...base,
-    ...(seen === undefined ? {} : "tools" in seen ? { upstream_reachable: true, upstream_tool_count: seen.tools.length, tools: tourOf(seen.tools) } : { upstream_error: seen.error }),
-    ...(refresh.ok ? {} : { next: "The grant no longer works: call begin_authorization and sign in again." }),
+    ...("tools" in seen ? { upstream_reachable: true, upstream_tool_count: seen.tools.length, tools: tourOf(seen.tools) } : { upstream_error: seen.error }),
   };
+};
+
+/** Refresh the grant now: proves the refresh token works. Rotates the grant (the new pair is saved first), so it is a write. */
+export const refreshGrant = async (deps: Deps) => {
+  await deps.access.force();
+  const after = await deps.stores.grant.read();
+  return { ok: true, refreshed: true, ...(after === undefined ? {} : { access_expires_at: isoOf(after.expiresAtEpoch) }) };
 };

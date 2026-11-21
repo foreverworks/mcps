@@ -10,6 +10,7 @@ export const GRANT_FILE = "grant.json";
 
 export const makeStores = (stateDir: string): Stores => ({
   client: storedFile(join(stateDir, "client.json"), { schema: clientOnDisk, fromDisk: clientFromDisk, toDisk: clientToDisk, lock: "client.lock" }),
+  candidate: storedFile(join(stateDir, "candidate.json"), { schema: clientOnDisk, fromDisk: clientFromDisk, toDisk: clientToDisk, lock: "candidate.lock" }),
   pending: pendingPkceAuthorizationFile(stateDir, "pending"),
   grant: storedFile(join(stateDir, GRANT_FILE), { schema: grantOnDisk, fromDisk: grantFromDisk, toDisk: grantToDisk, lock: "grant-file.lock" }),
   tools: storedFile(join(stateDir, "tools.json"), { schema: toolsOnDisk, fromDisk: toolsFromDisk, toDisk: toolsToDisk }),
