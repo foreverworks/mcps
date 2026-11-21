@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "mobbin": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-mobbin@0.1.0"
+      ],
+      "env": {
+        "MOBBIN_REDIRECT_URI": "${MOBBIN_REDIRECT_URI}"
+      }
+    }
+  }
+}

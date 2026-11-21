@@ -57,6 +57,10 @@
       "source": "home-assistant"
     },
     {
+      "name": "foreverworks-mobbin",
+      "source": "mobbin"
+    },
+    {
       "name": "foreverworks-notion",
       "source": "notion"
     },

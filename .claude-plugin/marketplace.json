@@ -91,6 +91,13 @@
       "version": "0.1.3"
     },
     {
+      "name": "foreverworks-mobbin",
+      "displayName": "Mobbin",
+      "source": "./plugins/mobbin",
+      "description": "Search Mobbin's library of app screens and flows from clients that cannot sign in to Mobbin.",
+      "version": "0.1.0"
+    },
+    {
       "name": "foreverworks-notion",
       "displayName": "Notion",
       "source": "./plugins/notion",

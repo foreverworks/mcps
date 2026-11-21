@@ -47,6 +47,20 @@ export {
 } from "./decimal.js";
 export { AMOUNT_SCALE, asAmount, computable, documentTotal, lineAmount, reversalTotal, type DocumentTotal, type RateTotal, type TaxedLine } from "./invoiceTotals.js";
 export { readJsonFile, withFileLock, writeJsonFile, type JsonFileOptions, type LockOptions } from "./jsonFile.js";
+export {
+  authorizationServerUrls,
+  discoverOAuth,
+  isSecureUrl,
+  protectedResourceUrl,
+  registerPublicClient,
+  resourceMetadataUrlOf,
+  type DiscoveryFail,
+  type DiscoverOptions,
+  type OAuthEndpoints,
+  type RegisteredClient,
+  type RegisterOptions,
+} from "./oauthDiscovery.js";
+export { grantAfterRefresh, makeGrantSource, type GrantSource, type RotatingGrant, type RotatingGrantOptions } from "./rotatingGrant.js";
 export { storedFile, type DiskSchema, type StoredFile, type StoredFileOptions } from "./storedFile.js";
 export { pendingAuthorizationFile, pendingPkceAuthorizationFile, type PendingAuthorization, type PendingPkceAuthorization } from "./pendingAuthorization.js";
 export { writeFileAtomic, writeFileAtomicWithStats } from "./files.js";
