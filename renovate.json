@@ -1,0 +1,12 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": [
+    "Renovate keeps the Dockerfile's base image current: only its FROM line. Dependabot keeps the npm packages and the GitHub Actions (.github/dependabot.yml).",
+    "A new release of ghcr.io/foreverworks/node within the same line merges on its own once the required checks pass, ci's image build among them (the base-images preset); a new Node major is a PR for a person."
+  ],
+  "extends": [
+    "github>foreverworks/renovate-config",
+    "github>foreverworks/renovate-config:base-images"
+  ],
+  "enabledManagers": ["dockerfile"]
+}

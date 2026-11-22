@@ -12,8 +12,10 @@
 
 # The base image: Node 26 (the packages still accept >=22.19) on Debian 13, pinned by
 # the digest of its multi-platform index, so a build never moves under you.
-# To bump it, read the new digest and Node version of the tag, and write both
-# here, in the one place the image is named:
+# Renovate moves it (renovate.json): a new digest or Node release within the 26
+# line merges on its own once ci, which builds every stage, passes. A new Node
+# major is a pull request for a person. By hand, read the new digest and Node
+# version of the tag, and write both here, in the one place the image is named:
 #   docker buildx imagetools inspect ghcr.io/foreverworks/node:26-trixie
 #   docker run --rm ghcr.io/foreverworks/node:26-trixie node --version
 FROM ghcr.io/foreverworks/node:26.13.1-trixie@sha256:dc55ea94c04ec98e231340ade2174bbf3a95fc6682d5323c3cfb3da38f066fd0 AS base
