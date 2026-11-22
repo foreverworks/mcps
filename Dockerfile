@@ -14,9 +14,9 @@
 # the digest of its multi-platform index, so a build never moves under you.
 # To bump it, read the new digest and Node version of the tag, and write both
 # here, in the one place the image is named:
-#   docker buildx imagetools inspect node:26-trixie-slim
-#   docker run --rm node:26-trixie-slim node --version
-FROM node:26.13.1-trixie-slim@sha256:e6bedef217677b276c591795e169840edd9096dbf13f29df8ef8d1856b8820bc AS base
+#   docker buildx imagetools inspect ghcr.io/foreverworks/node:26-trixie
+#   docker run --rm ghcr.io/foreverworks/node:26-trixie node --version
+FROM ghcr.io/foreverworks/node:26.13.1-trixie@sha256:dc55ea94c04ec98e231340ade2174bbf3a95fc6682d5323c3cfb3da38f066fd0 AS base
 
 # Only the package.json files and the lockfile, so that the install below is
 # reused until a dependency changes, whatever else in the tree does.
@@ -58,7 +58,11 @@ FROM base AS runtime
 # given to it from outside the image: chown 10001:10001 <dir>.
 ARG MCP_UID=10001
 ARG MCP_GID=10001
-RUN groupadd --gid "$MCP_GID" mcp \
+# The base image has no useradd or nologin: `passwd` and `login` provide them.
+RUN apt-get update \
+ && apt-get install -y --no-install-recommends passwd login \
+ && rm -rf /var/lib/apt/lists/* \
+ && groupadd --gid "$MCP_GID" mcp \
  && useradd --uid "$MCP_UID" --gid "$MCP_GID" --create-home --home-dir /home/mcp --shell /usr/sbin/nologin mcp \
  && install -d -o "$MCP_UID" -g "$MCP_GID" -m 0700 /var/lib/mcp
 
