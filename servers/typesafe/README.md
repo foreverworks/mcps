@@ -8,8 +8,8 @@ triage postings, transactions or emails without reading each one. Every tool
 is a read: nothing changes anywhere, and no tool is `money`.
 
 **You need** a TypeSafe account and an API key from its console. Calls are
-billed by input tokens, a fraction of a cent each, and Jev answers in about
-half a second.
+billed by input tokens, so one costs a fraction of a cent, and Jev answers in
+about half a second.
 
 ## What you can ask
 
@@ -190,7 +190,7 @@ TypeSafe.
 
 ## Other servers for TypeSafe
 
-Searched 2026-10-15. TypeSafe publishes none: its GitHub organisation has the
+As of 2026-10-15, TypeSafe publishes none: its GitHub organisation has the
 SDKs, agent skills and an n8n node. Two community servers are on npm:
 
 - **`typesafe-mcp`**: stdio under Bun, the key in an environment variable,

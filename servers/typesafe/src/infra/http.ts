@@ -9,7 +9,7 @@ import { driftError, fail, inputError } from "../domain/errors.js";
  *
  * Every request here changes nothing on TypeSafe's side (an evaluation is a
  * read that is billed), so each is sent as idempotent: a 5xx or a dropped
- * connection is simply tried again. 429 and 529 (their "overloaded") are both
+ * connection is tried again. 429 and 529 (their "overloaded") are both
  * rate limits, as their own SDK retries them.
  */
 const asTypesafeFailure = (failure: HttpFailure): never => {

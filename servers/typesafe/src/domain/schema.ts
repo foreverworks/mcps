@@ -27,7 +27,7 @@ export type State = SystemOneRequest["state"];
 
 /**
  * A Score as answered. Its legend only echoes the caller's own levels, so it stays plain JSON here:
- * since 0.7 the SDK types it through a recursive asset-aware mapping too deep for tsc to check a literal against.
+ * the SDK (0.7 and later) types it through a recursive asset-aware mapping too deep for tsc to check a literal against.
  */
 export type ScoreAnswer = Omit<ScoreResponse, "legend"> & { readonly legend: Readonly<Record<string, unknown>> };
 
