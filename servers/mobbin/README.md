@@ -82,6 +82,12 @@ claude mcp add mobbin -- node "$PWD/servers/mobbin/dist/index.js"
 In a JSON configuration, the command is `node` and its one argument the full path of `servers/mobbin/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
 
+> [!NOTE]
+> The commands above name the published package, which does not exist yet:
+> this server is on `main` but has no release, so `npx` and the Claude Desktop
+> bundle find nothing. Until its first release, [run it from a
+> clone](#from-a-clone).
+
 ## Configuration
 
 | Variable | Required | Meaning |
