@@ -61,7 +61,11 @@ const FEEDBACK = {
   cursor: cursor.describe("nextCursor from the previous call of the same kind."),
 };
 
-const CRASH_LOG = { submission: reviewId("A crash feedback's id, from list_testflight_feedback.") };
+const CRASH_LOG = {
+  submission: reviewId("A crash feedback's id, from list_testflight_feedback."),
+  from: z.number().int().min(1).optional().describe("Show the log's own lines from this one (1-based) instead of the summary, to read any part of it."),
+  count: z.number().int().min(1).max(400).optional().describe("With from: how many lines to show. Default 200."),
+};
 
 const REPLY_APP_STORE = {
   review: reviewId("The review's id, from list_app_store_reviews."),
@@ -134,10 +138,13 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
     "get_testflight_crash_log",
     {
       title: "Get a TestFlight crash log",
-      description: "A crash feedback's crash log, saved whole to the server's outbox: the answer gives the file's path, SHA-256 and size, and its first 40 lines.",
+      description:
+        "A crash feedback's crash log, saved whole to the server's outbox. The answer gives the file's path, SHA-256 and size, and why the app died: " +
+        "the exception and termination lines, Application Specific Information, the Last Exception Backtrace and the crashed thread's frames, in Apple's text or .ips format. " +
+        "Pass from (and count) to read any lines of the log itself.",
       inputSchema: CRASH_LOG,
     },
-    handled((a: ArgsOf<typeof CRASH_LOG>) => crashLog(deps, a)),
+    handled((a: ArgsOf<typeof CRASH_LOG>) => crashLog(deps, { submission: a.submission, ...compact({ from: a.from, count: a.count }) })),
   );
 
   server.registerTool(

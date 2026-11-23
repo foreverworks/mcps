@@ -2,7 +2,7 @@
   {
     "name": "get_testflight_crash_log",
     "title": "Get a TestFlight crash log",
-    "description": "A crash feedback's crash log, saved whole to the server's outbox: the answer gives the file's path, SHA-256 and size, and its first 40 lines.",
+    "description": "A crash feedback's crash log, saved whole to the server's outbox. The answer gives the file's path, SHA-256 and size, and why the app died: the exception and termination lines, Application Specific Information, the Last Exception Backtrace and the crashed thread's frames, in Apple's text or .ips format. Pass from (and count) to read any lines of the log itself.",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -11,6 +11,18 @@
           "minLength": 1,
           "maxLength": 200,
           "description": "A crash feedback's id, from list_testflight_feedback."
+        },
+        "from": {
+          "description": "Show the log's own lines from this one (1-based) instead of the summary, to read any part of it.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 9007199254740991
+        },
+        "count": {
+          "description": "With from: how many lines to show. Default 200.",
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 400
         }
       },
       "required": [

@@ -142,7 +142,7 @@ server's outbox); **write** publishes a reply under a review.
 | `list_app_store_reviews` | read | An app's App Store reviews with your reply and its state, by star rating, storefront or whether you replied. |
 | `list_play_reviews` | read | A package's Play reviews from the last 7 days (Google's limit) with your reply, optionally translated. |
 | `list_testflight_feedback` | read | Screenshot and crash feedback testers sent from TestFlight, with the device, OS and build. |
-| `get_testflight_crash_log` | read | One crash feedback's log, saved whole to the outbox, with its first 40 lines. |
+| `get_testflight_crash_log` | read | One crash feedback's log, saved whole to the outbox, with why the app died: the exception, the crashed thread's frames and the Last Exception Backtrace. `from` and `count` page through the rest. |
 | `reply_app_store_review` / `reply_play_review` | write | Publish your reply under a review. Refuses to replace an existing reply unless asked; the same text twice is sent once. |
 
 ## Troubleshooting
@@ -207,8 +207,13 @@ please report it with the message.
   4.5.1 and Google's `androidpublisher` v3 reference; a documented field that
   goes missing fails as `drift` instead of travelling on as an empty value.
 - **Crash logs go to the outbox**, because one runs to hundreds of lines. The
-  first 40, returned with the file's path and SHA-256, hold the exception and
-  the crashed thread in either of Apple's formats.
+  answer still carries what you need to read the crash where you are: the
+  exception and termination lines, Application Specific Information, the Last
+  Exception Backtrace and the crashed thread's frames, picked out of Apple's
+  text or JSON `.ips` format, with the file's path and SHA-256. The crashed
+  thread is often far below the first lines, so a client that cannot open the
+  outbox is not left with only the header; `from` and `count` read any other
+  part of the log.
 
 `npx tsx scripts/smoke.ts` drives the built server read-only with your
 credentials: `health`, three reviews per configured store, and three pieces

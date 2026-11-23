@@ -249,6 +249,71 @@ describe("the app-stores server", () => {
     expect(result.content[1]).toMatchObject({ type: "resource_link", uri: `file://${out.path}` });
   });
 
+  it("shows why the app died: the exception, the crashed thread and the Last Exception Backtrace, and pages the rest", async () => {
+    const { env } = credentials();
+    const log = [
+      "Incident Identifier: 00000000-0000-0000-0000-000000000000",
+      ...Array.from({ length: 30 }, (_, i) => `header ${i}`),
+      "Exception Type:  EXC_CRASH (SIGABRT)",
+      "Termination Reason: SIGNAL 6 Abort trap: 6",
+      "",
+      "Triggered by Thread:  2",
+      "",
+      "Application Specific Information:",
+      "abort() called",
+      "",
+      "Last Exception Backtrace:",
+      "0   CoreFoundation  0x1 __exceptionPreprocess + 164",
+      "1   Example         0x2 RCTFatal + 100",
+      "",
+      "Thread 0:",
+      "0   libsystem_kernel.dylib  0x3 mach_msg2_trap + 8",
+      "",
+      "Thread 2 name:  Dispatch queue: com.example.queue",
+      "Thread 2 Crashed:",
+      "0   libsystem_kernel.dylib  0x4 __pthread_kill + 8",
+      "1   Example         0x5 example_abort + 12",
+      "",
+      "Thread 3:",
+      "0   libsystem_kernel.dylib  0x6 mach_msg2_trap + 8",
+    ].join("\n");
+    const { fetch } = stores((a) => (a.url.pathname === "/v1/betaFeedbackCrashSubmissions/c-2/crashLog" ? { json: { data: { type: "betaCrashLogs", id: "l-2", attributes: { logText: log } } } } : { status: 404 }));
+    const { call } = await connected(env, fetch);
+    const out = await call("get_testflight_crash_log", { submission: "c-2" });
+    expect(out.crash).toEqual({
+      format: "text",
+      exception: ["Exception Type:  EXC_CRASH (SIGABRT)", "Termination Reason: SIGNAL 6 Abort trap: 6", "Triggered by Thread:  2"],
+      crashedThread: 2,
+      applicationSpecific: ["abort() called"],
+      lastExceptionBacktrace: ["0   CoreFoundation  0x1 __exceptionPreprocess + 164", "1   Example         0x2 RCTFatal + 100"],
+      crashedThreadFrames: ["Thread 2 name:  Dispatch queue: com.example.queue", "0   libsystem_kernel.dylib  0x4 __pthread_kill + 8", "1   Example         0x5 example_abort + 12"],
+    });
+    const page = await call("get_testflight_crash_log", { submission: "c-2", from: 2, count: 3 });
+    expect(page).toMatchObject({ from: 2, shown: 3, text: ["header 0", "header 1", "header 2"], next: 5 });
+    expect(page.crash).toBeUndefined();
+  });
+
+  it("reads the crashed thread of a JSON .ips crash report", async () => {
+    const { env } = credentials();
+    const report = {
+      faultingThread: 1,
+      exception: { type: "EXC_CRASH", signal: "SIGABRT" },
+      usedImages: [{ name: "libsystem_kernel.dylib" }, { name: "Example" }],
+      threads: [{ frames: [{ imageIndex: 0, symbol: "mach_msg2_trap", symbolLocation: 8 }] }, { queue: "com.example.queue", frames: [{ imageIndex: 0, symbol: "__pthread_kill", symbolLocation: 8 }, { imageIndex: 1, imageOffset: 4096 }] }],
+      lastExceptionBacktrace: [{ imageIndex: 1, symbol: "RCTFatal", symbolLocation: 100, sourceFile: "RCTAssert.m", sourceLine: 12 }],
+    };
+    const log = `${JSON.stringify({ app_name: "Example", bug_type: "309" })}\n${JSON.stringify(report, null, 2)}`;
+    const { fetch } = stores((a) => (a.url.pathname === "/v1/betaFeedbackCrashSubmissions/c-3/crashLog" ? { json: { data: { type: "betaCrashLogs", id: "l-3", attributes: { logText: log } } } } : { status: 404 }));
+    const { call } = await connected(env, fetch);
+    expect((await call("get_testflight_crash_log", { submission: "c-3" })).crash).toEqual({
+      format: "ips",
+      exception: ['{"type":"EXC_CRASH","signal":"SIGABRT"}'],
+      crashedThread: 1,
+      lastExceptionBacktrace: ["0 Example RCTFatal + 100 (RCTAssert.m:12)"],
+      crashedThreadFrames: ["com.example.queue", "0 libsystem_kernel.dylib __pthread_kill + 8", "1 Example + 4096"],
+    });
+  });
+
   it("says which store refused what: a revoked key, a key without the role, a deleted service account", async () => {
     const { env } = credentials();
     const revoked = stores(() => ({ status: 401, json: { errors: [{ status: "401", code: "NOT_AUTHORIZED", title: "Authentication credentials are missing or invalid.", detail: "Provide a properly configured and signed bearer token." }] } }));

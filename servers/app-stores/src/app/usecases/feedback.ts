@@ -1,7 +1,7 @@
 import { compact } from "@foreverworks/mcp-kit";
 
 import { fail, inputError } from "../../domain/errors.js";
-import { type FeedbackKind, headOf, newestFirst } from "../../domain/feedback.js";
+import { crashFocus, type FeedbackKind, headOf, linesOf, newestFirst } from "../../domain/feedback.js";
 import type { Deps } from "../ports.js";
 import { resolveAscApp } from "./apps.js";
 
@@ -23,10 +23,22 @@ export const listFeedback = async (deps: Deps, args: { readonly app?: string; re
   return { ...head, feedback: newestFirst([...crashes.items, ...screenshots.items]), ...(more.length === 0 ? {} : { more: `there is more ${more.join(" and ")} feedback: ask for one kind to page through it` }) };
 };
 
-/** A crash submission's log, saved whole to the outbox; the answer names the file and shows its first lines. */
-export const crashLog = async (deps: Deps, args: { readonly submission: string }) => {
+/**
+ * A crash submission's log, saved whole to the outbox. The answer names the
+ * file and shows why the app died (the exception, the crashed thread's frames,
+ * the Last Exception Backtrace), so a reader who cannot open the outbox still
+ * sees the cause; from and count page through any other lines.
+ */
+export const crashLog = async (deps: Deps, args: { readonly submission: string; readonly from?: number; readonly count?: number }) => {
   const id = args.submission.trim();
   const log = await deps.appStore.crashLog(id);
   const saved = await deps.outbox.save(`testflight-crash-${id.replace(/[^A-Za-z0-9-]/g, "_")}.txt`, new TextEncoder().encode(log));
-  return { submission: id, ...saved, lines: log.split(/\r?\n/).length, head: headOf(log) };
+  const lines = log.split(/\r?\n/).length;
+  if (args.from !== undefined) {
+    const count = args.count ?? 200;
+    const shown = linesOf(log, args.from, count);
+    return { submission: id, ...saved, lines, from: args.from, shown: shown.length, text: shown, ...(args.from - 1 + shown.length < lines ? { next: args.from + shown.length } : {}) };
+  }
+  const focus = crashFocus(log);
+  return { submission: id, ...saved, lines, ...(focus === null ? { head: headOf(log) } : { crash: focus, head: headOf(log) }) };
 };
