@@ -400,11 +400,27 @@ wrong identity goes out under that identity.
 | `list_folder` / `find_files` / `describe_file` | read | A folder's children, a search of the whole Drive, one file's metadata. |
 | `read_doc` | read | A Doc, Sheet or deck exported as text, markdown or HTML. |
 | `start_drive_cursor` / `drive_changes` | read | What changed since a cursor, in one call that returns only the delta. |
-| `download_file` | read | A file saved to the downloads folder, checked against Drive's checksum first (a Google file is exported). |
+| `download_file` | read | A file saved to the downloads folder, checked against Drive's checksum first (a Google file is exported). A file over the size limit comes down in pieces with `offset` and `length` (see below). |
 | `upload_file` | write | A file onto Drive byte for byte, checked against what Drive stored; a damaged upload is taken back. With `convert`, a .docx, .xlsx or .pptx (their older forms, or a .csv) becomes a Google Doc, Sheet or deck. |
 | `copy_file` / `move_file` / `rename_file` | write | Copy, move (with a dry run that names every collision) and rename, Docs included. |
 | `create_folder` | write | A folder and every missing folder above it. |
 | `trash_file` / `untrash_file` | write | Drive's trash, recoverable for 30 days; there is no permanent delete. |
+
+#### Downloading a large file in pieces
+
+`download_file` holds a whole file in memory and refuses one over 100 MiB. For a
+bigger file (a video, a disk image, a backup), ask for it a piece at a time with
+two optional arguments: `offset`, the byte where the piece starts (default 0), and
+`length`, its size in bytes (at most 100 MiB; 0, the default, means the whole
+file). The last piece may be shorter than `length`. Give each piece its own
+`filename`, then join the pieces in order on your side. Only files with bytes of
+their own can be fetched this way, not Google Docs or Sheets.
+
+Drive's checksums cover the whole file, so a piece is not checked against them.
+The result says so (`unverified`) and reports the piece's own `sha256` and `md5`
+under `range`, next to the whole file's `sha256` and `md5` from Drive: compare the
+assembled file with those. A piece Drive does not answer exactly as asked is
+refused and nothing is saved.
 
 ### Comments, sharing and revisions
 

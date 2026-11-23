@@ -3,7 +3,7 @@ import { createHash } from "node:crypto";
 import { resolveSaveDir } from "@foreverworks/mcp-kit";
 
 import { downloadName, exportPlan, MAX_DOWNLOAD_BYTES } from "../../domain/download.js";
-import { shape } from "../../domain/entries.js";
+import { type Entry, shape } from "../../domain/entries.js";
 import { apiError, configError, fail, inputError } from "../../domain/errors.js";
 import { storedCheck } from "../../domain/upload.js";
 import type { Deps } from "../ports.js";
@@ -19,9 +19,36 @@ export type DownloadArgs = {
   readonly saveDir: string;
   /** Defaults to Drive's name, with the export's extension. */
   readonly filename: string;
+  /** Where a piece starts; 0 is the start of the file. */
+  readonly offset: number;
+  /** The piece's size in bytes; 0 is the whole file. A piece may be at most MAX_DOWNLOAD_BYTES. */
+  readonly length: number;
 };
 
 const hex = (algorithm: "md5" | "sha256", bytes: Uint8Array): string => createHash(algorithm).update(bytes).digest("hex");
+
+type Downloads = NonNullable<Deps["downloads"]>;
+
+/**
+ * One piece of a large file. Drive's checksums cover the whole file, so a piece is
+ * hashed on its own and reported unverified; the whole file's checksums stay in the
+ * result for the caller to compare with the assembled file.
+ */
+const downloadPiece = async (deps: Deps, downloads: Downloads, dir: string, file: Entry, args: DownloadArgs) => {
+  const total = file.bytes ?? fail(apiError(200, `Drive reported no size for "${file.name}", so it cannot be downloaded in pieces`));
+  if (args.offset >= total) return fail(inputError(`offset ${args.offset} is at or past the end of "${file.name}", which is ${total} bytes`));
+  const length = Math.min(args.length, total - args.offset);
+  const bytes = await deps.drive.downloadRange(file.id, args.offset, length);
+  if (bytes.length !== length) return fail(apiError(200, `Drive sent ${bytes.length} bytes for a range of ${length}; nothing was saved`));
+  const path = await downloads.save(dir, downloadName(args.filename || file.name), bytes);
+  return {
+    ...file,
+    path,
+    size: bytes.length,
+    range: { offset: args.offset, length, total, sha256: hex("sha256", bytes), md5: hex("md5", bytes) },
+    unverified: "a range; compare the assembled file with sha256",
+  };
+};
 
 /**
  * A file off Drive into the downloads folder, byte for byte and proved so: the bytes
@@ -35,6 +62,10 @@ const hex = (algorithm: "md5" | "sha256", bytes: Uint8Array): string => createHa
 export const downloadFile = async (deps: Deps, args: DownloadArgs) => {
   const downloads = deps.downloads ?? fail(configError("this server has no folder to save downloads in (DRIVE_DOWNLOADS_DIR)"));
   if (args.fileId.trim() === "" && args.path.trim() === "") return fail(inputError("give file_id or path: the file to download"));
+  if (!Number.isSafeInteger(args.offset) || args.offset < 0) return fail(inputError("offset must be a whole number of bytes, 0 or more"));
+  if (!Number.isSafeInteger(args.length) || args.length < 0) return fail(inputError("length must be a whole number of bytes, 0 or more"));
+  if (args.length > MAX_DOWNLOAD_BYTES) return fail(inputError(`length is ${args.length}, over ${MAX_DOWNLOAD_BYTES}: ask for pieces of at most that size`));
+  if (args.length === 0 && args.offset > 0) return fail(inputError("offset needs a length: give both to download a piece"));
   const where = resolveSaveDir(downloads.dir, args.saveDir);
   if (!where.ok) return fail(inputError(where.reason));
 
@@ -42,6 +73,9 @@ export const downloadFile = async (deps: Deps, args: DownloadArgs) => {
   const file = shape(raw);
   if (file.isFolder) return fail(inputError(`"${file.name}" is a folder; list_folder shows what is in it`));
 
+  if (file.isNative && args.length > 0) {
+    return fail(inputError(`"${file.name}" is a Google file with no bytes of its own, so it cannot be downloaded in pieces; leave length at 0 to export it`));
+  }
   if (file.isNative) {
     const plan = exportPlan(file.mimeType, args.format);
     if ("refused" in plan) return fail(inputError(`"${file.name}": ${plan.refused}`));
@@ -54,8 +88,9 @@ export const downloadFile = async (deps: Deps, args: DownloadArgs) => {
   if (args.format !== "") {
     return fail(inputError(`"${file.name}" is a ${file.mimeType} with bytes of its own, saved as they are; format is for Docs, Sheets, Slides and Drawings`));
   }
+  if (args.length > 0) return downloadPiece(deps, downloads, where.dir, file, args);
   if (file.bytes !== null && file.bytes > MAX_DOWNLOAD_BYTES) {
-    return fail(inputError(`"${file.name}" is ${file.bytes} bytes, over ${MAX_DOWNLOAD_BYTES}`));
+    return fail(inputError(`"${file.name}" is ${file.bytes} bytes, over ${MAX_DOWNLOAD_BYTES}; use offset and length to download it in pieces of at most that size`));
   }
   const bytes = await deps.drive.download(file.id);
   const sha256 = hex("sha256", bytes);

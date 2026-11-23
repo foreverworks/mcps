@@ -110,6 +110,8 @@ export type DrivePort = {
   readonly exportText: (id: string, exportMime: string) => Promise<string>;
   /** A file's own bytes, as Drive stores them. */
   readonly download: (id: string) => Promise<Uint8Array>;
+  /** `length` bytes from `offset` (an HTTP Range request); the adapter fails unless that exact range came back. */
+  readonly downloadRange: (id: string, offset: number, length: number) => Promise<Uint8Array>;
   /** A native file (a Doc, a Sheet) rendered in another format: it has no bytes of its own. */
   readonly exportBytes: (id: string, exportMime: string) => Promise<Uint8Array>;
   readonly listComments: (fileId: string, options: { readonly includeDeleted: boolean; readonly modifiedAfter?: string; readonly limit: number }) => Promise<readonly RawComment[]>;

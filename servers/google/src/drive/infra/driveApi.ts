@@ -185,6 +185,19 @@ export const makeDriveApi = (request: Request, upload: Request = request): Drive
     exportText: (id, exportMime) => request<string>(`${fileUrl(id)}/export`, { query: { mimeType: exportMime }, as: "text" }),
     // Bytes on the long-timeout layer: a large file takes as long to come down as to go up.
     download: (id) => upload<Uint8Array>(fileUrl(id), { query: { alt: "media", ...ALL_DRIVES }, as: "bytes" }),
+    // A piece of a large file: Drive answers 206 with just that range. Anything but exactly the
+    // bytes asked for (a 200 with the whole file, a short body) is refused, so a piece is never wrong.
+    downloadRange: async (id, offset, length) => {
+      const bytes = await upload<Uint8Array>(fileUrl(id), {
+        query: { alt: "media", ...ALL_DRIVES },
+        headers: { Range: `bytes=${offset}-${offset + length - 1}` },
+        as: "bytes",
+      });
+      if (bytes.length !== length) {
+        return fail(apiError(200, `Drive answered the range bytes=${offset}-${offset + length - 1} with ${bytes.length} bytes, not ${length}`));
+      }
+      return bytes;
+    },
     exportBytes: (id, exportMime) => upload<Uint8Array>(`${fileUrl(id)}/export`, { query: { mimeType: exportMime }, as: "bytes" }),
     listComments: async (fileId, options) => {
       type CommentPage = { readonly comments?: readonly RawComment[]; readonly nextPageToken?: string };

@@ -1883,7 +1883,7 @@
   {
     "name": "download_file",
     "title": "Download a file from Drive",
-    "description": "Save a file from Drive into /srv/state/google/drive/downloads, which you can read, and prove it: the bytes are checked against Drive's own checksum before anything is written, so a damaged download is never saved. For a file no local copy has yet, or one known only by its id. A Google Doc, Sheet, Slides deck or Drawing has no bytes and is exported instead (a Doc as pdf, a Sheet as xlsx, Slides as pptx, a Drawing as png, unless format says otherwise). An earlier download of the same name in that folder is replaced. Returns the file with the saved path, size, sha256, md5 and verifiedBy (exportedAs for a Google file).",
+    "description": "Save a file from Drive into /srv/state/google/drive/downloads, which you can read, and prove it: the bytes are checked against Drive's own checksum before anything is written, so a damaged download is never saved. For a file no local copy has yet, or one known only by its id. A Google Doc, Sheet, Slides deck or Drawing has no bytes and is exported instead (a Doc as pdf, a Sheet as xlsx, Slides as pptx, a Drawing as png, unless format says otherwise). An earlier download of the same name in that folder is replaced. A file over the size limit is fetched in pieces: call again with offset and length, a filename per piece, and compare the assembled file with the whole-file sha256. Returns the file with the saved path, size, sha256, md5 and verifiedBy (exportedAs for a Google file).",
     "inputSchema": {
       "type": "object",
       "properties": {
@@ -1931,6 +1931,20 @@
           "default": "",
           "description": "The saved name; defaults to Drive's, with the export's extension.",
           "type": "string"
+        },
+        "offset": {
+          "default": 0,
+          "description": "For a file larger than the size limit: the byte where this piece starts. Needs length.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "length": {
+          "default": 0,
+          "description": "The piece's size in bytes, at most 104857600; the last piece may be shorter. 0 downloads the whole file. Not for Google files.",
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
         }
       },
       "$schema": "https://json-schema.org/draft/2020-12/schema",

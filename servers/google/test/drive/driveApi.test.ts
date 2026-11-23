@@ -82,4 +82,19 @@ describe("Drive keeps the source's modification time, and hands bytes back", () 
     expect(calls[0]).toMatchObject({ url: "https://www.googleapis.com/drive/v3/files/a%2Fb", spec: { query: { alt: "media" }, as: "bytes" } });
     expect(calls[1]).toMatchObject({ url: "https://www.googleapis.com/drive/v3/files/doc/export", spec: { query: { mimeType: "application/pdf" }, as: "bytes" } });
   });
+
+  it("asks for a byte range with a Range header and refuses an answer of the wrong length", async () => {
+    const served = (n: number) => (async (url: string, spec: RequestSpec = {}) => {
+      seen.push({ url, spec });
+      return new Uint8Array(n);
+    }) as unknown as Request;
+    const seen: { url: string; spec: RequestSpec }[] = [];
+    const got = await makeDriveApi(served(0), served(10)).downloadRange("f", 100, 10);
+    expect(got).toHaveLength(10);
+    expect(seen[0]).toMatchObject({
+      url: "https://www.googleapis.com/drive/v3/files/f",
+      spec: { query: { alt: "media" }, headers: { Range: "bytes=100-109" }, as: "bytes" },
+    });
+    await expect(makeDriveApi(served(0), served(20)).downloadRange("f", 100, 10)).rejects.toMatchObject({ error: { kind: "api" } });
+  });
 });

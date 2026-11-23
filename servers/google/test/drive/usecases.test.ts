@@ -13,6 +13,7 @@ import { downloadFile } from "../../src/drive/app/usecases/download.js";
 import { copyFile, makeFolder, move, pathOf, rename } from "../../src/drive/app/usecases/organise.js";
 import { changesSince } from "../../src/drive/app/usecases/sync.js";
 import { uploadFile } from "../../src/drive/app/usecases/upload.js";
+import { MAX_DOWNLOAD_BYTES } from "../../src/drive/domain/download.js";
 import { DOCUMENT_MIME, FOLDER_MIME, type RawFile } from "../../src/drive/domain/entries.js";
 import { asAppError, type AppError } from "../../src/drive/domain/errors.js";
 
@@ -47,6 +48,7 @@ const makeFake = (
   const uploads: { kind: "new" | "replace"; id: string; bytes: Uint8Array; modifiedTime?: string }[] = [];
   const saved: { dir: string; name: string; bytes: Uint8Array }[] = [];
   const exported: { id: string; mime: string }[] = [];
+  const ranges: { id: string; offset: number; length: number }[] = [];
   /** What Drive reports for bytes it stored: its two checksums, of what `stores` made of them. */
   const checksums = (bytes: Uint8Array) => {
     const kept = stores(bytes);
@@ -120,6 +122,10 @@ const makeFake = (
     },
     exportText: async () => "the words",
     download: async (id) => serves(blobs[id] ?? new Uint8Array()),
+    downloadRange: async (id, offset, length) => {
+      ranges.push({ id, offset, length });
+      return serves((blobs[id] ?? new Uint8Array()).subarray(offset, offset + length));
+    },
     exportBytes: async (id, mime) => {
       exported.push({ id, mime });
       return Buffer.from(`${id} as ${mime}`);
@@ -149,7 +155,7 @@ const makeFake = (
       },
     },
   };
-  return { deps, writes, store, uploads, saved, exported, revisionsDeleted };
+  return { deps, writes, store, uploads, saved, exported, ranges, revisionsDeleted };
 };
 
 
@@ -546,7 +552,7 @@ describe("downloadFile", () => {
   };
   const doc: RawFile = { id: "doc", name: "Weekly sync - 2030/01/15", mimeType: "application/vnd.google-apps.document" };
   const folder: RawFile = { id: "dir", name: "Branding", mimeType: FOLDER_MIME };
-  const args = { fileId: "", path: "", format: "", saveDir: "", filename: "" };
+  const args = { fileId: "", path: "", format: "", saveDir: "", filename: "", offset: 0, length: 0 };
 
   it("saves a file's bytes into the outbox only once they match Drive's own checksum", async () => {
     const { deps, saved } = makeFake({ svg: logo }, { blobs: { svg } });
@@ -591,6 +597,70 @@ describe("downloadFile", () => {
     const { deps } = makeFake({ svg: logo }, { blobs: { svg } });
     const { downloads: _none, ...nowhere } = deps;
     expect(await failure(downloadFile(nowhere, { ...args, fileId: "svg" }))).toMatchObject({ kind: "config" });
+  });
+
+  describe("in pieces", () => {
+    const content = Buffer.from("0123456789abcdefghij");
+    const whole: RawFile = {
+      id: "big",
+      name: "archive.bin",
+      mimeType: "application/octet-stream",
+      size: String(content.length),
+      md5Checksum: hash("md5", content),
+      sha256Checksum: hash("sha256", content),
+    };
+    const make = (options: Parameters<typeof makeFake>[1] = {}) => makeFake({ big: whole, doc }, { blobs: { big: content }, ...options });
+
+    it("requests just the range, saves it under the given name and reports the piece and the whole file", async () => {
+      const { deps, saved, ranges } = make();
+      const out = await downloadFile(deps, { ...args, fileId: "big", offset: 5, length: 10, filename: "part2" });
+      expect(ranges).toEqual([{ id: "big", offset: 5, length: 10 }]);
+      expect(saved).toHaveLength(1);
+      expect(Buffer.from(saved[0]?.bytes ?? []).toString()).toBe("56789abcde");
+      expect(out).toMatchObject({
+        path: "/outbox/google/drive/part2",
+        size: 10,
+        sha256: hash("sha256", content),
+        md5: hash("md5", content),
+        range: { offset: 5, length: 10, total: 20, sha256: hash("sha256", Buffer.from("56789abcde")), md5: hash("md5", Buffer.from("56789abcde")) },
+        unverified: "a range; compare the assembled file with sha256",
+      });
+      expect(out).not.toHaveProperty("verifiedBy");
+    });
+
+    it("shortens the last piece to what is left", async () => {
+      const { deps, saved, ranges } = make();
+      const out = await downloadFile(deps, { ...args, fileId: "big", offset: 15, length: 10 });
+      expect(ranges).toEqual([{ id: "big", offset: 15, length: 5 }]);
+      expect(out).toMatchObject({ size: 5, range: { offset: 15, length: 5, total: 20 } });
+      expect(Buffer.from(saved[0]?.bytes ?? []).toString()).toBe("fghij");
+    });
+
+    it("refuses an offset at or past the end, a length over the cap, and a Google file", async () => {
+      const { deps, saved, ranges } = make();
+      expect(await failure(downloadFile(deps, { ...args, fileId: "big", offset: 20, length: 4 }))).toMatchObject({ kind: "input", message: expect.stringMatching(/past the end/) });
+      expect(await failure(downloadFile(deps, { ...args, fileId: "big", length: MAX_DOWNLOAD_BYTES + 1 }))).toMatchObject({ kind: "input", message: expect.stringMatching(/over/) });
+      expect(await failure(downloadFile(deps, { ...args, fileId: "big", offset: -1, length: 4 }))).toMatchObject({ kind: "input" });
+      expect(await failure(downloadFile(deps, { ...args, fileId: "big", offset: 4 }))).toMatchObject({ kind: "input" });
+      expect(await failure(downloadFile(deps, { ...args, fileId: "doc", length: 4 }))).toMatchObject({ kind: "input", message: expect.stringMatching(/Google file/) });
+      expect(ranges).toEqual([]);
+      expect(saved).toEqual([]);
+    });
+
+    it("saves nothing when Drive sends a different number of bytes than the range", async () => {
+      const { deps, saved } = make({ serves: (b) => b.subarray(0, b.length - 1) });
+      expect(await failure(downloadFile(deps, { ...args, fileId: "big", offset: 0, length: 10 }))).toMatchObject({ kind: "api", message: expect.stringMatching(/nothing was saved/) });
+      expect(saved).toEqual([]);
+    });
+
+    it("leaves the whole-file download as it was, and says how to fetch a larger file", async () => {
+      const { deps, ranges } = make();
+      expect(await downloadFile(deps, { ...args, fileId: "big" })).toMatchObject({ size: 20, verifiedBy: "sha256" });
+      expect(ranges).toEqual([]);
+      const huge: RawFile = { ...whole, id: "huge", size: String(200 * 1024 * 1024) };
+      const bigger = makeFake({ huge });
+      expect(await failure(downloadFile(bigger.deps, { ...args, fileId: "huge" }))).toMatchObject({ kind: "input", message: expect.stringMatching(/offset and length/) });
+    });
   });
 });
 

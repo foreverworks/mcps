@@ -1,7 +1,7 @@
 import { z } from "zod";
 
 import { downloadFile } from "../../app/usecases/download.js";
-import { DOWNLOAD_FORMATS } from "../../domain/download.js";
+import { DOWNLOAD_FORMATS, MAX_DOWNLOAD_BYTES } from "../../domain/download.js";
 import { handled } from "../envelope.js";
 import type { Registrar } from "./types.js";
 
@@ -17,6 +17,7 @@ export const registerDownload: Registrar = (server, deps) => {
         "local copy has yet, or one known only by its id. A Google Doc, Sheet, Slides deck or Drawing has " +
         "no bytes and is exported instead (a Doc as pdf, a Sheet as xlsx, Slides as pptx, a Drawing as png, " +
         "unless format says otherwise). An earlier download of the same name in that folder is replaced. " +
+        "A file over the size limit is fetched in pieces: call again with offset and length, a filename per piece, and compare the assembled file with the whole-file sha256. " +
         "Returns the file with the saved path, size, sha256, md5 and verifiedBy (exportedAs for a Google file).",
       inputSchema: {
         file_id: z.string().default("").describe("The file's id. Takes precedence over path."),
@@ -27,10 +28,17 @@ export const registerDownload: Registrar = (server, deps) => {
           .describe("For a Google file only: what to save it as. Empty is its default."),
         save_dir: z.string().default("").describe(`A folder inside ${where} to save into; empty is ${where} itself.`),
         filename: z.string().default("").describe("The saved name; defaults to Drive's, with the export's extension."),
+        offset: z.number().int().min(0).default(0).describe("For a file larger than the size limit: the byte where this piece starts. Needs length."),
+        length: z
+          .number()
+          .int()
+          .min(0)
+          .default(0)
+          .describe(`The piece's size in bytes, at most ${MAX_DOWNLOAD_BYTES}; the last piece may be shorter. 0 downloads the whole file. Not for Google files.`),
       },
     },
-    handled((args: { file_id: string; path: string; format: string; save_dir: string; filename: string }) =>
-      downloadFile(deps, { fileId: args.file_id, path: args.path, format: args.format, saveDir: args.save_dir, filename: args.filename }),
+    handled((args: { file_id: string; path: string; format: string; save_dir: string; filename: string; offset: number; length: number }) =>
+      downloadFile(deps, { fileId: args.file_id, path: args.path, format: args.format, saveDir: args.save_dir, filename: args.filename, offset: args.offset, length: args.length }),
     ),
   );
 };
