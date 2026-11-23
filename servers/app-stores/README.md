@@ -232,7 +232,7 @@ of TestFlight feedback. It never replies.
 
 ## Other servers for App Store Connect and Google Play
 
-Searched 2026-10-22. Neither Apple nor Google publishes one.
+As of 2026-10-22, neither Apple nor Google publishes one.
 
 - **Expo's hosted MCP server** covers all of this (App Store and Play reviews
   and replies, TestFlight feedback and crashes, Play crashes), but it runs on
