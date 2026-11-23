@@ -32,8 +32,8 @@ const API_VERSION = "14";
 const LANGUAGE = "en";
 
 /**
- * Observed: list pages back to back are throttled with HTTP 429; detail calls
- * one at a time, ~700 ms apart, rarely are. So every API call (list pages
+ * Glovo throttles list pages fetched back to back with HTTP 429; detail calls
+ * one at a time, about 700 ms apart, rarely. So every API call (list pages
  * included) goes through one queue, at least this far apart.
  */
 export const CALL_GAP_MS = 700;
@@ -61,14 +61,12 @@ export type GlovoApiOptions = {
 
 /**
  * The release of the web app whose headers these are, read from the app's own
- * page on 2026-11-18 (`NEXT_PUBLIC_APP_VERSION` in the HTML of glovoapp.com/en).
- * The app sends it, with a leading "v", as `Glovo-App-Version` and inside
- * `Glovo-Client-Info`, on every request. It moves with each release of the web
- * app (v1.2718.0 on 2026-11-07, v1.2989.0 on 2026-11-18), so it is a constant
- * with an override, `GLOVO_APP_VERSION`, and not a value read at run time: the
- * page that carries it is on the apex glovoapp.com, which an egress list of
- * `*.glovoapp.com` does not admit. The app's own fallback, "N/A" (a build that
- * carries no version), was accepted on 2026-11-07.
+ * page (`NEXT_PUBLIC_APP_VERSION` in the HTML of glovoapp.com/en; v1.2989.0 on
+ * 2026-11-18). The app sends it, with a leading "v", as `Glovo-App-Version` and
+ * inside `Glovo-Client-Info`, on every request. It moves with each release of
+ * the web app, so it is a constant with an override, `GLOVO_APP_VERSION`, and
+ * not a value read at run time: the page that carries it is on the apex
+ * glovoapp.com, which an egress list of `*.glovoapp.com` does not admit.
  */
 export const DEFAULT_APP_VERSION = "v1.2989.0";
 const VERSION_SHAPE = /^[A-Za-z0-9][A-Za-z0-9._+-]{0,39}$/;
@@ -97,25 +95,18 @@ const BROWSER_USER_AGENT = "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (
 const ACCEPT = "application/json, text/plain, */*";
 
 /**
- * The analytics session the web app opens on load. Glovo has tightened its
- * check of /oauth/refresh's headers twice, and answers 403 whatever the token
- * when the set differs from the web app's:
- *
- * - 2026-11-07: required app version, client info, language code, the three
- *   Perseus headers and the request id (measured by dropping one header at a
- *   time from the app's own request; random UUIDs and the current time were
- *   accepted, and "N/A" passed as the version).
- * - 2026-11-18: 403 again for that set, with a brand-new refresh token, from
- *   Node and from a fetch inside the signed-in page, while the app's own call
- *   to the same path with the same body got 200. The set below is the one the
- *   app's axios instance sends, read from its public bundle: the API version
- *   and a real app version on refresh too, `Glovo-App-Context`,
- *   `Glovo-App-Development-State`, `Glovo-Request-TTL`, `Glovo-Dynamic-Session-Id`
- *   (the same id as the Perseus session's: the app sends one value twice),
- *   `Glovo-Client-Info` carrying that version, and the browser's own Accept,
- *   Accept-Language, Origin, Referer and User-Agent. Which of these Glovo
- *   checks has not been measured one by one (that takes the app's own token);
- *   all of them are sent.
+ * The analytics session the web app opens on load. Glovo checks the headers of
+ * /oauth/refresh against the web app's, and answers 403 whatever the token
+ * when the set differs (as of 2026-11, and its check has grown stricter more
+ * than once). The set below is the one the app's axios instance sends, read
+ * from its public bundle: the API version and a real app version on refresh
+ * too, `Glovo-App-Context`, `Glovo-App-Development-State`, `Glovo-Request-TTL`,
+ * `Glovo-Dynamic-Session-Id` (the same id as the Perseus session's: the app
+ * sends one value twice), `Glovo-Client-Info` carrying that version, the
+ * three Perseus headers and the request id, and the browser's own Accept,
+ * Accept-Language, Origin, Referer and User-Agent. Which of these Glovo
+ * checks is not known one by one, so all of them are sent. Random UUIDs and
+ * the current time are accepted for the ids.
  *
  * One session per process, as one page load is one in the app.
  */

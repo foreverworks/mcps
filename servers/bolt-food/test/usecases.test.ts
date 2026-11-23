@@ -168,7 +168,7 @@ describe("matchCardCharges", () => {
     expect(out.unmatchedOrders.map((o) => o.orderId)).toEqual([2]);
     // Order 3 is three weeks out of the window and was never fetched.
     expect(bolt.bolt.orderDetails).toHaveBeenCalledTimes(2);
-    // The window names Bolt's date basis, in this key order, as it always has.
+    // The window names Bolt's date basis, in this key order.
     expect(JSON.stringify(out.window)).toBe('{"orderDatesSearched":{"since":"2026-07-13","until":"2026-07-17"},"daysBefore":1,"daysAfter":2}');
   });
 });

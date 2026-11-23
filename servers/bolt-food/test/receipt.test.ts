@@ -106,8 +106,7 @@ describe("toReceipt", () => {
   });
 
   it("reports a missing total as missing, not as a free order", () => {
-    // This test used to assert total: "0.00" on a payload carrying no
-    // total_price, which is a figure Bolt never sent.
+    // A payload with no total_price has no total: "0.00" would be a figure Bolt never sent.
     expect(toReceipt(summary(), {}).total).toBeUndefined();
     expect(toReceipt(summary(), { total_price: { value: 0 } }).total).toBe("0.00");
   });

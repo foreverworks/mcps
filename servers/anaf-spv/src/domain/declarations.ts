@@ -125,7 +125,7 @@ export const factsOf = (xml: string, form: FormName): DeclarationFacts => {
 };
 
 /**
- * What DUKIntegrator said, from its output and its error file (measured
+ * What DUKIntegrator said, from its output and its error file (as seen
  * with a D212 kit): a valid file prints "Validare fara erori"
  * and writes `ok` to the error file; an invalid one prints "Erori la validare"
  * and writes the errors. It exits 0 either way, so the exit code says nothing.

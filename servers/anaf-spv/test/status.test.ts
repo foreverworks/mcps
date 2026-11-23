@@ -3,9 +3,8 @@
  * test/fixtures/stare: `none.html` and `refused.html` are stare.anaf.ro's own
  * answers of 2026-10-22 to an invented index and tax id (1999999901 and
  * 99999909; "abc" for the refusal), byte for byte in the page's ISO-8859-1;
- * `found.html` is written in the shape of a listing (anafpy's capture of
- * 2026-07-16, docs/anaf-reference/_sources/stared112/result-found.html) with
- * invented filings only.
+ * `found.html` is written in the shape of a listing the page gave in
+ * 2026-07, with invented filings only.
  */
 import { readFileSync } from "node:fs";
 

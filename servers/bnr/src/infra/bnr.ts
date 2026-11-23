@@ -6,13 +6,13 @@ import type { RatesDocument } from "../app/ports.js";
 import { ratesIn } from "./xml.js";
 
 /**
- * BNR's published XML at curs.bnr.ro, the host the bank moved its files to
- * (its "Curs XML" page names it; every www.bnr.ro/*.xml path now redirects to
- * the HTML home page). Static files, no key:
+ * BNR's published XML at curs.bnr.ro, the host its "Curs XML" page names.
+ * The older www.bnr.ro/*.xml addresses redirect to the HTML home page (as of
+ * 2026-10), so they are not used. Static files, no key:
  *
  * - `/nbrfxrates.xml`: the latest fixing, about 13:00 Bucharest on a banking day;
  * - `/files/xml/years/nbrfxrates<year>.xml`: every fixing of a year, the
- *   current one included (about 300 KB, measured 2026-10-18).
+ *   current one included (about 300 KB).
  *
  * A past year's file does not change, so it is kept for the life of the
  * process; the current year's and the latest are kept ten minutes. A file

@@ -7,11 +7,10 @@ import { visibleText } from "./portal/html.js";
 
 /**
  * ANAF's public status service for filed declarations, StareD112
- * (stare.anaf.ro/StareD112; www.anaf.ro/StareD112 resets the connection since
+ * (stare.anaf.ro/StareD112; www.anaf.ro/StareD112 resets the connection as of
  * 2026), which ANAF's forms pages point every electronic filing to. No
- * sign-in, no captcha. Read 2026-10-22 against anafpy's captures
- * (docs/anaf-reference/declaratii/stared112.md) and two answers recorded with
- * an invented index and tax id:
+ * sign-in, no captcha. Read 2026-10-22 against the page's own answers to an
+ * invented index and tax id:
  *
  *   POST /StareD112/vizualizareStare.do   ghiseu=N (filed online), id, cui
  *

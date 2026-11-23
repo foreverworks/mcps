@@ -5,7 +5,7 @@ import { attribute, element, options, tags, visibleText, withoutComments } from 
 /**
  * SPV's contact form (`/asistspv/`, which SPV shows in an iframe behind the
  * envelope pictogram) and the page it answers with, as this server reads
- * them. Measured through a browser: one form, multipart, posting to
+ * them. As seen through a browser: one form, multipart, posting to
  * `asistspatiuprivat.do`, with `cif_ales`, `categSolicit`, `subcategSolicit`,
  * the textarea `textintrebare` (maxlength 1500), the file input `docum` and a
  * submit button named `submit`. The markup's `cif_ales` is empty: the page's

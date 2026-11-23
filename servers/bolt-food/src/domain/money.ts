@@ -10,10 +10,10 @@
 /**
  * MISSING IS NOT ZERO.
  *
- * This returned 0 for an absent value, so an order whose payload carried no
- * `total_price` rendered as `"0.00"` and read as a free order. Nothing in a
- * receipt is improved by inventing a figure: a field Bolt did not send is
- * absent from the result, and a real zero still prints as `0.00`.
+ * An order whose payload carries no `total_price` must not render as `"0.00"`,
+ * which would read as a free order. Nothing in a receipt is improved by
+ * inventing a figure: a field Bolt did not send is absent from the result,
+ * and a real zero still prints as `0.00`.
  */
 export const toMinor = (value: number | undefined | null): number | undefined =>
   value === undefined || value === null ? undefined : Math.round(value * 100);

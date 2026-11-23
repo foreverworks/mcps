@@ -105,7 +105,7 @@ const syncOnce = async (deps: Deps, listed: Listing, args: Selection & { readonl
 
 /**
  * Wait for SPV's answer to a request (a RASPUNS SOLICITARE row carrying its
- * id). Measured: 40 to 90 seconds after request_document. A client that asked
+ * id). It usually appears 40 to 90 seconds after request_document. A client that asked
  * hears the seconds waited of `waitSeconds` after each look; one that cancels
  * ends the wait at once.
  */

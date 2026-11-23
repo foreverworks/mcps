@@ -11,9 +11,9 @@ import type { Fixing, Rate } from "../domain/rates.js";
  *   <Rate currency="HUF" multiplier="100">1.4501</Rate> ... </Cube> ... </Body></DataSet>
  *
  * The namespace is `https://www.bnr.ro/xsd` in the current files and
- * `http://www.bnr.ro/xsd` in older years' (2020-2025 read). The old
- * www.bnr.ro addresses now answer with the bank's HTML home page and
- * status 200, which silently breaks a reader that only checks the status: an
+ * `http://www.bnr.ro/xsd` in the years 2020 to 2025. The older www.bnr.ro
+ * addresses answer with the bank's HTML home page and status 200, which
+ * would pass for an empty year in a reader that only checks the status: an
  * answer that is not this document is drift, never an empty year. Pure.
  */
 import type { RatesDocument } from "../app/ports.js";

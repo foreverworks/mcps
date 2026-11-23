@@ -2,7 +2,7 @@ import { fail, inputError } from "./errors.js";
 
 /**
  * SPV's contact form ("Formular de contact", the envelope pictogram), as
- * measured: what it offers, and the rules a message must meet
+ * the live form shows it: what it offers, and the rules a message must meet
  * before anything is sent. Pure.
  *
  * The form preselects its FIRST identity, which for an account that also
@@ -36,7 +36,7 @@ export const DEFAULT_CATEGORY = 3;
 
 /**
  * The categories that take a subcategory, in the order the page lists their
- * groups (measured: petitions under OG 27/2002, public information
+ * groups (petitions under OG 27/2002, public information
  * under Law 544/2001, technical help), for a page that does not mark which
  * group is whose.
  */

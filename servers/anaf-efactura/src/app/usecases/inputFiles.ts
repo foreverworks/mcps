@@ -8,7 +8,7 @@ import { fail, inputError } from "../../domain/errors.js";
  * script wrote, with the SOURCE file's sha256, which the reader checks before
  * anything is sent. There is no third way: a document typed out by a model as
  * text is a retyping, and a retyped invoice can change by one character with
- * nothing noticing (one in about 6,200 base64 characters, measured).
+ * nothing noticing (about one error in 6,200 base64 characters).
  */
 export type DocumentInput = {
   /** The argument's name, for the messages. */

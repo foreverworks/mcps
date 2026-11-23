@@ -126,7 +126,7 @@ export type SealAnswer = { readonly msg?: string };
 /**
  * PlatitorTvaRest v9, one company. HAND-MODELLED: ANAF publishes a text file,
  * not a schema (doc_WS_V9.txt, cited in infra/config.ts, read 2026-09-30), and
- * the live answer differs from it in three places, measured the same day: no
+ * the live answer differs from it in three places (as of 2026-09-30): no
  * `cod`/`message` envelope, `perioade_TVA` is a list rather than one object,
  * and `data_inreg_Reg_RO_e_Factura` exists although the document does not name
  * it. A field may also be null (`cod_CAEN` is, for a ministry). Dates are

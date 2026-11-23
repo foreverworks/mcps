@@ -13,7 +13,7 @@ import { unzip } from "./zip.js";
  * A DUKIntegrator kit for one form and one of ANAF's packages for it, built once in the
  * cache and kept: ANAF's common jars and the integrator as its update server
  * lists them now (`update5/versiuni.xml`), the config folder it refuses to
- * start without ("folderul config nu poate fi determinat", measured), and the
+ * start without ("folderul config nu poate fi determinat"), and the
  * package's own validator and PDF jars from the forms page's "soft J" zip
  * (domain/declarations/kits.ts says which zip serves which periods).
  * The kit's Windows JRE and smart-card configs are not needed and not taken.

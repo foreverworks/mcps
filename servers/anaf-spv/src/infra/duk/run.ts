@@ -16,13 +16,13 @@ import type { makeKits } from "./kit.js";
  *   java -jar DUKIntegrator.jar -p <FORM> <xml> <errors> $ <attachment> <pdf>
  *
  * The JVM is held small (one compiler thread, serial GC) because it runs
- * inside the server's own memory and task limits; a validation measured about
+ * inside the server's own memory and task limits; a validation takes about
  * two seconds. The error file is the integrator's own words, kept verbatim.
  *
  * The PDF step's fifth argument is a ZIP to attach; ANAF's Instructiuni.txt
  * (update5/documentatie_6): "la declaratiile fara ZIP atasat acest parametru
  * trebuie sa fie 0". None of D212, D100, D300 and D112 attaches one, and `0`
- * is what each takes (measured on each of the four).
+ * is what each takes.
  */
 const NO_ZIP = "0";
 const JVM = ["-Xmx256m", "-Xss1m", "-XX:-MaxFDLimit", "-XX:-UsePerfData", "-XX:+UseSerialGC", "-XX:TieredStopAtLevel=1", "-XX:CICompilerCount=1", "-XX:ActiveProcessorCount=1", "-Djava.awt.headless=true"];

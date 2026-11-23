@@ -25,8 +25,9 @@ export const stateOf = (details: RawDetails): string => {
  * A picker's change to one line. English and Romanian wording both, because an
  * account set to Romanian gets Romanian text, and a stored payload may have been
  * fetched in it:
- * - removed: displayStyle STRIKETHROUGH, notice "Not available — you weren’t
- *   charged" (ro "Indisponibil — nu ai fost taxat"). The line was not paid for.
+ * - removed: displayStyle STRIKETHROUGH, and a notice that opens "Not available"
+ *   (ro "Indisponibil") and says the customer was not charged. The line was not
+ *   paid for.
  * - replacement: notice "Instead of <original>" (ro "În loc de <original>").
  */
 const UNAVAILABLE = /not available|unavailable|indisponibil/i;
@@ -72,7 +73,7 @@ export type ReceiptItem = ReturnType<typeof lineItem>;
 
 /**
  * Glovo's breakdown, verbatim and in its order. Unlike Bolt's, these lines DO
- * sum to the total on every delivered order measured. A "No cost" line (a free
+ * sum to the total on every delivered order seen. A "No cost" line (a free
  * delivery, e.g. with Prime) is 0.00; a DISCOUNT line is negative and
  * carries its percentage as `tag`.
  */

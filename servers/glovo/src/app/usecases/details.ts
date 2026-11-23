@@ -34,8 +34,8 @@ export async function* historyRows({ glovo }: Deps): AsyncGenerator<RawListRow> 
 /**
  * How far past `since` the walk keeps going before it believes the history has
  * left the range. The list is ordered by order id, and the delivery time that
- * dates a receipt was out of that order by at most about an hour in the
- * history measured. A day is generous, and costs a handful of calls.
+ * dates a receipt is out of that order by at most about an hour in the
+ * histories seen. A day is generous, and costs a handful of calls.
  */
 export const WALK_SLACK_DAYS = 1;
 

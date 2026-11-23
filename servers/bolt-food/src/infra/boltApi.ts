@@ -29,9 +29,10 @@ const HISTORY_PATH = "/deliveryClient/getOrderHistory";
 const DETAILS_PATH = "/deliveryClient/v2/getOrderDetails";
 
 /**
- * Measured 2026-09-10: getOrderDetails throttled ~23% of calls at four workers
- * with a 60 ms gap, and none serially at 350 ms. So details go one at a time,
- * at least this far apart. getOrderHistory at page_size=50 was never throttled.
+ * getOrderDetails throttles about 23% of calls when four run at once with a
+ * 60 ms gap, and none when they go one at a time 350 ms apart (tried
+ * 2026-09). So details go one at a time, at least this far apart.
+ * getOrderHistory at page_size=50 was not throttled.
  */
 export const DETAIL_GAP_MS = 350;
 const PAGE_SIZE = 50;
@@ -112,7 +113,7 @@ export const makeBoltApi = (credentials: () => Promise<Credentials>, options: Bo
     return fail(apiError(200, `${path}: ${envelope?.message ?? "no message"}`, envelope?.code));
   };
 
-  /** Detail calls only; the history was never throttled. */
+  /** Detail calls only; the history is not throttled. */
   const paced = makePacer(detailGapMs, { now, ...sleep });
 
   return {

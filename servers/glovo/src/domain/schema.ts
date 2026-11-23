@@ -2,8 +2,8 @@
  * The Glovo customer API payloads, as far as this server reads them.
  *
  * Every field is optional because none of it is a published contract: these are
- * the JSON shapes the web app (v1.2718.0, API version 14) receives, captured
- * in 2026. A field that disappears must degrade a receipt, not crash it.
+ * the JSON shapes the web app (v1.2718.0, API version 14) received when they were
+ * captured in 2026. A field that disappears must degrade a receipt, not crash it.
  *
  * Deliberately NOT modelled: `points` (the pickup and delivery addresses, with
  * the courier's door notes in `details`), `courier` and `attachments`. They are
@@ -41,7 +41,7 @@ export type RawPaymentLeg = {
   readonly type?: string;
   readonly provider?: string | null;
   readonly text?: string | null;
-  /** Always null in every payload measured; the amount lives in `text`. */
+  /** Always null in every payload seen; the amount lives in `text`. */
   readonly amount?: unknown;
 };
 
@@ -68,7 +68,7 @@ export type RawDetails = {
   readonly storeName?: string | null;
   readonly vertical?: string | null;
   readonly refunded?: boolean | null;
-  /** Always null in every payload measured: Glovo keeps no order-placed time. */
+  /** Always null in every payload seen: Glovo keeps no order-placed time. */
   readonly creationTime?: number | null;
   readonly scheduledTime?: number | null;
   readonly currentStatus?: { readonly type?: string | null; readonly creationTime?: number | null } | null;

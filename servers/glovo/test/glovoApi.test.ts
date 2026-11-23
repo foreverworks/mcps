@@ -48,7 +48,7 @@ describe("makeGlovoApi", () => {
     expect(headersOf(f.calls.find((c) => c.path === LIST)?.init ?? {})).toMatchObject({ authorization: "access-jwt" });
   });
 
-  // Glovo answers 403 to /oauth/refresh when this set differs from the web app's (2026-11-07 and again 2026-11-18).
+  // Glovo answers 403 to /oauth/refresh when this set differs from the web app's (as of 2026-11).
   const APP_SET = {
     accept: "application/json, text/plain, */*",
     "accept-language": "en",

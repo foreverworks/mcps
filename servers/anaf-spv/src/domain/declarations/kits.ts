@@ -15,7 +15,7 @@
  *   declares 2022's income.
  * - D100, D300 and D112 have one package for many periods: the validator
  *   picks the rules of the XML's period from a table inside it (read
- *   2026-10-22 from the jars; measured: the D112 package refuses a 12.2024
+ *   2026-10-22 from the jars; the D112 package refuses a 12.2024
  *   XML in the 07.2026 namespace and names the one that period takes). Their
  *   jars are the same bytes as the ones update5/versiuni.xml lists as current.
  */
@@ -43,7 +43,7 @@ export const KITS = {
     year(2022, "D212_20220301.zip", "2022-03-01"),
     year(2023, "D212_20231002.zip", "2023-10-02"),
     year(2024, "D212_20240708.zip", "2024-07-08"),
-    // The same bytes as update5's current D212_40 (measured 2026-10-18). 2026 has no soft J yet, only ANAF's web app.
+    // The same bytes as update5's current D212_40 (as of 2026-10-18). 2026 has no soft J yet, only ANAF's web app.
     year(2025, "D212Validator_01082025.zip", "2025-08-01", { version: "J13.0.1, PDF P10.0.0" }),
   ],
   D100: [

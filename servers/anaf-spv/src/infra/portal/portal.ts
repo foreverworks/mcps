@@ -29,7 +29,7 @@ const FORM_URLENCODED = { "content-type": "application/x-www-form-urlencoded" };
 /**
  * SPV's sign-in, an F5 access policy at /my.policy: the user name and
  * password, then the code SPV e-mails, both posted to the same address with
- * `vhost=standard`. The code goes in the field named `password`, as measured.
+ * `vhost=standard`. The code goes in the field named `password`, as SPV's own page does.
  * A post that SPV accepts redirects away from /my.policy; one it refuses
  * renders the form again with its reason.
  */

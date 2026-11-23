@@ -11,9 +11,9 @@
  * snapshot in openapi/, and runs openapi-typescript over it into
  * src/domain/generated/.
  *
- * mfinante.gov.ro resets connections from outside Romania (measured
- * 2026-09-28). ANAF_SPEC_MIRROR prefixes every URL,
- * so an Internet Archive copy can stand in:
+ * mfinante.gov.ro resets connections from outside Romania (as of
+ * 2026-09). ANAF_SPEC_MIRROR prefixes every URL, so an Internet Archive copy
+ * can stand in:
  *
  *   ANAF_SPEC_MIRROR=http://web.archive.org/web/2025id_/ npm run gen:types ...
  *

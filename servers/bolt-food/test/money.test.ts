@@ -10,7 +10,7 @@ describe("money", () => {
   });
 
   it("keeps missing distinct from zero", () => {
-    // An absent value used to become 0, so an order with no total_price read as
+    // An absent value must not become 0, or an order with no total_price would read as
     // a free order. Only a real zero is zero.
     expect(toMinor(undefined)).toBeUndefined();
     expect(toMinor(null)).toBeUndefined();

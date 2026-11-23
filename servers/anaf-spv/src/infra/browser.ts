@@ -6,8 +6,8 @@ import type { Cookies } from "../domain/session.js";
 /**
  * A browser just big enough for SPV: one host, cookies, redirects followed by
  * hand, no JavaScript. Everything SPV does in the page's script is replayed
- * here as the form posts it sends (measured: the sign-in, the
- * message list, a download and a request each work with no script at all).
+ * here as the form posts it sends (the sign-in, the message list, a
+ * download and a request each work with no script at all).
  *
  * Cookies are kept by name with their path, because SPV sets one under
  * /SNMD; a session is nothing but these cookies (F5's MRHSession and

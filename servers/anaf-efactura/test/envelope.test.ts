@@ -11,10 +11,9 @@ describe("handled", () => {
   });
 
   it("carries ANAF's XML inside the result rather than as the result", async () => {
-    // The envelope used to pass a bare string through verbatim, for tools that
-    // handed back ANAF's XML. Nothing does that now: upload_invoice and
-    // upload_status are read into a verdict and keep the document under `raw`,
-    // so every tool returns an object and the special case was dead.
+    // upload_invoice and upload_status read ANAF's XML into a verdict and keep
+    // the document under `raw`, so every tool returns an object and the
+    // envelope has no case for a bare string.
     const out = payload(await handled(async () => ({ accepted: true, raw: '<header index_incarcare="4321"/>' }))());
     expect(out["raw"]).toBe('<header index_incarcare="4321"/>');
   });

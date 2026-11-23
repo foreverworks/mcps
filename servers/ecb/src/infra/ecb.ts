@@ -18,10 +18,10 @@ import { ratesIn } from "./xml.js";
  * kept five minutes. The big one is read only for a day older than the 90-day
  * file reaches, whose rates do not change, so it is kept a day; a window that
  * runs on to today takes its newest fixings from the small files, never from
- * this one (app/usecases/fixings.ts). Measured on the 2026-11-13 file (7,136
- * fixings, 221,992 rates): about 0.25 s to parse and 18 MB of heap for the
- * parsed document once the text is released, so one copy is kept and nothing
- * is cached per query.
+ * this one (app/usecases/fixings.ts). The history parses in about 0.25 s and
+ * holds about 18 MB of heap once the text is released (7,136 fixings and
+ * 221,992 rates on 2026-11-13), so one parsed copy is kept and nothing is
+ * cached per query.
  */
 export const ECB_BASE = "https://www.ecb.europa.eu/stats/eurofxref";
 export const USER_AGENT = "mcps-ecb/1.0 (+https://github.com/foreverworks/mcps)";

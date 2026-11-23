@@ -38,9 +38,9 @@ export type Endpoints = { readonly [K in keyof typeof ANAF]: string };
  *
  * - validare, transformare: the same operations as `api.anaf.ro/prod/FCTEL/rest`
  *   (validare.html, xmltopdf.html), which answers 401 without a bearer token.
- *   Measured 2026-09-30: the public host validates and converts without one.
+ *   The public host validates and converts without one (as of 2026-09).
  * - signature: /api/validate/signature (validaresemnatura.html), ANAF's own
- *   check of its seal on an invoice. Measured 2026-09-30: public as well.
+ *   check of its seal on an invoice, public as well (as of 2026-09).
  * - vatRegistry: PlatitorTvaRest v9, per ANAF's doc_WS_V9.txt
  *   (static.anaf.ro/static/10/Anaf/Informatii_R/Servicii_web/doc_WS_V9.txt):
  *   POST, at most 100 CUIs a request, at most one request a second.

@@ -31,7 +31,7 @@ export const validationTarget = (reading: InvoiceReading): { readonly standard: 
 export type Finding = { readonly rule?: string; readonly location?: string; readonly text: string };
 
 /**
- * ANAF writes its findings as prose in these shapes, all seen on 2026-09-30
+ * ANAF writes its findings as prose in these shapes, all seen in 2026-09
  * (the first three live, the last in validare.html's own examples):
  *
  * - a Schematron rule, as `key=value` pairs, the text last:

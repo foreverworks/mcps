@@ -3,7 +3,7 @@ import { inflateSync } from "node:zlib";
 /**
  * The files embedded in a PDF (`/Type /EmbeddedFile` streams), as
  * DUKIntegrator's PDF step attaches the declaration's XML: one stream,
- * FlateDecode, its `/Length` often an indirect object (measured: a PDF it
+ * FlateDecode, its `/Length` often an indirect object (a PDF it
  * makes and a filed one both carry the source XML byte for byte). Enough of
  * PDF for that and nothing more.
  */

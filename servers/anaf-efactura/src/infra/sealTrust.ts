@@ -6,7 +6,7 @@ import { X509Certificate } from "node:crypto";
  *
  * The certificate inside a seal proves nothing on its own: anyone can make a
  * key pair and sign. What makes it ANAF's is who ISSUED that certificate and
- * to whom. Both seal certificates seen on 2026-09-30 ("Ministerul Finantelor
+ * to whom. Both seal certificates seen in 2026-09 ("Ministerul Finantelor
  * Publice", valid 2025-11-19..2027-11-19, and "Ministerul Finantelor",
  * 2025-12-05..2027-12-05) name organizationIdentifier 25886108 and were
  * issued by Trans Sped's qualified electronic seal CA, below.
@@ -22,7 +22,7 @@ import { X509Certificate } from "node:crypto";
  *
  * Not checked locally: revocation. The CRL and OCSP responder are Trans
  * Sped's (transsped.ro), outside the service's egress, and a revoked seal of
- * the Ministry of Finance would be national news before it was an edge case.
+ * the Ministry of Finance is not a case to expect.
  */
 export const SEAL_ORGANIZATION_IDENTIFIER = "25886108";
 

@@ -4,9 +4,9 @@
  *
  * Glovo sends every amount as a display STRING in Romanian number format:
  * "312,47 RON", "1.234,56 RON", "-64,20 RON", and "No cost" (ro "Fără costuri")
- * for a free delivery, "GRATUIT" (en "Free") for a free product line. They are parsed digit by digit into an integer and stay
- * one until they are printed, because a card row only joins to an order on
- * exact equality.
+ * for a free delivery, "GRATUIT" (en "Free") for a free product line. They are
+ * parsed digit by digit into an integer and stay one until they are printed,
+ * because a card row only joins to an order on exact equality.
  */
 
 export type Amount = { readonly minor: number; readonly currency?: string };

@@ -14,9 +14,10 @@ import { inScope, namespaceOf, splitName, type XmlAttribute, type XmlElement, ty
  *   is visibly used and not already declared above in the output.
  *
  * ANAF declares the inclusive one, and its seals confirm that is what it
- * signs. The output is the same as the exclusive form for them. lxml's C14N of a SignedInfo cut out of its
- * document adds `xmlns=""` to DigestMethod, which is why an earlier reading
- * concluded ANAF signed the exclusive form; it does not.
+ * signs. The output is the same as the exclusive form for them. lxml's C14N of
+ * a SignedInfo cut out of its document adds `xmlns=""` to DigestMethod, which
+ * can make the signature look as if it were made over the exclusive form; it
+ * was not.
  */
 export type C14nMode = "inclusive" | "exclusive";
 

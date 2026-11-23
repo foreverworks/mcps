@@ -34,7 +34,7 @@ export const asApiFailure = (failure: HttpFailure): never => {
 };
 
 const BAD_REQUEST = "bad_request";
-/** Measured 2026-11-18: a made-up plain token gets 401 invalid_token, one still wrapped in quotes gets 400 bad_request. */
+/** Glovo answers a made-up plain token with 401 invalid_token, and one still wrapped in quotes with 400 bad_request (as of 2026-11). */
 const BAD_REQUEST_HINT = " (Glovo answers this to a token that is not a plain JWT, such as one copied with its surrounding quotes)";
 
 /**
