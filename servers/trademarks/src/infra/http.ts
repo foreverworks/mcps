@@ -6,7 +6,7 @@ import { driftError, fail, inputError } from "../domain/errors.js";
  * The registers' side of the kit's HTTP client (packages/mcp-kit, http.ts):
  * which answers mean "later", the failure each outcome becomes, and the pace.
  * Every request here is a search or a lookup, so each is sent as idempotent
- * and a 5xx or a dropped connection is simply tried again.
+ * and a 5xx or a dropped connection is tried again.
  *
  * Both registers are public services run by public offices for people, so
  * the pace is set well under anything that could read as load: one request at
@@ -75,7 +75,7 @@ export const makeRegisterHttp = (policy: RegisterHttpPolicy, { fetch: injected, 
     isRetryable: (status) => status === 429 || status >= 500,
     fail: failureFor(policy),
     attempts: 3,
-    // A search answers in under a second measured (2026-10-05); twenty is a hung connection.
+    // A search answers in about a second; twenty is a hung connection.
     timeoutMs: 20_000,
     headers: { "user-agent": USER_AGENT, accept: "application/json", ...policy.headers },
     fetch: (input, init) => pace(() => send(input, init)),

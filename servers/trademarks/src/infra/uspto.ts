@@ -10,8 +10,8 @@ import { usptoAnswer, type UsptoAnswer } from "./uspto/schema.js";
 /**
  * The US register through the search backend of USPTO's own Trademark Search
  * page (tmsearch.uspto.gov, its configuration.json names the base). USPTO
- * documents no search API: TSDR answers by serial number only and needs a key
- * from an ID.me-verified account, and the Open Data Portal offers bulk files.
+ * documents no search API: TSDR answers by serial number only, and the Open
+ * Data Portal offers bulk files.
  * This backend answers a plain request without a key, and USPTO's terms ask
  * only that nobody load its servers ("unusually high numbers of database
  * accesses") or bulk-download through them, which one paced request per name
