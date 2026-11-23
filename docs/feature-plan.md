@@ -5,6 +5,9 @@ not to build and why, and how to ask for something. It rests on a comparison
 with the strongest published MCP servers in each domain, made in October 2026
 from their own code and documentation ([the list](#servers-we-compared-with)).
 
+What each server does today is in its own README. This page covers only what
+is not built.
+
 Nothing here is scheduled. A feature is built when someone needs it, so the way
 to move an item up is to say that you do ([how to ask](#how-to-ask-for-something)).
 
@@ -26,7 +29,7 @@ Two ideas are held back by a design question, not only by demand.
   Access, `aac run` ([README](https://github.com/bitwarden/agent-access/blob/main/README.md));
   1Password's server ([docs](https://www.1password.dev/environments/mcp-server.md)).
 
-Everything below is missing only because nobody has asked for it yet.
+Everything in this table is missing only because nobody has asked for it yet.
 
 | Server | What it would do | Who has it |
 |---|---|---|
@@ -137,6 +140,13 @@ look again, and each row says what would change it.
   already issued. It e-mails only at issue, which `create_invoice` takes as
   `sendEmail` (read against [its API](https://www.oblio.eu/api) and its PHP,
   JS, Python and Go SDKs in October 2026).
+- **Each new grant or outside host is a choice, not a default.** The servers
+  ask for the least access a tool needs, and name every outside host a server
+  calls. The ones added so far: Google Tasks, People and Meet scopes for the
+  Google server; an App Store Connect key and a Google Play service account
+  for app-stores; a USPTO API key for the trademark history tools; and
+  `api.pwnedpasswords.com` for bitwarden's exposed-password check, which sends
+  only five characters of a password's hash.
 - **A new dependency is weighed against what it brings in.** Porkbun's 0.52.0
   adds `@x402/core`, `@x402/evm` and `viem` though the tools that use them are
   left out; `rag` uses `pg` and `pg-connection-string` because a database has

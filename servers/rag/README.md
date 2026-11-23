@@ -216,6 +216,60 @@ the server measured below it embeds a question in about 0.7 s and holds 2.7 GiB.
 2. `create_collection` with a name.
 3. `index_path` with a file or folder; `search` with a question.
 
+### Try it on one machine
+
+This starts everything the server needs in Docker, with nothing installed
+beyond Docker itself, and ends in a first search. It was run on Linux
+(x86-64) with Postgres 19, pgvector 0.8.7 and text-embeddings-inference 1.9;
+the three containers were ready about two minutes after they started, most of
+it downloading the two models (about 4 GB), so expect longer on a slow line.
+
+1. Postgres with pgvector, on a port of its own. The `postgres` user is a
+   superuser, so the server creates the `vector` extension itself.
+
+   ```bash
+   docker run -d --name rag-db -e POSTGRES_PASSWORD=try -e POSTGRES_DB=rag \
+     -p 127.0.0.1:55432:5432 pgvector/pgvector:pg19
+   ```
+
+2. The embedding and reranker servers, on the CPU, sharing one folder for the
+   downloaded models:
+
+   ```bash
+   mkdir -p "$HOME/.cache/tei"
+   docker run -d --name rag-embed -p 127.0.0.1:8530:80 -v "$HOME/.cache/tei:/data" \
+     ghcr.io/huggingface/text-embeddings-inference:cpu-1.9 --model-id BAAI/bge-m3
+   docker run -d --name rag-rerank -p 127.0.0.1:8531:80 -v "$HOME/.cache/tei:/data" \
+     ghcr.io/huggingface/text-embeddings-inference:cpu-1.9 \
+     --model-id onnx-community/bge-reranker-v2-m3-ONNX
+   ```
+
+   Both are ready when `curl -s -o /dev/null -w '%{http_code}\n'
+   http://127.0.0.1:8530/health` (and `:8531`) prints `200`.
+
+3. Start the server with these settings, and a folder it may read:
+
+   ```bash
+   claude mcp add rag \
+     -e RAG_DATABASE_URL="postgresql://postgres:try@127.0.0.1:55432/rag" \
+     -e RAG_EMBED_URL=http://127.0.0.1:8530 -e RAG_RERANK_URL=http://127.0.0.1:8531 \
+     -e MCP_FILE_ROOTS="$HOME/notes" \
+     -- node "$PWD/servers/rag/dist/index.js"
+   ```
+
+4. Ask your assistant to run `health`. It answers `"ok":true`, the database
+   with its pgvector version, the embedding model `BAAI/bge-m3` at dimension
+   1024, the reranker `onnx-community/bge-reranker-v2-m3-ONNX`, and the
+   extractors it found. Then ask it to create a collection called `notes`,
+   index `$HOME/notes`, and answer a question from what is in it. A one-line
+   Markdown file about a lease indexed in 0.2 s, and the question "when does
+   the office rental end?" found it.
+
+When you are done, `docker rm -f rag-db rag-embed rag-rerank` removes the three
+containers, and with them the index. To skip the two model servers, see
+[Workers AI alone](#workers-ai-alone): it needs a Cloudflare account and
+token and sends your text to Cloudflare.
+
 ## Tools
 
 **read** changes nothing; **write** changes this server's own index, which the

@@ -28,7 +28,7 @@ export type Embedder = {
 /**
  * An embedding service elsewhere serving the model a local endpoint serves,
  * used to index a collection set to it. A question is embedded by the query provider
- * (local unless the server is set to ask the remote one).
+ * (local by default; Cloudflare when RAG_QUERY_PROVIDER says so or no local endpoint exists).
  */
 export type RemoteEmbedder = {
   readonly provider: RemoteProvider;

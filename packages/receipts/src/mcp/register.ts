@@ -10,9 +10,9 @@ import type { ReceiptTools, Zoned } from "./tools.js";
 /**
  * The whole tool surface of a receipts server, registered in this order:
  * health, list_orders (the app's own), get_receipt, get_receipts,
- * match_card_charges, search_items, export_items, order_stats. A client's
- * tools/list shows them in this order. Clients call these by name and argument; each
- * server's test/tools.snapshot.json holds them.
+ * match_card_charges, search_items, export_items, order_stats (a
+ * served tools/list shows them by name, because the guard sorts them). Clients call
+ * these by name and argument; each server's test/tools.snapshot.json holds them.
  */
 export const registerReceiptTools = <D extends Zoned, E extends object>(server: McpServer, deps: D, tools: ReceiptTools<D, E>): void => {
   const handled = makeHandled(tools.vocabulary);

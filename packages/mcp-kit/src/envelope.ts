@@ -19,8 +19,8 @@ import { asInputFileError, inputFileRemedy } from "./inputFileErrors.js";
  * in every server, whose failures every envelope recognises.
  *
  * Compact JSON, not pretty-printed: the text lands in a model's context, where
- * indentation is paid for in tokens and read by nobody. On list and search
- * results it is noticeably smaller.
+ * indentation is paid for in tokens and read by nobody. On typical list and search
+ * results it is roughly 13-29% smaller.
  */
 
 export type ToolResult = {

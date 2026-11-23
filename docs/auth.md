@@ -189,10 +189,10 @@ trusts an identity header must be reachable only through the proxy.
 | Proxy | MCP-aware? | Notes |
 |---|---|---|
 | [Tailscale `serve`](https://tailscale.com/kb/1312/serve) | identity headers, no OAuth | adds `Tailscale-User-Login`, `-Name`, `-Profile-Pic`, strips spoofed copies; none for tagged devices or Funnel; pairs with A1 or a header-trusting mode |
-| [tsidp](https://github.com/tailscale/tsidp) | yes, pre-1.0 | Tailscale's OIDC/OAuth server: DCR behind `allow_dcr`, RFC 8693 token exchange; CIMD not documented |
+| [tsidp](https://github.com/tailscale/tsidp) | yes, pre-1.0 | Tailscale's OIDC/OAuth server: DCR behind `allow_dcr`, RFC 8693 token exchange; CIMD not checked |
 | [Tailscale Aperture](https://www.tailscale.com/docs/aperture/mcp-server) | gateway | GA 2026-08-26; tailnet identity, deny by default; upstream by static token, per-user OAuth or DCR |
 | [Pomerium](https://www.pomerium.com/docs/capabilities/mcp/reference) | yes, since v0.30.0 | the AS for MCP clients (CIMD by domain); upstream OAuth per user, the token injected as `Bearer`, a signed `X-Pomerium-Assertion` |
-| [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/) | yes | "Managed OAuth": Access as the AS (RFC 8414 and 9728, DCR), `Cf-Access-Jwt-Assertion` to validate; [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/) with service tokens; CIMD not documented; traffic through Cloudflare |
+| [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/) | yes | "Managed OAuth": Access as the AS (RFC 8414 and 9728, DCR), `Cf-Access-Jwt-Assertion` to validate; [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/) with service tokens; CIMD not checked; traffic through Cloudflare |
 | [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy/issues/3167) | no | v7.15.5 answers 403 without `WWW-Authenticate`; [PR #3488](https://github.com/oauth2-proxy/oauth2-proxy/pull/3488) (RFC 9728, DCR) open |
 | Others | yes | [Docker MCP Gateway](https://github.com/docker/mcp-gateway), [Microsoft MCP Gateway](https://github.com/microsoft/mcp-gateway) (Entra ID roles), [Agent Router](https://theagentrouter.ai/docs/capabilities/mcp/) (formerly Envoy AI Gateway: JWT validation, tool rules) |
 
