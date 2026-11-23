@@ -5,9 +5,9 @@
  *   npm run build && npx tsx scripts/smoke-drive.ts
  *
  * Nearly read-only. It creates one throwaway folder, plans a move without
- * applying it, and trashes the folder again, because a move tool that was never exercised against
- * the real API is a claim rather than a result — and the trash is where the
- * evidence goes, not a permanent delete.
+ * applying it, and trashes the folder again: a move tool that was never run
+ * against the real API is a claim rather than a result. The trash keeps the
+ * evidence for 30 days; nothing is deleted for good.
  */
 import { connectSmoke, toolJson } from "@foreverworks/mcp-kit";
 

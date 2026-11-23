@@ -26,7 +26,7 @@ export const tabDocument = (doc: RawDocument, selector: string): { readonly docu
 
 const isObject = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === "object" && value !== null && !Array.isArray(value);
 
-/** The requests with every Location and Range naming the tab; unchanged for the first tab read the old way (no id). */
+/** The requests with every Location and Range naming the tab; unchanged for the first tab, which is read without a tab id. */
 export const inTab = (requests: readonly DocsRequest[], tabId: string): readonly DocsRequest[] =>
   tabId === ""
     ? requests

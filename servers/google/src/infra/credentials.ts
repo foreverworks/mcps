@@ -72,8 +72,8 @@ export const readClient = async (path: string): Promise<ClientConfig | undefined
 
 /**
  * Write a grant where the server reads it: the directory 0700, the file 0600
- * and written atomically, the file it replaces kept as `.bak` (0600), as the
- * consent scripts did. No access token is written; the server mints its own.
+ * and written atomically, the file it replaces kept as `.bak` (0600). No
+ * access token is written; the server mints its own.
  */
 export const saveCredentials = async (path: string, grant: NewGrant): Promise<void> => {
   await mkdir(dirname(path), { recursive: true, mode: 0o700 });

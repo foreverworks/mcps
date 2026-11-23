@@ -3,7 +3,7 @@ import type { Entry } from "./entries.js";
 /**
  * What a move would do, decided before anything is written.
  *
- * Drive's API has no "move" — a move is `files.update` with `addParents` and
+ * Drive's API has no "move": a move is `files.update` with `addParents` and
  * `removeParents`, and it will happily create a second file of the same name
  * beside the first, because Drive keys on id and not on path. So the checks
  * that a filesystem does for free have to be done here, and the plan is

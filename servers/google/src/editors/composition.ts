@@ -13,9 +13,9 @@ import { type Config, credentialsPathOf, defaultOf, discover, type Fs, type Gran
 
 /**
  * Docs, Sheets and Slides count their quotas per minute, like Drive, so a
- * rate-limit refusal waits at least this long: the general curve (1s, 2s, 4s,
- * 8s) spends every attempt before the bucket refills. Drive measured it
- * (drive/composition.ts); these three have the same per-minute buckets.
+ * rate-limit refusal waits at least this long: the general backoff curve (1s,
+ * 2s, 4s, 8s) spends every attempt before the bucket refills. Drive uses the
+ * same floor (drive/composition.ts).
  */
 const QUOTA_FLOOR_MS = 22_000;
 

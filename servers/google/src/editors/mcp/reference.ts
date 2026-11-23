@@ -28,8 +28,8 @@ const handled = makeHandled({ asAppError, remedyFor });
  * The reference the batch tools point to: the API's own schema, read from the
  * Discovery document they check requests against, so what it says a request
  * takes is exactly what the check accepts. No account, no network. It names
- * only the editors loaded (GOOGLE_TOOLSETS), with all three it reads as it
- * always has, and with none it is not registered.
+ * only the editors loaded (GOOGLE_TOOLSETS), all three by default, and with
+ * none it is not registered.
  */
 export const registerReference = (server: McpServer, apis: readonly EditorApi[] = EDITOR_APIS): void => {
   const words = apis.map((api) => WORDS[api]);

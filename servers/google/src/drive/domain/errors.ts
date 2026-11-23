@@ -3,8 +3,7 @@ import { type AppError, describeThrownWith, QUOTA_REMEDY, reconsent } from "../.
 /**
  * Drive's half of the failure vocabulary: the remedies. The failures
  * themselves are Google's and live in the shared module, re-exported here so
- * nothing under drive/ has to know which half it is importing. `ambiguous`,
- * `not_found` and `quota` joined that module with this product.
+ * nothing under drive/ has to know which half it is importing.
  */
 export * from "../../domain/errors.js";
 

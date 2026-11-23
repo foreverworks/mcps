@@ -6,8 +6,8 @@ import type { Matcher } from "../domain/find.js";
 /**
  * A regular expression, run where it cannot stall the process: in a fresh V8
  * context with a time limit, which interrupts a backtracking pattern mid-match
- * (measured: /(a+)+$/ on 40 a's and a "!" stopped at the 300 ms limit). Every
- * paragraph is matched in one run, so the limit is for the whole search.
+ * (`/(a+)+$/` against a long run of a's ending in "!" is the classic case).
+ * Every paragraph is matched in one run, so the limit is for the whole search.
  */
 const LIMIT_MS = 1500;
 

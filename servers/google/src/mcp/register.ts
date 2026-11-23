@@ -21,12 +21,10 @@ import { editorApisOf } from "./toolsets.js";
  * The tool surface of the loaded toolsets (GOOGLE_TOOLSETS; every one by
  * default): the account and consent tools the products share, then each
  * loaded product's own. A product not loaded registers nothing, so its tools
- * are absent from tools/list rather than listed and failing. Gmail's and
- * Calendar's names are kept as they were. Drive's were generic when it was a
- * server of its own (`list`, `move`, `trash`, the last one taken by Gmail), so
- * here they name what they act on: `list_folder`, `move_file`, `trash_file`.
- * Docs, Sheets and Slides were born here and name their object the same way
- * (`read_document`, `read_rows`, `read_deck`).
+ * are absent from tools/list rather than listed and failing. Tool names say
+ * what they act on: Drive's are `list_folder`, `move_file` and `trash_file`
+ * (a bare `trash` would clash with Gmail's), and the editors' are
+ * `read_document`, `read_rows` and `read_deck`.
  */
 export const registerAll = (server: McpServer, registries: Registries, loaded: readonly Toolset[] = ALL_TOOLSETS): void => {
   const has = (toolset: Toolset): boolean => loaded.includes(toolset);

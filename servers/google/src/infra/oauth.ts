@@ -26,8 +26,8 @@ export const makeTokenProvider = (loadCreds: () => Promise<Credentials>, store: 
   });
   /**
    * The scope the live token carries, as the issuer stated it at mint time.
-   * An entry written by an older build has none recorded, and one forced
-   * refresh fills it in rather than guessing.
+   * A cached entry with no scope recorded gets it from one forced refresh
+   * rather than a guess.
    */
   const scope = async (): Promise<string> => {
     const known = (await source.current()).scope;

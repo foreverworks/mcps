@@ -73,5 +73,5 @@ const CONVERSIONS: Readonly<Record<string, string>> = {
 /** The Google type a file of this type converts to, or undefined when it does not convert. */
 export const conversionOf = (sourceMime: string): string | undefined => CONVERSIONS[sourceMime];
 
-/** A converted file is named as Drive names one converted by hand: without the Office extension it no longer has. Any other dot stays. */
+/** A converted file is named as Drive names one converted by hand: without the Office extension, which the converted file does not keep. Any other dot stays. */
 export const convertedName = (name: string): string => name.replace(/\.(docx|doc|xlsx|xls|csv|pptx|ppt)$/i, "") || name;

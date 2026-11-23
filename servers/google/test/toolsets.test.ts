@@ -1,6 +1,6 @@
 /**
- * GOOGLE_TOOLSETS: unset or `all` serves what the server always served (the
- * snapshot in tools.test.ts, and the instructions below, word for word); a
+ * GOOGLE_TOOLSETS: unset or `all` serves every tool (the snapshot in
+ * tools.test.ts, and the instructions below, word for word); a
  * subset serves only its products' tools, and the instructions, list_accounts
  * and health name nothing else; an unknown name stops the start. No
  * credential and no network: every account points at files that do not exist.

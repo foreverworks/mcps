@@ -93,7 +93,7 @@ const GRANTS: Readonly<Partial<Record<Section, string>>> = { tasks: "for Google 
 export const sectionsOf = (loaded: readonly Toolset[]): readonly Section[] =>
   (Object.keys(SECTIONS) as Section[]).filter((s) => SECTIONS[s].toolsets.some((t) => loaded.includes(t)));
 
-/** list_accounts' description, naming the sections loaded. With every one, it reads as it always has. */
+/** list_accounts' description, naming the sections loaded; with every one it names all of them. */
 const listedDescription = (sections: readonly Section[]): string => {
   const grants = sections.filter((s) => GRANTS[s] !== undefined);
   return [
@@ -106,7 +106,7 @@ const listedDescription = (sections: readonly Section[]): string => {
   ].join(" ");
 };
 
-/** health's description, naming the sections loaded. With every one, it reads as it always has. */
+/** health's description, naming the sections loaded; with every one it names all of them. */
 const checkedDescription = (sections: readonly Section[]): string => {
   const grants = sections.filter((s) => GRANTS[s] !== undefined);
   return [

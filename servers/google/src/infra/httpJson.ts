@@ -56,9 +56,8 @@ export type HttpOptions = {
   readonly service?: string;
   /**
    * The least a rate-limit refusal waits. Drive's quota is PER MINUTE, so the
-   * general curve (1s, 2s, 4s, 8s) spends every attempt before the bucket
-   * refills; measured: the first three calls a fresh client made to Drive
-   * were all refused. 0 elsewhere.
+   * general backoff curve (1s, 2s, 4s, 8s) spends every attempt before the
+   * bucket refills. 0 where the default curve is enough.
    */
   readonly quotaFloorMs?: number;
 };
@@ -83,7 +82,7 @@ export const makeRequest = (tokens: Tokens, { timeoutMs = 30_000, sleep, service
 
 export type Request = HttpRequest;
 
-/** The read path's shape, kept because every read adapter is written against it. */
+/** An authenticated GET that returns the parsed JSON body; the shape every read adapter takes. */
 export const makeGetJson = (tokens: Tokens, options: HttpOptions = {}) => {
   const request = makeRequest(tokens, options);
   return <T>(url: string, query: Query = {}): Promise<T> => request<T>(url, { query });
