@@ -18,7 +18,7 @@ export const formOfLease = (catalog: Catalog, lease: Lease): string => {
 /**
  * Whether a held lease answers this request: a request that names a profile is answered by the lease of
  * that profile's form only (a phone's lease never answers a request for a watch), one that names none by
- * any, as before forms.
+ * any.
  */
 export const answersWant = (catalog: Catalog, want: Want) => (lease: Lease): boolean =>
   want.kind !== "device" || want.profile === undefined || lease.kind !== "device" || formOfLease(catalog, lease) === formOf(catalog, want.profile);

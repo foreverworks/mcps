@@ -278,12 +278,12 @@ the paper and the black of its own column, since a scanner's light is not even
 down the glass.
 
 **Parity.** The model, tables and raster were first built and validated on
-paper in Python and numpy. This port computes the same doubles where numpy's
-order of operations decides them (pairwise summation in a mean, `interp`'s
-exact-knot rule, Python's round-half-even), and solves the least squares by
-Householder QR where numpy calls LAPACK. On a measured calibration, all 420 x
-256 table entries equal the reference's, and the validation sheet's raster is
-byte-identical, made several times faster. `test/correction.test.ts` holds
+paper in Python and numpy. This TypeScript code computes the same doubles where
+numpy's order of operations decides them (pairwise summation in a mean,
+`interp`'s exact-knot rule, Python's round-half-even), and solves the least
+squares by Householder QR where numpy calls LAPACK. On a measured calibration,
+all 420 x 256 table entries equal the reference's, and the validation sheet's
+raster is byte-identical. `test/correction.test.ts` holds
 the tables to the reference's for an invented calibration, `test/pwg.test.ts`
 the encoder to the reference encoder's bytes, and `scripts/parity.ts` repeats
 the comparison for any calibration and document.

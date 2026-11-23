@@ -5,8 +5,8 @@
  * counted. Only 8-bit sGray pages are written here, which is what a mono
  * printer's `pwg-raster-document-type-supported` offers as `sgray_8`.
  *
- * The encoder makes the same bytes as the reference encoder this server's
- * correction was validated with, so a page can be compared byte for byte; the
+ * The encoder makes the same bytes as the Python reference encoder the
+ * correction was first validated with, so a page can be compared byte for byte; the
  * decoder reads any 8-bit single-colour PWG back, for round trips and checks.
  */
 

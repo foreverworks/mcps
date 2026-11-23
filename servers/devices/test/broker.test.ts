@@ -657,7 +657,7 @@ describe("variants: one emulator slot, several system images", () => {
     const r = await broker.acquire({ want: next, session: A, purpose: "api 35" });
     expect(r).toMatchObject({ status: "granted", resource: "emulator-5554", profile: "android-next", state: "booting", address: { env: { ANDROID_SERIAL: "emulator-5554", ANDROID_ADB_SERVER_PORT: "5037" } } });
     expect(world.calls).toEqual(["start phone1next"]);
-    // No profile: today's answer, the next free slot on its own profile.
+    // No profile: the next free slot, on its own profile.
     expect(await broker.acquire({ want: android, session: B, purpose: "any" })).toMatchObject({ status: "granted", resource: "emulator-5556", profile: "android-phone" });
     expect(world.calls).toEqual(["start phone1next", "start phone2"]);
     const s = (await broker.status({ session: A })) as Shown;
@@ -738,7 +738,7 @@ describe("variants: one emulator slot, several system images", () => {
       error: { kind: "input", message: `session session-a-000 holds emulator-5554 on android-phone (lease ${first.lease}), and a session holds one android device at a time: release it, then ask for android-next` },
     });
     expect(world.calls).toEqual(["start phone1"]);
-    // Its own profile, or none: the lease it holds, as today.
+    // Its own profile, or none: the lease it holds.
     expect(await broker.acquire({ want: { ...android, profile: "android-phone" }, session: A, purpose: "a" })).toMatchObject({ status: "held", lease: first.lease, profile: "android-phone" });
     expect(await broker.acquire({ want: android, session: A, purpose: "a" })).toMatchObject({ status: "held", lease: first.lease });
     // Released, the same slot serves the other profile.
@@ -1145,7 +1145,7 @@ describe("a start that fails: the unit of a slot started for a lease fails befor
     const raw = rawBrokerFor(world, DESKTOPS);
     const broker = as(raw, DEFAULT_TENANT);
     await broker.acquire({ want: windows, session: A, purpose: "a windows build" });
-    // An older control command: `win1 failed`, two columns.
+    // A control command that prints two columns: `win1 failed`.
     world.emulators[VM] = "failed";
     world.clock += 61_000;
     await broker.tick();

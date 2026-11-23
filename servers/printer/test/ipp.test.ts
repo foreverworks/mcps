@@ -1,7 +1,7 @@
 /**
- * IPP encoding held to the reference client's bytes (test/fixtures/
- * print-job.request.bin: the Print-Job request the validated scripts sent,
- * for an invented printer), and decoding held to a response assembled here
+ * IPP encoding held to the bytes of an independent reference client
+ * (test/fixtures/print-job.request.bin: its Print-Job request for an
+ * invented printer), and decoding held to a response assembled here
  * value by value, with every syntax a printer answers in, a collection inside
  * a collection among them.
  */

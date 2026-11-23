@@ -21,8 +21,8 @@ const WORD = /^[a-z-]+$/;
 
 /**
  * `<control> status`: one line per emulator or VM the host's control command knows, `<instance> <state>`, or
- * `<instance> <state> <result>` where the result is systemd's for a failed unit. An older control command
- * prints two columns; a line of any other shape is ignored.
+ * `<instance> <state> <result>` where the result is systemd's for a failed unit. A control command may print
+ * only two columns; a line of any other shape is ignored.
  */
 const statusLines = (text: string): readonly { readonly instance: string; readonly state: string; readonly result?: string }[] =>
   text
@@ -137,7 +137,7 @@ const UDID = /^[0-9A-F-]{36}$/i;
 const checkUdid = (udid: string): string => (UDID.test(udid) ? udid : fail(hostError("simulator", `not a UDID: ${udid}`)));
 
 // A Mac with no pairs, or a simctl that cannot list them, answers no pairs: a phone without a watch is
-// shut down, reset and deleted as before.
+// shut down, reset and deleted on its own.
 const LIST_PAIRS = "xcrun simctl list pairs --json 2>/dev/null || echo '{}'";
 
 /**

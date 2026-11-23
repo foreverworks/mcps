@@ -20,8 +20,8 @@ host. There is no account and no key.
 
 - "Get me an Android emulator for the next hour to test the sign-up flow."
 - "Which devices are free right now, and who holds the iPhone simulators?"
-- "Lease an iPhone simulator a Maestro flow can drive, and wait in line if
-  they're all taken."
+- "Lease an iPhone simulator that a Maestro flow (a mobile UI test) can drive,
+  and wait in line if they're all taken."
 - "Hold my emulator while Ana signs in to the test account, then take it
   back."
 - "I'm done with the emulator. Reset it and give it back."

@@ -22,7 +22,7 @@ export const RUNNING = new Set(["active", "activating", "deactivating", "reloadi
 
 const probeAndroidHost = async (deps: Deps, catalog: Catalog, host: Host, now: number): Promise<HostHealth> => {
   // A slot with a probe (an emulator with a door, a VM) is seen through the host's control command (its
-  // unit's state); an older emulator through the adb server its address names (a serial in `device` state).
+  // unit's state); an emulator without one through the adb server its address names (a serial in `device` state).
   const devices = catalog.devices.filter((d) => d.host === host.id);
   const viaUnit = devices.filter((d) => d.probe !== undefined);
   const viaServer = devices.filter((d) => d.probe === undefined && d.adb !== undefined);

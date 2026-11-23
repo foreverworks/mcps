@@ -23,7 +23,7 @@ export type Luts = {
 export type LutOptions = {
   readonly widthPx: number;
   readonly dpi: number;
-  /** Band width; 2 mm made visible steps on paper, 0.5 mm does not. */
+  /** Band width in mm; wider bands (2 mm) show as steps on paper. */
   readonly bandMm?: number;
   readonly whiteBelowPercent?: number;
 };

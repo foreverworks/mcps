@@ -20,7 +20,7 @@ describe("probe parsers", () => {
     expect(parseEmulatorStates("pool1 active\nrm -rf / now\nBad active\n\npool4 failed")).toEqual({ pool1: "active", pool4: "failed" });
   });
 
-  it("reads a failed unit's systemd Result from a third column, and an older control command's two columns as before", () => {
+  it("reads a failed unit's systemd Result from a third column, and accepts a control command's two columns", () => {
     const status = "bato1 failed timeout\nwin1 failed\npool1 active\npool2 failed oom-kill\nrm -rf /\npool3 failed Bad\n";
     expect(parseEmulatorStates(status)).toEqual({ bato1: "failed", win1: "failed", pool1: "active", pool2: "failed" });
     expect(parseEmulatorResults(status)).toEqual({ bato1: "timeout", pool2: "oom-kill" });
@@ -30,7 +30,7 @@ describe("probe parsers", () => {
       emulators: { bato1: "failed", win1: "failed", pool1: "active", pool2: "failed" },
       results: { bato1: "timeout", pool2: "oom-kill" },
     });
-    // Two columns only, as every host printed before: states, and no result.
+    // Two columns only: states, and no result.
     expect(parseAndroidProbe("43210000\n@@devices@@\n0.5\n@@devices@@\npool1 active\npool4 failed\n")).toEqual({ memAvailableMiB: 42197, load: 0.5, emulators: { pool1: "active", pool4: "failed" }, results: {} });
   });
 
@@ -174,7 +174,7 @@ describe("simulators on a Mac, over ssh", () => {
     expect(taken.asked.some((c) => c.includes(" pair "))).toBe(false);
   });
 
-  it("creates a phone with no watch as before: one create, no pairs asked", async () => {
+  it("creates a phone with no watch with one create, no pairs asked", async () => {
     const { asked, hosts } = scripted([
       ["list devices", devices()],
       ["list runtimes", runtimes],
@@ -204,7 +204,7 @@ describe("simulators on a Mac, over ssh", () => {
     expect(asked.at(-1)).toBe(`xcrun simctl shutdown ${PHONE} >/dev/null 2>&1; xcrun simctl shutdown ${WATCH} >/dev/null 2>&1; xcrun simctl delete ${PHONE} ${WATCH}`);
   });
 
-  it("acts on a phone with no watch in one call, as before", async () => {
+  it("acts on a phone with no watch in one call", async () => {
     const { asked, hosts } = scripted([["list pairs", pairs()]]);
     await hosts.shutdownSimulator(mac, PHONE);
     expect(asked).toHaveLength(1);
@@ -265,7 +265,7 @@ describe("a host with no ssh target: its control command runs on the broker's ma
     expect(sshed).toHaveLength(1);
   });
 
-  it("goes on over ssh for a host that has a target, with the same command lines as before", async () => {
+  it("goes on over ssh for a host that has a target, with the same command lines", async () => {
     const { sshed, ran, hosts } = wired({ status: "phone1 active\n" });
     await hosts.startEmulator(viaSsh, "phone1");
     await hosts.stopEmulator(viaSsh, "phone1");
@@ -293,7 +293,7 @@ describe("a host with no ssh target: its control command runs on the broker's ma
     await expect(local([process.execPath, "-e", "console.error('no answer from its service'); process.exit(3)"], 10_000)).rejects.toMatchObject({
       error: { kind: "host", host: process.execPath, message: "exit 3: no answer from its service" },
     });
-    // No shell reads the arguments: a metacharacter is just text.
+    // No shell reads the arguments: a metacharacter is plain text.
     expect(await local([process.execPath, "-e", "process.stdout.write(process.argv[1])", "a; echo b"], 10_000)).toBe("a; echo b");
     await expect(local(["/nonexistent/cloud-ctl", "status"], 10_000)).rejects.toMatchObject({ error: { message: expect.stringMatching(/^exit 127:/) } });
   });

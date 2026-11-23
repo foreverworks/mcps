@@ -325,7 +325,7 @@ export const depsFor = (world: World, catalog: Catalog = CATALOG): Deps => ({
     startEmulator: async (_host, instance, key) => {
       if (world.startFails) return fail(hostError("emu-1", "emulator-ctl: no answer from its service"));
       world.calls.push(key === undefined ? `start ${instance}` : `start ${instance} with ${key}`);
-      // As the host's side does: a failed unit is reset before it starts, so status no longer says failed.
+      // As the host's side does: a failed unit is reset before it starts, so status does not report the earlier failure.
       if (world.emulators[instance] === "stopped" || world.emulators[instance] === "failed") world.emulators[instance] = "booting";
       delete world.results[instance];
     },

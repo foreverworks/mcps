@@ -84,7 +84,7 @@ describe("the per-band tables", () => {
         if (d > 0) differing += 1;
       }),
     );
-    // the requirement is within one grey level; the port matches exactly, which a byte-identical raster needs
+    // the requirement is within one grey level; this code matches exactly, which a byte-identical raster needs
     expect(worst).toBeLessThanOrEqual(1);
     expect(differing).toBe(0);
   });
