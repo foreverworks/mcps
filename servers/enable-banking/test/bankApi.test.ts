@@ -36,9 +36,9 @@ describe("getTransactions pagination", () => {
   });
 
   it("stops on a null continuation key, which is what the last page carries", async () => {
-    // Measured against production: the final response sends an explicit null,
-    // not an absent field. Checking only for undefined sent the string "null"
-    // back as a key and earned a 422 on every complete statement.
+    // The final response sends an explicit null, not an absent field. Echoing
+    // it back as the continuation key would send the string "null", which the
+    // bank refuses with a 422.
     const spy = pages([
       { transactions: [tx(1)], continuation_key: "k1" },
       { transactions: [tx(2)], continuation_key: null },
@@ -93,8 +93,8 @@ describe("the consent calls", () => {
       validUntil: "2030-07-01T12:00:00Z",
       state: "enable-banking",
     });
-    // The body that works in production: no access.accounts (every account),
-    // no explicit booleans.
+    // No access.accounts (which asks for every account) and no explicit
+    // booleans, since balances and transactions default to true.
     expect(sentBody(spy)).toEqual({
       access: { valid_until: "2030-07-01T12:00:00Z" },
       aspsp: { name: "Example Bank", country: "DE" },

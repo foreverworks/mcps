@@ -39,7 +39,7 @@ describe("signJwt", () => {
   });
 
   it("sends the literal issuer the API accepts, and no sub", () => {
-    // Not the application_id: this literal is what the API accepts in production.
+    // Not the application_id: the API accepts this literal.
     const { payload } = parts(signJwt(privateKey, "app-id", NOW));
     expect(payload["iss"]).toBe("enablebanking.com");
     expect(payload["aud"]).toBe("api.enablebanking.com");

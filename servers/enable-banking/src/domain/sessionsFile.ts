@@ -59,14 +59,14 @@ export const entryGaps = (value: unknown): readonly string[] => {
 export const asSessionEntry = (value: unknown): SessionEntry | undefined =>
   entryGaps(value).length === 0 ? (value as SessionEntry) : undefined;
 
-/**
- * The file with one label set to a new entry and every other label carried over
- * exactly as it was parsed, whatever shape an older program left it in.
- */
 /** The file without one label, every other label carried over exactly as it was parsed. */
 export const withoutEntry = (file: Readonly<Record<string, unknown>>, label: string): Readonly<Record<string, unknown>> =>
   Object.fromEntries(Object.entries(file).filter(([key]) => key !== label));
 
+/**
+ * The file with one label set to a new entry and every other label carried over
+ * exactly as it was parsed, whatever shape an older program left it in.
+ */
 export const withEntry = (
   file: Readonly<Record<string, unknown>>,
   label: string,

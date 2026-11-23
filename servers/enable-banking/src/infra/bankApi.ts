@@ -48,8 +48,8 @@ export const makeBankApi = (request: Request, redirectUrl: () => Promise<string>
   startAuth: async (r) => {
     // `access.accounts` is left out on purpose: that is how every account is
     // asked for, and the bank's own consent screen lets the person tick them.
-    // balances and transactions default to true, which is what is wanted and
-    // what the calls that have worked in production never sent explicitly.
+    // balances and transactions default to true, which is what is wanted, so
+    // they are not sent.
     const body: StartAuthorizationRequest = {
       access: { valid_until: r.validUntil },
       aspsp: { name: r.aspspName, country: r.aspspCountry },

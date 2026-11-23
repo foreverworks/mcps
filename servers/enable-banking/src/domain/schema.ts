@@ -4,7 +4,7 @@
  * written here. Type-only: nothing of it runs. The one import in domain/, on
  * purpose.
  *
- * Two adjustments on top of the generated types, both measured, never guessed:
+ * Two adjustments on top of the generated types, both taken from what the API really sends:
  *
  * 1. **An optional field may arrive as `null`, not only absent.** The spec
  *    types `HalTransactions.continuation_key` as a string and its own prose says

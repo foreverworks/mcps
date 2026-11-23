@@ -12,7 +12,7 @@
  * - `defaultNonNullable: false`: a field the schema gives a default stays
  *   optional. openapi-typescript's default would make it required, which on a
  *   request body forces fields (credentials_autosubmit, access.balances) that
- *   the calls working in production have never sent.
+ *   this server leaves to the API's own defaults.
  *
  * Read the diff before committing a regeneration: a field that turned optional
  * is a place where the code has to say what it does without it.
