@@ -34,7 +34,7 @@ one, every sign-in waits for someone to type the code.
 | Node.js 22.19 or newer | `node --version` | Install it. |
 | Java 8 or newer, only to validate declarations | `java -version` | Install it, or skip it: everything else works without it. |
 
-Until the package is on npm, build it from a clone as the README's
+To run a clone instead of the published package, build it as the README's
 [Install](../README.md#from-a-clone) section shows, and use
 `node <clone>/servers/anaf-spv/dist/index.js` wherever this page says `npx`.
 

@@ -3,8 +3,9 @@
 Look up the National Bank of Romania's reference exchange rates from your AI
 assistant: the rate in force on any day since 2005, with the date
 [BNR](https://www.bnr.ro) published it; amounts converted to or from RON;
-several currencies or a window of fixings at once; and the yearly average ANAF
-converts foreign income at in the D212. It only reads: no tool writes or is
+several currencies or a window of fixings at once; and the yearly average that
+ANAF (Romania's tax authority) converts foreign income at in the D212 (the
+annual income declaration, "Declarația unică"). It only reads: no tool writes or is
 `money`. Rates stay BNR's exact text (`4.2440`, never `4.244`).
 
 **You need** nothing: no account and no key. The server reads BNR's public
@@ -101,12 +102,12 @@ it.
 ### The source
 
 BNR publishes static XML at `curs.bnr.ro`, the host its "Curs XML" page names
-(read 2026-10-18): `/nbrfxrates.xml` is the latest fixing, and
+(as of 2026-10): `/nbrfxrates.xml` is the latest fixing, and
 `/files/xml/years/nbrfxrates<year>.xml` every fixing of a year, the current
 one included (about 300 KB). A rate is RON per unit, or per 100 units (its
 `multiplier`) for HUF, JPY, KRW and a few others.
 
-**The old `www.bnr.ro` addresses answer with the HTML home page and status
+**The older `www.bnr.ro` addresses answer with the HTML home page and status
 200**, which a reader that checks only the status takes for a year with no
 rates. Here any answer that is not BNR's rates document fails as `drift`, and
 so does a rate that is not a plain decimal.

@@ -1,11 +1,12 @@
 # <img src="icons/icon.svg" width="36" height="36" alt="ONRC trade register icon"> ONRC trade register MCP server
 
-Follow your filings at Romania's trade register from your AI assistant, on
-[myportal.onrc.ro](https://myportal.onrc.ro): their status in the office's own
-words, the documents in a filing's file, the fee notes, and the invoices with
-what is still outstanding. It only reads: it files, pays and changes nothing
-at ONRC, and has no `money` tools. The one thing it writes is the session it
-holds for you.
+Follow your filings at Romania's trade register from your AI assistant. The
+register is ONRC (Oficiul Național al Registrului Comerțului), and its customer
+portal is [myportal.onrc.ro](https://myportal.onrc.ro). You get each filing's
+status in the office's own words, the documents in its file, the fee notes, and
+the invoices with what is still outstanding. It only reads: it files, pays and
+changes nothing at ONRC, and has no `money` tools. The one thing it writes is
+the session it holds for you.
 
 **You need** a myportal.onrc.ro account you can sign in to in a browser. There
 is no API key, because the portal has no public API: you hand the server your
@@ -160,7 +161,7 @@ field the server depends on. It needs updating; please report the message.
 ## How it works
 
 **The session is yours, held by the server.** The portal signs in through
-Keycloak, whose refresh token lasts as long as the SSO session, so a server
+Keycloak (an open-source sign-in server), whose refresh token lasts as long as the SSO session, so a server
 can hold the session and refresh it. It cannot sign in: that takes the user's
 password, second factor and a captcha, none of which belong in a server. So
 the one manual step is the standard authorization-code flow with PKCE, through
@@ -190,8 +191,9 @@ idle session, which is how to choose `ONRC_KEEPALIVE_MIN`.
 make too. Each entry in a filing's file repeats the signed-in person, identity
 document and personal numeric code included; no answer here carries any of
 it, and a test checks that. The fee notes' and invoices' envelopes were read
-live, but their items were modelled from the portal's code, so their fields
-are all optional and the first live answer is the check (`scripts/smoke.ts`).
+from live answers, but their items are modelled from the portal's code, so
+their fields are all optional and a live answer is the check
+(`scripts/smoke.ts`).
 
 **Dates are Bucharest's**, whatever the host's zone: the server sends the first
 moment of `from` and the last of `to` there as UTC instants, as the portal's
@@ -211,10 +213,11 @@ begins or completes a login itself.
 
 ## Limitations
 
-- **Nothing files anything.** A filing (a mențiune, a capital increase) is a
-  legal act with a fee; when it comes, it will be a `money` tool your client
-  confirms with you, and the application PDF is signed with your qualified
-  certificate, which stays with you.
+- **Nothing files anything.** A filing (a mențiune, which is a change to a
+  company's registered details, or a capital increase) is a legal act with a
+  fee; when it comes, it will be a `money` tool your client confirms with you,
+  and the application PDF is signed with your qualified certificate, which
+  stays with you.
 - **Some of the portal is not reached yet**: the capital increase wizard
   (`social-capital`), `mentions`, `name-reservation`, the certificat
   constatator, a document's bytes (`portal-core-service-download-server`), and
@@ -229,7 +232,7 @@ Searched 2026-10-15. ONRC publishes none, and the portal has no public API (the
 register's company data is offered programmatically only under contract). No
 community server reaches an account on the portal; searches of npm, PyPI,
 GitHub, the MCP Registry and the web found only tools over public company data
-(company search by name or CUI, directors, financials):
+(company search by name or CUI, the tax identification number, plus directors and financials):
 
 - **paianjenul.ro's hosted connector.**
 - **`com.adrianhomelab/leadgen-onrc`** in the MCP Registry.

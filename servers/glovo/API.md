@@ -1,8 +1,8 @@
 # Glovo: notes on the web app's API
 
 Glovo documents none of this. These notes come from watching the signed-in web
-app at https://glovoapp.com (version 1.2718.0 when first captured, 1.2989.0 when the headers were last checked on 2026-11-18, API version 14) and the orders
-it returned. Glovo can change any of it without notice.
+app at https://glovoapp.com (version 1.2989.0 on 2026-11-18, API version 14) and the orders it
+returned. Glovo can change any of it without notice.
 
 ## Client
 
@@ -17,7 +17,7 @@ Every call goes to one host:
   application/json` among them. It answers
   `{accessToken, expiresIn: 1198, refreshToken, tokenType: "bearer"}`.
   **A request whose headers differ from the web app's is answered 403 whatever
-  the token.** Glovo tightened this on 2026-11-07 and again on 2026-11-18.
+  the token.** Glovo's check has grown stricter more than once (as of 2026-11).
 - **The refresh token does not rotate**: the answer carries the same one, still
   valid, so refreshing is safe to repeat and does not sign the browser out. The
   answer is a credential: never log it.

@@ -254,10 +254,10 @@ enforce.
   order under `orders/` in the state folder, written whole by rename so
   processes can share it, 0600 in a 0700 folder because it holds the delivery
   address.
-- **Detail calls go out one at a time, at least 350 ms apart**: in parallel
-  they were throttled often, one at a time at that gap never. Bolt throttles
-  with HTTP 200 and code 1005 in the body; the server treats that as a 429 and
-  backs off 1 s, 2 s, 4 s and so on, six attempts in all.
+- **Detail calls go out one at a time, at least 350 ms apart**: run in
+  parallel, Bolt throttles them often, and at that gap it did not. Bolt
+  throttles with HTTP 200 and code 1005 in the body; the server treats that
+  as a 429 and backs off 1 s, 2 s, 4 s and so on, six attempts in all.
 - **A cold read is two to three orders a second**; stored orders read
   instantly. The history is one call per 50 orders, remembered for five
   minutes.

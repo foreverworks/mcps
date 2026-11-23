@@ -1,16 +1,19 @@
 # <img src="icons/icon.svg" width="36" height="36" alt="ANAF e-Factura icon"> ANAF e-Factura MCP server
 
-Read the invoices your company sent and received through Romania's e-Factura,
-check ANAF's seal on them, and file invoices and e-Transport declarations with
-[ANAF](https://www.anaf.ro), from your AI assistant. It also validates, renders
-and writes invoices, and looks companies up in ANAF's VAT registry. Its three
+Read the invoices your company sent and received through e-Factura, Romania's
+mandatory electronic invoicing system, check the seal ANAF puts on them, and
+file invoices and e-Transport declarations (the notice of a road transport of
+goods) with [ANAF](https://www.anaf.ro), Romania's tax authority, from your AI
+assistant. It also validates, renders and writes invoices, and looks companies
+up in ANAF's VAT registry. Its three
 `money` tools (`upload_invoice`, `upload_invoice_b2c`, `etransport_file`) file
 a document that cannot be withdrawn: your client asks you before each call,
 and each goes to ANAF's test environment unless you say otherwise.
 
 **You need** an OAuth application registered with ANAF (its client id, secret
-and callback URL), the company's CIF, and a person with a qualified digital
-certificate and SPV rights for the company, who signs in once in a browser.
+and callback URL), the company's CIF (its tax id), and a person with a
+qualified digital certificate and SPV rights for the company (SPV is ANAF's
+private mailbox for taxpayers), who signs in once in a browser.
 The server then renews the grant itself, and its `--health` check warns two
 weeks before it would need that person again. Validating, rendering, building
 and reading an invoice, checking a seal and looking up a company need no
@@ -199,9 +202,9 @@ client asks you before each call.
 | `list_invoices_window` | read | The same over a date range of at most 60 days, a page at a time, filtered by `filtru` (E errors, T sent, P received, R awaiting a response). |
 | `download_invoice` | read | Saves one signed ZIP to the outbox once it opens, every entry matches its checksum, and ANAF's seal holds. ANAF allows 10 downloads a day per message. |
 | `upload_invoice` | **money** | Files an invoice XML (UBL, CII, CN or RASP) to a company. Test environment unless `test` is false. |
-| `upload_invoice_b2c` | **money** | Files an invoice to a person through ANAF's `/uploadb2c`, otherwise as `upload_invoice`. |
+| `upload_invoice_b2c` | **money** | Files an invoice to a person (B2C, business to consumer) through ANAF's `/uploadb2c`, otherwise as `upload_invoice`. |
 | `upload_status` | read | How an upload was processed: ok (with its download id), processing, or failed with ANAF's reasons. |
-| `etransport_list` | read | e-Transport declarations from the last `zile` days, at most 60: UIT, declarant, partner, carrier, vehicle, and ANAF's reasons for one it refused. |
+| `etransport_list` | read | e-Transport declarations from the last `zile` days, at most 60: UIT (the transport's tracking code), declarant, partner, carrier, vehicle, and ANAF's reasons for one it refused. |
 | `etransport_file` | **money** | Files a declaration XML (schema v2): a new transport, a correction, a deletion, a confirmation or a vehicle change. Test environment unless `test` is false. |
 | `etransport_status` | read | How a declaration was processed: ok (the UIT is valid from now), processing, or failed. |
 | `build_invoice` | read | Writes a CIUS-RO invoice (UBL) from fields into the outbox, totals computed exactly and the draft checked first. Files nothing. |

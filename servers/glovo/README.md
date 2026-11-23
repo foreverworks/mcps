@@ -281,8 +281,8 @@ can enforce.
   so processes can share it, 0600 in a 0700 folder because it holds the
   delivery address.
 - **Every call goes out one at a time, at least 700 ms apart**, history pages
-  included: a burst of history pages was throttled (HTTP 429), calls at that
-  gap rarely are. A 429 is waited out at least 20 seconds (longer if
+  included: Glovo throttles a burst of history pages (HTTP 429), and rarely
+  calls at that gap. A 429 is waited out at least 20 seconds (longer if
   `Retry-After` asks), four attempts in all; a 401 earns one fresh access
   token.
 - **A cold read is about 1.4 orders a second**; stored orders read instantly,

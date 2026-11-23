@@ -1,9 +1,10 @@
 # <img src="icons/icon.svg" width="36" height="36" alt="eToll (rovinietă) icon"> eToll (rovinietă) MCP server
 
-Check your cars' rovinietă from your AI assistant, on your
-[eToll](https://portal.etoll.ro) account: until which day each vignette is
+Check your cars' rovinietă (Romania's road-use vignette) from your AI
+assistant, on your [eToll](https://portal.etoll.ro) account: until which day each vignette is
 valid and how many days are left, the vignettes and bridge passes you bought,
-the invoices, eToll's notifications and CNAIR's status page. It can also buy a
+the invoices, eToll's notifications and the status page of CNAIR, the national
+road infrastructure company that runs eToll. It can also buy a
 vignette: `quote_vignette` gives the price for each duration, and
 `place_order`, its one **money** tool, places the order after you confirm one
 line and hands you eToll's card payment page on euplatesc.ro. You pay there
@@ -148,7 +149,7 @@ Your client confirms it with you; a deployment can have the server ask
 instead (`MCP_CONFIRM=elicit`, [docs/configuration.md](../../docs/configuration.md)).
 Then, in order, and stopping at the first that fails:
 
-1. The price is asked again, and must be the confirmed one to the last ban;
+1. The price is asked again, and must be the confirmed one to the last ban (a hundredth of a leu);
    otherwise `refused` with `PRICE_CHANGED`, and nothing is ordered.
 2. The order is created, and its total must be there and be the confirmed
    one; otherwise it is cancelled and the answer is `PRICE_CHANGED` (or

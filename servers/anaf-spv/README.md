@@ -1,10 +1,13 @@
 # <img src="icons/icon.svg" width="36" height="36" alt="ANAF SPV icon"> ANAF SPV MCP server
 
-Read and keep what ANAF posts to your Spațiul Privat Virtual
-([pfinternet.anaf.ro](https://pfinternet.anaf.ro)) from your AI assistant:
+Read and keep what ANAF, Romania's tax authority, posts to your Spațiul Privat
+Virtual (SPV, the private mailbox every taxpayer has on
+[pfinternet.anaf.ro](https://pfinternet.anaf.ro)) from your AI assistant:
 decisions, summonses, notifications, payment confirmations and answers. It also
 requests documents, writes to ANAF through SPV's contact form (a dry run unless
-you say otherwise), validates declarations and files a D212. Nothing here moves
+you say otherwise), validates declarations (D212, the annual income return;
+D100, D300 and D112, the company's tax, VAT and payroll returns) and files a
+D212. Nothing here moves
 money; the one `money` tool, `submit_declaration`, files a declaration, and
 your client asks you before each call.
 
@@ -212,7 +215,7 @@ declaration, and your client asks you before each call.
 | Tool | Access | What it does |
 |---|---|---|
 | `validate_declaration` | read | ANAF's own validator for a D212, D100, D300 or D112 and its period: the errors verbatim, what it makes payable, and the filing PDF, checked to carry the XML. |
-| `submit_declaration` | **money** | File a D212's PDF at formularespv-pf: the index de depunere, then SPV's RECIPISA. A D100's, D300's or D112's is checked, then refused before anything is sent. |
+| `submit_declaration` | **money** | File a D212's PDF at formularespv-pf: the index de depunere (filing index), then SPV's RECIPISA (receipt). A D100's, D300's or D112's is checked, then refused before anything is sent. |
 | `declaration_status` | read | A filing's state at ANAF and its signed receipt, by its number, from ANAF's public status page. No sign-in. |
 
 ## Money

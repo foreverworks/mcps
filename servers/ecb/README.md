@@ -120,7 +120,7 @@ day older than that. When it does read the history it lays the two small files
 over its tail, so a copy cached before today's fixing is never why a window
 ends a day early. The two small files are kept five minutes (the ECB serves
 them for five) and the history a day. Parsing the history takes about a
-quarter of a second and 18 MB of memory, measured on the 2026-11-13 file.
+quarter of a second and 18 MB of memory (the 2026-11-13 file).
 
 **The files do not agree on style.** The daily file is indented, quotes with
 `'` and writes `365.60` for the forint; the other two are one line, quote with

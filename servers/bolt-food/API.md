@@ -98,9 +98,9 @@ discount can be recovered.
 
 `getOrderDetails` throttles with HTTP 200 and
 `{code: 1005, message: "TOO_MANY_REQUESTS"}` in the body, not with a 429.
-Several workers in parallel were throttled often; one call at a time, 350 ms
+Several workers in parallel are throttled often; one call at a time, 350 ms
 apart, with a backoff on 1005, completes cleanly. `getOrderHistory` at
-`page_size=50` was never throttled.
+`page_size=50` was not throttled.
 
 ## What the receipt numbers mean
 

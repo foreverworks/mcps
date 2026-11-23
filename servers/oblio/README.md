@@ -5,7 +5,7 @@ Issue and track a Romanian company's invoices from your AI assistant, through
 rates and issued invoices; it issues invoices and proformas, records payments,
 and cancels, restores, reverses or deletes invoices. Every tool that makes,
 changes or unmakes a fiscal document is `money`: your client asks you first,
-and shows the total computed the way ANAF checks it.
+and shows the total computed the way ANAF (Romania's tax authority) checks it.
 
 **You need** an Oblio account, its API secret, and the tax id (CIF) of the
 company the server should act on. There is no sandbox: an invoice issued here
@@ -125,7 +125,7 @@ before each call.
 | `list_products` | read | Saved products and services, filtered by name or code, a page at a time. Never cached. |
 | `list_series` | read | The document series and the number each one issues next. Cached 10 minutes, and forgotten after any issue or delete. |
 | `list_vat_rates` | read | The VAT rates a line's `vat_name` and `vat_percentage` come from. Cached 10 minutes. |
-| `list_invoices` | read | Issued invoices by period, series, buyer, status (unpaid, paid, cancelled) and e-Factura state, newest first, a page at a time. |
+| `list_invoices` | read | Issued invoices by period, series, buyer, status (unpaid, paid, cancelled) and e-Factura state (e-Factura is ANAF's e-invoicing system), newest first, a page at a time. |
 | `get_invoice` / `get_proforma` | read | One document by series and number: its PDF and e-Factura links, its total and its payments. |
 | `create_proforma` | write | Issues a proforma. It is not a fiscal document, but it takes a number in its series. |
 | `create_invoice` | **money** | Issues an invoice. |
@@ -231,7 +231,7 @@ against another company.
   ("included") silently turns a net price into a gross one. **`vat_percentage`
   is required** because the total you confirm is computed from it.
 - **The buyer's code and IBAN are checked by their check digits**: a Romanian
-  buyer's `cif` must be a CIF with a valid control digit or a valid CNP, so a
+  buyer's `cif` must be a CIF with a valid control digit or a valid CNP (a person's numeric code), so a
   transposed digit cannot send the invoice to another company. A buyer whose
   `country` is another country passes as written. With `send_email`, the
   answer's `emailedTo` says where Oblio sent the invoice.

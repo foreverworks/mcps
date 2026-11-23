@@ -12,7 +12,8 @@ CNAS, and no tool spends money.
 **You need** an eSănătateaMea account. The server signs in either with the
 account's e-mail, password and authenticator code, by itself (the password from
 a file or a vault MCP server, the code computed from the authenticator key or
-read from the vault), or through ROeID in your browser, approved on your phone.
+read from the vault), or through ROeID (the sign-in with Romania's electronic identity card)
+in your browser, approved on your phone.
 CNAS publishes no API for patients: this is an unofficial client of the API the
 portal itself uses, so it can break when the portal changes.
 
@@ -61,6 +62,12 @@ claude mcp add esanatateamea -- node "$PWD/servers/esanatateamea/dist/index.js"
 
 In a JSON configuration, the command is `node` and its one argument the full path of `servers/esanatateamea/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
+
+> [!NOTE]
+> The commands above name the published package, which does not exist yet:
+> this server is on `main` but has no release, so `npx` and the Claude Desktop
+> bundle find nothing. Until its first release, [run it from a
+> clone](#from-a-clone).
 
 ## Configuration
 
