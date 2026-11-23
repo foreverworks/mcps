@@ -38,5 +38,5 @@ each protection does not cover.
 
 ## Supported versions
 
-The latest commit on `main`. Packages will follow semantic versioning once
-they are on npm.
+The latest commit on `main` and the latest release of each package. A
+package's `CHANGELOG.md` says what each release changed.

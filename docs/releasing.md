@@ -172,9 +172,9 @@ made public, takes steps 7 to 11 again.
   account ids, hostnames, or figures and stories from a real account or
   deployment, in `src/`, `test/`, `scripts/` or the docs, in the tree or the
   history ([CONTRIBUTING.md](../CONTRIBUTING.md#personal-data-and-deployments)).
-  Done by reading, not by pattern search: every tracked file on 2026-10-22,
-  then every file changed since, on 2026-10-23. Pattern searches missed what
-  only a reader recognises (filing numbers, message ids, brand names).
+  Done by reading every tracked file, then every file changed since, not by
+  pattern search: a pattern misses what only a reader recognises (filing
+  numbers, message ids, brand names).
 - [x] **`npm run check` green on a clean clone**, on Node 22 and 24.
 - [x] **CI on GitHub-hosted runners.** No job, and no pull request from a
   fork, runs on a self-hosted runner.

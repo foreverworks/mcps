@@ -118,9 +118,11 @@ to set. To run one copy that several clients share over HTTP, see
 
 ## Status
 
-The servers are used every day by the people who wrote them. The fifteen servers
-for Romania and for everyone are published on npm and listed in the official MCP
-Registry, so `npx` runs each of them without a clone. The [extras](#extras) are
+The servers are used every day by the people who wrote them. The servers for
+Romania and for everyone are published on npm and listed in the official MCP
+Registry, so `npx` runs each of them without a clone. A server that is new on
+`main` can be one release ahead: until its first release, its `npx` command
+finds nothing and you build it from source as above. The [extras](#extras) are
 never published: build them from source as above.
 
 ## Documentation
@@ -135,8 +137,8 @@ never published: build them from source as above.
 - [Authentication](docs/auth.md): how clients, servers and the services behind
   them authenticate, and which options a deployment has.
 - [Architecture](docs/architecture.md): how a server and the toolkit are built.
-- [Roadmap](docs/feature-plan.md): what other MCP servers do that these do not
-  yet, what is done, and what is still open.
+- [Roadmap](docs/feature-plan.md): what may come next, what we chose not to
+  build and why, and how to ask for something.
 - [Releasing](docs/releasing.md): how packages reach npm and the MCP Registry,
   and the [plugins](plugins) made from them for Claude Code and Cursor.
 - [Privacy](https://foreverworks.github.io/mcps/privacy/): what the servers do

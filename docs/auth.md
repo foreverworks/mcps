@@ -2,8 +2,11 @@
 
 For anyone who deploys these servers or reviews their security: who may call a
 server, whose grant it uses at the service behind it, and who approves a call
-that spends money or files a document. Facts about other products date from
-2026-10-07 unless marked; UNVERIFIED means unchecked.
+that spends money or files a document. Facts about other products come from
+their own documentation as read on 2026-10-07, unless a line carries another
+date. Where a table says "not documented", we looked and the vendor's pages
+say nothing; "not checked" means we did not look. Neither means "no": confirm
+before you rely on a cell.
 
 ## What these servers do
 
@@ -186,10 +189,10 @@ trusts an identity header must be reachable only through the proxy.
 | Proxy | MCP-aware? | Notes |
 |---|---|---|
 | [Tailscale `serve`](https://tailscale.com/kb/1312/serve) | identity headers, no OAuth | adds `Tailscale-User-Login`, `-Name`, `-Profile-Pic`, strips spoofed copies; none for tagged devices or Funnel; pairs with A1 or a header-trusting mode |
-| [tsidp](https://github.com/tailscale/tsidp) | yes, pre-1.0 | Tailscale's OIDC/OAuth server: DCR behind `allow_dcr`, RFC 8693 token exchange; CIMD UNVERIFIED |
+| [tsidp](https://github.com/tailscale/tsidp) | yes, pre-1.0 | Tailscale's OIDC/OAuth server: DCR behind `allow_dcr`, RFC 8693 token exchange; CIMD not documented |
 | [Tailscale Aperture](https://www.tailscale.com/docs/aperture/mcp-server) | gateway | GA 2026-08-26; tailnet identity, deny by default; upstream by static token, per-user OAuth or DCR |
 | [Pomerium](https://www.pomerium.com/docs/capabilities/mcp/reference) | yes, since v0.30.0 | the AS for MCP clients (CIMD by domain); upstream OAuth per user, the token injected as `Bearer`, a signed `X-Pomerium-Assertion` |
-| [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/) | yes | "Managed OAuth": Access as the AS (RFC 8414 and 9728, DCR), `Cf-Access-Jwt-Assertion` to validate; [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/) with service tokens; CIMD UNVERIFIED; traffic through Cloudflare |
+| [Cloudflare Access](https://developers.cloudflare.com/cloudflare-one/access-controls/applications/http-apps/managed-oauth/) | yes | "Managed OAuth": Access as the AS (RFC 8414 and 9728, DCR), `Cf-Access-Jwt-Assertion` to validate; [MCP server portals](https://developers.cloudflare.com/cloudflare-one/access-controls/ai-controls/mcp-portals/) with service tokens; CIMD not documented; traffic through Cloudflare |
 | [oauth2-proxy](https://github.com/oauth2-proxy/oauth2-proxy/issues/3167) | no | v7.15.5 answers 403 without `WWW-Authenticate`; [PR #3488](https://github.com/oauth2-proxy/oauth2-proxy/pull/3488) (RFC 9728, DCR) open |
 | Others | yes | [Docker MCP Gateway](https://github.com/docker/mcp-gateway), [Microsoft MCP Gateway](https://github.com/microsoft/mcp-gateway) (Entra ID roles), [Agent Router](https://theagentrouter.ai/docs/capabilities/mcp/) (formerly Envoy AI Gateway: JWT validation, tool rules) |
 
@@ -208,7 +211,7 @@ clock skew.
 | [WorkOS AuthKit](https://workos.com/docs/authkit/mcp) | yes | automatic, off by default ([changelog](https://workos.com/changelog/client-id-metadata-support-for-mcp-auth)) | |
 | [Stytch](https://stytch.com/docs/connected-apps/oauth-learn-more/client-types) | yes | behind a toggle ([blog](https://stytch.com/blog/stytch-supports-cimd/)) | |
 | [Descope](https://www.descope.com/blog/post/cimd-support) | yes | GA 2026-01-27 | vaults upstream tokens |
-| Clerk | UNVERIFIED | UNVERIFIED (search results only) | |
+| Clerk | not checked | not checked | known only from search results |
 | Microsoft Entra ID | no | no ([2026-04 write-up](https://blog.pamelafox.org/2026/04/building-mcp-servers-with-entra-id-and.html)) | pre-register clients, or a proxy |
 | [Okta](https://developer.okta.com/blog/2026/08/24/xaa-oidc-resource) | not checked | not checked | Cross App Access (ID-JAG) |
 | [`workers-oauth-provider`](https://github.com/cloudflare/workers-oauth-provider) | yes, 90-day TTL | yes | a library; 1.0 on 2026-09-24 |
@@ -233,16 +236,16 @@ it.
 
 From vendor documentation, mostly undated; the official client matrix was
 removed on 2026-05-27, and the [extensions client matrix](https://modelcontextprotocol.io/extensions/client-matrix)
-covers extensions only. UNVERIFIED: the documentation says nothing.
+covers extensions only. "Not documented" means the vendor's pages say nothing.
 
 | Client | Static header | DCR | CIMD | Own OAuth client | Localhost or private network | Elicitation form / URL | Approval prompts |
 |---|---|---|---|---|---|---|---|
 | [Claude Code](https://code.claude.com/docs/en/mcp) | `--header`, `headers`, `headersHelper` | yes | yes | `--client-id`, `--client-secret` | yes | yes / yes | [permission rules](https://code.claude.com/docs/en/permissions) on `mcp__<server>__<tool>`; annotations not used |
 | [Claude.ai, Desktop, mobile](https://claude.com/docs/connectors/building/authentication) | beta for some organizations | yes | yes (preferred) | yes | no: from Anthropic's cloud ([`160.79.104.0/21`](https://platform.claude.com/docs/en/api/ip-addresses)), else [MCP tunnels](https://claude.com/docs/connectors/mcp-tunnels/overview) (preview) | not documented | per tool; read-only tools run unasked, destructive ones always prompt ([review criteria](https://claude.com/docs/connectors/building/review-criteria)) |
-| [ChatGPT](https://developers.openai.com/apps-sdk/build/auth) | no | yes | yes (preferred) | yes | no: public HTTPS or OpenAI's tunnel | UNVERIFIED | write tools confirmed, `readOnlyHint` respected ([reference](https://developers.openai.com/plugins/reference)) |
+| [ChatGPT](https://developers.openai.com/apps-sdk/build/auth) | no | yes | yes (preferred) | yes | no: public HTTPS or OpenAI's tunnel | not documented | write tools confirmed, `readOnlyHint` respected ([reference](https://developers.openai.com/plugins/reference)) |
 | [Responses API](https://developers.openai.com/api/docs/guides/tools-connectors-mcp) | `headers`, `authorization` | n/a | n/a | n/a | no: public, or a tunnel | not documented | `require_approval`: `always`, `never`, a filter |
 | [Codex](https://learn.chatgpt.com/docs/extend/mcp) | `bearer_token_env_var`, `http_headers` | yes | yes | `--oauth-client-id` | yes | yes / partial (2026-07-28 bugs) | `auto` / `prompt` / `writes` / `approve` |
-| [Cursor](https://cursor.com/docs/mcp) | `headers` ([ignored](https://forum.cursor.com/t/mcp-headers-config-ignored-when-server-has-oauth-discovery/156054) when the server advertises OAuth) | yes | UNVERIFIED | `auth.CLIENT_ID` | yes | yes / UNVERIFIED | asks by default; allowlist |
+| [Cursor](https://cursor.com/docs/mcp) | `headers` ([ignored](https://forum.cursor.com/t/mcp-headers-config-ignored-when-server-has-oauth-discovery/156054) when the server advertises OAuth) | yes | not documented | `auth.CLIENT_ID` | yes | yes / not documented | asks by default; allowlist |
 | VS Code (Copilot) | `headers` | yes | since 1.107 | `oauth.clientId` | yes | yes / yes | every tool not `readOnlyHint` |
 | [Gemini CLI](https://geminicli.com/docs/tools/mcp-server/) | `headers` | yes | no (#25724) | yes | yes | no (#28074) / no | unless `trust: true` |
 
@@ -366,7 +369,7 @@ refresh tokens 365; each refresh returns a new pair to save; test and
 production differ
 ([URL list](https://static.anaf.ro/static/10/Anaf/Informatii_R/Servicii_web/url_eFactura.html)).
 **ANAF SPV** has no API, so the server signs in as a person does. **ONRC
-myportal** has no public API (UNVERIFIED): the server uses the portal's own
+myportal** has no public API that we could find: the server uses the portal's own
 Keycloak client (discovery at
 `https://sso.onrc.ro/realms/onrc/.well-known/openid-configuration`), which
 works but is not a sanctioned integration.

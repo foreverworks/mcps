@@ -18,8 +18,8 @@ npm run build
 Each server is then a Node program at `servers/<name>/dist/index.js` (`dist/`
 is not in git). To build one server only, run
 `npm run kit && npm run build -w @foreverworks/mcp-oblio`: the servers import
-the built toolkit, so the kit comes first. Once the packages are on npm, each
-server's README also offers install buttons, an `npx` command and a Claude
+the built toolkit, so the kit comes first. The README of each
+published server also offers install buttons, an `npx` command and a Claude
 Desktop bundle (`.mcpb`), none of which needs a checkout.
 
 ## Over stdio: one copy per session
@@ -274,8 +274,9 @@ Two things the sandbox blocks until you allow them:
 One image holds every server, built once; a container runs one of them. Each
 push to `main` that passes the checks publishes it as
 `ghcr.io/foreverworks/mcps`, tagged with the commit (`:<full sha>`, what a
-deployment should pin) and `:main` (the latest). To build it yourself, from a
-checkout: `docker build -t mcps .`
+deployment should pin) and `:main` (the latest). If `docker pull` answers
+`unauthorized` for it, or you prefer your own copy, build it from a checkout:
+`docker build -t mcps .`
 
 A container is reached over a network, not on the machine's own loopback, so
 the server binds every interface and lists the `Host` names its clients use

@@ -1,120 +1,72 @@
 # Roadmap
 
-How these servers compare with the strongest published MCP servers in each of
-their domains: what is still open, what was built, what we do better and keep,
-and what we chose not to copy. It was researched on 2026-10-21 from the other
-servers' own code and documentation
-([how](#how-this-was-researched)); most of what it found was built by
-2026-10-22, when this page was last brought up to date. Item ids (K1, O3, PB1
-and so on) never change: commits, code comments and notes refer to them.
+What may come next in these servers and why it has not, what we have chosen
+not to build and why, and how to ask for something. It rests on a comparison
+with the strongest published MCP servers in each domain, made in October 2026
+from their own code and documentation ([the list](#servers-we-compared-with)).
 
-## Still open
+Nothing here is scheduled. A feature is built when someone needs it, so the way
+to move an item up is to say that you do ([how to ask](#how-to-ask-for-something)).
 
-None is scheduled; the last column says what each waits on.
+## What may come next
 
-| Item | What it would do | Who has it | Waits on |
-|---|---|---|---|
-| E4 | enable-banking: a local cache of transactions, so a repeated question spends none of the few reads a day PSD2 allows without the account holder present | banking-mcp ([schema.sql](https://github.com/matcha-ai-test/banking-mcp/blob/f77a5a7/schema.sql)) | A need. A cache is a second copy of bank data on disk, and a deployment that already keeps a ledger may prefer to read that |
-| W1 | bitwarden: `run_with_secret`, which runs a command from an operator's allowlist with a password, a field or a TOTP code in its environment and returns its output with the secret scrubbed, so the model never sees the secret | Bitwarden's Agent Access, `aac run` ([README](https://github.com/bitwarden/agent-access/blob/main/README.md)); 1Password's server ([docs](https://www.1password.dev/environments/mcp-server.md)) | A design for the allowlist, which is all of its security. A command that echoes its environment defeats scrubbing, so it must scrub by value and say so in the result |
-| T3 | typesafe: CSV rows and Markdown sections as `ask_batch` records, and files matched by a glob inside the file roots; today it reads one JSONL or JSON file | `typesafe-mcp` ([README](https://github.com/MarkChu-git/typesafe-mcp/blob/main/README.md)) | A need |
-| D2 | devices: notice that a leased device died, restart it on the same lease, and tell the holder through the lease's state | Callstack's simlock ([README](https://github.com/callstackincubator/simlock/blob/HEAD/README.md)) | A need |
+Two ideas are held back by a design question, not only by demand.
 
-### Gaps with no item yet
+- **enable-banking: a local cache of transactions**, so a repeated question
+  spends none of the few reads a day that PSD2 allows without the account
+  holder present. A cache is a second copy of bank data on disk, and a
+  deployment that already keeps a ledger may prefer to read that. Others have
+  one: banking-mcp ([schema.sql](https://github.com/matcha-ai-test/banking-mcp/blob/f77a5a7/schema.sql)).
+- **bitwarden: `run_with_secret`.** It would run a command from an operator's
+  allowlist with a password, a field or a TOTP code in its environment, and
+  return the output with the secret scrubbed, so the model never sees the
+  secret. The allowlist is all of its security and has no design yet: a command
+  that echoes its environment defeats scrubbing, so the output must be scrubbed
+  by value, and the result must say so. Others have it: Bitwarden's Agent
+  Access, `aac run` ([README](https://github.com/bitwarden/agent-access/blob/main/README.md));
+  1Password's server ([docs](https://www.1password.dev/environments/mcp-server.md)).
 
-None is planned; an item is opened when someone needs one.
+Everything below is missing only because nobody has asked for it yet.
 
-| Server | What others have | Source | Here today |
-|---|---|---|---|
-| google | An image handed to the model as image content | aaronsb's [gmail.yaml](https://github.com/aaronsb/google-workspace-mcp/blob/9c9f803/src/factory/manifest/gmail.yaml); the Gemini extension's `slides.getImages` in [index.ts](https://github.com/gemini-cli-extensions/workspace/blob/089927e/workspace-server/src/index.ts) | `get_thumbnails` returns URLs |
-| notion | Block update and delete | suekou's [blocks/definitions.ts](https://github.com/suekou/mcp-notion-server/blob/efa09a2/src/tools/blocks/definitions.ts) | Markdown edits: `edit_content`, `append_content`, `replace_content` |
-| notion | Comment edit and delete | awkoy's [comments.ts](https://github.com/awkoy/notion-mcp-server/blob/7ea7189/src/operations/comments.ts) | `get_comments` and `add_comment` |
-| anaf-efactura | Public registries: financial statements, farmers, religious bodies | anafpy's [public/tools.py](https://github.com/robert-malai/anafpy/blob/main/src/anafpy/mcp/public/tools.py) | `lookup_company` covers the VAT and e-Factura registries |
-| anaf-spv | More declaration forms (D394 and others) | anafpy's [declaratii/tools.py](https://github.com/robert-malai/anafpy/blob/main/src/anafpy/mcp/declaratii/tools.py) | D212 filed; D100, D300 and D112 validated but not filed (see [Decisions](#decisions)) |
-| bitwarden | Cards, identities and folders | warden-mcp ([README](https://github.com/icoretech/warden-mcp/blob/main/README.md)); [Bitwarden's server](https://github.com/bitwarden/mcp-server) | Logins and secure notes |
-| eas | Writing a workflow file (`workflow_create`) | Expo's hosted server ([docs](https://docs.expo.dev/eas/ai/mcp/)) | `validate_workflow` checks one; nothing writes one. Rollouts are set per update group; branch rollouts on a channel are not covered |
-| trademarks | More offices, such as UKIPO | MarkMesh ([README](https://github.com/team-markmesh/mark_mesh_skill/blob/HEAD/README.md)) | USPTO and EUIPO. WIPO, TMview and OSIM are not searched, on their terms of use (see [Rejected](#rejected)) |
-| all | Evals of how well a model picks the tools | Sentry's `packages/mcp-server-evals` ([repo](https://github.com/getsentry/sentry-mcp)); Cloudflare's `packages/eval-tools` | None. Tool snapshots and `scripts/check-docs.ts` pin the tool surface |
+| Server | What it would do | Who has it |
+|---|---|---|
+| typesafe | CSV rows and Markdown sections as `ask_batch` records, and files matched by a glob inside the file roots. Today it reads one JSONL or JSON file | `typesafe-mcp` ([README](https://github.com/MarkChu-git/typesafe-mcp/blob/main/README.md)) |
+| devices | Notice that a leased device died, restart it on the same lease, and tell the holder through the lease's state | Callstack's simlock ([README](https://github.com/callstackincubator/simlock/blob/HEAD/README.md)) |
+| google | An image handed to the model as image content. `get_thumbnails` returns URLs today | aaronsb's [gmail.yaml](https://github.com/aaronsb/google-workspace-mcp/blob/9c9f803/src/factory/manifest/gmail.yaml); the Gemini extension's `slides.getImages` in [index.ts](https://github.com/gemini-cli-extensions/workspace/blob/089927e/workspace-server/src/index.ts) |
+| notion | Block update and delete. Markdown edits cover it today: `edit_content`, `append_content`, `replace_content` | suekou's [blocks/definitions.ts](https://github.com/suekou/mcp-notion-server/blob/efa09a2/src/tools/blocks/definitions.ts) |
+| notion | Comment edit and delete. `get_comments` and `add_comment` exist | awkoy's [comments.ts](https://github.com/awkoy/notion-mcp-server/blob/7ea7189/src/operations/comments.ts) |
+| anaf-efactura | Public registries: financial statements, farmers, religious bodies. `lookup_company` covers the VAT and e-Factura registries | anafpy's [public/tools.py](https://github.com/robert-malai/anafpy/blob/main/src/anafpy/mcp/public/tools.py) |
+| anaf-spv | More declaration forms, such as the D394. D212 is filed; D100, D300 and D112 are validated but not filed ([why](#choices-that-shape-the-servers)) | anafpy's [declaratii/tools.py](https://github.com/robert-malai/anafpy/blob/main/src/anafpy/mcp/declaratii/tools.py) |
+| bitwarden | Cards, identities and folders. Logins and secure notes exist | warden-mcp ([README](https://github.com/icoretech/warden-mcp/blob/main/README.md)); [Bitwarden's server](https://github.com/bitwarden/mcp-server) |
+| eas | Writing a workflow file (`workflow_create`). `validate_workflow` checks one and nothing writes one. Rollouts are set per update group, and branch rollouts on a channel are not covered | Expo's hosted server ([docs](https://docs.expo.dev/eas/ai/mcp/)) |
+| trademarks | More offices, such as UKIPO. USPTO and EUIPO are searched; WIPO, TMview and OSIM are not, on their terms of use (see [Rejected](#rejected)) | MarkMesh ([README](https://github.com/team-markmesh/mark_mesh_skill/blob/HEAD/README.md)) |
+| all | Evals of how well a model picks the tools. None today: tool snapshots and `scripts/check-docs.ts` pin the tool surface | Sentry's `packages/mcp-server-evals` ([repo](https://github.com/getsentry/sentry-mcp)); Cloudflare's `packages/eval-tools` |
 
-## Done
+## How to ask for something
 
-Eight work packages, in the order built, each with its tests, README rows
-and snapshots. E1 to E3 came first, on their own.
+Open an issue on the repository. Say the job you want your assistant to do,
+which service and account it touches, and what that needs (a grant, a key, a
+plan). Say what class the tool would have (`read`, `write` or `money`), since
+that decides the confirmation a person sees. A new `money` tool lands with its
+confirmation line agreed and tested, and a deployment that turns client
+confirmation off decides for itself whether to keep such a tool on.
 
-| Item | What landed |
-|---|---|
-| **Before** | |
-| E1 | enable-banking `get_transactions` filters by text, direction and an amount range compared as exact decimals, and reads every account when `account_uid` is left out |
-| E2 | enable-banking `export_transactions`: CSV to the outbox with its SHA-256, written by the kit's CSV writer that the receipts servers share |
-| E3 | enable-banking `revoke_session` ends a consent at the bank |
-| **1. Kit foundations** | |
-| K2 | The guard derives every tool's `openWorldHint` and `idempotentHint` (a write is idempotent only when its policy line says so, each with a test) and lists tools in name order; `check-docs` requires server instructions |
-| K3 | A file a tool writes to the outbox is linked in its result as a `resource_link` |
-| K1 | An optional output schema per tool: the guard checks the result against it and also sends it as structured content. It is opt-in because a schema roughly doubles a tool's definition (`scripts/measure-tokens.ts`); bnr, trademarks and eas's lists came first |
-| **2. Read-only wins** | |
-| O1 | oblio `list_invoices` by period, buyer, status and e-Factura state, with a cursor |
-| B1 | bnr `convert` to or from RON at the rate in force on a day or the last one before it, rounded once by a named rule |
-| B2 | bnr `rates`: several currencies on a day, or every fixing in a window |
-| A2 | anaf-efactura `parse_invoice`: a UBL invoice, from a file or an archive in the outbox, as JSON whose values are the document's own text |
-| A1 | anaf-efactura `build_invoice` writes a CIUS-RO invoice from fields to the outbox, its totals by the kit's shared rule (`invoiceTotals.ts`), ready for `validate_invoice` and `upload_invoice` by path |
-| S1 | anaf-spv `declaration_status`: a filing's state and receipt from ANAF's public status page, at any time after filing |
-| T1 | typesafe `ask_batch` takes thresholds per question and answers act, review or abstain per row |
-| T2 | typesafe `where`, `top` and `counts` on a batch result |
-| F1 | bolt-food and glovo `order_stats`: what orders cost per store and per month, in `packages/receipts` |
-| E-EAS1 | eas `validate_workflow`: a workflow file at a ref or by path, checked by EAS's own validator |
-| M1 | trademarks `search_marks` filters by goods and services text where the office's search can (USPTO), and says where it cannot |
-| M2 | trademarks: a `similarity` score from 0 to 100 on every mark, computed the same way for every office |
-| N3 | notion `list_views` and `query_view` run a saved view as Notion shows it |
-| N4 | notion `list_users`, and a person column filtered by name or e-mail |
-| G6 | google `get_messages` reads several messages of one mailbox in one call |
-| **3. Long calls** | |
-| K4 | Progress and cancellation: a cancelled read stops, and a write cancelled after it was sent ends as `outcome_unknown`, never resent. anaf-spv `sync_messages` and `await_reply`, google `harvest_attachments` and typesafe `ask_batch` report progress |
-| E-EAS2 | eas `wait_for_run` waits for a workflow run or a build to end, with progress |
-| D1 | devices `acquire` can wait for the boot (`until_booted`), and `wait` reports the place in the queue |
-| **4. Writes** | |
-| N1 | notion `create_page` applies a database's default or a named template |
-| N2 | notion `upload_file` and `download_files`: files in by path, out to the outbox |
-| N5 | notion `add_column`, `add_options` and `create_database`, each checked against the schema first |
-| G2 | google `create_event` and `update_event` make a Meet link, focus time and out of office |
-| G4 | google `upload_file` with `convert` turns a .docx, .xlsx or .pptx into a Google Doc, Sheet or deck |
-| PB3 | porkbun `export_dns_zone` writes a BIND zone file to the outbox; `import_dns_records` takes one by path |
-| W2 | bitwarden `check_exposed` checks a stored password against Have I Been Pwned by k-anonymity: five characters of its hash leave the server |
-| W3 | bitwarden `create_note` keeps a secret, typed or from a file, and never returns its text |
-| E-EAS3 | eas `set_rollout` raises an update's rollout and `revert_rollout` sends its devices back |
-| D3 | devices `pause` and `resume` hand a leased device to a person and back without losing it |
-| **5. Packaging** | |
-| P1 | `check-docs` writes each server's `mcpName` and `server.json` from its package.json; the release publishes to npm with provenance, then to the MCP Registry, once the repository is public ([releasing.md](releasing.md)) |
-| P3 | A changelog per package, kept with changesets; a change of access class that no changelog tells fails CI ([.changeset/README.md](../.changeset/README.md)) |
-| P4 | One icon set drawn by `scripts/icons.ts`: an icon per server and per google product, at initialize, on tools and in the registry |
-| P2 | VS Code and Cursor install links in every README, and a Claude Desktop `.mcpb` bundle per server built by `scripts/bundle.ts` |
-| **6. New grants** | |
-| G1 | google Tasks: lists and tasks read and written, and `agenda` showing the tasks due |
-| G3 | google `find_people` over contacts and a Workspace directory |
-| G5 | google `list_meetings` and `get_transcript` for Meet transcripts and notes |
-| M3 | trademarks `mark_history`, `mark_documents` and `download_mark_documents` through USPTO's TSDR API |
-| E-EAS4 | A server of its own, `app-stores`: App Store and Play reviews with replies, TestFlight feedback and crash logs |
-| **7. New money tools** | |
-| PB2 | porkbun refuses a purchase or top-up over the account's own limit as `over_limit` before sending it |
-| PB1 | porkbun on the vendor's 0.52.0: 17 of its 21 new tools offered, 5 of them `money`, each confirmation line tested; USDC payments and API key minting left out |
-| O2 | oblio `collect_invoice` records a payment; the invoice is read first, so the confirmation names its own buyer and currency |
-| O4 | oblio `reverse_invoice` issues a storno whose total is the original's, negated, once per invoice |
-| A3 | anaf-efactura `upload_invoice_b2c` files an invoice to a person |
-| A4 | anaf-efactura `etransport_file` and `etransport_status` file and follow e-Transport declarations |
-| S2 | anaf-spv `validate_declaration` takes D100, D300 and D112 beside D212; `submit_declaration` stops before sending them (see [Decisions](#decisions)) |
-| **8. Protocol move** | |
-| K5 | Sign-in links are offered through URL elicitation where the client supports it, and stay in the result where it does not |
-| K6 | SDK v2: protocols 2025-11-25 and 2026-07-28 served side by side over stdio and HTTP, so money confirmation by elicitation also works over HTTP for 2026-07-28 clients |
+A pull request is welcome too: [CONTRIBUTING.md](../CONTRIBUTING.md) has the
+setup, the house style and the checks. For a vulnerability, follow
+[SECURITY.md](../SECURITY.md) instead.
 
-## What we do better, and must keep
+## What every change must keep
 
-Every change keeps these; a feature that would give one up is rejected.
+These are where the servers do better than the ones we compared with, and a
+feature that would give one up is turned down.
 
 | Strength | Where it lives | What others do |
 |---|---|---|
 | Money is exact decimal strings from the API to the answer | `packages/mcp-kit/src/decimal.ts`, each server's schemas | `bankmcp` turns amounts into numbers ([data.ts](https://github.com/noskillish/bankmcp/blob/f28fac6/src/data.ts)); `elcukro/bank-mcp` uses `parseFloat` ([enable-banking/index.ts](https://github.com/elcukro/bank-mcp/blob/c6abad5/src/providers/enable-banking/index.ts)); `ts-anaf` takes `unitPrice: z.number()` ([ubl.ts](https://github.com/florin-szilagyi/ts-anaf/blob/main/mcp/src/tools/ubl.ts)); `@pipeworx/mcp-bnr-ro` returns rates as numbers, so `4.2440` arrives as `4.244` |
 | A write whose outcome is unknown is never sent again | `packages/mcp-kit/src/http.ts` | `anaf-efactura-mcp` retries its upload three times ([index.js](https://github.com/Hegetiby/anaf-efactura-mcp/blob/main/src/index.js), `fetchWithRetry`); awkoy's Notion server retries every handler on 5xx, writes included ([dispatch/index.ts](https://github.com/awkoy/notion-mcp-server/blob/7ea7189/src/dispatch/index.ts)) |
-| Idempotent issuing: oblio derives a key from the document when none is given, and anaf-efactura refuses to file the same bytes twice | `servers/oblio`, the anaf-efactura ledger | The one other Oblio server with a key keeps it in memory and needs the caller to pass it; `anaf-efactura-mcp` retries its upload (above) |
+| Issuing is idempotent: oblio derives a key from the document when none is given, and anaf-efactura refuses to file the same bytes twice | `servers/oblio`, the anaf-efactura ledger | The one other Oblio server with a key keeps it in memory and needs the caller to pass it; `anaf-efactura-mcp` retries its upload (above) |
 | One access class per tool drives its annotations, the ceilings, confirmation and the audit line; inputs are strict; a server refuses to start on a stale policy | `packages/mcp-kit/src/serve/guard.ts`, [security.md](security.md) | Hints set by hand per tool; unknown arguments silently dropped |
-| The total a person confirms is computed by the same function whose result the call sends | `packages/mcp-kit/src/invoiceTotals.ts`, `servers/oblio/src/domain` | No competitor checks the issued total |
+| The total a person confirms is computed by the same function whose result the call sends | `packages/mcp-kit/src/invoiceTotals.ts`, `servers/oblio/src/domain` | No other server we looked at checks the issued total |
 | Files go in by path or as checksummed bytes, and come out through an outbox with their SHA-256 | `packages/mcp-kit/src/inputFile.ts`, `outbox.ts` | Base64 or XML typed into tool arguments (`ts-anaf`'s `xml: z.string()` in [upload.ts](https://github.com/florin-szilagyi/ts-anaf/blob/main/mcp/src/tools/upload.ts); awkoy's [files.ts](https://github.com/awkoy/notion-mcp-server/blob/7ea7189/src/operations/files.ts)) |
 | Secrets never reach the model: generated and stored in the server (bitwarden), private keys written to a file (porkbun) | `servers/bitwarden`, `servers/porkbun` | Bitwarden's own server returns passwords and takes them as arguments ([bitwarden/mcp-server](https://github.com/bitwarden/mcp-server)) |
 | HTTP on loopback only, a bearer token per client, a Host check, no CORS | `packages/mcp-kit/src/serve` | `anaf-efactura-mcp` listens on `0.0.0.0` with no check ([transport.js](https://github.com/Hegetiby/anaf-efactura-mcp/blob/main/shared/transport.js)); `warden-mcp` takes the vault password in request headers and has no authentication of its own ([README](https://github.com/icoretech/warden-mcp/blob/main/README.md)) |
@@ -122,7 +74,10 @@ Every change keeps these; a feature that would give one up is rejected.
 | Several accounts or workspaces in one call, and no default account on a write | `servers/google`, `servers/notion` | One account per connection (Google's servers, Notion's hosted server) |
 | Every Google batchUpdate is checked against the API's own schema | `servers/google` ([google-gaps.md](../servers/google/docs/google-gaps.md)) | Raw, unchecked relays |
 
-## What we will not copy
+## What we will not build
+
+Patterns we saw in other servers and left out, with the reason. Each reason
+is a rule for new work too.
 
 | Pattern | Seen in | Why not |
 |---|---|---|
@@ -139,13 +94,16 @@ Every change keeps these; a feature that would give one up is rejected.
 
 ## Rejected
 
+Ideas we considered and set aside. A reason that stops holding is a reason to
+look again, and each row says what would change it.
+
 | Idea | Seen in | Why not, for now |
 |---|---|---|
-| MCP Apps (`ui://` views) | GitHub, suekou | Few clients render them, Claude Code's terminal not among them; the strong case, a money confirmation screen, is served by client confirmation and elicitation. Revisit when client support is wide |
-| Sampling | The everything server | Deprecated in 2026-07-28 |
-| Tasks | The everything server | Moved to an extension in 2026-07-28 and dropped from the core of SDK v2, which the kit runs on (K6) |
-| Prompts and completions in general | anafpy, bankmcp, Expo | Low value for servers that wrap APIs; server instructions (K2) carry the start-here text. A prompt per workflow can come later if clients surface them |
-| Resources mirroring tools (`notion://page/{id}`, `anafmsg://`) | awkoy, anafpy | They duplicate the read tools; resource links (K3) cover files |
+| MCP Apps (`ui://` views) | GitHub, suekou | Few clients render them, Claude Code's terminal not among them. The strongest case, a money confirmation screen, is served by client confirmation and elicitation. Revisit when client support is wide |
+| Sampling | The everything server | Deprecated in the 2026-07-28 protocol |
+| Tasks | The everything server | Moved to an extension in 2026-07-28 and dropped from the core of SDK v2, which the kit runs on |
+| Prompts and completions in general | anafpy, bankmcp, Expo | Low value for servers that wrap APIs; each server's instructions carry the start-here text. A prompt per workflow can come later if clients surface them |
+| Resources mirroring tools (`notion://page/{id}`, `anafmsg://`) | awkoy, anafpy | They duplicate the read tools, and a file a tool writes is already linked in its result as a resource link |
 | Paging `tools/list` | Nobody | No client needs it at 115 tools, the most any server here lists |
 | Tool tiers that hide tools | `workspace-mcp` ([tool_tiers.yaml](https://github.com/taylorwilsdon/google_workspace_mcp/blob/484f64b/core/tool_tiers.yaml)) | The access ceiling (`MCP_MAX_ACCESS`) already narrows a deployment; hiding by tier makes a tool's absence ambiguous |
 | OAuth as a resource server | GitHub, Sentry | Needed only off loopback; [auth.md](auth.md) plans it for that case |
@@ -166,47 +124,30 @@ Every change keeps these; a feature that would give one up is rejected.
 | Images in TypeSafe judgments | `typesafe-mcp` | TypeSafe marks image input experimental |
 | Company search over public register data in onrc | leadgen ([tools.json](https://github.com/darksider4all/leadgen-mcp/blob/main/leadgen_mcp/tools.json)), howtoromania | A different product from the account's own filings; anaf-efactura's `lookup_company` covers the VAT registry |
 
-## Decisions
+## Choices that shape the servers
 
-Taken by the maintainers; none blocks an item any more.
-
-- **New money tools are approved**: O2, O4, A3, A4, S2's submit for each new
-  form, and PB1's Porkbun tools. Each lands with its confirmation line agreed
-  and tested; a deployment that turns client confirmation off decides for
-  itself whether to keep such a tool on.
-- **New dependencies are approved**: SDK v2 (K6); Porkbun 0.52.0, which brings
-  `@x402/core`, `@x402/evm` and `viem` though their tools are left out (PB1);
-  changesets (P3); the `.mcpb` CLI (P2); `pg` (node-postgres) and its own URL
-  parser `pg-connection-string` for `rag`, the first server with a database, which
-  has no SDK of its own to bring one (approved by the maintainer on 2026-10-29).
-- **New grants and egress are approved**: Google Tasks, People and Meet scopes
-  (G1, G3, G5); an App Store Connect key and a Play service account (E-EAS4); a
-  USPTO API key (M3); `api.pwnedpasswords.com` (W2).
 - **The registry namespace is `com.foreverworks/*`**, proven by a DNS record on
   foreverworks.com, rather than `io.github.foreverworks/*`
-  ([releasing.md](releasing.md)).
-- **S2 stops before sending.** ANAF takes D100, D300 and D112 only through
-  e-guvernare.ro, as a PDF signed with a qualified certificate, which this
-  server does not hold; `submit_declaration` checks the PDF and stops.
-- **O3, `send_invoice_email`, is dropped.** Oblio's API cannot e-mail a
-  document already issued; it e-mails only at issue (`sendEmail`, which
-  `create_invoice` takes). Checked on 2026-10-22 against
-  [its API](https://www.oblio.eu/api) and its PHP, JS, Python and Go SDKs.
+  ([releasing.md](releasing.md#the-registry-namespace-comforeverworks)).
+- **anaf-spv stops before sending a D100, D300 or D112.** ANAF takes them only
+  through e-guvernare.ro, as a PDF signed with a qualified certificate, which
+  this server does not hold. `validate_declaration` checks the PDF, and
+  `submit_declaration` stops before sending.
+- **Oblio has no `send_invoice_email`.** Oblio's API cannot e-mail a document
+  already issued. It e-mails only at issue, which `create_invoice` takes as
+  `sendEmail` (read against [its API](https://www.oblio.eu/api) and its PHP,
+  JS, Python and Go SDKs in October 2026).
+- **A new dependency is weighed against what it brings in.** Porkbun's 0.52.0
+  adds `@x402/core`, `@x402/evm` and `viem` though the tools that use them are
+  left out; `rag` uses `pg` and `pg-connection-string` because a database has
+  no SDK of its own.
 
-## How this was researched
+## Servers we compared with
 
-1. **Our side, from the code.** Every server was started with an empty
-   environment and asked for `tools/list`, as `scripts/check-docs.ts` does; a
-   tool's access class is the one its `policy.ts` gives it.
-2. **Their side, from their code.** For each domain, the two to four strongest
-   published servers: the vendor's own first, then the most used (GitHub stars,
-   npm or PyPI downloads, the official MCP Registry, Smithery, Glama,
-   PulseMCP). Their tool lists and sources were read on GitHub or from
-   unpacked packages; none of their code was run.
-3. **Every claim is sourced.** A "they have X" links to a file or a doc page;
-   a "we lack X" was checked against our code. Links point at the default
-   branch unless a commit is named, and give the tool or function name beside
-   them, since a file can move.
+October 2026. A "they have X" in this page links to a file or a doc page, and a
+"we lack X" was checked against our code. Links point at the default branch
+unless a commit is named, with the tool or function name beside them, since a
+file can move.
 
 | Domain | Compared with |
 |---|---|

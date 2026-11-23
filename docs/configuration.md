@@ -87,7 +87,7 @@ docker run --rm -e MCP_SERVER=bnr -e MCP_HTTP_PORT=8080 -e MCP_HTTP_HOST=0.0.0.0
   that reaches the server through a published port other than
   `MCP_HTTP_PORT` sends that port in `Host`, so list the name without one.
 - **Unset, nothing changes.** Without both variables the server binds
-  `127.0.0.1` and answers its two loopback names, as before.
+  `127.0.0.1` and answers its two loopback names.
 - **Setting either without `MCP_HTTP_PORT` stops the start**, as a public
   host does: there is no HTTP listener to configure. The startup line names
   the address bound and the extra names answered.
