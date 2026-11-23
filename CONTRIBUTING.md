@@ -233,6 +233,21 @@ and the guard in more depth.
     answers `needs_login`. Everything else belongs in the tool's own
     description. The servers here run from 250 to 800 characters.
 
+## Who each file is written for
+
+- **READMEs, docs, comments and error texts are written for people.** They
+  never address a coding agent, and a person can follow every one of them.
+- **`AGENTS.md`, `CLAUDE.md` and skills may hold notes for coding agents.**
+  They are as public as the rest of the repository, and nothing a person needs
+  lives only there: a rule a contributor must know is also in a file for people.
+- **MCP tool descriptions and server instructions are read by a model and by a
+  person.** They are behaviour, so they stay short and have tests, and an edit
+  to one is a change to the server.
+- **A comment says why, and what is not obvious.** It is never the story of an
+  edit ("now", "used to", "fixed") and carries no tracker key or ticket number.
+  A date belongs only where it dates a fact about an outside service that can
+  change.
+
 ## Writing a server's README
 
 A server's README is the first thing a stranger reads, often arriving from the
