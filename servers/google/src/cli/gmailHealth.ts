@@ -13,7 +13,7 @@ import { NO_MAILBOX } from "../gmail/infra/accounts.js";
  *
  * THE OUTPUT IS THE CONTRACT, not just the exit code. Every line starts with
  * `GMAIL:`, so a caller can tell "this ran and reached a verdict" from "this
- * crashed before it could say anything" — which matters because a stale
+ * crashed before it could say anything". That matters because a stale
  * checkout, a missing build or an uncaught error would otherwise be reported as
  * a dead Google grant and send an operator to fix something that was never
  * broken.

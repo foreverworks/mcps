@@ -1,21 +1,17 @@
 /**
  * Gmail web links. Pure.
  *
- * Measured against real Gmail rather than copied,
- * because the obvious copy was wrong: Google's own Gmail MCP server returns
- * drafts as `#all?compose=thread-f:<thread>+msg-a:<draft>`, and that opened an
- * EMPTY compose window for every draft this server made, standalone or reply.
- * What Gmail itself puts in the address bar when you open a draft is an opaque
- * token (`compose=JHrtff...`), and that token turned out to be the legacy id
- * string re-encoded (see gmailToken). Emitting the token opens the draft.
+ * The links follow what Gmail itself puts in the address bar, not the
+ * `#all?compose=thread-f:<thread>+msg-a:<draft>` form that Google's own Gmail
+ * MCP server returns: that form opens an EMPTY compose window. When you open a
+ * draft, Gmail writes an opaque token (`compose=JHrtff...`), which is the
+ * legacy id string re-encoded (see gmailToken). Emitting the token opens the
+ * draft.
  *
- * And the id string inside it DIFFERS by kind of account, measured on fresh
- * drafts in one mailbox of each kind, each form tried in each:
+ * The id string inside the token differs by kind of account:
  *   consumer Gmail (gmail.com)   f:<thread>|msg-a:<draft>+msg-a:<draft>
  *   Google Workspace             f:<thread>+msg-a:<draft>
- * Each form opens an empty compose window in the other kind of account. The
- * Workspace form is the one Google's own server writes, which is why its links
- * work for a Workspace mailbox.
+ * Each form opens an empty compose window in the other kind of account.
  *
  * A reply draft has no compose link at all: Gmail keeps it inline at the foot
  * of its conversation, so its link is the conversation.
@@ -43,8 +39,8 @@ const GMAIL = "BCDFGHJKLMNPQRSTVWXZbcdfghjklmnpqrstvwxz";
 /**
  * Gmail's opaque web id (`FMfcgz...`, `JHrtff...`): the legacy id string,
  * base64-encoded, read as one number in base 64 and written out again in
- * base 40 over consonants. Proved against three tokens Gmail produced itself,
- * not inferred; test/gmail/webUrl.test.ts pins it with invented ids.
+ * base 40 over consonants. Checked against tokens Gmail produced itself;
+ * test/gmail/webUrl.test.ts pins it with invented ids.
  */
 export const gmailToken = (legacy: string): string => {
   let n = 0n;

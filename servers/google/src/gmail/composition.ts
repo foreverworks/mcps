@@ -115,7 +115,7 @@ export type Registry = {
  * Accounts are built LAZILY and then kept.
  *
  * Lazily, because a broken credentials file for one mailbox must not stop the
- * server from starting and serving the other — the failure belongs to the call
+ * server from starting and serving the other: the failure belongs to the call
  * that touches it. Kept, because the token cache lives inside the bundle and
  * rebuilding it per call would re-read and re-refresh on every tool use.
  *

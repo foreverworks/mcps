@@ -76,9 +76,9 @@ export type ThreadSummary = {
 /**
  * Summarise a thread fetched with format=metadata.
  *
- * Deliberately NO attachment field: measured against Gmail, format=metadata
- * returns the payload's headers and nothing else, `parts` is absent entirely,
- * so any attachment flag computed here would be permanently false. Filter with
+ * Deliberately NO attachment field: Gmail's format=metadata returns the
+ * payload's headers and nothing else, `parts` is absent entirely, so any
+ * attachment flag computed here would be permanently false. Filter with
  * the query (has:attachment) and read the real list from a full fetch.
  */
 export const threadSummary = (thread: RawThread, id: string): ThreadSummary => {

@@ -188,9 +188,9 @@ describe("saveAttachment", () => {
 
 describe("degrade paths report what actually failed", () => {
   it("names a tagged failure instead of [object Object]", async () => {
-    // Our failures are tagged plain objects, not Errors. `instanceof Error`
-    // missed every one of them, so a revoked grant on one mailbox was reported
-    // as "[object Object]" - the exact case per-account reporting exists for.
+    // Our failures are tagged plain objects, not Errors, so `instanceof Error`
+    // does not recognise them. A revoked grant on one mailbox must still read
+    // as its message, not "[object Object]": that is what per-account reporting is for.
     const revoked = (() => {
       try {
         return fail(authError("invalid_grant", "token has been expired or revoked"));

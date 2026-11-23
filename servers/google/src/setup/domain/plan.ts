@@ -72,7 +72,6 @@ const CONSOLE = "https://console.cloud.google.com";
 /**
  * The console pages setup opens, each pinned to the project with `project=`,
  * because without it the console shows whichever project was open last.
- * Checked by hand in the console on 2026-11-02.
  */
 export const consoleLinks = (projectId: string, apis: readonly string[]) => {
   const project = `project=${encodeURIComponent(projectId)}`;
@@ -93,9 +92,9 @@ export const PROJECT_CREATE_URL = `${CONSOLE}/projectcreate`;
 
 /**
  * What an External app's Branding page needs before Google lets it be
- * published (observed 2026-11-02: Publish app stays disabled, "complete your
- * configuration on the Branding page", until a home page and a privacy policy
- * on an authorized domain are set). This server's own pages serve, since the
+ * published (as of 2026-11 the console keeps Publish app disabled, "complete
+ * your configuration on the Branding page", until a home page and a privacy
+ * policy on an authorized domain are set). This server's own pages serve, since the
  * app a person makes is a copy of it; their own pages work as well.
  */
 export const APP_DOMAIN = {

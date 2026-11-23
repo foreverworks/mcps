@@ -1,7 +1,7 @@
 /**
  * The registry is pure string-and-path work, so every rule it enforces is
- * provable without a credential — which is the point of keeping it here rather
- * than inside the composition root.
+ * provable without a credential, which is why it lives apart from the
+ * composition root.
  */
 import { describe, expect, it } from "vitest";
 

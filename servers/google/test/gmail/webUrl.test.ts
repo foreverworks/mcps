@@ -1,8 +1,7 @@
 /**
- * The link builder, pinned. Its encoding was proved against tokens Gmail
- * itself put in its address bar (see webUrl.ts); the ids here are invented, in
- * the same formats, and each expected token is what that proved encoding gives
- * for them, written out as a literal. If these drift, the links stop opening
+ * The link builder, pinned. Its encoding matches tokens Gmail itself puts in
+ * its address bar (see webUrl.ts); the ids here are invented, in the same
+ * formats, and each expected token is written out as a literal. If these drift, the links stop opening
  * what they name, silently: nothing else in the suite would notice.
  */
 import { describe, expect, it } from "vitest";

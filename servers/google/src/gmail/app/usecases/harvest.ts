@@ -37,9 +37,9 @@ const wanted = (name: string, extensions: readonly string[]): boolean =>
  *
  * Gmail's own "download all attachments" zip is keyed by THREAD id and
  * silently omits every part keyed by message id, so a harvest built on it can
- * come up short without saying so. Walking the
- * MIME tree per message and fetching each part by id cannot lose one that way,
- * and the manifest states the count so the caller can reconcile it.
+ * come up short without saying so. Walking the MIME tree per message and
+ * fetching each part by id cannot lose one that way, and the manifest states
+ * the count so the caller can reconcile it.
  *
  * Nothing here throws on a per-file failure: one unreadable part is listed in
  * `failed` and the rest still land. A harvest that aborts partway through is

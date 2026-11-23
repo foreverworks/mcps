@@ -49,7 +49,7 @@ describe("searchAccounts", () => {
 
     const out = await searchAccounts([personal, work], { maxResults: 10 });
 
-    // A thread id means nothing without the mailbox it came from — Gmail ids
+    // A thread id means nothing without the mailbox it came from: Gmail ids
     // are per-account, so an untagged merged list is unusable.
     expect(out.threads.map((t) => `${t.account}:${t.id}`)).toEqual(["work:w1", "personal:p1", "work:w2"]);
   });

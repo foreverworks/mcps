@@ -23,10 +23,9 @@ export const matchingThreadIds = async ({ gmail }: Deps, query: string, limit: n
  *
  * Gmail's per-user quota is 250 units a second and reading or changing a
  * thread costs 10, so past an initial burst about 25 threads a second get
- * through. DEFAULT_CONCURRENCY overruns that, and on a long run the request
- * layer's retries run out for some threads: on an inbox of a few thousand
- * threads, a first pass at full speed takes about two minutes and leaves a few
- * untouched. Those go round again, this few at a time, once the burst is over.
+ * through. DEFAULT_CONCURRENCY overruns that, so on a long run the request
+ * layer's retries run out for some threads and they are left untouched. Those
+ * go round again, this few at a time, once the burst is over.
  */
 export const SECOND_PASS_CONCURRENCY = 4;
 

@@ -62,8 +62,8 @@ export const plainTextAsHtml = (s: string): string => `<div dir="ltr">${textToHt
  * converted from its HTML rather than taken from its own text/plain part:
  * senders that build mail from a template often ship a text part that is the
  * HTML with its tags deleted (a typical order confirmation: dozens of empty
- * lines per layout table and a literal "&copy;"), and quoting that verbatim is what put
- * a column of bare ">" lines under a reply. Runs of blank lines collapse to one.
+ * lines per layout table and a literal "&copy;"), and quoting that verbatim
+ * leaves a column of bare ">" lines under a reply. Runs of blank lines collapse to one.
  */
 const originalText = (original: Bodies, htmlToText: (h: string) => string): string =>
   (original.html !== undefined ? htmlToText(original.html) : (original.text ?? ""))

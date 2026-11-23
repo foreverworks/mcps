@@ -37,8 +37,8 @@ const select = (
 ): readonly [string | undefined, BodySource] => {
   if (detail === "raw_html") return html !== undefined ? [html, "html"] : [plain, plain ? "plain" : "none"];
   if (plain !== undefined) return [plain, "plain"];
-  // The fallback is the point: mail that ships only text/html used to come back
-  // as raw markup, which is unreadable and several times larger than its words.
+  // Mail that ships only text/html is converted: raw markup is unreadable and
+  // several times larger than its words.
   if (html !== undefined) return [htmlToText(html), "html-converted"];
   return [undefined, "none"];
 };

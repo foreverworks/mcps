@@ -36,7 +36,7 @@ export const canWrite = (granted: readonly string[]): boolean => granted.include
 
 /**
  * Creating or deleting a filter. Not part of canWrite: a modify grant consented
- * before the filter tools existed lacks it, and everything else still works.
+ * without gmail.settings.basic still reads, drafts, sends and labels.
  */
 export const canEditFilters = (granted: readonly string[]): boolean =>
   granted.includes(GMAIL_SETTINGS_BASIC) || granted.includes(GMAIL_FULL);

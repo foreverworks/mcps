@@ -30,7 +30,7 @@ export type AccountPage = {
  * in, and running the same query twice by hand and merging it by eye is exactly
  * the work a tool should absorb.
  *
- * A mailbox that fails is REPORTED and the others still answer — a dead grant
+ * A mailbox that fails is REPORTED and the others still answer: a dead grant
  * on one account must not turn a two-account search into no search at all.
  * Paging stays per-account, because Gmail's page tokens are per-mailbox and
  * pretending otherwise would silently drop results.

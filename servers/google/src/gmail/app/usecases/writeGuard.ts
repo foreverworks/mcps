@@ -40,8 +40,8 @@ export const requireWrite = async (deps: Deps): Promise<void> => {
 /**
  * Creating or deleting a filter: everything requireWrite checks, and then
  * gmail.settings.basic, which gmail.modify does not include. A modify grant
- * consented before the filter tools existed lacks it until it is consented
- * again; every other write keeps working meanwhile.
+ * consented without it is refused here until it is consented again; every
+ * other write works on it.
  */
 export const requireFilters = async (deps: Deps): Promise<void> => {
   await requireWrite(deps);
