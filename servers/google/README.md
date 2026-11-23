@@ -153,8 +153,7 @@ Drive, Docs, Sheets and the rest all the same. `GOOGLE_TOOLSETS` names the
 products to load, separated by commas, the way GitHub's MCP server takes
 `GITHUB_TOOLSETS`. The tools of a product not loaded are not there at all:
 not in the tool list, not in the server's instructions, not in
-`list_accounts` or `health`. Unset, empty or `all`, every product is loaded,
-as before.
+`list_accounts` or `health`. Unset, empty or `all`, every product is loaded.
 
 | Toolset | What it loads |
 |---|---|
@@ -174,12 +173,10 @@ loaded: every other tool takes a label `list_accounts` names, every remedy
 points to `health`, and consent is how any grant is made, including one a
 loaded product leans on (Meet reads a calendar event through the Calendar
 grant). A name that is not a toolset stops the server at start, with a
-message listing the ones there are. Measured with
-`scripts/measure-tokens.ts` on 2026-10-23 (GPT-4 tokenizer), the tool list is
-115 tools and about 84,800 tokens with every toolset (39,200 without the
-product icons, which a client may not show the model), 43 tools and 35,600
-(16,100) with `gmail,calendar`, and 46 tools and 32,400 (15,200) with
-`drive,docs,sheets`.
+message listing the ones there are. `scripts/measure-tokens.ts` weighs the
+tool list with the GPT-4 tokenizer (it needs `npm i --no-save gpt-tokenizer`):
+115 tools and about 85,600 tokens with every toolset, 43 tools and 35,900 with
+`gmail,calendar`, and 46 tools and 32,800 with `drive,docs,sheets`.
 
 To load mail and calendars only, with Claude Code:
 
@@ -629,7 +626,7 @@ Call again with `file_id`, one of the ids listed.
   `?authuser=<address>`, because `/u/0/` depends on sign-in order.
 - **Speed.** `search_threads` fetches thread metadata 16 at a time, only the
   headers a summary reads: Gmail's batch endpoint runs its sub-requests one
-  after another, and measured slower.
+  after another, so one batch is slower than sixteen concurrent requests.
 
 ### Calendar
 
@@ -739,6 +736,8 @@ clean up after themselves.
 
 ## Limitations
 
+[docs/google-gaps.md](docs/google-gaps.md) gives the reason for each of these, and what to do instead.
+
 - **No permanent delete of mail or files**, only Gmail's and Drive's trash. A
   draft, label or filter deleted here is gone, though.
 - **Filters** only set labels (no forwarding), and Gmail has no filter update:
@@ -779,7 +778,7 @@ clean up after themselves.
 
 ## Other servers for Google Workspace
 
-Searched 2026-10-15. Google runs its own servers, and two community servers
+As of 2026-10-15, Google runs its own servers, and two community servers
 are maintained and broad:
 
 - **Google's remote MCP servers** for Gmail, Drive, Docs, Sheets, Slides,
@@ -788,7 +787,7 @@ are maintained and broad:
   account. They do less: the Gmail server cannot send, download an attachment
   or sync incrementally; the Drive server cannot move, rename or trash a file;
   Docs, Sheets and Slides take a raw, unchecked `batchUpdate`.
-  [docs/google-gaps.md](docs/google-gaps.md) compares them tool by tool.
+  [docs/google-gaps.md](docs/google-gaps.md#compared-with-googles-own-workspace-mcp-servers) compares them tool by tool.
 - **`googleworkspace/cli`**, Google's command line, has dropped its MCP mode;
   its Gemini CLI extension **`gemini-cli-extensions/workspace`** is a stdio
   server for one signed-in account.
