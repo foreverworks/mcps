@@ -1,6 +1,6 @@
 /**
- * PORKBUN_TOOLSETS: unset or `all` serves what the server always served (the
- * snapshot in tools.test.ts, and the vendor's instructions word for word); a
+ * PORKBUN_TOOLSETS: unset or `all` serves every toolset (the snapshot in
+ * tools.test.ts, and the vendor's instructions word for word); a
  * subset registers only its tools and the instructions say what is missing;
  * an unknown name stops the start. The table in src/mcp/toolsets.ts must name
  * every tool the pinned package offers, and nothing else. No credential is

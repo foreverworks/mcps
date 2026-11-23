@@ -218,8 +218,8 @@ const bytesOf = (raw: string): Buffer => {
  * BIND's TTL: seconds, or a sum of units (1h30m, 2d, 1w). The test reads
  * digits, then any number of unit-and-digits, then an optional last unit:
  * one way to read any token, so it takes time in proportion to its length.
- * (`(\d+[smhdw]?)+` read a run of digits in every way it can be cut, and a
- * field of 30 zeros and a letter took seconds.)
+ * (`(\d+[smhdw]?)+` would try every way of cutting a run of digits, and a
+ * field of 30 zeros and a letter would take seconds.)
  */
 const ttlOf = (token: Token | undefined): number | undefined => {
   if (token === undefined || token.quoted || !/^\d+(?:[smhdw]\d+)*[smhdw]?$/i.test(token.raw)) return undefined;
@@ -248,7 +248,7 @@ const written = (tokens: readonly Token[]): string => tokens.map((t) => (t.quote
  * them, with what is deliberately not imported (SOA, NS, DNSSEC data); or
  * every problem found, each with its line. A record outside the domain, a
  * type Porkbun cannot hold, `$INCLUDE` or `$GENERATE` is a problem: the file
- * is fixed rather than silently imported in part.
+ * is refused until it is fixed, rather than silently imported in part.
  */
 export const parseZone = (text: string, domainName: string): ParsedZone => {
   const domain = lower(domainName);

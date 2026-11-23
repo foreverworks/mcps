@@ -1,6 +1,6 @@
 /**
  * What this server leaves out of the vendor's catalog (src/infra/vendor/offer.ts),
- * and that the money tools 0.52.0 added confirm exactly what they send.
+ * and that the money tools of the pinned package confirm exactly what they send.
  */
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";

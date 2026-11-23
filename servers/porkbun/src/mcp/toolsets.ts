@@ -4,7 +4,7 @@ import { toolsetPolicy, toolsetsFrom, type ToolPolicy, type Toolsets } from "@fo
  * Toolsets (packages/mcp-kit toolsets.ts): PORKBUN_TOOLSETS, a comma-separated
  * list of the names below, loads only those tools, so a client that edits DNS
  * is not handed 113 tool definitions with every request. Unset, blank or
- * `all` loads every one, which is the server as it always was.
+ * `all` loads every one.
  *
  * Porkbun's package gives its tools no categories, so the table below is
  * ours, by tool name, and nothing is derived from a name's shape. It must name
@@ -28,7 +28,7 @@ export type Toolset = (typeof TOOLSET_NAMES)[number];
  * description says to call it before offering to buy anything) and
  * `get_api_settings` (which every capped tool's description names) come with
  * any of them. The three weigh 734 tokens together (GPT-4 tokenizer,
- * 2026-10-23), of 44,172 for every tool.
+ * Porkbun's package 0.52.0), of 44,172 for every tool.
  */
 export const ALWAYS: readonly string[] = ["ping", "get_balance", "get_api_settings"];
 

@@ -116,7 +116,7 @@ the client makes, and Porkbun's are long. `PORKBUN_TOOLSETS` names the
 toolsets to load, separated by commas. The tools of the others are not there
 at all, and the server's instructions tell the assistant which toolsets are
 missing, so it can tell you instead of looking for a way around. Unset, empty
-or `all`, every toolset is loaded, as before.
+or `all`, every toolset is loaded.
 
 | Toolset | What it loads |
 |---|---|
@@ -143,7 +143,7 @@ caps before it is sent. A name that is not a toolset stops the server at
 start, with a message listing the ones there are. `src/mcp/toolsets.ts`
 places each tool by name, and a version of Porkbun's package with a tool it
 does not place fails the tests and will not start. Measured with
-`scripts/measure-tokens.ts` on 2026-10-23 (GPT-4 tokenizer), the tool list is
+`scripts/measure-tokens.ts` against Porkbun's package 0.52.0 (GPT-4 tokenizer), the tool list is
 113 tools and about 44,200 tokens with every toolset, 23 tools and 8,800 with
 `dns,forwards`, and 25 tools and 12,300 with `domains,account`.
 
@@ -615,8 +615,8 @@ tool, not even as a dry run.
 
 ## Other servers for Porkbun
 
-Searched 2026-10-15. Porkbun publishes its own, and it is the one this server
-runs:
+As of 2026-10-15, Porkbun publishes its own server, and it is the one this
+server runs:
 
 - **`@porkbunllc/mcp-server`** (`com.porkbun/mcp` in the MCP Registry), by
   Porkbun: stdio, with the key pair in environment variables. Porkbun also
