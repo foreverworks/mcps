@@ -28,7 +28,7 @@ export const buildDeps = (spec: AccountSpec, timeZone: string): Deps => {
 };
 
 export type Registry = {
-  /** The accounts with a grant, as the disk has them now. */
+  /** The accounts with a grant, as the disk lists them on each call. */
   readonly labels: readonly string[];
   readonly defaultLabel: string;
   readonly root: string;
