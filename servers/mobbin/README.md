@@ -4,8 +4,9 @@ Search [Mobbin](https://mobbin.com)'s library of real app screens, flows and
 sections from any AI assistant, including the ones that cannot sign in to
 Mobbin themselves. This server holds one sign-in to a Mobbin account, keeps it
 fresh, and serves Mobbin's own search tools to every client that presents this
-server's token. It only reads: no tool is `money`, and nothing it forwards
-changes your Mobbin account.
+server's token. Nothing it forwards changes your Mobbin account, and no tool is
+`money`. Its own sign-in tools are `write`: they change only what this server
+keeps on disk.
 
 **You need** a Mobbin account (the plan decides what Mobbin lets you search),
 and a one-time sign-in in a browser where you are logged in to it. Mobbin's
@@ -22,8 +23,8 @@ directory, never printed and never sent to a client.
 - "Is the Mobbin connection still working, and when does its sign-in need renewing?"
 
 **Why a bridge, when Mobbin has its own server.** Mobbin runs its own official
-MCP server at `api.mobbin.com/mcp`, and it needs OAuth: whoever connects signs in as themselves, and every client keeps its own
-grant. That is the right design for a person at a desktop client. It does not
+MCP server at `api.mobbin.com/mcp`, and it needs OAuth: whoever connects signs
+in as themselves, and every client keeps its own grant. That is the right design for a person at a desktop client. It does not
 fit three common cases: a client that cannot do OAuth at all (a script, a
 headless agent, a hosted assistant), a team that does not want every client
 holding its own long-lived grant to one account, and a deployment that wants
@@ -39,9 +40,10 @@ official server on one side and an ordinary MCP server on the other.
   token on every use, so two clients refreshing at once would break each other.
   Here one refresh runs at a time, and the new pair is saved before the new
   access token is used.
-- **A token per client.** Clients authenticate to this server with its own
-  bearer tokens (`MCP_HTTP_TOKENS_DIR`), one per client, which you can issue
-  and revoke without touching your Mobbin sign-in.
+- **A token per client.** Over HTTP, clients authenticate to this server with
+  its own bearer tokens (`MCP_HTTP_TOKENS_DIR`), one per client, which you can
+  issue and revoke without touching your Mobbin sign-in. Over stdio the client
+  is whoever started the process.
 
 ## Install
 
@@ -87,7 +89,7 @@ In a JSON configuration, the command is `node` and its one argument the full pat
 | `MOBBIN_MCP_URL` | no | Mobbin's MCP server. Default `https://api.mobbin.com/mcp`. The sign-in service is found from this address at run time, never hard-coded. |
 | `MOBBIN_REDIRECT_URI` | no | Where the browser lands after you sign in. It need not be listening: you copy the address from the browser. Default `http://127.0.0.1:8976/callback`. It must be https, or http on a loopback host, or the server does not start. Changing it registers a new client at the next `begin_authorization`. |
 | `MOBBIN_SCOPE` | no | The scopes to ask for, separated by spaces. Default: what Mobbin's server asks for, plus `offline_access` when the sign-in service offers it, which is what returns a refresh token. |
-| `MOBBIN_STATE_DIR` | no | Where the grant, the registered client and the last tool list are kept. Default: the unit's `StateDirectory`, else `$XDG_STATE_HOME/mcps/mobbin`. |
+| `MOBBIN_STATE_DIR` | no | Where the grant, the registered client and the last tool list are kept. Default: `$STATE_DIRECTORY` when a systemd service sets it, else `$XDG_STATE_HOME/mcps/mobbin` (`~/.local/state/mcps/mobbin`; `%APPDATA%\mcps\mobbin` on Windows). |
 
 The variables every server shares (the HTTP listener and its tokens, limits,
 `MCP_EGRESS_ALLOW`) are in [docs/configuration.md](../../docs/configuration.md).
@@ -102,9 +104,9 @@ You do this once per deployment, from any client of this server.
 1. Ask the assistant to call `begin_authorization`. It registers this server
    with Mobbin's sign-in service and returns `authorize_url`.
 2. Open `authorize_url` in a browser where you are signed in to Mobbin, and
-   allow access. The browser then goes to `http://127.0.0.1:8976/callback` with
-   `?code=...&state=...` after it. The page itself fails to load, because
-   nothing listens there: that is expected.
+   allow access. The browser then goes to `MOBBIN_REDIRECT_URI` (by default
+   `http://127.0.0.1:8976/callback`) with `?code=...&state=...` after it. The
+   page itself fails to load, because nothing listens there: that is expected.
 3. Copy the whole address from the browser's address bar and give it to the
    assistant, which passes it to `complete_authorization` as `redirect_url`.
    The whole address is needed, not just the code: its `state` is checked.
@@ -125,7 +127,10 @@ You do this once per deployment, from any client of this server.
 ## Tools
 
 Every tool is **read** or **write**; none is `money`. Mobbin's tools keep their
-own names, descriptions and input fields: this server takes them from Mobbin's own tool list, caches that list in `tools.json` in the state directory, and serves them as given, so what you see is what Mobbin published when the list was last read.
+own names, descriptions and input fields: this server takes them from Mobbin's
+own tool list, caches that list in `tools.json` in the state directory, and
+serves them as given, so what you see is what Mobbin published when the list
+was last read.
 
 ### This server's
 
@@ -134,7 +139,7 @@ own names, descriptions and input fields: this server takes them from Mobbin's o
 | `health` | read | Whether a grant exists and when its access token ends, whether Mobbin answers, how many tools it lists, which are offered here, which Mobbin lists that are not classified (hidden), and which classified ones it no longer lists. Never refreshes the grant and never prints a token. |
 | `refresh_grant` | write | Refreshes the grant now, to prove the refresh token works. Calls refresh a due token by themselves; this is a check, and it rotates the grant. |
 | `begin_authorization` | write | Registers this server as a client of Mobbin's sign-in service when needed, and returns the link to open in a browser signed in to Mobbin. |
-| `complete_authorization` | write | Takes the whole address the browser landed on, checks its state belongs to the sign-in begun, exchanges its code once, and stores the grant. A new client registration and the new grant replace the old ones only now. |
+| `complete_authorization` | write | Takes the whole address the browser landed on, checks its state belongs to the sign-in begun, exchanges its code once, and stores the grant. A new client registration replaces the old one only together with the new grant. |
 
 ### Mobbin's, forwarded
 
@@ -155,8 +160,9 @@ whatever Mobbin lists would hand a client a tool nobody here has read.
 with `invalid_grant` or `invalid_client` (the account revoked access, or the
 token had not been used for a long time). Only those two end a grant: a busy or
 failing Mobbin (429, 5xx) answers `unreachable` or `upstream`, keeps the grant
-and is worth retrying. The dead grant is dropped, so the next calls say "no Mobbin account" at once. Connect the
-account again as above.
+and is worth retrying. The dead grant is dropped, so the next calls say "no
+Mobbin account is connected to this server yet" at once. Connect the account
+again as above.
 
 **`authorization`: "no sign-in is open" or "closed"**. The address was used
 already, or the sign-in is more than ten minutes old. Call `begin_authorization`
@@ -196,8 +202,9 @@ authorization-code flow and PKCE (S256). The verifier and the state wait in
 the state directory between the two calls, so a restart in between loses
 nothing.
 
-**Rotating refresh tokens.** A refresh, like a code exchange, is sent once and never resent: a resend after a lost answer would present a token Mobbin already rotated. Refreshing is one exchange at a time, in this
-process and across processes (a lock in the state directory). The new access
+**Rotating refresh tokens.** A refresh, like a code exchange, is sent once and
+never resent: a resend after a lost answer would present a token Mobbin already
+rotated. Refreshing is one exchange at a time, in this process and across processes (a lock in the state directory). The new access
 and refresh tokens are written, atomically, before the access token is used;
 a write that fails fails the refresh, and a crash after it loses nothing. A
 call whose token Mobbin refuses before its stated expiry refreshes once and
@@ -210,10 +217,11 @@ server builds its tools per request, so it lists each of Mobbin's tools with
 the description and input fields Mobbin last published, kept in
 `tools.json` in the state directory.
 
-**State.** `grant.json` (the tokens), `client.json` (the registered client and
-the endpoints it signs in at), `pending.json` (the sign-in in progress) and
-`tools.json` (Mobbin's last tool list) and `candidate.json` (a new client registration, kept apart until its sign-in completes), in `MOBBIN_STATE_DIR`, each written
-whole at mode 0600.
+**State.** In `MOBBIN_STATE_DIR`, each file written whole at mode 0600:
+`grant.json` (the tokens), `client.json` (the registered client and the
+endpoints it signs in at), `candidate.json` (a new client registration, kept
+apart until its sign-in completes), `pending.json` (the sign-in in progress)
+and `tools.json` (Mobbin's last tool list).
 
 ## Limitations
 

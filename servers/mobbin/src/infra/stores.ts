@@ -5,9 +5,9 @@ import { pendingPkceAuthorizationFile, storedFile } from "@foreverworks/mcp-kit"
 import type { Stores } from "../app/ports.js";
 import { clientFromDisk, clientOnDisk, clientToDisk, grantFromDisk, grantOnDisk, grantToDisk, toolsFromDisk, toolsOnDisk, toolsToDisk } from "../domain/schema.js";
 
-/** The files of the state directory, each 0600 and written whole. */
 export const GRANT_FILE = "grant.json";
 
+/** The files of the state directory, each 0600 and written whole. */
 export const makeStores = (stateDir: string): Stores => ({
   client: storedFile(join(stateDir, "client.json"), { schema: clientOnDisk, fromDisk: clientFromDisk, toDisk: clientToDisk, lock: "client.lock" }),
   candidate: storedFile(join(stateDir, "candidate.json"), { schema: clientOnDisk, fromDisk: clientFromDisk, toDisk: clientToDisk, lock: "candidate.lock" }),
