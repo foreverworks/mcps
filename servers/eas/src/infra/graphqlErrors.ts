@@ -1,7 +1,7 @@
 import type { AppError } from "../domain/errors.js";
 
 /**
- * EAS's GraphQL errors, as they come (2026-10-03, read back):
+ * EAS's GraphQL errors, as seen in its answers on 2026-10-03:
  *
  *   {"message": "Experience with id '...' does not exist.",
  *    "extensions": {"code": "INTERNAL_SERVER_ERROR", "errorCode": "EXPERIENCE_NOT_FOUND",

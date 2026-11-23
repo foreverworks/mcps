@@ -169,8 +169,9 @@ group from another project is always refused.
 
 ## Troubleshooting
 
-**`config`: "neither EXPO_TOKEN_FILE nor EXPO_TOKEN is set".** Give the
-server a token ([Getting a robot user's token](#getting-a-robot-users-token)).
+**`config`: "neither EXPO_TOKEN_FILE nor EXPO_TOKEN is set"**, or a message
+that the token file cannot be read. Give the server a token, or fix the path
+([Getting a robot user's token](#getting-a-robot-users-token)).
 
 **`auth`.** EAS refused the token: the robot or its token was deleted or
 revoked. Check them at expo.dev (account settings, Robots) and replace the
