@@ -22,7 +22,7 @@ export type DeepReadonly<T> = T extends (infer U)[]
  * OpenAPI generators type an optional field as `T | undefined`, and APIs send
  * `null` for it anyway. Enable Banking's spec types
  * `HalTransactions.continuation_key` as a string while its own prose says
- * "Null if there are no more pages", and production sends the null (echo it
+ * "Null if there are no more pages", and the live API sends the null (echo it
  * back as the string "null" and the next page request fails with 422).
  * Widening every optional field makes the compiler ask what the code does with
  * one. Required fields are taken at the spec's word.

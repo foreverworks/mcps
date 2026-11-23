@@ -149,7 +149,7 @@ describe("clients the server tells apart, through the relay", () => {
 /**
  * A relay with one token for the server, which is held to read: every client
  * of the relay is, and since the server sees one client they also share the
- * files their calls save. This pins that, as the warning and the docs say.
+ * files their calls save. This pins that, as the relay's start-up warning and its README say.
  */
 describe("clients of a relay that share one upstream token held to a ceiling", () => {
   it("get back their own calls' files, and each other's too, because to the server they are one client", async () => {

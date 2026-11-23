@@ -3,12 +3,12 @@
  *
  * Every server here discriminates a failure by a `kind` field rather than by
  * `instanceof`, because the tag survives serialisation, a module boundary and a
- * round trip through JSON, and a class does not. The five servers had
- * byte-identical copies of the machinery below and differed only in the union
- * of failures they name, which is the part worth writing per server.
+ * round trip through JSON, and a class does not. The machinery
+ * below is the same for every server; each server writes only the union of
+ * failures it names.
  *
  * The symbol is namespaced per server on purpose. Two servers in one process
- * (a test, a future composed binary) must not catch each other's failures and
+ * (a test, say) must not catch each other's failures and
  * report them under their own remedies.
  */
 
@@ -24,7 +24,7 @@ export type ErrorKit<E> = {
 /**
  * `required(value, what)`: a field the wire schema marks optional that this
  * call cannot do without. Each server says what the absence becomes (Google's
- * is an API error, Oblio's a drift), so it passes `missing`.
+ * is an API error, Oblio's a reply outside its documented shape), so it passes `missing`.
  */
 export const makeRequired =
   (missing: (what: string) => never) =>

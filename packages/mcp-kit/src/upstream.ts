@@ -49,7 +49,7 @@ export type UpstreamOptions = {
   readonly timeoutMs?: number;
 };
 
-// The cast is the SDK's own gap (see smoke.ts): its HTTP transport does not satisfy its Transport
+// The cast is the SDK's own gap: its HTTP transport does not satisfy its Transport
 // type under exactOptionalPropertyTypes.
 export const upstreamTransport: UpstreamTransportFor = async (endpoint) => {
   if (endpoint.kind === "stdio") return new StdioClientTransport({ command: endpoint.command, args: [...endpoint.args], env: { ...endpoint.env }, stderr: "ignore" });

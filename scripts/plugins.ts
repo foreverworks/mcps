@@ -1,6 +1,6 @@
 /**
  * Writes and checks the plugin folders: each server that is published (its
- * audience ships and its package.json is no longer private, as
+ * audience ships and its package.json is not `"private": true`, as
  * scripts/release.ts decides) as a plugin for Claude and for Cursor under
  * plugins/<server>/, and the repository's marketplace for each at its root.
  * Every file is derived from the server's package.json, its README's tool

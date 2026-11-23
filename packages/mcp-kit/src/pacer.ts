@@ -9,8 +9,7 @@ const realSleep: Sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms
 /**
  * One call at a time, their starts at least `gapMs` apart, across every caller
  * in the process. For an API that throttles bursts rather than volume: both
- * delivery apps refused calls fired back to back and never refused the same
- * calls spaced out (the measured gaps are in bolt-food's and glovo's adapters),
+ * delivery apps refuse calls fired back to back (each adapter sets its own gap),
  * and ANAF's VAT registry allows one request a second per client. A failed
  * call does not stall the queue behind it.
  */

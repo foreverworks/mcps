@@ -11,9 +11,9 @@ import { describe, expect, it } from "vitest";
  * `serve` puts the MCP_EGRESS_ALLOW guard on `globalThis.fetch`, and every
  * server builds its dependencies before it serves. A client that takes `fetch`
  * while it is built (a default, an option, a field) keeps the function that
- * existed then, so its requests are never checked against the list. The Bolt
- * Food and Glovo clients did exactly that. A fetch kept as a value is the
- * kit's `liveFetch`, which reads the global at every call.
+ * existed then, so its requests are never checked against the list. A fetch
+ * kept as a value must be the kit's `liveFetch`, which reads the global at
+ * every call.
  *
  * The check reads each file's syntax tree, so layout, comments and strings
  * cannot hide or fake a use. Every use of `fetch` (the identifier, or
@@ -22,8 +22,8 @@ import { describe, expect, it } from "vitest";
  * fetch`), compared (`x === fetch`), or a name being declared or written
  * (`const fetch`, a parameter, an object key, `options.fetch`, an assignment
  * to it); anywhere else it hands the function on, and is flagged. It follows no
- * alias: `const g = globalThis; g.fetch` is beyond it, and beyond review only
- * if the reviewer stops reading.
+ * alias: `const g = globalThis; g.fetch` is beyond it, so a code
+ * review has to catch that form.
  *
  * (The parser is the one vitest's own bundler ships, declared as a dev
  * dependency here: TypeScript 7's compiler has no parser a script can call.)

@@ -10,8 +10,8 @@ export type SecretSource = { readonly file: string; readonly value: string };
 /**
  * One secret, read the one way that never quotes it.
  *
- * A named file that cannot be read, or is empty (a tenant without the vault
- * value gets a lone newline), fails through `fail` rather than falling back to
+ * A named file that cannot be read, or is empty (a deployment whose secret store
+ * holds no value for it writes a lone newline), fails through `fail` rather than falling back to
  * the variable: a service configured for files and running without them is a
  * broken deployment. Neither set is `undefined`, because whether that is an
  * error is the server's call (porkbun's documentation tools need no key).

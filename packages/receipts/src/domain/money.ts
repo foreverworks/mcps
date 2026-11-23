@@ -16,7 +16,7 @@ const PLACES = 2;
 
 /**
  * Amounts leave these servers as decimal STRINGS ("42.50"): a consumer that
- * parses a number back into a float has at least been told it is doing so. MISSING IS NOT ZERO: an amount
+ * turns one back into a float does so knowingly. MISSING IS NOT ZERO: an amount
  * the app did not send stays undefined, and a real zero prints as "0.00".
  */
 export function formatMinor(minor: number): string;

@@ -1,7 +1,7 @@
 /**
  * Publishes what a release should: every workspace that ships (a server whose
  * audience is not "extras", a package something that ships depends on;
- * scripts/packaging.ts) whose package.json is no longer `"private": true`
+ * scripts/packaging.ts) whose package.json is not `"private": true`
  * and whose version npm does not have yet, the toolkit first, with
  * provenance; then each such server's registry entry
  * (`server.json`) to the official MCP Registry, which checks the npm package's
@@ -42,8 +42,8 @@ const onNpm = (w: Workspace): boolean => {
 /**
  * Waits until npm serves a version it just accepted. npm answers a publish
  * with "may take a few minutes to become available", and the registry checks
- * the npm package before it takes an entry: on the first release, the entry
- * sent a second after npm accepted its package was refused with npm's 404.
+ * the npm package before it takes an entry, so an entry sent right after npm
+ * accepts the package is refused with npm's 404.
  */
 const awaitOnNpm = async (w: Workspace, minutes = 15): Promise<void> => {
   const until = Date.now() + minutes * 60_000;
@@ -124,11 +124,10 @@ const publishedByTrustedPublisher = async (w: Workspace): Promise<boolean> => {
  * maintainer's second factor, so this runs on their machine, never in CI.
  *
  * `npm trust list` wants that second factor too, and run with its output
- * captured it cannot ask, so it fails and proves nothing: on 2026-11-03 it
- * sent mcp-kit, trusted since 2026-10-31, on to `npm trust github`, whose 409
- * ("a trusted publisher configuration ... already exists") ended the run before
- * any package that needed trust. The version's publisher is read first, and a
- * failed `npm trust github` no longer stops the packages after it.
+ * captured it cannot ask, so it fails and proves nothing. Whether a package
+ * already trusts the workflow is therefore read from the published version's
+ * publisher. A failed `npm trust github` (npm answers 409 when the
+ * configuration already exists) does not stop the packages after it.
  */
 const trust = async (shipping: readonly Workspace[], dryRun: boolean): Promise<void> => {
   if (!npmIsAtLeast(NPM_TRUST)) throw new Error(`npm trust needs npm ${NPM_TRUST.join(".")} or newer: npm install -g npm@latest`);

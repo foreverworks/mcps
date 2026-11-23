@@ -3,7 +3,7 @@
  * manifests, its MCP configuration and the repository's two marketplaces,
  * each a pure function of the server's package.json (scripts/packaging.ts).
  *
- * The references these follow, read on 2026-11-03:
+ * The references these follow:
  *   Claude: https://code.claude.com/docs/en/plugins-reference (plugin.json,
  *   userConfig), .../plugins/marketplace-reference, and the directory's
  *   https://claude.com/docs/plugins/pre-submission-checklist
@@ -48,9 +48,9 @@ export const claudePlugin = (m: Manifest, publisher: string): Readonly<Record<st
 
 /**
  * Claude's `.mcp.json`. An option nobody set reaches the server as an empty
- * string (Claude Code 2.1.316, tried on 2026-11-03; a required one unset keeps
- * the server from starting), which every server reads as unset: check-docs
- * starts each one that way.
+ * string (as of Claude Code 2.1.316; a required one left unset keeps the
+ * server from starting), which every server reads as unset: check-docs starts
+ * each one that way.
  */
 export const claudeMcp = (m: Manifest): Readonly<Record<string, unknown>> => ({
   mcpServers: {

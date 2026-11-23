@@ -11,9 +11,8 @@ import type { LinkForPerson } from "../call.js";
  *
  * Nothing waits for the page to be finished: the servers here learn that from
  * the address the person brings back to a `complete_*` tool, matched to its
- * begun sign-in by the `state` in it, never from a notification. 2026-07-28
- * removed the completion notification, so this already works the way the new
- * revision does.
+ * begun sign-in by the `state` in it, never from a notification. The 2026-07-28
+ * revision removed the completion notification; this design needs none.
  */
 
 /** What the person answered, in the spec's words. */

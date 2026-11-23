@@ -4,8 +4,8 @@ import { mapWithConcurrency } from "./concurrency.js";
  * The shell modes' contract (`--health`, `--refresh`): ONE line per check,
  * starting with the server's prefix, and an exit code.
  *
- * THE LINE IS PART OF THE CONTRACT, not just the code. It lets the daily
- * maintenance tell "this ran and reached a verdict" from "this crashed before
+ * THE LINE IS PART OF THE CONTRACT, not just the code. It lets a scheduled
+ * health check tell "this ran and reached a verdict" from "this crashed before
  * it could say anything", which matters because a stale checkout or a missing
  * build would otherwise be reported as a dead grant and send an operator to fix
  * something that was never broken.

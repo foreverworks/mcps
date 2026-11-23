@@ -5,7 +5,7 @@
 
 /**
  * Map with at most `limit` calls in flight, preserving input order. Each
- * server picks its own limit and records why (Gmail's 16 was measured).
+ * server picks its own limit and says why next to it.
  */
 export const mapWithConcurrency = async <T, R>(items: readonly T[], limit: number, fn: (item: T, index: number) => Promise<R>): Promise<readonly R[]> => {
   const results = new Array<R>(items.length);

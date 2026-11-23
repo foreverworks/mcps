@@ -1,8 +1,4 @@
-/* Hallmark · genre: modern-minimal · macrostructure: Split Studio · theme: Cobalt, its accent the icon tile's blue (hue 261)
- * tone: technical, calm · enrichment: none (typography and the servers' own icons) · nav: N1b bordered bar · footer: Ft2 inline single line
- * pre-emit critique: P4 H4 E4 S4 R5 V4
- *
- * The site's one stylesheet. scripts/site.ts puts before it the @font-face rules of the fonts it
+/* The site's one stylesheet: a plain, technical look in blue, with only type and the servers' own icons for decoration. scripts/site.ts puts before it the @font-face rules of the fonts it
  * copies, and --color-tile, the icon tile's blue from scripts/icons.ts, so the accent is the icons'.
  */
 
@@ -181,7 +177,7 @@ main { display: block; }
   .hero .lede { padding-top: var(--space-2xs); }
 }
 
-/* The two audiences, side by side: the diptych. */
+/* The two audiences, side by side. */
 .diptych { display: grid; gap: var(--space-xl) var(--space-2xl); padding-bottom: var(--space-2xl); }
 @media (min-width: 56rem) { .diptych { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); } }
 .audience > header { border-top: 2px solid var(--color-ink); padding-top: var(--space-md); }
@@ -213,7 +209,7 @@ main { display: block; }
 .maturity-beta::before { background: linear-gradient(90deg, var(--color-accent) 50%, transparent 50%); }
 .meta strong, .facts strong { color: var(--color-ink); font-weight: 600; }
 
-/* Extras: the same rows, quieter, two to a line, under their own honest heading. */
+/* Extras: the same rows, quieter, two to a line, under their own heading. */
 .extras { padding-block: var(--space-xl) var(--space-2xl); }
 .extras > header { display: grid; gap: var(--space-xs) var(--space-2xl); border-top: var(--rule); padding-top: var(--space-md); margin-bottom: var(--space-md); }
 .extras h2 { font-size: var(--text-xl); margin: 0; }

@@ -177,7 +177,7 @@ const outputParser = (schema: unknown): SafeParser | undefined => (isZod4(schema
 /**
  * An argument the tool does not name is refused, not dropped. zod strips an
  * unknown key by default, so `list_invoices({ days: 3 })` against a schema that
- * says `zile` would run on the default window and say nothing. Strict, the
+ * names the argument `window` would run on the default window and say nothing. Strict, the
  * call fails naming the key, and the JSON Schema a client sees says
  * `additionalProperties: false`. A schema that is not zod 4
  * is left as it came: mixing versions in one object is what the SDK refuses.
@@ -253,10 +253,8 @@ type SafeParser = { readonly safeParse: (value: unknown) => { readonly success: 
  * as `unexpected` in the usual failure shape; a failure passes as it is, with
  * no structured content, as the spec has it.
  *
- * Measured 2026-10-22 (scripts/measure-tokens.ts, GPT-4 tokenizer): an output
- * schema adds about as much to a tool's definition as the rest of it (bnr's
- * three tools 635 -> 1,320 tokens, trademarks' three 927 -> 2,288, eas's seven
- * lists +1,636). Claude Code shows the model neither the schema nor, when
+ * An output schema roughly doubles a tool's definition in tokens
+ * (scripts/measure-tokens.ts weighs it). Claude Code shows the model neither the schema nor, when
  * structured content is present, the text block (it passes the structured
  * content in its place), so there it costs nothing; a client that forwards
  * schemas and both blocks pays the definition and each result twice. Hence

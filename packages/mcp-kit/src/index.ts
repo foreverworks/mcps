@@ -1,6 +1,6 @@
 /**
- * The parts every server in this repo had copied, and the rules every server
- * must follow the same way.
+ * The parts every server in this repo shares, and the rules every server
+ * follows the same way.
  *
  * What belongs here is machinery with no opinion about any one API: the failure
  * tag, the tool envelope, a backoff schedule, calendar and exact decimal
@@ -13,7 +13,7 @@
  * confirmation for money, the audit line).
  * What does NOT belong here is anything that names an endpoint, a field or a
  * remedy. Those are the parts that make a server worth reading, and a shared
- * copy of them would be wrong for four servers out of five.
+ * copy of them would be wrong for most servers.
  */
 export { makeErrorKit, makeRequired, type ErrorKit } from "./errors.js";
 export { asFailure, failure, makeHandled, outcomeOf, type EnvelopeVocabulary, type ToolResult } from "./envelope.js";

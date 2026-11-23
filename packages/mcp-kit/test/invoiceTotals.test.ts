@@ -22,7 +22,7 @@ describe("documentTotal, EN 16931 rounding", () => {
 
   it("computes VAT once per rate on the sum, not per line", () => {
     // Three lines of 0.10 at 5%: per line it would be 3 x round(0.005) = 0.03;
-    // per rate it is round(0.30 x 5%) = round(0.015) = 0.02, which is what ANAF checks.
+    // per rate it is round(0.30 x 5%) = round(0.015) = 0.02, which is what ANAF (Romania's tax authority) checks.
     expect(total(line("0.10", "1", "5"), line("0.10", "1", "5"), line("0.10", "1", "5"))).toMatchObject({
       net: "0.30",
       vat: "0.02",

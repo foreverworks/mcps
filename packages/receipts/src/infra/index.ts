@@ -12,6 +12,6 @@ export { envPrefix, resolvePaths, resolveTimeZone } from "./paths.js";
 /**
  * How long an order history (or a page of it) is reused. Every tool starts
  * from it, a new order can land at any time, and five minutes is short enough
- * that "I just ordered, where is it" answers itself by the time anyone asks twice.
+ * that a freshly placed order shows up soon after.
  */
 export const HISTORY_TTL_MS = 5 * 60_000;

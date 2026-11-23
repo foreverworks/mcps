@@ -27,7 +27,7 @@ import { unclassified, type ToolPolicy } from "./policy.js";
  * One entry point, two transports.
  *
  * stdio is the default: a session spawns the server and owns it. HTTP is the
- * same server run ONCE on the box, as a service every session connects to.
+ * same server run once on one machine, as a service every client session connects to.
  * What a server registers does not change with the transport; only how it is
  * reached, and, over HTTP, who may reach it and how often: a client with a
  * bearer token, or, for a server that only reads public data, anyone
@@ -183,7 +183,7 @@ export const bearerMatches = (header: string | undefined, token: string): boolea
  * the time taken does not say which client's token was nearly right.
  *
  * The token is also what keeps a web page out. Loopback is reachable from any
- * browser on the box, but a page cannot send an Authorization header without a
+ * browser on the machine, but a page cannot send an Authorization header without a
  * CORS preflight, and this server answers the preflight with a 401 and no CORS
  * headers, so the browser never sends the real request.
  */
@@ -448,9 +448,9 @@ const ownFilesFor = (files: FileEndpoints | undefined, settings: GuardSettings):
  * Both protocol generations on the one route, told apart by the body: a
  * request carrying 2026-07-28's `_meta` goes to the SDK's handler for that
  * revision (which answers JSON, or a stream once a call reports progress),
- * everything else is 2025-11-25 and earlier, served here as before: JSON
- * responses, or a stream for a call that asks for progress (asksProgress).
- * Kept so because plain clients (a script with curl) read one JSON answer.
+ * everything else is 2025-11-25 and earlier, answered with JSON, or
+ * with a stream for a call that asks for progress (asksProgress). Plain
+ * clients (a script with curl) read one JSON answer.
  */
 const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits, where: Where, files?: FileEndpoints): Promise<Served> => {
   const { options } = runtime;

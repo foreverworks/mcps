@@ -13,15 +13,13 @@
  * content in place of the text and shows the model no output schema (checked
  * 2026-10-22 with claude -p against a probe server).
  *
- * 2026-10-22, the first users: bnr 3 tools 635 -> 1,320 tokens with output
- * schemas; trademarks 3 tools 927 -> 2,288; eas 19 tools 5,102 -> 6,738 (its
- * seven lists).
+ * An output schema roughly doubles a small tool's definition: bnr's 3 tools
+ * go from 635 to 1,320 tokens, which is why a server adds one only where the
+ * checked result is worth that.
  *
  * A `NAME=value` argument starts each server with that variable set, to weigh
- * a configuration, such as a server's toolsets (2026-10-23, google: every
- * toolset, gmail,calendar and drive,docs,sheets; porkbun: every toolset 113
- * tools 44,172, dns,forwards 23 tools 8,770, domains,account 25 tools 12,326;
- * each README has its numbers).
+ * a configuration, such as a server's toolsets. Each server README that has
+ * toolsets lists what they cost.
  *
  *   npx tsx scripts/measure-tokens.ts [server ...] [NAME=value ...]
  */

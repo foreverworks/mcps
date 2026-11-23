@@ -150,7 +150,7 @@ export const bearer = (tokens: BearerTokens): HttpAuth => ({
 
 /*
  * The authorization-code flow's pure parts (RFC 6749 4.1 with PKCE, RFC 7636):
- * the verifier and its challenge, the state, the URL the owner opens, and the
+ * the verifier and its challenge, the state, the URL the user opens, and the
  * redirect it lands on, read back. The exchange is `authorizationCode` above.
  * `random` is injectable so a test can pin every byte.
  */
@@ -206,7 +206,7 @@ export const authorizeUrl = (request: AuthorizeRequest): string => {
 /** Where an authorization ended, read from the URL the browser was redirected to. */
 export type Redirect =
   | { readonly kind: "code"; readonly code: string; readonly state: string }
-  /** The provider said no (access_denied when the owner cancelled), with its description when it gave one. */
+  /** The provider said no (access_denied when the user cancelled), with its description when it gave one. */
   | { readonly kind: "refused"; readonly error: string; readonly description?: string; readonly state?: string }
   /** Not a redirect from an authorization at all: unparseable, or no code and no error. */
   | { readonly kind: "invalid"; readonly message: string };

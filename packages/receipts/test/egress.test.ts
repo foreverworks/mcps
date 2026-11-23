@@ -14,9 +14,9 @@ import { POLICY, type ReceiptTools, registerReceiptTools, runServer, startServer
 /**
  * The allowlist (MCP_EGRESS_ALLOW) holds for a server started the way a
  * receipts server starts, even when its API client takes `fetch` while its
- * dependencies are built, which is what the Bolt Food and Glovo clients did:
- * `buildDeps` runs before `serve`, and `serve` is where the guard used to go in
- * force, so a client built first kept the unguarded function for good.
+ * dependencies are built, as the Bolt Food and Glovo clients do. `buildDeps`
+ * runs before `serve`, so a guard that replaced `fetch` only inside `serve`
+ * would leave such a client with the unguarded function for good.
  *
  * No request leaves the machine: the "API" is a stub on loopback, reached
  * under two names (127.0.0.1 is on the list, localhost is not) and counting

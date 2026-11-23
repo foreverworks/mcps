@@ -159,8 +159,8 @@ describe("the state a question travels in", () => {
     const elsewhere = await call({ name: "refund_it", arguments: { amount: "10.00" }, inputResponses: yes, requestState: await state() });
     expect(json(elsewhere)).toMatchObject({ error: { kind: "confirmation_invalid", message: expect.stringContaining("another call") } });
 
-    // The MAC's first character, not its last: the last of 43 base64url characters carries two padding bits, so
-    // changing only those leaves the MAC as it was, and the "forged" state verified in about 1 run in 17.
+    // Change the MAC's first character, not its last: the last of its 43 base64url characters carries two
+    // padding bits, so changing only those would leave the MAC as it was.
     const forged = String(await state()).replace(/\.(.)([^.]*)$/, (_, c: string, rest: string) => `.${c === "A" ? "B" : "A"}${rest}`);
     expect(json(await call({ name: "pay_it", arguments: { amount: "10.00", to: "x" }, inputResponses: yes, requestState: forged }))).toMatchObject({
       error: { kind: "confirmation_invalid" },

@@ -170,8 +170,8 @@ describe("json files", () => {
   });
 
   it("leaves no window where the file is world-readable", async () => {
-    // The mode goes on the temp file: rename preserves it, a chmod afterwards
-    // would not.
+    // The mode is set on the temp file before the rename, so the final path never exists with a
+    // looser mode; a chmod after the rename would leave a window where it is readable.
     const path = join(await dir(), "nested", "deep", "tokens.json");
     await writeJsonFile(path, { token: "secret" });
     expect((await stat(path)).mode & 0o777).toBe(0o600);

@@ -288,8 +288,7 @@ ${html}</article>
 /**
  * What the servers, and the plugins made from them, do with a person's data:
  * the page a plugin listing links to as its privacy policy
- * (scripts/plugins.ts). Each sentence is a fact of the code, checked when it
- * was written (2026-11-03): the servers run where their user starts them;
+ * (scripts/plugins.ts). Each sentence is a fact of the code: the servers run where their user starts them;
  * nothing in this repository sends telemetry, analytics or crash reports; a
  * server's requests go to the services its README names, with the
  * credentials it is given; its state is in folders on the machine it runs on

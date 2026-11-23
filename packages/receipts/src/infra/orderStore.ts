@@ -9,10 +9,10 @@ import type { OrderStore } from "../app/ports.js";
  * without refetching hundreds of them at a paced few per second.
  *
  * Files rather than one big JSON, because more than one process (the service,
- * a `--health` run, a session's own copy) uses the same directory: a write is a
+ * a `--health` run, a second copy started by hand) uses the same directory: a write is a
  * rename of a whole file, so two processes storing different orders never
  * clobber each other, and two storing the same order write the same bytes. A
- * file that fails to parse reads as absent and is simply fetched again.
+ * file that fails to parse reads as absent and is fetched again.
  *
  * The payload holds the delivery address, so files are 0600 in a 0700 dir.
  */

@@ -10,8 +10,7 @@ import { writeFileAtomic } from "./files.js";
  *
  * Several processes can run one server against one state directory (one stdio
  * copy per session, a service and its command-line modes), so the files
- * holding tokens and consents are contended. Three servers had grown their own
- * version of the two rules that matter:
+ * holding tokens and consents are contended. Two rules matter:
  *
  * 1. **Write to a temp file and rename.** A rename is atomic; a half-written
  *    tokens.json is a grant nobody can recover.

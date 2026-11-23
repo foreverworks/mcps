@@ -55,8 +55,8 @@ const bundle = async (m: Manifest, out: string): Promise<string> => {
     mkdirSync(tarballs);
     const kit = Object.fromEntries(TOOLKIT.map((dir) => [nameOf(dir), `file:${pack(dir, tarballs)}`]));
     const server = pack(`servers/${m.server}`, tarballs);
-    // The toolkit is not on npm yet when a release first builds this: the overrides
-    // send the server's own dependency on it to the tarball beside it.
+    // The overrides send the server's dependency on the toolkit to the tarball beside it,
+    // so a bundle never needs the toolkit's version to be on npm.
     writeFileSync(join(stage, "package.json"), jsonText({ name: `mcp-${m.server}-bundle`, private: true, type: "module", dependencies: { [m.name]: `file:${server}` }, overrides: kit }));
     run("npm", ["install", "--omit=dev", "--ignore-scripts", "--install-links", "--no-audit", "--no-fund", "--no-package-lock"], stage);
     rmSync(tarballs, { recursive: true });

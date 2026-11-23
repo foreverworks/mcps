@@ -4,7 +4,7 @@
  * A runaway agent loop is the realistic threat, not an attacker: one session
  * that calls a tool in a tight loop would otherwise spend a shared API quota
  * (Oblio allows 30 document calls per 100 s for the whole account) for every
- * other session on the box. So each CLIENT, the label of the token it
+ * other session sharing the server. So each CLIENT, the label of the token it
  * presented, has its own bucket. A public server has no tokens, so there each
  * caller's address has one (serve/public.ts).
  */
@@ -76,8 +76,7 @@ export const isFull = (bucket: Bucket, nowMs: number, { ratePerSec, burst }: Pic
 /**
  * The most callers whose buckets are kept at once. On a public server the
  * callers are addresses, which anyone can bring by the thousand. A bucket
- * keyed by an IPv6 /64 holds about 230 bytes of heap (measured 2026-11-03,
- * Node 22, 100,000 of them), so this is about 2.3 MB at worst; and at the
+ * keyed by an IPv6 /64 holds about 230 bytes of heap, so this is about 2.3 MB at worst; and at the
  * default rate a bucket is full again, and forgotten, 10 s after its caller's
  * last request.
  */

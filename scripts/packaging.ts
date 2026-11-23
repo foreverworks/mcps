@@ -350,7 +350,7 @@ export const readManifest = (root: string, server: string): { readonly manifest?
  * is ever published. A server ships when its audience does; a package ships
  * when something that ships depends on it, so a package only the extras use
  * is never published either. `private` is the other gate: a workspace that
- * ships is published once it is no longer private.
+ * ships is published unless it is `"private": true`.
  */
 export type Workspace = {
   readonly dir: string;

@@ -33,8 +33,8 @@ const AFTER_KILL_MS = 5_000;
  * whole group: a tool that starts others (ocrmypdf starts tesseract and
  * ghostscript, ssh a proxy command) would otherwise leave them running and
  * holding the output pipes open, and the call would wait for them past its
- * deadline. Measured: `bash -c "sleep 12 & sleep 12"` with a 1 s deadline
- * resolved after 12 s when only the direct child was killed.
+ * deadline. For example, `bash -c "sleep 12 & sleep 12"` with a 1 s deadline
+ * would resolve after 12 s if only the direct child were killed.
  */
 export const run = (argv: readonly string[], options: RunOptions): Promise<RunResult> =>
   new Promise((resolve) => {
