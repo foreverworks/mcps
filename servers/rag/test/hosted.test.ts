@@ -146,7 +146,7 @@ describe("the model Workers AI serves alone", () => {
     for (const bad of ["0", "-3", "1.5", "1e3", "0x10", "many"]) expect(failureOf(() => models({ ...ENV, RAG_EMBED_DIMENSION: bad }))).toMatchObject({ kind: "config", variable: "RAG_EMBED_DIMENSION" });
   });
 
-  it("is not built when a local endpoint is named: then the model is the local one, as before", () => {
+  it("is not built when a local endpoint is named: then the model is the local one", () => {
     for (const local of [{ RAG_EMBED_URL: "http://embed.example" }, { RAG_EMBED_MODELS: JSON.stringify({ other: { url: "http://embed.example" } }) }]) {
       const [model] = models({ ...ENV, ...local });
       expect(model?.remoteOnly).toBeUndefined();
@@ -206,7 +206,7 @@ describe("query inference with no local endpoint", () => {
 
   it("reranks at Workers AI for a local embed endpoint only when remote query inference is asked for", () => {
     const local = { RAG_EMBED_URL: "http://embed.example", RAG_CLOUDFLARE_ACCOUNT_ID: ACCOUNT, RAG_CLOUDFLARE_API_TOKEN: "t" };
-    // Questions asked to stay local keep their candidate passages local as well: no rerank endpoint is an error there, as it was.
+    // Questions asked to stay local keep their candidate passages local as well: no rerank endpoint is an error there.
     expect(buildDeps(local).hostedRerank).toBeUndefined();
     expect(buildDeps({ ...local, RAG_QUERY_PROVIDER: "cloudflare" }).hostedRerank).toMatchObject({ provider: "cloudflare" });
     expect(buildDeps({ ...local, RAG_QUERY_PROVIDER: "cloudflare" }).inference?.status()).toMatchObject({ fallback: "local" });

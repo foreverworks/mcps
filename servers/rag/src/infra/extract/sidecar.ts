@@ -4,10 +4,9 @@
  * text are one placeholder per RUN of pages ("[OCR skipped on page(s) 1-2]"),
  * so entries cannot be matched to pages by position alone.
  *
- * Why the sidecar and not pdftotext of the OCRed PDF: measured 2026-10-29 on a
- * Romanian page, pdftotext read the invisible text layer with the space before
- * every word starting with "î" missing ("Chiriașulîși"), three runs in three;
- * the sidecar had every line exact.
+ * Why the sidecar and not pdftotext of the OCRed PDF: pdftotext can lose the space before a
+ * word when it reads the invisible text layer (on a Romanian page it joined "Chiriașul" and
+ * "își" into "Chiriașulîși"), while the sidecar keeps tesseract's lines exact.
  */
 const SKIPPED = /^\[OCR skipped on page\(s\) (\d+)(?:-(\d+))?\]$/u;
 

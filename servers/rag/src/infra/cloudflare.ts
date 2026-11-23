@@ -43,9 +43,9 @@ export const cloudflareUnset = (env: NodeJS.ProcessEnv): readonly string[] => [
 
 /**
  * Workers AI's error codes that matter here. 3036 is the documented "daily free allocation used up"
- * (developers.cloudflare.com/workers-ai/platform/errors); 4006 is what a Workers Free account was
- * actually answered, HTTP 429, once it had spent its allocation (2026-10-29: every request from
- * 25,666 neurons on, until the reset). Neither passes before 00:00 UTC, so neither is retried.
+ * (developers.cloudflare.com/workers-ai/platform/errors). 4006 is what a Workers Free account gets
+ * in practice (HTTP 429) once it has spent its allocation. Neither clears before 00:00 UTC, so
+ * neither is retried.
  */
 const DAILY_ALLOCATION_SPENT: ReadonlySet<string> = new Set(["3036", "4006"]);
 const OUT_OF_CAPACITY = "3040";

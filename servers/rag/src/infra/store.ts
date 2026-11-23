@@ -17,7 +17,7 @@ import type { Pool } from "./database.js";
  * pgvector advises for a filter of few values: collections embedded by different
  * models share the table but never a graph, whose neighbours would otherwise be
  * vectors from another model's space, and a search reads only its collection's
- * graph. Tables made before that had one index for every collection
+ * graph. Tables made by an older version had one index for every collection
  * (rag_chunk_embedding); ensureIndex builds a collection's own and drops that
  * one once no collection needs it.
  *
@@ -67,9 +67,9 @@ const inTransaction = async <T>(pool: Pool, work: (client: pg.PoolClient) => Pro
 };
 
 /**
- * Columns added after the first release, for tables made before them: where a
- * collection's chunks are embedded (local, which is what embedded them then)
- * and what a remote provider has cost it.
+ * Columns that tables made by an older version lack, added in place: where a
+ * collection's chunks are embedded (local, which is what embedded them before
+ * providers existed) and what a remote provider has cost it.
  */
 const UPGRADES: readonly string[] = [
   "ALTER TABLE rag_collection ADD COLUMN IF NOT EXISTS snapshot boolean NOT NULL DEFAULT false",
@@ -92,7 +92,7 @@ const schemaSql = (dimension: number): readonly string[] => [
      collection text NOT NULL REFERENCES rag_collection (name) ON DELETE CASCADE,
      source text NOT NULL, sha256 text NOT NULL, size bigint NOT NULL, kind text NOT NULL, pages integer,
      extraction text NOT NULL DEFAULT '', indexed timestamptz NOT NULL DEFAULT now(), PRIMARY KEY (collection, source))`,
-  // Tables made before the column existed: their documents read as extracted some other way, so each is read once more.
+  // A table made without the column gets '', which no extraction key equals, so each document is read once more.
   "ALTER TABLE rag_document ADD COLUMN IF NOT EXISTS extraction text NOT NULL DEFAULT ''",
   `CREATE TABLE IF NOT EXISTS rag_chunk (
      collection text NOT NULL, source text NOT NULL, id text NOT NULL, ordinal integer NOT NULL,
@@ -162,7 +162,7 @@ const collectionOf = (r: CollectionSql): CollectionInfo => ({
   dimension: r.dimension,
   created: r.created.toISOString(),
   provider: r.provider === "cloudflare" ? "cloudflare" : "local",
-  // Collections made before providers were recorded: the local model is what embedded them.
+  // A collection recorded without a provider model was embedded by the local model.
   provider_model: r.provider_model === "" ? r.model : r.provider_model,
   ...(r.provider_probe === null ? {} : { provider_probe: r.provider_probe }),
   spent_tokens: Number(r.spent_tokens),
@@ -221,13 +221,11 @@ const flat = (column: string): string => `subvector(${column}, 1, vector_dims(${
  * A cosine pgvector cannot compute (a zero vector gives NaN) counts as 0, as it does in memory. The last
  * SELECT always returns a row, so the source's own size comes back even when no document was found.
  *
- * Measured on 70,000 chunks of 1,024 dimensions (1,000 documents of 70 chunks, a source of 70): 22 s at 10
- * candidates and 55 s at 50 for a first version, which carried the chunk ids and locations in every pair
- * row, sorted all the pairs, and fetched each stored vector from its TOAST table for every cosine (10
- * million buffer reads for 1.35 million pairs). Vectors of 1,024 floats are stored out of line, so `kept`
- * and `compared` hold flat copies (`subvector` over the whole vector), `kept` drives the cross join and
- * `compared` is its small inner side (`OFFSET 0` keeps the planner from flattening that back). Now 2.7 s and
- * 5.3 s.
+ * Vectors of 1,024 floats are stored out of line (TOAST), so reading one for every cosine is slow:
+ * a plan that carried chunk ids and locations in every pair row, sorted all the pairs and fetched each
+ * stored vector per cosine spent 10 million buffer reads on 1.35 million pairs. Instead `kept` and
+ * `compared` hold flat copies (`subvector` over the whole vector), `kept` drives the cross join and
+ * `compared` is its small inner side (`OFFSET 0` keeps the planner from flattening that back).
  */
 export const SIMILAR_SQL = `
 WITH own AS (
@@ -592,7 +590,7 @@ export const makeStore = (pool: () => Promise<Pool>, tuning: { readonly similarT
     matching: async (scope: SearchScope, text, limit) =>
       inTransaction(await pool(), async (client) => {
         // The full-text half is bounded: a question whose every word is frequent still matches most of a
-        // large collection, and ranking every match took 50 s over 105,882 chunks. Past the bound the
+        // large collection, and ranking every match can take tens of seconds. Past the bound the
         // query is cancelled (SQLSTATE 57014) and search goes on with the vector half.
         await query(client, `SET LOCAL statement_timeout = ${MATCH_TIMEOUT_MS}`);
         // ANY word of the query (OR), accents removed on both sides, words of one or two letters and the

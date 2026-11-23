@@ -21,7 +21,7 @@ const SECRET = { file: "RAG_DATABASE_PASSWORD_FILE", value: "RAG_DATABASE_PASSWO
  * The pool's settings: the URL taken apart here, then the password from the
  * file or variable. Not `{ connectionString, password }`: pg parses the
  * string over the other settings, and a URL with no password then sets it
- * to nothing (pg 8.23, measured: "client password must be a string").
+ * to nothing, which fails the connection with "client password must be a string".
  */
 export const poolConfigOf = (url: string, password: string | undefined): pg.PoolConfig => ({
   ...parseIntoClientConfig(url),

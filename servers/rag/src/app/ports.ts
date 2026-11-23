@@ -27,7 +27,8 @@ export type Embedder = {
 
 /**
  * An embedding service elsewhere serving the model a local endpoint serves,
- * used to index a collection set to it. Questions are always embedded locally.
+ * used to index a collection set to it. A question is embedded by the query provider
+ * (local unless the server is set to ask the remote one).
  */
 export type RemoteEmbedder = {
   readonly provider: RemoteProvider;

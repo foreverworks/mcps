@@ -813,7 +813,7 @@ describe("local-only collections", () => {
     expect(await s.call("snapshot_collections", { copies: [{ from: "docs", name: "docs-frozen" }] })).toMatchObject({ snapshots: [{ name: "docs-frozen" }] });
   });
 
-  it("changes nothing else: the other tools answer as before, and health lists the names sorted", async () => {
+  it("changes nothing else: the other tools answer as usual, and health lists the names sorted", async () => {
     const s = await withRemote({ localOnly: new Set(["notes", "journal"]) });
     const source = join(s.inbox, "lease/contract.md");
     const found = await s.call("search", { query: QUESTION, collections: ["journal"] });

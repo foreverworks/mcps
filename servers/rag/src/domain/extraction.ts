@@ -5,9 +5,9 @@ import type { Kind } from "./kinds.js";
  * chunks hold: every file is then read again on its next run, though only the
  * chunks whose text changed are embedded again.
  *
- * 2: OCR forced on the pages without enough text (a stamped page number no
- * longer stops it), control characters dropped, UTF-16 text files, long words
- * cut.
+ * Version 2 forces OCR on pages without enough text (a stamped page number
+ * does not stop it), drops control characters, reads UTF-16 text files and
+ * cuts long words.
  */
 export const PIPELINE_VERSION = 2;
 

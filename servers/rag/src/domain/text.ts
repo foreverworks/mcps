@@ -17,7 +17,7 @@ export const includesRomanian = (language: string): boolean => language.split("+
 /**
  * Control characters other than tab and newline: a form feed or vertical tab
  * becomes a line break, the rest go. Postgres refuses NUL in text outright,
- * and one NUL in a file failed the database write for the whole call.
+ * so one NUL in a file would fail the database write for the whole call.
  */
 const CONTROL = /[\u0000-\u0008\u000B\u000C\u000E-\u001F\u007F]/gu;
 

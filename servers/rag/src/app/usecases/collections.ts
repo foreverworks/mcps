@@ -151,8 +151,7 @@ export const snapshotCollections = async (deps: Deps, copies: readonly { readonl
  * its own vector index if it was made without one, and moves it to another
  * embedding provider when one is named. A remote provider is probed first and
  * refused unless it embeds as the model's local endpoint does, so chunks from
- * either provider sit in one index and every question, embedded locally,
- * finds both. A local-only collection (RAG_LOCAL_ONLY_COLLECTIONS) is refused
+ * either provider sit in one index and one question finds both. A local-only collection (RAG_LOCAL_ONLY_COLLECTIONS) is refused
  * any remote provider, before the provider is probed.
  *
  * A model with no local endpoint (`remoteOnly`) needs no embedding call to

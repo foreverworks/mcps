@@ -72,6 +72,7 @@ Claude Desktop (Settings, Developer, Edit Config) and most other clients read th
 
 The commands above set only what is required; [Configuration](#configuration) has the rest. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
+
 ## Configuration
 
 | Variable | Required | Meaning |
@@ -125,7 +126,7 @@ the same dimension share one.
 Each collection has an HNSW index of its own, partial on the collection's name,
 as pgvector advises for filtering by a few values: a search reads only its
 collection's graph, and collections embedded by different models never share
-one. Tables made by an earlier version had one index for every collection
+one. Tables made by an older version of this server had one index for every collection
 (`rag_chunk_embedding`); `health` lists the collections still without their own,
 and `create_collection` with each one's name builds it (concurrently: search and
 indexing go on meanwhile; 105,882 chunks took about three minutes) and drops the
@@ -193,9 +194,8 @@ and neurons Workers AI billed for the call, and `list_collections` the total
 per collection. A spent daily allocation stops the call with a `provider`
 error whose reason is `quota`; the files indexed until then stay indexed, and
 the collection can go on locally meanwhile. Workers AI enforces the allocation
-late: one account's requests went through to 25,666 neurons before it answered
-code 4006 to every one, and that refusal still held hours after the 00:00 UTC
-reset.
+late: an account can run past its 10,000 neurons before the service answers
+code 4006 to every request, and that refusal can outlast the 00:00 UTC reset.
 
 ### The models
 
