@@ -13,8 +13,8 @@ Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/)
 - "Is the Mobbin connection still working, and when does its sign-in need renewing?"
 
 **Why a bridge, when Mobbin has its own server.** Mobbin runs its own official
-MCP server at `api.mobbin.com/mcp`, and it needs OAuth: whoever connects signs in as themselves, and every client keeps its own
-grant. That is the right design for a person at a desktop client. It does not
+MCP server at `api.mobbin.com/mcp`, and it needs OAuth: whoever connects signs
+in as themselves, and every client keeps its own grant. That is the right design for a person at a desktop client. It does not
 fit three common cases: a client that cannot do OAuth at all (a script, a
 headless agent, a hosted assistant), a team that does not want every client
 holding its own long-lived grant to one account, and a deployment that wants
@@ -30,9 +30,10 @@ official server on one side and an ordinary MCP server on the other.
   token on every use, so two clients refreshing at once would break each other.
   Here one refresh runs at a time, and the new pair is saved before the new
   access token is used.
-- **A token per client.** Clients authenticate to this server with its own
-  bearer tokens (`MCP_HTTP_TOKENS_DIR`), one per client, which you can issue
-  and revoke without touching your Mobbin sign-in.
+- **A token per client.** Over HTTP, clients authenticate to this server with
+  its own bearer tokens (`MCP_HTTP_TOKENS_DIR`), one per client, which you can
+  issue and revoke without touching your Mobbin sign-in. Over stdio the client
+  is whoever started the process.
 
 ## What it can change
 
