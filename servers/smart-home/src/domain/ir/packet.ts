@@ -14,7 +14,7 @@
 
 /**
  * The blaster's duration unit in microseconds. Measured on an RM4 mini
- * (2026-10-26) from five learned presses of an NEC remote: the 108 ms frame
+ * from five learned presses of an NEC remote: the 108 ms frame
  * period came back as 3478-3481 units (31.0 us each), the 13.5 ms leader as
  * 433-436 (31.0 us), and the 1125 and 2250 us bit periods as 36.8 and 72.9
  * units on average (30.6-30.9 us). 31 us is within about a percent of all of

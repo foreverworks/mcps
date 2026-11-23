@@ -222,7 +222,7 @@ by their bytes, because two presses of one button differ in their timing.
 device's type, MAC, name and lock flag; an auth request under the protocol's
 public default key opens a session with its own AES key; the commands follow
 under that key. Every call opens its own session, so nothing is kept between
-calls and a blaster that rebooted is simply asked again. The packets are
+calls and a blaster that rebooted is asked again. The packets are
 byte-identical to python-broadlink's, the library every open integration
 follows (the tests hold them to its bytes).
 

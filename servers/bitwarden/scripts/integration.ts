@@ -6,7 +6,7 @@
  * own, reads back what was stored, as Bitwarden's apps would, and signs with
  * it the way their authenticator does. Keys are made in this run and printed
  * nowhere. First, calls that arrive together on a first start and after a
- * restart must all answer, which they did not while each one unlocked.
+ * restart must all answer, which needs them to share one unlock.
  *
  * The CLI talks to a server over HTTPS only, so Vaultwarden gets a
  * certificate from a throwaway authority, which the server and the CLI trust
@@ -95,9 +95,9 @@ const main = async (): Promise<void> => {
     };
     return { client, call };
   };
-  // Calls that arrive together, as a deploy's health check and an agent's call do after a restart. Each used to
-  // log in and unlock on its own; the CLI keeps the vault's key under one session key in data.json, so the second
-  // unlock turned the first call's key stale ("the vault is locked after unlocking", "Vault is locked.").
+  // Calls that arrive together, as a deploy's health check and an agent's call do after a restart. They must share
+  // one unlock: the CLI keeps the vault's key under one session key in data.json, so a second unlock would turn
+  // the first call's key stale ("the vault is locked after unlocking", "Vault is locked.").
   const together = async (call: (name: string, args?: Record<string, unknown>) => Promise<Answer>): Promise<void> => {
     const all = await Promise.all([call("health"), call("find_logins", { search: "nothing here" }), call("list_passkeys", {}), call("health")]);
     for (const answer of all) assert.equal(answer.error, undefined, JSON.stringify(answer.error));

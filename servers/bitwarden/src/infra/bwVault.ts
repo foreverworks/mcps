@@ -64,9 +64,9 @@ const checkId = (id: string): void => {
  * Every `bw unlock` stores the vault's key in data.json under a NEW session
  * key, and the key any earlier unlock handed out stops opening it: `bw status`
  * then answers "locked" and every other command "Vault is locked.". So calls
- * that find no key share one unlock rather than each running its own (two
- * calls just after a restart used to, and the one whose key went stale
- * answered "the vault is locked after unlocking"), and a call whose key went
+ * that find no key share one unlock rather than each running its own (the
+ * one whose key went stale would answer "the vault is locked after
+ * unlocking"), and a call whose key went
  * stale drops it only if no other call has replaced it already.
  */
 export const makeBwVault = ({ run, credentials, serverUrl, now }: BwVaultOptions): VaultPort => {

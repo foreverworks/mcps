@@ -32,8 +32,8 @@ import type { Exchange, Plan } from "./udp.js";
 /**
  * The Blasters port over BroadLink's protocol: hello, then auth, then the
  * command, a new session per operation (nothing is kept between calls, so a
- * blaster that rebooted or was re-locked is simply asked again). A request
- * that cannot happen twice harmfully (hello, auth, a read) is sent again
+ * blaster that rebooted or was re-locked is asked again). A request
+ * that is harmless to repeat (hello, auth, a read) is sent again
  * when no answer comes; an IR code is sent once, and silence after it is
  * reported as an unknown outcome, never retried.
  */
@@ -47,7 +47,7 @@ export type BlasterOptions = {
   readonly random: () => number;
 };
 
-/** Timing: an RM4 mini answered every request within 0.12 s on its own LAN (measured 2026-10-26); a VPN or subnet route adds its round trip. */
+/** Timing: an RM4 mini answered every request within 0.12 s on its own LAN; a VPN or subnet route adds its round trip. */
 const READ: Omit<Plan, "accept"> = { waitMs: 1000, attempts: 4 };
 const ONCE: Omit<Plan, "accept"> = { waitMs: 3000, attempts: 1 };
 /** A learning window lasts about 25 s on an RM4 mini; it is opened again before that. */

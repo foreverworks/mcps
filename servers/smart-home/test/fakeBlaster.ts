@@ -1,6 +1,6 @@
 /**
  * An RM4 mini as the server meets it on the network, answering the way the
- * real one does (measured 2026-10-26): a hello answer of 128 bytes, auth and
+ * real one does: a hello answer of 128 bytes, auth and
  * commands echoing the request's count, "storage error" (-5) or "read error"
  * (-10) to a check while nothing has been learned, and -1 to auth while Lock
  * device is on in the vendor's app.

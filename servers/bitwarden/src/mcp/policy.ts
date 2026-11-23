@@ -4,7 +4,7 @@ import type { ToolPolicy } from "@foreverworks/mcp-kit";
  * Every tool, classified (packages/mcp-kit, policy.ts).
  *
  * `get_password`, `get_field` and `totp` hand a secret to the calling agent, and are still
- * `read`, not `money` as Porkbun's private keys are: this server is meant for
+ * `read`, not `money`: this server is meant for
  * an account that holds the agent's OWN logins, made for it to use without
  * asking. A person's own passwords belong in a vault this account cannot
  * reach; what a person lends goes into a shared collection on purpose.

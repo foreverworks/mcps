@@ -7,7 +7,7 @@ import { cliError, fail } from "../../domain/errors.js";
 /** The official CLI's entry point, from the pinned `@bitwarden/cli` in this workspace. Run by this Node, never from PATH. */
 const BW_JS = join(dirname(createRequire(import.meta.url).resolve("@bitwarden/cli/package.json")), "build", "bw.js");
 
-/** In testing, `bw status` took 2.7 s and `bw list items` 3.1 s; a sync over a slow link takes longer. */
+/** `bw status` and `bw list items` each take a few seconds, and a sync over a slow link takes longer. */
 const TIMEOUT_MS = 90_000;
 
 export type BwResult = { readonly code: number; readonly stdout: string; readonly stderr: string };

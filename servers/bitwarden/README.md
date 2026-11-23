@@ -76,7 +76,8 @@ claude mcp add bitwarden -e BITWARDEN_CLIENT_ID_FILE="<path to API key client id
 
 In a JSON configuration, the command is `node` and its one argument the full path of `servers/bitwarden/dist/index.js`. To share one running copy between several clients over HTTP, see [docs/deploying.md](../../docs/deploying.md).
 <!-- install:end -->
-The official CLI, `@bitwarden/cli` (pinned to 2026.10.0), is a dependency of
+
+The official CLI, `@bitwarden/cli` (pinned to 2026.10.1), is a dependency of
 the package: `npx` and `npm ci` install it with the server, which runs it
 under its own Node and never uses a `bw` on your PATH.
 
@@ -232,7 +233,7 @@ reads and writes its single `data.json`. The process keeps only the session
 key from `bw unlock`; after a restart, the next call logs in and unlocks
 again. Calls that arrive while there is no key share that one unlock: every
 `bw unlock` stores the vault's key under a new session key and the one before
-stops opening it, so two unlocks at once left one call holding a stale key.
+stops opening it, so two unlocks at once would leave one call holding a stale key.
 Secrets reach the CLI through its environment or stdin, never its
 arguments, which every local user can read. As a child process, the CLI is not
 covered by `MCP_EGRESS_ALLOW` ([docs/configuration.md](../../docs/configuration.md)).

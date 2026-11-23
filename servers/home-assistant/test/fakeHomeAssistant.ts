@@ -241,7 +241,7 @@ export const fakeHomeAssistant = (options: FakeOptions = {}) => {
     requests,
     sockets,
     states,
-    /** Make Home Assistant accept another token from now on (the owner made a new one). */
+    /** Make Home Assistant accept another token from now on (the user made a new one). */
     acceptToken: (next: string) => {
       token = next;
     },

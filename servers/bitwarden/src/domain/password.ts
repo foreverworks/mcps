@@ -11,7 +11,7 @@ export type PasswordRules = { readonly length: number; readonly symbols: boolean
 const LOWER = "abcdefghijkmnopqrstuvwxyz";
 const UPPER = "ABCDEFGHJKLMNPQRSTUVWXYZ";
 const DIGITS = "23456789";
-/** Symbols every signup form we have met accepts; no quotes, backslashes or spaces. */
+/** Symbols that signup forms commonly accept; no quotes, backslashes or spaces. */
 const SYMBOLS = "!@#$%^&*-_=+";
 
 export const DEFAULT_RULES: PasswordRules = { length: 24, symbols: true };

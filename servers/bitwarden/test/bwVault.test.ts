@@ -82,8 +82,8 @@ const outcome = async <T>(p: Promise<T>) => p.then((value) => ({ value }), (thro
 
 describe("the CLI session", () => {
   it("is unlocked once for calls that arrive together on a fresh process, and every one of them succeeds", async () => {
-    // After a restart: the deploy's health check and an agent's totp arrived within the same seconds, each unlocked,
-    // and the second unlock turned the first one's key stale under its next command ("the vault is locked after unlocking").
+    // After a restart, a health check and a totp call can arrive within the same seconds. If each unlocked, the
+    // second unlock would turn the first one's key stale under its next command ("the vault is locked after unlocking").
     const cli = fakeCli({ loggedIn: true });
     const vault = vaultOn(cli);
     const deps = depsOf(vault);
