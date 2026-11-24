@@ -1,0 +1,35 @@
+{
+  "name": "foreverworks-granola",
+  "displayName": "Granola",
+  "version": "0.1.0",
+  "description": "Read your Granola meetings, notes and transcripts from clients that cannot sign in to Granola.",
+  "author": {
+    "name": "Forever Works",
+    "url": "https://foreverworks.github.io/mcps/"
+  },
+  "homepage": "https://foreverworks.github.io/mcps/servers/granola/",
+  "repository": "https://github.com/foreverworks/mcps",
+  "license": "MIT",
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "granola",
+    "meetings",
+    "meeting-notes",
+    "transcripts",
+    "oauth"
+  ],
+  "icon": "./assets/icon.png",
+  "documentationUrl": "https://foreverworks.github.io/mcps/servers/granola/",
+  "supportUrl": "https://github.com/foreverworks/mcps/issues",
+  "privacyPolicyUrl": "https://foreverworks.github.io/mcps/privacy/",
+  "userConfig": {
+    "granola_redirect_uri": {
+      "type": "string",
+      "title": "Redirect address",
+      "description": "Where the browser lands after you sign in to Granola; it need not be reachable. Defaults to a loopback address.",
+      "required": false
+    }
+  }
+}

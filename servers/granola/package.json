@@ -1,0 +1,66 @@
+{
+  "name": "@foreverworks/mcp-granola",
+  "version": "0.1.0",
+  "description": "MCP server that bridges Granola's own hosted MCP server: one OAuth grant held on the server, your meetings, notes and transcripts served read-only to clients that cannot sign in to Granola themselves",
+  "mcpName": "com.foreverworks/granola",
+  "mcp": {
+    "title": "Granola",
+    "audience": "general",
+    "maturity": "beta",
+    "tagline": "Read your Granola meetings, notes and transcripts from clients that cannot sign in to Granola.",
+    "inputs": {
+      "GRANOLA_REDIRECT_URI": {
+        "title": "Redirect address",
+        "type": "text",
+        "required": false,
+        "description": "Where the browser lands after you sign in to Granola; it need not be reachable. Defaults to a loopback address."
+      }
+    }
+  },
+  "keywords": [
+    "mcp",
+    "model-context-protocol",
+    "mcp-server",
+    "granola",
+    "meetings",
+    "meeting-notes",
+    "transcripts",
+    "oauth"
+  ],
+  "license": "MIT",
+  "author": "Forever Works",
+  "homepage": "https://foreverworks.github.io/mcps/servers/granola/",
+  "bugs": "https://github.com/foreverworks/mcps/issues",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/foreverworks/mcps.git",
+    "directory": "servers/granola"
+  },
+  "type": "module",
+  "bin": {
+    "mcp-granola": "dist/index.js"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md",
+    "icons",
+    "!dist/**/*.map",
+    "!dist/**/*.tsbuildinfo"
+  ],
+  "engines": {
+    "node": ">=22.19"
+  },
+  "scripts": {
+    "prebuild": "node ../../scripts/clean-dist.mjs",
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "test": "vitest run",
+    "typecheck": "tsc -p tsconfig.test.json",
+    "prepack": "node ../../scripts/prepack.mjs"
+  },
+  "dependencies": {
+    "@foreverworks/mcp-kit": "^0.3.0",
+    "zod": "^4.6.7"
+  }
+}

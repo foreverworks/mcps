@@ -1,0 +1,14 @@
+{
+  "mcpServers": {
+    "granola": {
+      "command": "npx",
+      "args": [
+        "-y",
+        "@foreverworks/mcp-granola@0.1.0"
+      ],
+      "env": {
+        "GRANOLA_REDIRECT_URI": "${user_config.granola_redirect_uri}"
+      }
+    }
+  }
+}
