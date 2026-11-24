@@ -79,19 +79,22 @@ jobs:
 
   image:
     # Every stage the image workflow publishes, built from this commit and pushed
-    # nowhere, so a change to the Dockerfile or its base image (Renovate's base
-    # bumps merge on their own once ci passes) proves it still builds before it
-    # merges, not after.
+    # nowhere, then started the way that workflow starts it before a publish
+    # (.github/scripts/image-start-check.sh: the server answers over stdio, and
+    # each program a stage adds runs), so a change to the Dockerfile or its base
+    # image (Renovate's base bumps merge on their own once ci passes) proves it
+    # builds and starts before it merges, not after.
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
       - uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
-      - name: Build image, printer, anafspv and devices
+      - name: Build and start image, printer, anafspv and devices
         run: |
           set -euo pipefail
           for target in image printer anafspv devices; do
             echo "::group::${target}"
-            docker buildx build --target "$target" .
+            docker buildx build --target "$target" --load --tag "mcps-${target}-check" .
+            .github/scripts/image-start-check.sh "$target" "mcps-${target}-check"
             echo "::endgroup::"
           done

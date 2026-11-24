@@ -83,7 +83,22 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Build and push
+      # The main build is started before it is published, too: a server that
+      # does not start in it fails the job, and nothing is pushed under its tag.
+      - name: Build the image
+        uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
+        with:
+          context: .
+          target: image
+          load: true
+          tags: mcps-image-check
+          labels: |
+            org.opencontainers.image.revision=${{ env.SHA }}
+
+      - name: Check that the image starts
+        run: .github/scripts/image-start-check.sh image mcps-image-check
+
+      - name: Push the image
         id: build
         uses: docker/build-push-action@c3c9e263c25d99ce0380d002d59b67737d91b0dc # v7.4.0
         with:
@@ -110,10 +125,8 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ env.SHA }}
 
-      - name: Check that poppler runs in the printer image
-        run: |
-          docker run --rm --entrypoint pdftoppm mcps-printer-check -v
-          docker run --rm --entrypoint pdfinfo mcps-printer-check -v
+      - name: Check that the printer image starts and poppler runs in it
+        run: .github/scripts/image-start-check.sh printer mcps-printer-check
 
       - name: Push the printer image
         id: build-printer
@@ -138,8 +151,8 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ env.SHA }}
 
-      - name: Check that Java runs in the anaf-spv image
-        run: docker run --rm --entrypoint java mcps-anafspv-check -version
+      - name: Check that the anaf-spv image starts and Java runs in it
+        run: .github/scripts/image-start-check.sh anafspv mcps-anafspv-check
 
       - name: Push the anaf-spv image
         id: build-anafspv
@@ -165,14 +178,8 @@ jobs:
           labels: |
             org.opencontainers.image.revision=${{ env.SHA }}
 
-      - name: Check that the devices image has what the server runs
-        run: |
-          docker run --rm --entrypoint ssh mcps-devices-check -V
-          docker run --rm --entrypoint incus mcps-devices-check --version
-          docker run --rm --entrypoint jq mcps-devices-check --version
-          docker run --rm --entrypoint bash mcps-devices-check --version
-          docker run --rm --entrypoint setsid mcps-devices-check --version
-          docker run --rm --entrypoint awk mcps-devices-check -W version
+      - name: Check that the devices image starts and has what the server runs
+        run: .github/scripts/image-start-check.sh devices mcps-devices-check
 
       - name: Push the devices image
         id: build-devices
