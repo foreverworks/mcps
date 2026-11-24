@@ -13,6 +13,11 @@ const BEFORE_LISTING =
   "One of Granola's own tools, forwarded as it is. Its fields are those Granola publishes; they appear here once the grant has listed Granola's tools (health does it), until then any object is passed on and Granola checks it.";
 
 /** The description of a forwarded tool before Granola's own has been listed. */
+/** Granola's own text is shown to a model in every session: a runaway title or description from the cache is cut. */
+const MAX_DESCRIPTION = 4000;
+const MAX_TITLE = 200;
+const capped = (text: string, max: number): string => (text.length <= max ? text : `${text.slice(0, max - 1)}\u2026`);
+
 const describedBefore = (name: string): string => `${FALLBACK_LINES[name] ?? ""} ${BEFORE_LISTING}`.trim();
 
 /**
@@ -74,7 +79,7 @@ export const registerAll = (server: McpServer, deps: Deps): void => {
     const spec = known.find((t) => t.name === name);
     server.registerTool(
       name,
-      { title: spec?.title ?? name, description: spec?.description ?? describedBefore(name), inputSchema: inputSchemaOf(spec) },
+      { title: capped(spec?.title ?? name, MAX_TITLE), description: capped(spec?.description ?? describedBefore(name), MAX_DESCRIPTION), inputSchema: inputSchemaOf(spec) },
       async (args: Record<string, unknown>) => {
         try {
           return (await callGranola(deps, name, args)) as never;

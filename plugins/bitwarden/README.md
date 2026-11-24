@@ -23,7 +23,7 @@ Free and open source, from [Forever Works](https://foreverworks.github.io/mcps/)
 
 ## What it can change
 
-It has 17 tools. Some of them change things in your account, and none moves money.
+It has 17 tools. Some of them write, and its documentation says what each one changes; none moves money.
 
 ## Install
 

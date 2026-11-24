@@ -5,10 +5,10 @@
 The first release. Your assistant can search and read your Granola meetings,
 notes and transcripts through Granola's own official MCP server, from clients
 and scripts that cannot sign in to Granola themselves: `search_meetings`,
-`get_meetings`, `get_meeting_transcript`, `search_transcripts`,
+`list_meetings`, `get_meetings`, `get_meeting_transcript`, `search_transcripts`,
 `list_meeting_folders`, `get_meeting_attachment`, `get_account_info`,
 `list_templates`, `get_agent_brief` and `query_granola_meetings`, all `read`,
-forwarded exactly as Granola answers them. The server holds one sign-in to your
+forwarded with their content unchanged. The server holds one sign-in to your
 Granola account, refreshes it by itself (Granola's refresh tokens rotate, so one
 refresh runs at a time and the new pair is saved before it is used), and serves
 those tools to every client that presents the server's own token.

@@ -25,4 +25,25 @@ export const matchPending = (pending: PendingPkceAuthorization | undefined, stat
   return pending;
 };
 
+/** The page the browser landed on is the redirect address the sign-in began with: same origin and path, whatever follows. */
+export const landedOnRedirect = (redirectUri: string, landed: string): boolean => {
+  try {
+    const a = new URL(redirectUri);
+    const b = new URL(landed.trim());
+    return a.origin === b.origin && a.pathname === b.pathname;
+  } catch {
+    return false;
+  }
+};
+
+/** RFC 9207: when the returning address names the issuer that answered (`iss`), it must be the one this sign-in began with. */
+export const issuerMatches = (issuer: string, landed: string): boolean => {
+  try {
+    const named = new URL(landed.trim()).searchParams.get("iss");
+    return named === null || named.replace(/\/$/, "") === issuer.replace(/\/$/, "");
+  } catch {
+    return false;
+  }
+};
+
 export const isoOf = (epoch: number): string => new Date(epoch * 1000).toISOString();

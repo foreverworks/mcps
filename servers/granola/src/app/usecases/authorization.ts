@@ -1,6 +1,6 @@
 import { authorizeUrl, newPkce, newState, offerLink, parseRedirect } from "@foreverworks/mcp-kit";
 
-import { AUTHORIZATION_TTL_S, isoOf, matchPending, scopeFor } from "../../domain/authorization.js";
+import { AUTHORIZATION_TTL_S, isoOf, issuerMatches, landedOnRedirect, matchPending, scopeFor } from "../../domain/authorization.js";
 import { authorizationError, fail, inputError } from "../../domain/errors.js";
 import type { ClientRegistration } from "../../domain/schema.js";
 import type { Deps } from "../ports.js";
@@ -80,9 +80,12 @@ export const completeAuthorization = async (deps: Deps, args: { readonly redirec
   if (redirect.kind === "invalid") return fail(inputError(`that is not the address the browser landed on: ${redirect.message}`));
   if (redirect.kind === "refused") return fail(authorizationError(`Granola refused the sign-in: ${redirect.error}${redirect.description === undefined ? "" : ` (${redirect.description})`}`));
   const pending = matchPending(await stores.pending.read(), redirect.state, now());
+  // Before the code is spent: the address must be where this sign-in was sent, from the issuer it was begun with.
+  if (!landedOnRedirect(pending.redirectUri, args.redirectUrl)) return fail(authorizationError(`that address is not on the redirect address this sign-in began with (${pending.redirectUri}); paste the address the browser landed on after you allowed access`));
   const candidate = await stores.candidate.read();
   const client = candidate ?? (await stores.client.read());
   if (client === undefined) return fail(authorizationError("no client is registered: call begin_authorization first"));
+  if (!issuerMatches(client.issuer, args.redirectUrl)) return fail(authorizationError("that address names a different sign-in service (its iss does not match the one this sign-in began with)"));
 
   const granted = await oauth.exchange(client, redirect.code, pending.verifier);
   await stores.pending.clear();

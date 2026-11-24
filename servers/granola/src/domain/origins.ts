@@ -5,6 +5,10 @@
  * token would follow. So every endpoint must sit on the same site as the MCP
  * server being signed in to (mcp.granola.ai and mcp-auth.granola.ai share
  * granola.ai), over https; a loopback host is the one exception, for a test.
+ *
+ * "The same site" is a heuristic: the last two labels of the host. It is exact
+ * for granola.ai, and it would be too loose for a suffix such as co.uk, which
+ * this server never talks to; it is not a public-suffix lookup.
  */
 
 const LOOPBACK = new Set(["127.0.0.1", "localhost", "[::1]"]);

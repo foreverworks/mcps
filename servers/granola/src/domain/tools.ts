@@ -12,6 +12,7 @@ import type { ToolSpec } from "./schema.js";
  */
 export const UPSTREAM_TOOLS = {
   search_meetings: "forward",
+  list_meetings: "forward",
   get_meetings: "forward",
   get_meeting_transcript: "forward",
   search_transcripts: "forward",
@@ -46,6 +47,7 @@ export const WITHHELD_TOOLS = namesWhere("withhold");
 /** What each forwarded tool is for, shown until Granola's own description has been listed. */
 export const FALLBACK_LINES: Readonly<Record<string, string>> = {
   search_meetings: "Find meetings by topic, keyword, person, company, date or folder.",
+  list_meetings: "List meetings by date, without a search query.",
   get_meetings: "Read meetings by id: notes, AI summary, attendees and note links.",
   get_meeting_transcript: "Read the word-for-word transcript of a meeting (needs a paid Granola plan).",
   search_transcripts: "Search what was said across meeting transcripts (needs a paid Granola plan).",

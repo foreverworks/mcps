@@ -28,7 +28,7 @@ const clientFor = (client: ClientRegistration, failure: (f: OAuthFailure) => nev
  */
 export const makeOAuth = (resource: string, fetchImpl: typeof fetch = liveFetch): OAuthPort => ({
   discover: async (upstreamUrl) => {
-    const found = await discoverOAuth({ resourceUrl: upstreamUrl, fail: discovery, fetch: fetchImpl });
+    const found = await discoverOAuth({ resourceUrl: upstreamUrl, fail: discovery, fetch: refusingRedirects(fetchImpl) });
     // A credential goes only where the MCP server's own site says, never to an address a document merely names.
     for (const endpoint of [found.issuer, found.authorizationEndpoint, found.tokenEndpoint, found.registrationEndpoint]) {
       if (endpoint !== undefined && !onSameSite(upstreamUrl, endpoint)) return discovery(`${endpoint} is not an https address on the same site as ${upstreamUrl}`);
@@ -42,7 +42,7 @@ export const makeOAuth = (resource: string, fetchImpl: typeof fetch = liveFetch)
       redirectUris: [redirectUri],
       scope,
       fail: discovery,
-      fetch: fetchImpl,
+      fetch: refusingRedirects(fetchImpl),
     }),
   exchange: (client, code, verifier) =>
     clientFor(

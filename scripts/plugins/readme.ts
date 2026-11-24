@@ -50,7 +50,7 @@ const reachOf = (readme: string): string => {
       "Claude Code asks you before every call to a money tool, in every permission mode, and Cursor asks before any tool that is not read-only unless you have allowed it.",
     ].join(" ");
   }
-  if (access.some(([, a]) => a === "write")) return `${count}. Some of them change things in your account, and none moves money.`;
+  if (access.some(([, a]) => a === "write")) return `${count}. Some of them write, and its documentation says what each one changes; none moves money.`;
   return `${access.length === 1 ? "Its one tool only reads" : `All ${access.length} of its tools only read`}, so it cannot change anything.`;
 };
 

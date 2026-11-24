@@ -114,6 +114,18 @@ describe("complete_authorization", () => {
     expect((await flow.done()).error).toMatchObject({ kind: "authorization", message: expect.stringContaining("no sign-in is open") });
   });
 
+  it("refuses an address that is not on the redirect address, or that names another issuer, before spending the code", async () => {
+    const s = await setup();
+    const flow = await s.signIn();
+    const elsewhere = flow.landed.replace("127.0.0.1:8977/callback", "127.0.0.1:9/callback");
+    expect((await s.call("complete_authorization", { redirect_url: elsewhere })).error).toMatchObject({ kind: "authorization", message: expect.stringContaining("redirect address") });
+    const issuer = `${s.fake.origin}/auth/v1`;
+    expect((await s.call("complete_authorization", { redirect_url: `${flow.landed}&iss=${encodeURIComponent("https://other.example.com")}` })).error).toMatchObject({ kind: "authorization", message: expect.stringContaining("iss") });
+    expect(s.fake.tokenRequests).toHaveLength(0);
+    // The issuer the sign-in began with is accepted when named (RFC 9207).
+    expect(await s.call("complete_authorization", { redirect_url: `${flow.landed}&iss=${encodeURIComponent(issuer)}` })).toMatchObject({ ok: true });
+  });
+
   it("answers a refusal at Granola's page, a stale sign-in and a bare code with what to do next", async () => {
     const s = await setup();
     const flow = await s.signIn();
@@ -202,7 +214,7 @@ describe("Granola's tools", () => {
   });
 
   it("classifies every tool Granola documents, and every forwarded one is read-only in the policy", () => {
-    expect(KNOWN_TOOLS).toEqual(["search_meetings", "get_meetings", "get_meeting_transcript", "search_transcripts", "list_meeting_folders", "get_meeting_attachment", "get_account_info", "list_templates", "get_agent_brief", "query_granola_meetings"]);
+    expect(KNOWN_TOOLS).toEqual(["search_meetings", "list_meetings", "get_meetings", "get_meeting_transcript", "search_transcripts", "list_meeting_folders", "get_meeting_attachment", "get_account_info", "list_templates", "get_agent_brief", "query_granola_meetings"]);
     expect(WITHHELD_TOOLS).toEqual(expect.arrayContaining(["create_folder", "update_folder", "add_note_to_folder", "remove_note_from_folder", "update_meeting_title", "update_private_notes", "update_summary", "generate_summary", "create_meeting_note_from_transcript", "give_feedback", "sign_out"]));
     for (const name of KNOWN_TOOLS) expect(POLICY[name]).toEqual({ access: "read" });
     for (const name of WITHHELD_TOOLS) expect(POLICY[name]).toBeUndefined();
@@ -219,6 +231,13 @@ describe("Granola's tools", () => {
     // The list survives a restart: it is read from the state directory.
     const restarted = await buildDeps({}, { config: { upstreamUrl: s.fake.mcpUrl }, stateDir: s.stateDir });
     expect(restarted.knownTools()).toHaveLength(LISTED);
+  });
+
+  it("cuts a runaway description from the cached tool list", async () => {
+    const s = await setup();
+    await s.deps.rememberTools([{ name: "search_meetings", description: "x".repeat(10_000), inputSchema: { type: "object", properties: {} } }]);
+    const tool = (await (await s.connect()).listTools()).tools.find((t) => t.name === "search_meetings");
+    expect(tool?.description?.length).toBe(4000);
   });
 
   it("says to sign in when there is no grant", async () => {

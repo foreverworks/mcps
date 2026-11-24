@@ -8,7 +8,7 @@ import { registerAll } from "./mcp/register.js";
 const INSTRUCTIONS =
   "Meetings, notes and transcripts from one Granola account, read through Granola's own MCP server; nothing here changes a meeting. " +
   "Start with health. When it says there is no grant, or a call answers not_authorized, the account's owner signs in: begin_authorization, they open its link in a browser and sign in to Granola, " +
-  "then complete_authorization with the address the browser lands on. After that search_meetings finds meetings, get_meetings reads their notes and summaries, and get_meeting_transcript and search_transcripts read what was said " +
+  "then complete_authorization with the address the browser lands on. After that search_meetings finds meetings (list_meetings lists them by date), get_meetings reads their notes and summaries, and get_meeting_transcript and search_transcripts read what was said " +
   "(transcripts need a paid Granola plan). Granola limits requests per tool (query_granola_meetings far more tightly than the rest): batch ids rather than looping.";
 
 /**

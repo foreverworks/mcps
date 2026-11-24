@@ -29,8 +29,8 @@ official server on one side and an ordinary MCP server on the other.
 - **Read-only by construction.** Granola's write and account tools are never
   registered here, so a client that can read your meetings cannot rename them,
   rewrite their summaries, move them between folders or sign the account out.
-- **Transcripts untouched.** Results are forwarded exactly as Granola answers
-  them, so a transcript here is the one Granola's own connector returns.
+- **Transcripts untouched.** The content of each result comes back as Granola
+  sent it, with no rewriting, so a transcript here is the text Granola returns.
 - **Refresh handled in one place.** Granola's sign-in service rotates the refresh
   token on every use, so two clients refreshing at once would break each other.
   Here one refresh runs at a time, and the new pair is saved before the new
@@ -38,11 +38,15 @@ official server on one side and an ordinary MCP server on the other.
 - **A token per client.** Over HTTP, clients authenticate to this server with
   its own bearer tokens (`MCP_HTTP_TOKENS_DIR`), one per client, which you can
   issue and revoke without touching your Granola sign-in. Over stdio the client
-  is whoever started the process.
+  is whoever started the process. Every client token can call the three
+  sign-in tools (`begin_authorization`, `complete_authorization`,
+  `refresh_grant`), and so can replace the one grant. To keep a client to
+  reading, give it a ceiling with `MCP_CLIENT_MAX_ACCESS`, for example
+  `reader=read` ([configuration](../../docs/configuration.md)).
 
 ## What it can change
 
-It has 14 tools. Some of them change things in your account, and none moves money.
+It has 15 tools. Some of them write, and its documentation says what each one changes; none moves money.
 
 ## Install
 

@@ -42,8 +42,8 @@ official server on one side and an ordinary MCP server on the other.
 - **Read-only by construction.** Granola's write and account tools are never
   registered here, so a client that can read your meetings cannot rename them,
   rewrite their summaries, move them between folders or sign the account out.
-- **Transcripts untouched.** Results are forwarded exactly as Granola answers
-  them, so a transcript here is the one Granola's own connector returns.
+- **Transcripts untouched.** The content of each result comes back as Granola
+  sent it, with no rewriting, so a transcript here is the text Granola returns.
 - **Refresh handled in one place.** Granola's sign-in service rotates the refresh
   token on every use, so two clients refreshing at once would break each other.
   Here one refresh runs at a time, and the new pair is saved before the new
@@ -51,7 +51,11 @@ official server on one side and an ordinary MCP server on the other.
 - **A token per client.** Over HTTP, clients authenticate to this server with
   its own bearer tokens (`MCP_HTTP_TOKENS_DIR`), one per client, which you can
   issue and revoke without touching your Granola sign-in. Over stdio the client
-  is whoever started the process.
+  is whoever started the process. Every client token can call the three
+  sign-in tools (`begin_authorization`, `complete_authorization`,
+  `refresh_grant`), and so can replace the one grant. To keep a client to
+  reading, give it a ceiling with `MCP_CLIENT_MAX_ACCESS`, for example
+  `reader=read` ([configuration](../../docs/configuration.md)).
 
 ## Install
 
@@ -163,6 +167,7 @@ was last read.
 | Tool | Access | What it does |
 |---|---|---|
 | `search_meetings` | read | Find meetings by topic, keyword, person, company, date or folder. |
+| `list_meetings` | read | List meetings by date, when there is nothing to search for. Granola does not show this tool to every assistant; if it does not list it for your account, `health` names it under `missing`. |
 | `get_meetings` | read | Read meetings by id: your private notes, the AI summary, attendees and links. |
 | `get_meeting_transcript` | read | The word-for-word transcript of a meeting. Needs a paid Granola plan. |
 | `search_transcripts` | read | Search what was said across transcripts, with passages and where to read on. Needs a paid Granola plan. |
@@ -186,15 +191,14 @@ A tool Granola adds later is not offered until someone has read it and decided
 here, in the code (`src/domain/tools.ts`): `health` names it under `hidden`, so
 you can see that something is waiting. This is on purpose: a bridge that
 forwarded whatever Granola lists would hand a client a tool nobody here has read.
-(`list_meetings`, which Granola's help page mentions, is waiting this way.)
 
 ### Limits set by Granola
 
 From Granola's help page on its MCP server (read on 2026-11-24; Granola says some
 accounts have lower limits and that limits may change). On paid plans most tools
-allow 5 requests a second and `query_granola_meetings` 50 an hour. On the free
+allow 5 requests a second (`list_meetings` included) and `query_granola_meetings` 50 an hour. On the free
 plan `query_granola_meetings` allows 15 an hour, `get_meetings`,
-`get_meeting_attachment` and `list_templates` 10 an hour each, and the others 2
+`get_meeting_attachment` and `list_templates` 10 an hour each, and the others, `list_meetings` included, 2
 a second. This server adds no limit of its own and does not retry a call: a
 limited call comes back as Granola's own answer. Ask for several meeting ids in
 one `get_meetings` call rather than one call each.
@@ -202,8 +206,8 @@ one `get_meetings` call rather than one call each.
 ## Troubleshooting
 
 **`not_authorized`**. There is no grant, or Granola refused the refresh token
-with `invalid_grant` or `invalid_client` (the account revoked access, or the
-token had not been used for a long time). Only those two end a grant: a busy or
+with `invalid_grant` or `invalid_client` (for example because the account
+revoked access). Only those two end a grant: a busy or
 failing Granola (429, 5xx) answers `unreachable` or `upstream`, keeps the grant
 and is worth retrying. The dead grant is dropped, so the next calls say "no
 Granola account is connected to this server yet" at once. Connect the account
@@ -252,7 +256,7 @@ can bridge another OAuth-only MCP server the same way.
 
 **Registration and PKCE.** It registers a public client by dynamic client
 registration (RFC 7591: no secret, the authorization-code and refresh-token
-grants, a loopback redirect address, which Granola checks at registration),
+grants and a loopback redirect address, the metadata Granola asks for),
 stores the client id, and signs in with the authorization-code flow and PKCE
 (S256). Every authorize link and every token request names the MCP server as
 the `resource`. The verifier and the state wait in the state directory between
@@ -269,8 +273,8 @@ where it was meant to go.
 
 **Forwarding.** Each call opens a short connection to Granola's MCP server
 (Streamable HTTP) with the access token and closes it after. The answer is
-returned as Granola gave it, byte for byte, including a result Granola marks as
-an error. This server builds its tools per request, so it lists each of
+returned with the content Granola gave, unchanged, including a result Granola
+marks as an error. This server builds its tools per request, so it lists each of
 Granola's tools with the description and input fields Granola last published,
 kept in `tools.json` in the state directory.
 
@@ -290,30 +294,16 @@ and `tools.json` (Granola's last tool list).
 - A new Granola tool needs a code change before anyone can call it (see
   [Tools](#tools)).
 - The sign-in needs a person with a browser, once, and again if the grant is
-  revoked or unused for long enough that Granola expires it. Granola has no API
+  revoked or otherwise ends. Granola has no API
   key for MCP and no headless sign-in, so there is nothing to automate there.
 - Granola's MCP server is Granola's: if it changes how it signs people in or
   what its tools take, this server follows after an update.
 
 ## Other servers for Granola
 
-Searched on 2026-11-24 (Granola's help page, web search over GitHub, PyPI and
-MCP directories). Found, and not audited line by line:
-
-- **Granola's own hosted server**, `https://mcp.granola.ai/mcp`, official,
-  OAuth with a browser sign-in and no API keys. This server bridges it rather
-  than replacing it, and uses it as the one source of truth. Use it directly
-  when your client can sign in and you want your own account in it.
-- **Community servers that read the Granola desktop app's local data or its
-  unofficial web API**, among them `EoinFalconer/granola-mcp-server`,
-  `Bencockin/granola-mcp`, `proofgeist/granola-mcp-server`,
-  `Primary-OS/granola-mcp` and `btn0s/granola-mcp`. They sidestep
-  the official server, depend on files or endpoints Granola does not document,
-  and mostly need the desktop app on the same machine.
-- **`pavitarsaini/granola-mcp`**, a remote server on Cloudflare Workers with its
-  own OAuth, for people who want to host one.
-
-What this server does that they do not: it uses only Granola's official,
-documented interface, holds one OAuth grant in one place for many clients that
-cannot sign in, with the rotating refresh token handled safely, offers a
-separate token per client, and never offers a tool that writes.
+Searched on 2026-11-24 (Granola's help page and a web search): Granola's own
+hosted server, `https://mcp.granola.ai/mcp`, is official, uses OAuth with a
+browser sign-in and has no API keys. This server bridges it rather than
+replacing it, and uses it as the one source of truth. Use it directly when your
+client can sign in and you want your own account in it. Community servers for
+Granola also exist; check the MCP registry or GitHub for ones that suit you.
