@@ -18,7 +18,7 @@
 # version of the tag, and write both here, in the one place the image is named:
 #   docker buildx imagetools inspect ghcr.io/foreverworks/node:26-trixie
 #   docker run --rm ghcr.io/foreverworks/node:26-trixie node --version
-FROM ghcr.io/foreverworks/node:26.13.1-trixie@sha256:43f20e1f67a48ede18cea65630e4db917066bf4f7f61741f6d67b72de1923cf5 AS base
+FROM ghcr.io/foreverworks/node:26.13.1-trixie@sha256:d4ebf5424ae2b533c67770bddbe87d432a3b17304e4441c2a2ffef74eb480442 AS base
 
 # Only the package.json files and the lockfile, so that the install below is
 # reused until a dependency changes, whatever else in the tree does.
