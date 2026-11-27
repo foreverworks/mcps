@@ -45,11 +45,13 @@
   "//": [
     "overrides: each one raises a transitive dependency whose parent pins a vulnerable version, and no release of the parent allows the fixed one (as of 2026-10).",
     "multer: @bitwarden/cli pins 2.3.0 (GHSA-3pph-fpjx-jg34, fixed in 2.4.0); only its `bw serve` API uses it, which the bitwarden server never runs. Remove once @bitwarden/cli depends on multer >= 2.4.0.",
+    "node-forge: @bitwarden/cli pins 1.4.0 exactly, still in 2026.11.1 (GHSA alerts fixed in 1.4.1 to 1.4.4; one advisory has no fix yet); the CLI uses it for its crypto, so this stays a patch bump within 1.4. Remove once @bitwarden/cli depends on node-forge >= 1.4.4.",
     "tmp: external-editor 3.1.0 (its last release) wants tmp ^0.0.33 (GHSA-52f5-9888-hmc6, GHSA-ph9p-34f9-6g65, fixed in 0.2.6); it reaches us through @bitwarden/cli's pinned inquirer 8.2.6 and @anthropic-ai/mcpb's @inquirer/prompts 6. It only calls tmp.tmpNameSync, unchanged in 0.2. Remove once nothing depends on external-editor."
   ],
   "overrides": {
     "@bitwarden/cli": {
-      "multer": "^2.4.0"
+      "multer": "^2.4.0",
+      "node-forge": "^1.4.4"
     },
     "external-editor": {
       "tmp": "^0.2.6"
