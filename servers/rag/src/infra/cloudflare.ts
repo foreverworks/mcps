@@ -26,7 +26,9 @@ import { CLOUDFLARE_RERANK_MODELS, type Usage } from "../domain/provider.js";
  */
 
 export const DEFAULT_MODEL = "@cf/baai/bge-m3";
-/** Texts per request: about 25,000 tokens of 1200-character chunks, well inside the model's 60,000-token window. */
+/** Leave 5,000 tokens below BGE-M3's 60,000-token context window for request framing and estimate variance. */
+export const EMBED_TOKEN_BUDGET = 55_000;
+/** Texts per request, also bounded by EMBED_TOKEN_BUDGET for BGE-M3. */
 export const DEFAULT_BATCH = 64;
 const API = "https://api.cloudflare.com/client/v4";
 const TOKEN = { file: "RAG_CLOUDFLARE_API_TOKEN_FILE", value: "RAG_CLOUDFLARE_API_TOKEN" } as const;
@@ -154,7 +156,9 @@ export const makeCloudflareEmbedder = (env: NodeJS.ProcessEnv, { model: chosen, 
   const model = chosen?.trim() || env["RAG_CLOUDFLARE_MODEL"]?.trim() || DEFAULT_MODEL;
   const client = makeCloudflareClient(env, options);
   return {
-    provider: "cloudflare", model, batch: batch ?? positive(env["RAG_CLOUDFLARE_BATCH"], DEFAULT_BATCH), missing: client.missing,
+    provider: "cloudflare", model, batch: batch ?? positive(env["RAG_CLOUDFLARE_BATCH"], DEFAULT_BATCH),
+    ...(model === DEFAULT_MODEL ? { tokenBudget: EMBED_TOKEN_BUDGET } : {}),
+    missing: client.missing,
     embed: async (texts) => {
       if (texts.length === 0) return { vectors: [], usage: { requests: 0, texts: 0, tokens: 0, neurons: 0 } };
       const out = await client.run(model, { text: texts });

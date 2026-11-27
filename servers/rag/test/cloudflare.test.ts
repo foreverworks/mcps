@@ -9,7 +9,7 @@ import { join } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 
 import { asAppError } from "../src/domain/errors.js";
-import { addUsage, batches, compareProbe, cosine, MIN_PROBE_COSINE, NO_USAGE } from "../src/domain/provider.js";
+import { addUsage, batches, batchesWithinTokenBudget, compareProbe, cosine, estimatedTokens, MIN_PROBE_COSINE, NO_USAGE } from "../src/domain/provider.js";
 import { makeCloudflareEmbedder, makeCloudflareReranker, usageOf } from "../src/infra/cloudflare.js";
 
 type Sent = { readonly url: string; readonly headers: Record<string, string>; readonly body: unknown };
@@ -113,6 +113,7 @@ describe("the Workers AI client", () => {
     ]);
     expect(out.usage).toEqual({ requests: 1, texts: 2, tokens: 14, neurons: 0.015 });
     expect(embedder.batch).toBe(64);
+    expect(embedder.tokenBudget).toBe(55_000);
   });
 
   it("waits and asks again when Workers AI is out of capacity or rate-limited, honouring Retry-After", async () => {
@@ -191,5 +192,15 @@ describe("the probe and usage arithmetic", () => {
     expect(addUsage(addUsage(NO_USAGE, one), one)).toEqual({ requests: 2, texts: 4, tokens: 40, neurons: 0.042984 });
     expect(batches([1, 2, 3, 4, 5], 2)).toEqual([[1, 2], [3, 4], [5]]);
     expect(batches([], 3)).toEqual([]);
+  });
+
+  it("estimates multilingual text conservatively and splits at the token boundary in order", () => {
+    expect(estimatedTokens("\u00e9")).toBe(2);
+    expect(batchesWithinTokenBudget(["ab", "cd", "e", "fg"], 3, 4)).toEqual({ batches: [["ab", "cd"], ["e", "fg"]] });
+    expect(batchesWithinTokenBudget(["a", "b", "c"], 2, 100)).toEqual({ batches: [["a", "b"], ["c"]] });
+  });
+
+  it("rejects an over-budget item before returning any request batches", () => {
+    expect(batchesWithinTokenBudget(["fits", "too large"], 64, 8)).toEqual({ batches: [], oversized: { index: 1, estimatedTokens: 9 } });
   });
 });

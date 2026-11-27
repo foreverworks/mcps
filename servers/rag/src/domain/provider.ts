@@ -67,3 +67,39 @@ export const compareProbe = (local: readonly (readonly number[])[], remote: read
 /** Texts cut into batches of at most `size`, in order. */
 export const batches = <T>(items: readonly T[], size: number): T[][] =>
   Array.from({ length: Math.ceil(items.length / Math.max(1, size)) }, (_, i) => items.slice(i * size, (i + 1) * size));
+
+const utf8 = new TextEncoder();
+
+/** A conservative token estimate from UTF-8 bytes, which also handles multilingual text. */
+export const estimatedTokens = (text: string): number => utf8.encode(text).byteLength;
+
+/** Text batches kept within both the provider's item count and estimated token budget. */
+export const batchesWithinTokenBudget = (
+  texts: readonly string[],
+  size: number,
+  budget: number,
+): {
+  readonly batches: readonly (readonly string[])[];
+  readonly oversized?: { readonly index: number; readonly estimatedTokens: number } | undefined;
+} => {
+  const countLimit = Math.max(1, size);
+  const tokenLimit = Math.max(1, budget);
+  const batches: string[][] = [];
+  let current: string[] = [];
+  let currentTokens = 0;
+
+  for (const [index, text] of texts.entries()) {
+    const tokens = estimatedTokens(text);
+    if (tokens > tokenLimit) return { batches: [], oversized: { index, estimatedTokens: tokens } };
+    if (current.length > 0 && (current.length >= countLimit || currentTokens + tokens > tokenLimit)) {
+      batches.push(current);
+      current = [];
+      currentTokens = 0;
+    }
+    current.push(text);
+    currentTokens += tokens;
+  }
+
+  if (current.length > 0) batches.push(current);
+  return { batches };
+};

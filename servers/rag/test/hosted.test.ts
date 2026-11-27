@@ -17,7 +17,7 @@ import { makeQueryInference } from "../src/app/inference.js";
 import type { RemoteEmbedder, RemoteReranker } from "../src/app/ports.js";
 import { buildDeps, embeddingModelsFrom } from "../src/composition.js";
 import { asAppError, fail } from "../src/domain/errors.js";
-import { NO_USAGE, PROBE_TEXTS } from "../src/domain/provider.js";
+import { estimatedTokens, NO_USAGE, PROBE_TEXTS } from "../src/domain/provider.js";
 import { makeSources } from "../src/infra/sources.js";
 import { POLICY } from "../src/mcp/policy.js";
 import { registerAll } from "../src/mcp/register.js";
@@ -347,6 +347,30 @@ describe("the whole server on Workers AI alone", () => {
     const lines = s.logged.filter((l) => l.includes("query_inference"));
     expect(lines).toHaveLength(2);
     expect(lines.join("")).not.toContain("repairs");
+  });
+
+  it("splits a large file under Workers AI's token budget and keeps vector order", async () => {
+    const s = await running();
+    const largeFile = join(s.inbox, "large.txt");
+    const text = Array.from({ length: 6_000 }, (_, i) => `Section ${String(i).padStart(5, "0")} records the invoice payment date and amount for this customer.`).join("\n\n");
+    await writeFile(largeFile, text);
+    await s.call("create_collection", { name: "docs" });
+
+    const indexed = await s.call("index_path", { collection: "docs", path: largeFile });
+    expect(indexed).toMatchObject({ indexed: 1, failed: 0 });
+    expect(indexed.embedding.tokens).toBeGreaterThan(60_000);
+
+    const requests = s.ai.of("@cf/baai/bge-m3").map((run) => run.body["text"] as string[]);
+    const budget = s.deps.models()[0]?.remote.cloudflare?.tokenBudget ?? 0;
+    expect(budget).toBe(55_000);
+    expect(requests.length).toBeGreaterThan(1);
+    expect(requests.every((batch) => batch.length <= 64 && batch.reduce((sum, item) => sum + estimatedTokens(item), 0) <= budget)).toBe(true);
+
+    const stored = s.store.rows().filter((row) => row.source.endsWith("large.txt")).sort((a, b) => a.ordinal - b.ordinal);
+    const sent = requests.flat();
+    expect(stored).toHaveLength(indexed.chunks_embedded);
+    expect(sent).toEqual(stored.map((row) => row.body));
+    expect(stored.map((row) => row.embedding)).toEqual(stored.map((row) => fakeEmbed(row.body)));
   });
 
   it("scores candidates with a Clef decision model when one is chosen, by the setting or for one call", async () => {
