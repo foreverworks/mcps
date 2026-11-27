@@ -180,8 +180,8 @@ made public, takes steps 7 to 11 again.
   fork, runs on a self-hosted runner.
 - [x] **GitHub settings**: private vulnerability reporting on (SECURITY.md
   relies on it), branch protection on `main` (no force pushes, no deletion),
-  Dependabot alerts and security updates, version updates for npm and
-  actions (`.github/dependabot.yml`), and a read-only default workflow token
+  Dependabot alerts and security updates, version updates for npm, actions
+  and the base image through Renovate (`renovate.json`), and a read-only default workflow token
   (Settings, Actions, General, Workflow permissions): every workflow
   declares the permissions its jobs need.
 - [x] **Decide per server what ships.** The rule: an extras server is never

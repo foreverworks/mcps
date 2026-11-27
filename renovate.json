@@ -1,12 +1,26 @@
 {
   "$schema": "https://docs.renovatebot.com/renovate-schema.json",
   "description": [
-    "Renovate keeps the Dockerfile's base image current: only its FROM line. Dependabot keeps the npm packages and the GitHub Actions (.github/dependabot.yml).",
+    "Renovate keeps every dependency current: the npm packages (the workspaces share one lockfile), the GitHub Actions and the Dockerfile's base image. `npm run check` in CI decides whether an update lands.",
+    "The shared preset sends npm minors and patches as one weekly PR, the Actions as another, and holds majors on the Dependency Dashboard for a tick.",
     "A new release of ghcr.io/foreverworks/node within the same line merges on its own once the required checks pass, ci's image build among them (the base-images preset); a new Node major is a PR for a person."
   ],
   "extends": [
     "github>foreverworks/renovate-config",
     "github>foreverworks/renovate-config:base-images"
   ],
-  "enabledManagers": ["dockerfile"]
+  "enabledManagers": ["npm", "github-actions", "dockerfile"],
+  "packageRules": [
+    {
+      "description": "A vendor release can add tools, and porkbun's policy stops the server on a tool it has not classified, so this one is bumped by hand with its classification (servers/porkbun/README.md).",
+      "matchPackageNames": ["@porkbunllc/mcp-server"],
+      "enabled": false
+    },
+    {
+      "description": "The types follow the oldest Node the packages accept (engines), not the newest Node.",
+      "matchPackageNames": ["@types/node"],
+      "matchUpdateTypes": ["major"],
+      "enabled": false
+    }
+  ]
 }
