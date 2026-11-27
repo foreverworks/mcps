@@ -109,6 +109,12 @@ says:
   characters at most) and a box to tick; the call runs only on a yes, with
   exactly the arguments confirmed. Over HTTP this needs a 2026-07-28 client,
   and a client that cannot be asked is refused (`confirmation_unavailable`).
+- **`approvals`**: by a person, through an approval service the deployment
+  runs (`MCP_APPROVALS_URL`): the server files the same one line with it, holds
+  the call until the person answers on their own device, and runs only on a
+  yes. The question never passes through the client, so a client that runs
+  tools unasked, or an agent steered by a prompt injection, cannot answer it
+  (C1 below).
 - **`none`**: not at all; the hints only.
 
 A tool above `MCP_MAX_ACCESS` stays listed, says it is disabled, and refuses
@@ -438,13 +444,14 @@ guarantee enforces it itself (C1 to C3).
 
 ### What the kit does, and what it trades
 
-C4 with C5 by default, C2 and C6 as options, and a ceiling; C1 and C3 are not
+C4 with C5 by default, C1, C2 and C6 as options, and a ceiling; C3 is not
 built.
 
 | Setting | Who confirms a money call | Holds against |
 |---|---|---|
 | `MCP_CONFIRM=client` | the client: Claude Code on every call, others on `destructiveHint` or their settings | a model calling a money tool on its own, through a client that honours the mark |
 | `MCP_CONFIRM=elicit` | the person at the client, asked with the exact line | also a client that runs tools unasked but shows elicitations to a person |
+| `MCP_CONFIRM=approvals` | a person on their own device, asked with the exact line by the approval service | also a caller that holds the server's token, a prompt-injected agent included, as long as it cannot reach the person's device or the service's token |
 | `MCP_CONFIRM=none` | the client's own policy | nothing beyond the hints |
 | `MCP_MAX_ACCESS=write` | nobody: money tools refuse | everything, at the price of the money tools |
 
@@ -452,11 +459,10 @@ built.
 through a client that asks. Whoever holds the credential can call without one,
 and answer an elicitation too: whoever starts the process over stdio or holds
 a token over HTTP, including an agent whose shell can read its own token file
-([security.md](security.md#where-the-protections-stop)). Only C1, or C3 tied
+([security.md](security.md#where-the-protections-stop)). Only C1 (`MCP_CONFIRM=approvals`), or C3 tied
 to an authenticated person, holds against such a caller. Where agents have
 shells and tokens, keep money tools off (`MCP_MAX_ACCESS=write`), keep the
-token out of their reach, or put an out-of-band approval, outside this
-project, in front of the server.
+token out of their reach, or confirm through an approval service.
 
 ## How other open-source MCP servers do it
 

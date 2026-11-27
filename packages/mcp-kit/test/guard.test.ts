@@ -203,7 +203,7 @@ describe("guard, confirming money calls with the user (MCP_CONFIRM=elicit)", () 
   it("reads the settings, elicitation included on either transport (2026-07-28 carries the question over HTTP)", () => {
     expect(guardSettingsFrom({ MCP_CONFIRM: "elicit" })).toEqual({ maxAccess: "money", confirm: "elicit" });
     expect(() => guardSettingsFrom({ MCP_MAX_ACCESS: "admin" })).toThrow(/not one of read, write, money/);
-    expect(() => guardSettingsFrom({ MCP_CONFIRM: "off" })).toThrow(/not one of client, elicit, none/);
+    expect(() => guardSettingsFrom({ MCP_CONFIRM: "off" })).toThrow(/not one of client, elicit, approvals, none/);
     expect(guardSettingsFrom({})).toEqual({ maxAccess: "money", confirm: "client" });
     expect(guardSettingsFrom({ MCP_CLIENT_MAX_ACCESS: " anaf-spv=read , x=write," })).toEqual({
       maxAccess: "money",

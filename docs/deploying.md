@@ -125,7 +125,10 @@ What changes over HTTP:
   can write and the server can read.
 - **Server-side confirmation needs a newer client.** With `MCP_CONFIRM=elicit`
   a client of protocol 2026-07-28 is asked mid-call, and a 2025-11-25 client
-  is refused each confirmed call. The default, `client`, works as over stdio.
+  is refused each confirmed call. The default, `client`, works as over stdio,
+  and so does `approvals`, which asks through a service of yours and needs
+  nothing of the client but patience: give it a tool timeout longer than
+  `MCP_APPROVALS_TIMEOUT_S`.
 - **Limits are per client**, so one client's runaway loop leaves the others
   their share ([Limits](configuration.md#limits-http)).
 - **Tokens are read at startup.** Adding, changing or removing one takes a

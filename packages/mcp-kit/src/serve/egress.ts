@@ -48,7 +48,21 @@ export const installEgress = (patterns: readonly string[]): void => {
  */
 export const guardEgress = (env: NodeJS.ProcessEnv): void => {
   const patterns = egressFrom(env);
-  if (patterns !== undefined) installEgress(patterns);
+  if (patterns !== undefined) installEgress([...patterns, ...approvalsHost(env)]);
+};
+
+/**
+ * The approval service's host, when MCP_CONFIRM=approvals names one: the
+ * deployment has already said, in MCP_APPROVALS_URL, that this server talks
+ * to it, so MCP_EGRESS_ALLOW need not say it again (one source for the name).
+ */
+const approvalsHost = (env: NodeJS.ProcessEnv): readonly string[] => {
+  if (env["MCP_CONFIRM"]?.trim() !== "approvals") return [];
+  try {
+    return [new URL(env["MCP_APPROVALS_URL"]?.trim() ?? "").hostname];
+  } catch {
+    return [];
+  }
 };
 
 /**

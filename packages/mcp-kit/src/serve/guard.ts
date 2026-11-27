@@ -10,6 +10,7 @@ import { asFailure, failure, outcomeOf } from "../envelope.js";
 import { type HandedBack, watchHandedBack } from "../handedBack.js";
 import { type Access, type ConfirmedRule, isIdempotent, needsPerson, type ToolArgs, type ToolPolicy, type ToolRule } from "../policy.js";
 import { ceilingRefusing, DEFAULT_SETTINGS, type GuardSettings, within } from "./confirm.js";
+import { askApproval } from "./approvals.js";
 import { answering, answerTo, canOpenLink, canShowForm, clientCapabilities, digestOf, stateFor } from "./asking.js";
 import { answeredResult } from "./link.js";
 
@@ -35,7 +36,7 @@ export type AuditLine = {
   readonly access: Access;
   readonly outcome: string;
   readonly ms: number;
-  /** `elicit` when the server confirmed the call with the user itself. */
+  /** `elicit` when the server confirmed the call with the user itself, `approvals` when a person approved it through the approval service. */
   readonly confirmed?: string;
   /** For a call that handed a person a link (serve/link.ts): their answer, or `unsupported` or `failed` when nobody was asked. */
   readonly link?: string;
@@ -145,6 +146,8 @@ const noteFor = (rule: ToolRule, settings: GuardSettings): string => {
   switch (settings.confirm) {
     case "elicit":
       return ` ${what}: the server asks the user to confirm each call before it runs.`;
+    case "approvals":
+      return ` ${what}: the server asks a person to approve each call on their own device, and waits for the answer before it runs.`;
     case "client":
       return ` ${what}: the client asks the user to approve each call.`;
     case "none":
@@ -321,6 +324,7 @@ const runConfirmed = async (
   answered: Awaited<ReturnType<typeof answering>>,
 ): Promise<Ran> => {
   const resolved = rule.resolve === undefined ? args : await rule.resolve(args);
+  if (options.settings.confirm === "approvals") return runApproved(asking, rule, options, cb, hadSchema, resolved);
   if (options.settings.confirm !== "elicit") return { result: await run(cb, hadSchema, resolved, asking.ctx) };
   if (answered?.kind === "confirm") {
     if (answered.args !== digestOf(resolved)) {
@@ -340,7 +344,7 @@ const runConfirmed = async (
         : "this server confirms this call with the user, and a client of protocol 2025-11-25 over HTTP cannot be asked anything mid-call",
     });
   }
-  const line = `${options.service}: ${rule.summary(resolved)}`.replace(/[\r\n]+/g, " ").slice(0, 300);
+  const line = lineFor(options.service, rule, resolved);
   return {
     result: inputRequired({
       inputRequests: { confirm: inputRequired.elicit({ message: `Confirm? ${line}`, requestedSchema: PROMPT_SCHEMA }) },
@@ -348,6 +352,43 @@ const runConfirmed = async (
     }),
     asked: "confirm",
   };
+};
+
+/** The one line a person reads about a call: the server, then what its policy says the call does. */
+const lineFor = (service: string, rule: ConfirmedRule, resolved: ToolArgs): string => `${service}: ${rule.summary(resolved)}`.replace(/[\r\n]+/g, " ").slice(0, 300);
+
+/**
+ * A call a person approves through the deployment's approval service
+ * (MCP_CONFIRM=approvals, serve/approvals.ts): asked and answered within this
+ * one call, so nothing travels through the client between the question and
+ * the run, and the call runs on the very arguments the line was written from.
+ * Any answer but a yes, and any failure to ask, refuses the call.
+ */
+const runApproved = async (
+  asking: Asking,
+  rule: ConfirmedRule,
+  options: GuardOptions & { readonly settings: GuardSettings },
+  cb: Callback,
+  hadSchema: boolean,
+  resolved: ToolArgs,
+): Promise<Ran> => {
+  const approvals = options.settings.approvals;
+  if (approvals === undefined) return failGuard({ kind: "confirmation_unavailable", message: "this server confirms such calls through an approval service, and none is configured" });
+  const { signal, progress } = callOf(asking.ctx);
+  const verdict = await askApproval(
+    approvals,
+    { service: options.service, tool: asking.tool, client: asking.client, line: lineFor(options.service, rule, resolved), argsDigest: digestOf(resolved) },
+    signal,
+    progress,
+  );
+  switch (verdict.kind) {
+    case "approved":
+      return { result: await run(cb, hadSchema, resolved, asking.ctx), confirmed: "approvals" };
+    case "refused":
+      return failGuard({ kind: "confirmation_denied", message: verdict.message });
+    case "unavailable":
+      return failGuard({ kind: "confirmation_unavailable", message: verdict.message });
+  }
 };
 
 /**

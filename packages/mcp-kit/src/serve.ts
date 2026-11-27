@@ -36,6 +36,8 @@ import { unclassified, type ToolPolicy } from "./policy.js";
 
 /** How long a request may take to arrive: Node's request timeout, and with an inbox on the limit of the one route's body. */
 const REQUEST_TIMEOUT_MS = 30_000;
+/** What a call approved at the last moment still has to run in, beyond the approval wait. */
+const APPROVAL_MARGIN_MS = 120_000;
 
 /** Where the one HTTP route lives. Anything else is a 404. */
 export const MCP_PATH = "/mcp";
@@ -568,6 +570,12 @@ export const serve = async (options: ServeOptions): Promise<Served> => {
   const listen = listenFrom(env);
   const settings = options.settings ?? guardSettingsFrom(env);
   if (listen.kind === "public") checkPublic(options.name, options.policy, settings);
+  // A call that waits for an approval must outlive the wait, or the listener answers 504 while a person may still say yes.
+  if (settings.approvals !== undefined && listen.kind !== "stdio" && settings.approvals.timeoutSec * 1000 + APPROVAL_MARGIN_MS > limitsFrom(env).timeoutMs) {
+    throw new Error(
+      `${options.name}: MCP_APPROVALS_TIMEOUT_S (${settings.approvals.timeoutSec} s) leaves a call no time to run within MCP_HTTP_TIMEOUT_MS (${limitsFrom(env).timeoutMs} ms); lower the first or raise the second by ${APPROVAL_MARGIN_MS / 1000} s more`,
+    );
+  }
   guardEgress(env);
   installKeepAlive(env);
   const runtime: Runtime = {

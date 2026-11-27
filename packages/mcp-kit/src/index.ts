@@ -120,6 +120,7 @@ export {
   type Confirm,
   type GuardSettings,
 } from "./serve/confirm.js";
+export { approvalsSettingsFrom, askApproval, DEFAULT_APPROVALS_TIMEOUT_SEC, DEFAULT_APPROVALS_TOOLS, type ApprovalAsk, type ApprovalsSettings, type Verdict as ApprovalVerdict } from "./serve/approvals.js";
 export { asGuardError, failGuard, guardRemedy, type GuardError } from "./guardErrors.js";
 export { admit, DEFAULT_LIMITS, egressFrom, hostAllowed, limitsFrom, MAX_CALLERS, take, type Bucket, type Limits } from "./serve/limits.js";
 export { guardEgress } from "./serve/egress.js";

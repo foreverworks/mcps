@@ -262,7 +262,12 @@ and in `_meta["foreverworks.com/access"]`.
 |---|---|---|
 | `MCP_MAX_ACCESS` | `money` | The highest class this server runs: `read`, `write` or `money`. A tool above it is still listed, says it is disabled, and refuses every call (`access_denied`). |
 | `MCP_CLIENT_MAX_ACCESS` | | Lower ceilings for named clients, as `client=class` pairs separated by commas (`mail-reader=read,bob=write`). The client is the name of the bearer token it called with (`MCP_HTTP_TOKENS_DIR`). A call above its class is refused (`access_denied`, naming the client), and so is any request to the [file endpoints](#files-to-and-from-another-machine) (403) but a download of a file its own calls handed back. Meant for another server that calls this one as its client and needs to read, not to send or pay. |
-| `MCP_CONFIRM` | `client` | Who confirms with the person a `money` call, and a `write` its policy marks `confirm` (one that acts outside the computer): `client`, `elicit` or `none`, as below. |
+| `MCP_CONFIRM` | `client` | Who confirms with the person a `money` call, and a `write` its policy marks `confirm` (one that acts outside the computer): `client`, `elicit`, `approvals` or `none`, as below. |
+| `MCP_APPROVALS_URL` | | With `MCP_CONFIRM=approvals`, required: the MCP endpoint (Streamable HTTP) of the approval service that asks a person. Its host is let through `MCP_EGRESS_ALLOW` without being listed there. |
+| `MCP_APPROVALS_TOKEN_FILE` | | With `MCP_CONFIRM=approvals`, required: the file holding the bearer token for that service. It is read on every question, so a rotated token needs no restart. |
+| `MCP_APPROVALS_TIMEOUT_S` | `600` | How long a person has to answer, in seconds (30 to 3600). Over HTTP it must leave the call two minutes within `MCP_HTTP_TIMEOUT_MS`, or the server does not start. |
+| `MCP_APPROVALS_TOOLS` | `request,await,cancel` | The service's three tool names, in that order: the one that files a question, the one that waits for its answer, the one that withdraws it. |
+| `MCP_APPROVALS_REQUESTER_META` | | The `_meta` key a requester record goes under on each call to the service (`client`, `session`, `title`, `host`, `extra`), for a service that shows who asks. Unset, none is sent. |
 
 [security.md](security.md#money-and-confirmation) explains each value of
 `MCP_CONFIRM` and how each client confirms:
@@ -274,8 +279,37 @@ and in `_meta["foreverworks.com/access"]`.
   what will happen. A client that cannot be asked mid-call (one without
   elicitation, or a 2025-11-25 client over HTTP) has the call refused
   (`confirmation_unavailable`).
+- **`approvals`**: the server asks a person through an approval service you
+  run (`MCP_APPROVALS_URL`), on their own device, and holds the call until
+  they answer. The question never passes through the client or the model, so
+  it holds against an agent that runs tools unasked and against a prompt
+  injection. No answer in time, a no, or a service that cannot be asked
+  refuses the call. The protocol is below.
 - **`none`**: the annotations only, for a deployment whose money calls are
   decided elsewhere.
+
+#### The approval service's protocol
+
+The service is an MCP server over Streamable HTTP with a bearer token, and
+three tools (`MCP_APPROVALS_TOOLS` names them):
+
+- **request** `{ "connector": "approve", "title": "...", "params": { "action": "<line>" }, "timeout_sec": <n> }`
+  files a yes-or-no question and answers, as JSON text, `{ "id": "...", "status": "pending" }`.
+  `action` is the one line the server's policy writes for the call (one line,
+  300 characters at most), with the server's name first.
+- **await** `{ "id": "...", "timeout_sec": <n> }` waits up to `timeout_sec`
+  (the server asks for 30 at most) and answers the same JSON with the current
+  `status`.
+- **cancel** `{ "id": "..." }` withdraws a question: the server sends it when
+  nobody answered in time, when the call was cancelled while it waited, and
+  when it could not read an answer.
+
+`status` is `pending` until someone answers, `approved` or `done` for a yes;
+anything else (`denied`, `expired`, `cancelled`, `failed`) is a no. A tool's
+error may come as `{ "error": { "kind": "...", "message": "..." } }` text, and
+refuses the call (`confirmation_unavailable`). Give the server a token of its
+own at the service, allowed to ask and nothing else, and keep it out of your
+agents' reach: whoever holds it can file questions, though never answer them.
 
 ### Files a tool takes as input
 

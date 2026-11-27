@@ -1,4 +1,5 @@
 import type { Access } from "../policy.js";
+import { type ApprovalsSettings, approvalsSettingsFrom, describeApprovals } from "./approvals.js";
 
 /**
  * What the guard does before a tool runs, beyond the policy itself.
@@ -32,13 +33,18 @@ import type { Access } from "../policy.js";
  *     2025-11-25 client over HTTP is refused each such call
  *     (`confirmation_unavailable`), since its stateless transport cannot carry
  *     the question back.
+ *   - `approvals`: the server asks a person through an approval service of
+ *     the deployment's own (MCP_APPROVALS_URL, serve/approvals.ts), waits for
+ *     the answer and runs on a yes. The question never passes through the
+ *     client or the model, so an agent that runs tools unasked, or one that a
+ *     prompt injection steers, cannot answer it.
  *   - `none`: the hints only; whether to ask is the client's own policy. For an
  *     unattended deployment whose money calls are decided elsewhere.
  */
 
-export type Confirm = "client" | "elicit" | "none";
+export type Confirm = "client" | "elicit" | "approvals" | "none";
 
-export const CONFIRM_MODES: readonly Confirm[] = ["client", "elicit", "none"];
+export const CONFIRM_MODES: readonly Confirm[] = ["client", "elicit", "approvals", "none"];
 
 export type GuardSettings = {
   /** The highest access class this server runs. */
@@ -46,6 +52,8 @@ export type GuardSettings = {
   readonly confirm: Confirm;
   /** Lower ceilings for named clients (MCP_CLIENT_MAX_ACCESS); a client not named has `maxAccess`. */
   readonly clientMaxAccess?: Readonly<Record<string, Access>>;
+  /** Where `approvals` asks; set exactly when `confirm` is `approvals`. */
+  readonly approvals?: ApprovalsSettings;
 };
 
 export const ACCESS_ORDER: readonly Access[] = ["read", "write", "money"];
@@ -86,7 +94,13 @@ export const guardSettingsFrom = (env: NodeJS.ProcessEnv): GuardSettings => {
   const confirm = env["MCP_CONFIRM"]?.trim() || "client";
   if (!(CONFIRM_MODES as readonly string[]).includes(confirm)) throw new Error(`MCP_CONFIRM "${confirm}" is not one of ${CONFIRM_MODES.join(", ")}`);
   const clientMaxAccess = clientCeilingsFrom(env["MCP_CLIENT_MAX_ACCESS"]);
-  return { maxAccess: max as Access, confirm: confirm as Confirm, ...(clientMaxAccess === undefined ? {} : { clientMaxAccess }) };
+  const approvals = confirm === "approvals" ? approvalsSettingsFrom(env) : undefined;
+  return {
+    maxAccess: max as Access,
+    confirm: confirm as Confirm,
+    ...(clientMaxAccess === undefined ? {} : { clientMaxAccess }),
+    ...(approvals === undefined ? {} : { approvals }),
+  };
 };
 
 /** `peer=read,other=write`: each client's ceiling. A pair that does not read so is a process that must not start. */
@@ -108,7 +122,7 @@ const clientCeilingsFrom = (raw: string | undefined): Readonly<Record<string, Ac
 };
 
 /** The startup line's words for the settings. */
-export const describeSettings = ({ maxAccess, confirm, clientMaxAccess }: GuardSettings): string =>
+export const describeSettings = ({ maxAccess, confirm, clientMaxAccess, approvals }: GuardSettings): string =>
   [
     maxAccess === "money" ? "every tool enabled" : `tools above ${maxAccess} disabled`,
     ...(clientMaxAccess === undefined
@@ -116,7 +130,9 @@ export const describeSettings = ({ maxAccess, confirm, clientMaxAccess }: GuardS
       : [`clients limited: ${Object.entries(clientMaxAccess)
           .map(([client, access]) => `${client} ${access}`)
           .join(", ")}`]),
-    confirm === "elicit"
+    confirm === "approvals" && approvals !== undefined
+      ? `money and confirmed calls ${describeApprovals(approvals)}`
+      : confirm === "elicit"
       ? "money and confirmed calls confirmed with the user by elicitation"
       : confirm === "client"
         ? "money and confirmed calls marked for the client to confirm"

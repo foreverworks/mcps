@@ -125,6 +125,15 @@ Such a tool stays a write for the ceiling and is confirmed exactly like money.
   cannot be asked mid-call (one without elicitation, or a 2025-11-25 client
   over HTTP) has each such call refused (`confirmation_unavailable`), never run
   unconfirmed.
+- **`approvals`.** The server asks a person through an approval service the
+  deployment runs, on another device: it files the same one line the
+  elicitation would show, waits for the answer inside the call, and runs only
+  on a yes, on the arguments it wrote the line from. Nothing passes through
+  the client between the question and the run, so neither the client nor the
+  model can answer it, and a prompt-injected agent with a valid token is held
+  as firmly as any other caller. No answer in time, a no, or a service that
+  cannot be asked refuses the call, and a question nobody needs any more is
+  withdrawn ([the protocol](configuration.md#the-approval-services-protocol)).
 - **`none`.** The annotations only, for a deployment whose money calls are
   decided elsewhere.
 
@@ -139,10 +148,11 @@ argument, a replayed answer, another tool's answer or a forged state is
 refused (`confirmation_invalid`), and nothing runs. A restart forgets the key,
 so a pending question is asked again.
 
-**Know the limit.** Confirmation covers only calls made through a client that
-asks. If your agents have shells and tokens, keep money tools off
-(`MCP_MAX_ACCESS=write`), keep the token out of the agent's reach, or put an
-approval on another device in front of the server;
+**Know the limit.** `client` and `elicit` cover only calls made through a
+client that asks. If your agents have shells and tokens, keep money tools off
+(`MCP_MAX_ACCESS=write`), keep the token out of the agent's reach, or confirm
+on another device with `approvals`, keeping the approval service's token out of
+the agents' reach too;
 [auth.md](auth.md#layer-c-a-human-approves-consequential-tools) compares the
 options.
 

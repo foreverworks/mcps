@@ -31,7 +31,7 @@ export const guardRemedy = (error: GuardError): string => {
     case "confirmation_denied":
       return "the user declined this call; do not retry it unless they ask";
     case "confirmation_unavailable":
-      return "this server asks the user to confirm such calls, and this client cannot show the question; use a client with MCP elicitation, over stdio or over HTTP with protocol 2026-07-28";
+      return "this server confirms such calls with a person and could not ask this time; the message says why (a client without MCP elicitation, or an approval service that did not answer). Nothing ran";
     case "confirmation_invalid":
       return "make the call again without an answer; the user is asked afresh";
     case "cancelled":
