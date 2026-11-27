@@ -36,6 +36,8 @@ export type RemoteEmbedder = {
   readonly model: string;
   /** Texts per request. */
   readonly batch: number;
+  /** Estimated input-token ceiling per request, when the provider has one. */
+  readonly tokenBudget?: number | undefined;
   /** The settings it lacks (an empty token file counts as missing), without calling it: health reports them and spends nothing. */
   readonly missing: () => Promise<readonly string[]>;
   /** One vector per text, in order, and what the provider says the request cost. */

@@ -950,3 +950,20 @@ describe("named-only collections", () => {
     expect(fine.named_only_invalid).toBeUndefined();
   });
 });
+
+describe("token-bounded remote indexing", () => {
+  it("returns a clear error for an oversized chunk before requesting or saving it", async () => {
+    const sent: string[] = [];
+    const remote = fakeRemote({ sent, tokenBudget: 1 });
+    const s = await connected({ remote });
+    await s.call("create_collection", { name: "docs", embedding_provider: "cloudflare" });
+    sent.length = 0;
+
+    const indexed = await s.call("index_path", { collection: "docs", path: s.inbox });
+    expect(indexed.failed).toBeGreaterThan(0);
+    expect(indexed.failed_files[0]?.error).toMatch(/chunk 1 estimates \d+ tokens, exceeding Workers AI's 1-token request budget/u);
+    expect(indexed.chunks_embedded).toBe(0);
+    expect(sent).toEqual([]);
+    expect((await s.store.documents("docs", { limit: 20, offset: 0 })).total).toBe(0);
+  });
+});

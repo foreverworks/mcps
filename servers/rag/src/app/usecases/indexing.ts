@@ -5,7 +5,7 @@ import { chunkDocument, type Chunk } from "../../domain/chunk.js";
 import { asAppError, describeFailure, fail, inputError } from "../../domain/errors.js";
 import { extractionKey, incompleteKey } from "../../domain/extraction.js";
 import { kindOf, SUPPORTED_EXTENSIONS } from "../../domain/kinds.js";
-import { addUsage, batches, NO_USAGE, type Usage } from "../../domain/provider.js";
+import { addUsage, batches, batchesWithinTokenBudget, NO_USAGE, type Usage } from "../../domain/provider.js";
 import { normaliseText } from "../../domain/text.js";
 import type { CollectionInfo, Deps, DocumentToStore, EmbeddingModel, RemoteEmbedder } from "../ports.js";
 import { findCollection, modelFor, refuseRemoteForLocalOnly, remoteFor } from "./collections.js";
@@ -61,7 +61,15 @@ type Target = { readonly collection: CollectionInfo; readonly model: EmbeddingMo
 const embedAll = async (deps: Deps, { collection, model, remote }: Target, texts: readonly string[]): Promise<Embedded> => {
   const vectors: (readonly number[])[] = [];
   let usage = NO_USAGE;
-  for (const batch of batches(texts, remote?.batch ?? deps.settings.embedBatch)) {
+  let pending: readonly (readonly string[])[];
+  if (remote?.tokenBudget === undefined) pending = batches(texts, remote?.batch ?? deps.settings.embedBatch);
+  else {
+    const planned = batchesWithinTokenBudget(texts, remote.batch, remote.tokenBudget);
+    if (planned.oversized !== undefined)
+      return fail(inputError(`chunk ${planned.oversized.index + 1} estimates ${planned.oversized.estimatedTokens} tokens, exceeding Workers AI's ${remote.tokenBudget}-token request budget`));
+    pending = planned.batches;
+  }
+  for (const batch of pending) {
     if (cancelled()) return fail(inputError("the call was cancelled"));
     if (remote === undefined) {
       vectors.push(...(await model.embedder.embed(batch)));
