@@ -355,7 +355,12 @@ const runConfirmed = async (
 };
 
 /** The one line a person reads about a call: the server, then what its policy says the call does. */
-const lineFor = (service: string, rule: ConfirmedRule, resolved: ToolArgs): string => `${service}: ${rule.summary(resolved)}`.replace(/[\r\n]+/g, " ").slice(0, 300);
+const lineFor = (service: string, rule: ConfirmedRule, resolved: ToolArgs): string => {
+  // One line, whatever the arguments hold: no line break, control or format character (a bidi override, U+2028) can make a second.
+  const line = `${service}: ${rule.summary(resolved)}`.replace(/[\p{Cc}\p{Cf}\p{Zl}\p{Zp}]+/gu, " ");
+  // Cut where it must be, and say so: the person must not read a cut line as the whole call.
+  return line.length <= 300 ? line : `${line.slice(0, 299)}…`;
+};
 
 /**
  * A call a person approves through the deployment's approval service

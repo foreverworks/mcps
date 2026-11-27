@@ -128,7 +128,8 @@ What changes over HTTP:
   is refused each confirmed call. The default, `client`, works as over stdio,
   and so does `approvals`, which asks through a service of yours and needs
   nothing of the client but patience: give it a tool timeout longer than
-  `MCP_APPROVALS_TIMEOUT_S`.
+  `MCP_APPROVALS_TIMEOUT_S`, and the same to any proxy in between, since a
+  waiting call may send no byte for minutes.
 - **Limits are per client**, so one client's runaway loop leaves the others
   their share ([Limits](configuration.md#limits-http)).
 - **Tokens are read at startup.** Adding, changing or removing one takes a

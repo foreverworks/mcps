@@ -5,6 +5,13 @@ import { Client, StreamableHTTPClientTransport } from "@modelcontextprotocol/cli
 
 import type { Progress } from "../call.js";
 
+/** A pause that ends early when the call is cancelled. */
+const pause = (ms: number, signal: AbortSignal | undefined): Promise<void> =>
+  new Promise((resolve) => {
+    const timer = setTimeout(resolve, ms);
+    signal?.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
+  });
+
 /**
  * `MCP_CONFIRM=approvals`: before a `money` call (or a `write` its policy
  * marks `confirm`) runs, the server asks a person through an approval service
@@ -34,6 +41,10 @@ import type { Progress } from "../call.js";
  * An answer the server cannot read, a service that cannot be reached, a token
  * that cannot be read, and no answer in time are all a no: the call is refused
  * and nothing runs. The tools' own errors may come as `{"error": {...}}` text.
+ *
+ * One limit is the service's to close: a question the service filed while the
+ * request itself failed (a timeout, a dropped connection) has no id here, so
+ * it cannot be withdrawn, and a yes to it runs nothing.
  */
 
 export type ApprovalsSettings = {
@@ -71,6 +82,18 @@ export const DEFAULT_APPROVALS_TOOLS = { request: "request", await: "await", can
 
 /** How long one wait at the service lasts at most: short enough that a cancelled call stops waiting soon. */
 const AWAIT_STEP_SEC = 30;
+/** The shortest round of waiting: a service that answers `pending` at once is not asked again sooner. */
+const AWAIT_MIN_MS = 1000;
+/**
+ * How many questions one client may have open at once. A caller that files
+ * question after question (a prompt-injected agent, say) would bury the person
+ * in requests until one gets a careless yes; past this, a call is refused
+ * before anything is filed.
+ */
+export const MAX_OPEN_PER_CLIENT = 3;
+
+/** The questions open now, per client. */
+const open = new Map<string, number>();
 /** How long the service has to answer anything but a wait. */
 const CALL_TIMEOUT_MS = 30_000;
 
@@ -144,10 +167,10 @@ const settled = (status: string): Verdict =>
 /** The requester record a service shows beside the question: what this server says about the call, no more. */
 const requesterOf = (ask: ApprovalAsk): Record<string, unknown> => ({
   client: ask.service,
-  session: ask.client,
-  title: `${ask.service} ${ask.tool}`,
-  host: hostname(),
-  extra: { session_url_unavailable: "a call to an MCP server, which has no page of its own", tool: ask.tool, caller: ask.client, args_sha256: ask.argsDigest },
+  session: ask.client.slice(0, 200),
+  title: `${ask.service} ${ask.tool}`.slice(0, 120),
+  host: hostname().slice(0, 100),
+  extra: { session_url_unavailable: "a call to an MCP server, which has no page of its own", tool: ask.tool.slice(0, 200), caller: ask.client.slice(0, 200), args_sha256: ask.argsDigest },
 });
 
 /**
@@ -157,6 +180,21 @@ const requesterOf = (ask: ApprovalAsk): Record<string, unknown> => ({
  * its timeout on progress keeps waiting too.
  */
 export const askApproval = async (settings: ApprovalsSettings, ask: ApprovalAsk, signal?: AbortSignal, progress?: Progress, now: () => number = Date.now): Promise<Verdict> => {
+  const held = open.get(ask.client) ?? 0;
+  if (held >= MAX_OPEN_PER_CLIENT) {
+    return { kind: "unavailable", message: `this client has ${held} calls waiting for a person's answer already; wait for those before asking again` };
+  }
+  open.set(ask.client, held + 1);
+  try {
+    return await asked(settings, ask, signal, progress, now);
+  } finally {
+    const left = (open.get(ask.client) ?? 1) - 1;
+    if (left > 0) open.set(ask.client, left);
+    else open.delete(ask.client);
+  }
+};
+
+const asked = async (settings: ApprovalsSettings, ask: ApprovalAsk, signal: AbortSignal | undefined, progress: Progress | undefined, now: () => number): Promise<Verdict> => {
   const token = await readFile(settings.tokenFile, "utf8").then(
     (t) => t.trim(),
     (cause: unknown) => new Error(`MCP_APPROVALS_TOKEN_FILE cannot be read (${(cause as NodeJS.ErrnoException).code ?? "error"})`),
@@ -188,9 +226,13 @@ export const askApproval = async (settings: ApprovalsSettings, ask: ApprovalAsk,
       if (left <= 0) return { kind: "refused", message: `nobody answered within ${settings.timeoutSec} s` };
       progress?.(Math.floor((now() - started) / 1000), settings.timeoutSec, "waiting for a person to approve this call");
       const step = Math.min(left, AWAIT_STEP_SEC);
+      const round = now();
       const waited = seen(await call(settings.tools.await, { id, timeout_sec: step }, step * 1000 + CALL_TIMEOUT_MS));
       if (waited.error !== undefined) return { kind: "unavailable", message: waited.error };
+      if (waited.id !== undefined && waited.id !== id) return { kind: "unavailable", message: "the approval service answered about another question" };
       status = waited.status ?? "pending";
+      const spent = now() - round;
+      if (status === "pending" && spent < AWAIT_MIN_MS) await pause(AWAIT_MIN_MS - spent, signal);
     }
     const verdict = settled(status);
     if (verdict.kind === "approved") id = undefined;

@@ -263,7 +263,7 @@ and in `_meta["foreverworks.com/access"]`.
 | `MCP_MAX_ACCESS` | `money` | The highest class this server runs: `read`, `write` or `money`. A tool above it is still listed, says it is disabled, and refuses every call (`access_denied`). |
 | `MCP_CLIENT_MAX_ACCESS` | | Lower ceilings for named clients, as `client=class` pairs separated by commas (`mail-reader=read,bob=write`). The client is the name of the bearer token it called with (`MCP_HTTP_TOKENS_DIR`). A call above its class is refused (`access_denied`, naming the client), and so is any request to the [file endpoints](#files-to-and-from-another-machine) (403) but a download of a file its own calls handed back. Meant for another server that calls this one as its client and needs to read, not to send or pay. |
 | `MCP_CONFIRM` | `client` | Who confirms with the person a `money` call, and a `write` its policy marks `confirm` (one that acts outside the computer): `client`, `elicit`, `approvals` or `none`, as below. |
-| `MCP_APPROVALS_URL` | | With `MCP_CONFIRM=approvals`, required: the MCP endpoint (Streamable HTTP) of the approval service that asks a person. Its host is let through `MCP_EGRESS_ALLOW` without being listed there. |
+| `MCP_APPROVALS_URL` | | With `MCP_CONFIRM=approvals`, required: the MCP endpoint (Streamable HTTP) of the approval service that asks a person. Use `https`, or `http` only over a network that encrypts on its own (loopback, a WireGuard tunnel): the token travels with every question. Where `MCP_EGRESS_ALLOW` is set, this host is let through without being listed there. |
 | `MCP_APPROVALS_TOKEN_FILE` | | With `MCP_CONFIRM=approvals`, required: the file holding the bearer token for that service. It is read on every question, so a rotated token needs no restart. |
 | `MCP_APPROVALS_TIMEOUT_S` | `600` | How long a person has to answer, in seconds (30 to 3600). Over HTTP it must leave the call two minutes within `MCP_HTTP_TIMEOUT_MS`, or the server does not start. |
 | `MCP_APPROVALS_TOOLS` | `request,await,cancel` | The service's three tool names, in that order: the one that files a question, the one that waits for its answer, the one that withdraws it. |
@@ -307,9 +307,16 @@ three tools (`MCP_APPROVALS_TOOLS` names them):
 `status` is `pending` until someone answers, `approved` or `done` for a yes;
 anything else (`denied`, `expired`, `cancelled`, `failed`) is a no. A tool's
 error may come as `{ "error": { "kind": "...", "message": "..." } }` text, and
-refuses the call (`confirmation_unavailable`). Give the server a token of its
-own at the service, allowed to ask and nothing else, and keep it out of your
-agents' reach: whoever holds it can file questions, though never answer them.
+refuses the call (`confirmation_unavailable`). One client may have three
+questions open at once; a fourth call is refused before anything is filed, so
+nobody is buried in requests until one gets a careless yes.
+
+What the service must guarantee, since the kit cannot: that only the person
+can answer, never whoever holds a token. Give the server a token of its own
+at the service, allowed to ask and nothing else, and keep it out of your
+agents' reach. A question the service filed while the request itself failed
+(a timeout, a dropped connection) has no id the server knows, so it cannot be
+withdrawn; a yes to it runs nothing.
 
 ### Files a tool takes as input
 

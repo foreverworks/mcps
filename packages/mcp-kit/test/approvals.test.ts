@@ -32,8 +32,9 @@ const registerService = (server: McpServer): void => {
     { description: "files", inputSchema: { connector: z.literal("approve"), title: z.string(), params: z.object({ action: z.string() }), timeout_sec: z.number() } },
     async ({ title, params, timeout_sec }: { title: string; params: { action: string }; timeout_sec: number }, ctx: unknown) => {
       if (params.action.includes("refuse me")) return answer({ error: { kind: "bad_param", message: "no such thing" } });
+      if (params.action.includes("break me")) return { content: [{ type: "text" as const, text: "it broke" }], isError: true };
       const job: Filed = {
-        id: `ew_${filed.length + 1}`,
+        id: `appr_${filed.length + 1}`,
         action: params.action,
         title,
         timeout: timeout_sec,
@@ -48,6 +49,7 @@ const registerService = (server: McpServer): void => {
   server.registerTool("wait_it", { description: "waits", inputSchema: { id: z.string(), timeout_sec: z.number() } }, async ({ id }: { id: string }) => {
     const job = filed.find((j) => j.id === id);
     if (job === undefined) return answer({ error: { kind: "not_found" } });
+    if (job.action.includes("swap me")) return answer({ id: "appr_other", status: "done" });
     const status = job.statuses.length > 1 ? (job.statuses.shift() as string) : (job.statuses[0] as string);
     return answer({ id, status });
   });
@@ -193,8 +195,36 @@ describe("guard, a money call approved by a person through an approval service (
     expect(parse(await client.callTool({ name: "pay_it", arguments: { amount: "1", to: "refuse me" } }))).toMatchObject({
       error: { kind: "confirmation_unavailable", message: expect.stringContaining("bad_param") },
     });
+    expect(parse(await client.callTool({ name: "pay_it", arguments: { amount: "1", to: "break me" } }))).toMatchObject({ error: { kind: "confirmation_unavailable" } });
+    expect(parse(await client.callTool({ name: "pay_it", arguments: { amount: "1", to: "swap me" } }))).toMatchObject({
+      error: { kind: "confirmation_unavailable", message: expect.stringContaining("another question") },
+    });
     expect(effects).toEqual([]);
   });
+
+  it("asks one line, with no character that could make a second, and marks a line it had to cut", async () => {
+    script.set("svc: pay 1 RON to x to y", ["denied"]);
+    script.set(`svc: pay 1 RON to ${"y".repeat(400)}`.slice(0, 299) + "…", ["denied"]);
+    const { client } = await connect(settingsWith());
+    await client.callTool({ name: "pay_it", arguments: { amount: "1", to: "x\u2028\u202eto y" } });
+    expect(filed[0]?.action).toBe("svc: pay 1 RON to x to y");
+    await client.callTool({ name: "pay_it", arguments: { amount: "1", to: "y".repeat(400) } });
+    expect(filed[1]?.action).toHaveLength(300);
+    expect(filed[1]?.action.endsWith("…")).toBe(true);
+  });
+
+  it("refuses a client more open questions than it may have, before filing one", async () => {
+    const { client } = await connect(settingsWith());
+    const waiting = [1, 2, 3].map((n) => client.callTool({ name: "pay_it", arguments: { amount: String(n), to: "slow" } }));
+    await new Promise((r) => setTimeout(r, 300));
+    expect(parse(await client.callTool({ name: "pay_it", arguments: { amount: "4", to: "slow" } }))).toMatchObject({
+      error: { kind: "confirmation_unavailable", message: expect.stringContaining("waiting for a person's answer already") },
+    });
+    expect(filed).toHaveLength(3);
+    for (const job of filed) job.statuses = ["denied"];
+    await Promise.all(waiting);
+    expect(effects).toEqual([]);
+  }, 15_000);
 
   it("says in each tool's description that a person approves its calls, and marks nothing for the client", async () => {
     const { client } = await connect(settingsWith());
