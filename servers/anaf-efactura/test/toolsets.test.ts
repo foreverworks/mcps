@@ -187,7 +187,7 @@ describe("registry,documents: the server for anyone, with no grant", () => {
   it("validates a document, and renders it as a PDF attached to the answer", async () => {
     const xml = Buffer.from(UBL_INVOICE, "utf8");
     const sha256 = await SHA256(UBL_INVOICE);
-    const document = { content_base64: xml.toString("base64"), sha256 };
+    const document = UBL_INVOICE;
     const posted: string[] = [];
     withFetch(async (url) => {
       posted.push(url);
@@ -196,13 +196,40 @@ describe("registry,documents: the server for anyone, with no grant", () => {
     const { client } = await connect(PUBLIC);
     const checked = await call(client, "validate_invoice", { xml: document });
     expect(checked.isError).toBeUndefined();
-    expect(checked.answer).toMatchObject({ valid: true });
+    expect(checked.answer).toMatchObject({ valid: true, file: { size: xml.length, sha256 } });
     const pdf = await call(client, "invoice_pdf", { xml: document });
     expect(pdf.isError).toBeUndefined();
-    expect(pdf.answer).toMatchObject({ saved: true, inline: true, bytes: 14 });
+    expect(pdf.answer).toMatchObject({ saved: true, inline: true, bytes: 14, file: { size: xml.length, sha256 } });
     expect(pdf.answer).not.toHaveProperty("path");
     expect(pdf.content[1]).toMatchObject({ type: "resource", resource: { mimeType: "application/pdf", blob: Buffer.from("%PDF-1.5\n%fake").toString("base64") } });
     expect(posted.every((url) => url.startsWith("https://webservicesp.anaf.ro/"))).toBe(true);
+  });
+
+  it("takes the XML as text, hashes it itself and answers what arrived; a seal check takes both files as text", async () => {
+    withFetch(async () => json({ msg: "Fișierele încărcate au fost validate cu succes" }));
+    const { client } = await connect(PUBLIC);
+    const parsed = await call(client, "parse_invoice", { xml: UBL_INVOICE });
+    expect(parsed.isError).toBeUndefined();
+    expect(parsed.answer).toMatchObject({ file: { size: Buffer.byteLength(UBL_INVOICE), sha256: await SHA256(UBL_INVOICE) } });
+    const sealed = await call(client, "verify_signature", { xml: UBL_INVOICE, signature: "<Signature/>" });
+    expect(sealed.answer["error"]).toBeUndefined();
+    expect(sealed.answer).toMatchObject({ source: { invoice: { sha256: await SHA256(UBL_INVOICE) }, signature: { sha256: await SHA256("<Signature/>") } } });
+  });
+
+  it("refuses text over the cap, and an object where text is asked", async () => {
+    const { client } = await connect(PUBLIC);
+    for (const xml of ["x".repeat(1_048_577), { path: "/etc/hostname" }, ""]) {
+      const refused = (await client.callTool({ name: "validate_invoice", arguments: { xml } })) as { isError?: boolean };
+      expect(refused.isError).toBe(true);
+    }
+  });
+
+  it("keeps path and checked base64 only where there is a grant: text is refused there", async () => {
+    const { client, tools } = await connect({});
+    const xml = tools.find((tool) => tool.name === "validate_invoice")?.inputSchema.properties?.["xml"] as { type?: string };
+    expect(xml.type).toBe("object");
+    const refused = (await client.callTool({ name: "validate_invoice", arguments: { xml: UBL_INVOICE } })) as { isError?: boolean };
+    expect(refused.isError).toBe(true);
   });
 
   it("answers a message_id from a caller who sends it anyway with an error that names it, not a grant failure", async () => {
@@ -211,7 +238,7 @@ describe("registry,documents: the server for anyone, with no grant", () => {
     expect(pdf.isError).toBe(true);
     expect(pdf.content[0]?.text).toMatch(/message_id/);
     const bare = await call(client, "invoice_pdf", {});
-    expect(bare.answer).toMatchObject({ error: { kind: "input", message: "give the invoice as xml: { path } for a file, or { content_base64, sha256 } from a script" } });
+    expect(bare.answer).toMatchObject({ error: { kind: "input", message: "give the invoice as xml: its XML text" } });
   });
 });
 

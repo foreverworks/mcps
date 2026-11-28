@@ -34,7 +34,7 @@ https://mcp.foreverworks.com/anaf-efactura
 - **In other clients** that take a remote MCP server: add the address as a
   Streamable HTTP server, with no authentication.
 
-The hosted server has only what needs no ANAF account: `health`, `lookup_company` (ANAF's VAT registry), `build_invoice`, `validate_invoice`, `invoice_pdf`, `parse_invoice` and `verify_signature`. It files nothing and cannot read any company's invoices: for those, install it yourself with your own ANAF grant. A hosted server cannot read files from your computer, so `build_invoice` and `invoice_pdf` give the file back attached to the answer, and the tools that take an invoice or a seal (`validate_invoice`, `invoice_pdf`, `parse_invoice`, `verify_signature`) take it as `{ "content_base64": "...", "sha256": "..." }` from a script or an agent that can run one, never as a path.
+The hosted server has only what needs no ANAF account: `health`, `lookup_company` (ANAF's VAT registry), `build_invoice`, `validate_invoice`, `invoice_pdf`, `parse_invoice` and `verify_signature`. It files nothing and cannot read any company's invoices: for those, install it yourself with your own ANAF grant. A hosted server cannot read files from your computer, so `build_invoice` and `invoice_pdf` give the file back attached to the answer, and the tools that take an invoice (`validate_invoice`, `invoice_pdf`, `parse_invoice`) take its XML as text: `xml` is the document itself, up to 1,048,576 characters. `verify_signature` takes the invoice and ANAF's seal the same way, as the XML text of `xml` and `signature`. Because the server hashes the text it receives, it cannot tell you the text was retyped wrongly: every answer gives the `sha256` and size of what arrived (`file`, or `source` for a seal), so compare them with your source file. A seal covers the invoice's exact bytes, so check that hash before you trust a failed `verify_signature`. A path or base64 is not taken here.
 
 The hosted server is rate-limited for each caller, so it suits a person working
 with an assistant, not bulk lookups: a call over the limit is refused with a 429
@@ -184,7 +184,7 @@ MCP_HTTP_CLIENT_IP_HEADER=cf-connecting-ip npx -y @foreverworks/mcp-anaf-efactur
 
 ### Files in and out
 
-A document goes in byte for byte, never as text a model retyped, because
+A document goes in byte for byte, never as text a model retyped (except on a server with no grant, which has no disk and takes the XML as text and answers its hash, [above](#serving-it-to-anyone)), because
 ANAF's seal covers the exact bytes: by path from the server's file roots
 (`MCP_FILE_ROOTS`; over stdio, the client's folders or the working directory),
 or as `{ "content_base64": "...", "sha256": "..." }` from a script. A link, a

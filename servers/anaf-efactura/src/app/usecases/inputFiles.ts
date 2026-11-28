@@ -6,7 +6,10 @@ import { fail, inputError } from "../../domain/errors.js";
  * A document the caller hands in, one of two ways, both byte-exact (mcp-kit's
  * input-file reader): by path, inside the server's file roots, or as base64 a
  * script wrote, with the SOURCE file's sha256, which the reader checks before
- * anything is sent. There is no third way: a document typed out by a model as
+ * anything is sent. There is no third way, with one exception (mcp/fileArgs.ts):
+ * a server with no grant has no disk, so its document tools take the XML as text
+ * and answer the sha256 and size of what arrived, for the caller to compare with
+ * its source. Nowhere else: a document typed out by a model as
  * text is a retyping, and a retyped invoice can change by one character with
  * nothing noticing (about one error in 6,200 base64 characters).
  */

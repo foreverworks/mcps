@@ -5,7 +5,7 @@ import { invoicePdf, validateInvoice } from "../../app/usecases/documents.js";
 import { parseInvoice } from "../../app/usecases/parse.js";
 import { verifySignature } from "../../app/usecases/signatures.js";
 import { handled } from "../envelope.js";
-import { documentInput, type FileArg, fileArg } from "../fileArgs.js";
+import { documentInput, type FileArg, fileArg, xmlTextArg } from "../fileArgs.js";
 import { PARSE_OUTPUT } from "../outputs.js";
 import type { Registrar } from "./types.js";
 
@@ -22,6 +22,9 @@ export const registerDocuments: Registrar = (server, deps) => {
   const { grantless, outbox } = deps.mode;
   // Where a path may point and how else a file may come, in the reader's own words (mcp-kit, from MCP_FILE_ROOTS).
   const files = deps.files.readInput;
+  // With no grant there is no disk to read from, so a document goes in as its XML text (fileArgs.ts); otherwise by path or checked base64.
+  const document = (what: string) => (grantless ? xmlTextArg(what) : fileArg(what, files));
+  const given = grantless ? "the XML text as xml, which the server hashes (answered in file: size, sha256)" : "xml: { path } for a file, or { content_base64, sha256 } from a script";
   server.registerTool(
     "validate_invoice",
     {
@@ -30,11 +33,11 @@ export const registerDocuments: Registrar = (server, deps) => {
         "Check a UBL invoice or credit note against ANAF's own schema and CIUS-RO rules without " +
         "filing it. Answers valid, and when not, findings: each with the rule it broke (e.g. BR-RO-001), where " +
         "in the document, and ANAF's text. invoice is what the XML says it is, and file which file was read (name, " +
-        "size, sha256). Needs no grant. CII is not accepted: ANAF validates UBL only. The document goes as xml: " +
-        "{ path } for a file, or { content_base64, sha256 } from a script.",
-      inputSchema: { xml: fileArg("The invoice XML (at most 5 MB)", files) },
+        "size, sha256). Needs no grant. CII is not accepted: ANAF validates UBL only. The document goes as " +
+        `${given}.`,
+      inputSchema: { xml: document("The invoice XML (at most 5 MB)") },
     },
-    handled((args: { xml: FileArg }) => validateInvoice(deps, { xml: documentInput("xml", args.xml) })),
+    handled((args: { xml: FileArg | string }) => validateInvoice(deps, { xml: documentInput("xml", args.xml) })),
   );
 
   server.registerTool(
@@ -45,18 +48,18 @@ export const registerDocuments: Registrar = (server, deps) => {
         "Read a UBL invoice or credit note into plain JSON: seller and buyer (names, VAT and legal ids, " +
         "address, contact), every line (quantity, unit, price, net amount, VAT category and rate), the VAT " +
         "breakdown, the totals, and the payment terms (due date, terms, IBAN). Every value is the document's own " +
-        "text, amounts included, never a number; a field the document does not fill is absent. Give xml ({ path } " +
-        "for a file, or { content_base64, sha256 } from a script)" + (grantless ? "" : " or archive, a .zip download_invoice saved to the outbox") + ". " +
+        "text, amounts included, never a number; a field the document does not fill is absent. Give " +
+        (grantless ? given : `xml ({ path } for a file, or { content_base64, sha256 } from a script)`) + (grantless ? "" : " or archive, a .zip download_invoice saved to the outbox") + ". " +
         "Reads only: nothing goes to ANAF. To have ANAF check the document, use validate_invoice.",
       inputSchema: grantless
-        ? { xml: fileArg("A UBL invoice or credit note", files).optional() }
+        ? { xml: document("A UBL invoice or credit note").optional() }
         : {
-            xml: fileArg("A UBL invoice or credit note", files).optional(),
+            xml: document("A UBL invoice or credit note").optional(),
             archive: z.string().default("").describe("A .zip in the downloads outbox, from download_invoice: its name, or its path under the outbox."),
           },
       outputSchema: PARSE_OUTPUT,
     },
-    handled((args: { xml?: FileArg; archive?: string }): Promise<OutputOf<typeof PARSE_OUTPUT>> =>
+    handled((args: { xml?: FileArg | string; archive?: string }): Promise<OutputOf<typeof PARSE_OUTPUT>> =>
       parseInvoice(deps, { xml: documentInput("xml", args.xml), archive: args.archive ?? "" }),
     ),
   );
@@ -65,13 +68,13 @@ export const registerDocuments: Registrar = (server, deps) => {
     .string()
     .default("")
     .describe("A folder INSIDE the downloads outbox (e.g. \"2026-09\"); empty means the outbox itself. A path outside it is refused.");
-  const document = fileArg("A UBL invoice or credit note", files).optional();
+  const pdfDocument = document("A UBL invoice or credit note").optional();
   const validate = z.boolean().default(true).describe("For a document only: validate before converting.");
   const pdfInput = grantless
-    ? { xml: document, validate, ...(outbox ? { save_dir: saveDir } : {}) }
+    ? { xml: pdfDocument, validate, ...(outbox ? { save_dir: saveDir } : {}) }
     : {
         message_id: messageId,
-        xml: document,
+        xml: pdfDocument,
         validate,
         save_dir: saveDir,
         test: z.boolean().default(false).describe("For message_id only: fetch it from ANAF's test environment."),
@@ -85,8 +88,7 @@ export const registerDocuments: Registrar = (server, deps) => {
         (outbox ? " and save it to the downloads outbox" : ", attached to the answer as a file (this server keeps no copy)") +
         ". Give " +
         (grantless ? "the UBL document" : "message_id (from list_invoices) for a filed invoice, or a UBL document") +
-        " as xml ({ path } for a file, or " +
-        "{ content_base64, sha256 } from a script). " +
+        (grantless ? " as " + given + ". " : " as xml ({ path } for a file, or { content_base64, sha256 } from a script). ") +
         (grantless ? "The document" : "A filed invoice is not validated again; a document") +
         " is validated first " +
         "unless validate is false, and when it fails nothing is " +
@@ -97,7 +99,7 @@ export const registerDocuments: Registrar = (server, deps) => {
         (grantless ? "." : "; fetching a filed invoice by message_id does."),
       inputSchema: pdfInput,
     },
-    handled((args: { message_id?: string; xml?: FileArg; validate: boolean; save_dir?: string; test?: boolean }) =>
+    handled((args: { message_id?: string; xml?: FileArg | string; validate: boolean; save_dir?: string; test?: boolean }) =>
       invoicePdf(deps, {
         messageId: args.message_id ?? "",
         xml: documentInput("xml", args.xml),
@@ -110,8 +112,8 @@ export const registerDocuments: Registrar = (server, deps) => {
 
   const sealInput = grantless
     ? {
-        xml: fileArg("The invoice XML from the archive", files),
-        signature: fileArg("The semnatura_*.xml from the same archive", files),
+        xml: document("The invoice XML from the archive"),
+        signature: document("The semnatura_*.xml from the same archive"),
       }
     : {
         message_id: messageId,
@@ -131,8 +133,10 @@ export const registerDocuments: Registrar = (server, deps) => {
           : "ONE of: message_id (downloads the archive: ANAF allows 10 downloads a day per message), archive (a .zip " +
             "already in the downloads outbox, from download_invoice; costs nothing), or the two files from an " +
             "archive kept elsewhere (costs nothing): xml and signature, each ") +
-        "{ path } or { content_base64, sha256 }, " +
-        "read byte for byte, since the seal covers the invoice's exact bytes. " +
+        (grantless ? "the XML text of each, " : "{ path } or { content_base64, sha256 }, ") +
+        "read byte for byte, since the seal covers the invoice's exact bytes" +
+        (grantless ? " (text you retype may differ from the file; the sha256 of what arrived is in source, to compare with the file's)" : "") +
+        ". " +
         "Checked locally first: the " +
         "certificate against Trans Sped's seal CA and the Ministry of Finance, the signature, and the digest of " +
         "the invoice's raw bytes. Only when that cannot decide is ANAF asked. Answers valid, checkedBy (local " +
@@ -140,7 +144,7 @@ export const registerDocuments: Registrar = (server, deps) => {
       inputSchema: sealInput,
     },
     handled(
-      (args: { message_id?: string; archive?: string; xml?: FileArg; signature?: FileArg; test?: boolean }) =>
+      (args: { message_id?: string; archive?: string; xml?: FileArg | string; signature?: FileArg | string; test?: boolean }) =>
         verifySignature(deps, {
           messageId: args.message_id ?? "",
           archive: args.archive ?? "",

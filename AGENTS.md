@@ -54,7 +54,10 @@ script's header before running it: some take options that write.
 - **Classify every tool** in `src/mcp/policy.ts`; the server will not start
   otherwise. `money` means money moves or a legal document is made or unmade.
 - **Files go in by path** through the kit's input-file reader, never as text or
-  base64 a model types; results report SHA-256 and size.
+  base64 a model types; results report SHA-256 and size. The one exception is
+  anaf-efactura's document tools on a server with no grant and so no disk
+  (`mcp/fileArgs.ts`): they take the XML as text and answer the SHA-256 and size
+  of what arrived, for the caller to compare.
 - **Errors are tagged objects**: in a catch that describes a failure, call the
   server's `asAppError(thrown)` before anything else; `instanceof Error` misses
   every one of them.

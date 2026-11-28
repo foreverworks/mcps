@@ -2,7 +2,7 @@ import { sha256Of } from "@foreverworks/mcp-kit";
 
 import { fail, inputError } from "../../domain/errors.js";
 import type { Deps } from "../ports.js";
-import { refuseWithoutGrant } from "./deliver.js";
+import { howToGive, refuseWithoutGrant } from "./deliver.js";
 import { archiveContents, outboxArchive } from "./archive.js";
 import { type DocumentInput, given, readDocumentText, utf8Of } from "./inputFiles.js";
 
@@ -26,7 +26,7 @@ const sourceOf = async (deps: Deps, args: ParseInvoiceArgs) => {
     return { text: utf8Of(invoice, `the invoice in ${path}`), source: { archive: { path, sha256: sha256Of(bytes), bytes: bytes.length } } };
   }
   const document = await readDocumentText(deps.files.readInput, args.xml);
-  if (document === undefined) return fail(inputError("give the invoice as xml: { path } for a file, or { content_base64, sha256 } from a script"));
+  if (document === undefined) return fail(inputError(`give the invoice as ${howToGive(deps)}`));
   return { text: document.text, source: { file: document.read } };
 };
 

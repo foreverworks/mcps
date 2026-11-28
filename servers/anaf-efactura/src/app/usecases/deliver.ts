@@ -16,6 +16,10 @@ export const noFolderWithoutOutbox = (deps: Deps, saveDir: string): void => {
   if (!deps.mode.outbox && saveDir !== "") fail(inputError("this server keeps no outbox, so there is no folder to save into: the file comes back in the answer"));
 };
 
+/** How a caller is told to give a document: its text with no grant (there is no disk), else by path or checked base64. */
+export const howToGive = (deps: Deps, name = "xml"): string =>
+  deps.mode.grantless ? `${name}: its XML text` : `${name}: { path } for a file, or { content_base64, sha256 } from a script`;
+
 /** A parameter that reads what the grant fetched or an outbox holds, asked of a server that has neither. */
 export const refuseWithoutGrant = (deps: Deps, parameter: string): void => {
   if (deps.mode.grantless) {

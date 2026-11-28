@@ -29,12 +29,18 @@ const pairOf = async (deps: Deps, args: VerifySignatureArgs) => {
   if (args.archive !== "") refuseWithoutGrant(deps, "archive");
   const files = given(args.xml) || given(args.signature);
   const sources = [args.messageId !== "", args.archive !== "", files].filter(Boolean).length;
-  if (sources !== 1) return fail(inputError("give one of: message_id, archive, or the invoice with its signature (xml and signature, each { path } or { content_base64, sha256 })"));
+  if (sources !== 1) return fail(
+      inputError(
+        deps.mode.grantless
+          ? "give the invoice with its signature: xml and signature, each as its XML text"
+          : "give one of: message_id, archive, or the invoice with its signature (xml and signature, each { path } or { content_base64, sha256 })",
+      ),
+    );
   if (files) {
     const invoice = await readDocument(deps.files.readInput, args.xml);
     const seal = await readDocument(deps.files.readInput, args.signature);
     if (invoice === undefined || seal === undefined) {
-      return fail(inputError("the invoice and its signature go together: xml and signature, each { path } or { content_base64, sha256 }"));
+      return fail(inputError(deps.mode.grantless ? "the invoice and its signature go together: xml and signature, each as its XML text" : "the invoice and its signature go together: xml and signature, each { path } or { content_base64, sha256 }"));
     }
     return { invoice: invoice.bytes, seal: seal.bytes, source: { invoice: describeRead(invoice), signature: describeRead(seal) } };
   }

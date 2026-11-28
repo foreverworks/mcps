@@ -5,7 +5,7 @@ import { parseMessageId } from "../../domain/ids.js";
 import { MAX_VALIDATION_BYTES, pdfName, validationTarget, verdictOf } from "../../domain/validation.js";
 import type { Deps } from "../ports.js";
 import { digestsOf, fetchArchive, invoiceInArchive } from "./archive.js";
-import { deliver, noFolderWithoutOutbox, refuseWithoutGrant } from "./deliver.js";
+import { deliver, howToGive, noFolderWithoutOutbox, refuseWithoutGrant } from "./deliver.js";
 import { type DocumentInput, given, readDocumentText } from "./inputFiles.js";
 
 const sized = (xml: string): string => {
@@ -24,7 +24,7 @@ const sized = (xml: string): string => {
  */
 export const validateInvoice = async (deps: Deps, args: { readonly xml: DocumentInput }) => {
   const document = await readDocumentText(deps.files.readInput, args.xml);
-  if (document === undefined) return fail(inputError("give the invoice as xml: { path } for a file, or { content_base64, sha256 } from a script"));
+  if (document === undefined) return fail(inputError(`give the invoice as ${howToGive(deps)}`));
   const xml = sized(document.text);
   const { standard, facts } = validationTarget(deps.readInvoice(xml));
   return { ...verdictOf(await deps.anaf.validate(xml, standard)), standard, invoice: facts, file: document.read };
@@ -51,8 +51,8 @@ const sourceOf = async (deps: Deps, args: InvoicePdfArgs) => {
   return fail(
     inputError(
       deps.mode.grantless
-        ? "give the invoice as xml: { path } for a file, or { content_base64, sha256 } from a script"
-        : "give message_id (a filed invoice), or a document as xml: { path } for a file, or { content_base64, sha256 } from a script",
+        ? `give the invoice as ${howToGive(deps)}`
+        : `give message_id (a filed invoice), or a document as ${howToGive(deps)}`,
     ),
   );
 };
