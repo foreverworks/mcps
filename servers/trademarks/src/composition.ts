@@ -8,14 +8,24 @@ import { makeRegisterHttp, type RegisterHttpOptions } from "./infra/http.js";
 import { makeOutbox } from "./infra/outbox.js";
 import { makeTsdrRecords, SOURCE as TSDR, TSDR_BASE } from "./infra/tsdr.js";
 import { loadTsdrKey } from "./infra/tsdr/credentials.js";
+import { POLICY } from "./mcp/policy.js";
+import { loadToolsets } from "./mcp/toolsets.js";
 import { makeUsptoRegister, SOURCE as USPTO, USPTO_BASE } from "./infra/uspto.js";
 
 /** The sources this server knows; TRADEMARKS_SOURCES (comma-separated) narrows them, unset is all three. */
 export const SOURCE_NAMES = ["uspto", "euipo", "tsdr"] as const;
 
+/**
+ * TRADEMARKS_SOURCES narrows the sources; so does leaving out the `records`
+ * toolset (TRADEMARKS_TOOLSETS), whose tools are the only ones TSDR serves: a
+ * server without them has no use for the key, and health does not list a source
+ * nothing can call.
+ */
 const enabledSources = (env: NodeJS.ProcessEnv): ReadonlySet<string> => {
   const listed = env["TRADEMARKS_SOURCES"]?.trim();
-  return new Set(listed ? listed.split(",").map((s) => s.trim().toLowerCase()) : SOURCE_NAMES);
+  const named = new Set(listed ? listed.split(",").map((s) => s.trim().toLowerCase()) : SOURCE_NAMES);
+  if (!loadToolsets(POLICY, env).loaded.includes("records")) named.delete("tsdr");
+  return named;
 };
 
 /**

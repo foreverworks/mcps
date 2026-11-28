@@ -7,6 +7,9 @@ import type { Office } from "./mark.js";
  * each says it was not searched and where a human can look instead.
  */
 export const UNCOVERED: Readonly<Partial<Record<Office, string>>> = {
+  EM:
+    "not searched: this server has no EU source enabled (EUIPO's API needs credentials of its own). Check by hand at " +
+    "https://euipo.europa.eu/eSearch; an EU mark covers every member state, Romania included.",
   RO:
     "not searched: OSIM's own register (api.osim.ro:8443/tm-registry) sits behind a reCAPTCHA, and TMview, which carries it, " +
     "reserves its data against bots and automated access without EUIPO's written authorisation. Check by hand at " +
