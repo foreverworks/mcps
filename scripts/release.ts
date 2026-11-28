@@ -119,6 +119,19 @@ const publishedByTrustedPublisher = async (w: Workspace): Promise<boolean> => {
 };
 
 /**
+ * Whether npm has never had this package. Trusted publishing only publishes a
+ * new version of a package that exists, so its first publish needs a token
+ * (docs/releasing.md, "Give the workflow a token"). Only npm's 404 counts as
+ * new; any other answer stops the release, since doubt must not send half of it.
+ */
+const neverOnNpm = async (w: Workspace): Promise<boolean> => {
+  const answer = await fetch(`https://registry.npmjs.org/${w.name.replace("/", "%2f")}`, { method: "HEAD" });
+  if (answer.status === 404) return true;
+  if (answer.ok) return false;
+  throw new Error(`npm answered ${answer.status} for ${w.name}: cannot tell whether it was ever published`);
+};
+
+/**
  * Connects each published package to the release workflow, once per package;
  * a package that already trusts it is left alone. npm asks for the
  * maintainer's second factor, so this runs on their machine, never in CI.
@@ -196,6 +209,20 @@ const main = async (): Promise<void> => {
   if (shipping.length === 0) {
     console.log("nothing to publish: every package that ships is still private (removing that flag publishes it)");
     return;
+  }
+  // Before anything is sent: a package npm has never had stops a publish midway (E404) without a token.
+  const firsts: Workspace[] = [];
+  for (const w of shipping) if (await neverOnNpm(w)) firsts.push(w);
+  // actions/setup-node with registry-url sets a placeholder of X's when no token is given.
+  const token = (process.env["NODE_AUTH_TOKEN"] ?? "").trim();
+  if (firsts.length > 0 && (token === "" || /^X+(-X+)*$/.test(token))) {
+    console.error(
+      [
+        ...firsts.map((w) => `${w.name}: never on npm, so its first publish needs a token (docs/releasing.md)`),
+        'Give the workflow a token, or mark these "private": true until then; nothing was published.',
+      ].join("\n"),
+    );
+    process.exit(1);
   }
   for (const w of shipping) {
     if (onNpm(w)) console.log(`${w.name}@${w.version}: already on npm`);

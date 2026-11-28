@@ -77,25 +77,11 @@
       "version": "0.2.2"
     },
     {
-      "name": "foreverworks-granola",
-      "displayName": "Granola",
-      "source": "./plugins/granola",
-      "description": "Read your Granola meetings, notes and transcripts from clients that cannot sign in to Granola.",
-      "version": "0.2.0"
-    },
-    {
       "name": "foreverworks-home-assistant",
       "displayName": "Home Assistant",
       "source": "./plugins/home-assistant",
       "description": "Read your Home Assistant's states, areas and history, and run its actions, approving locks first.",
       "version": "0.1.4"
-    },
-    {
-      "name": "foreverworks-mobbin",
-      "displayName": "Mobbin",
-      "source": "./plugins/mobbin",
-      "description": "Search Mobbin's library of app screens and flows from clients that cannot sign in to Mobbin.",
-      "version": "0.2.0"
     },
     {
       "name": "foreverworks-notion",

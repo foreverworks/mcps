@@ -62,6 +62,9 @@ official server on one side and an ordinary MCP server on the other.
 <!-- install:begin -->
 [![Install in VS Code](https://img.shields.io/badge/VS_Code-Install_Server-0098FF?style=flat-square&logo=visualstudiocode&logoColor=white)](https://vscode.dev/redirect/mcp/install?name=granola&inputs=%5B%7B%22type%22%3A%22promptString%22%2C%22id%22%3A%22granola_redirect_uri%22%2C%22description%22%3A%22Optional.%20Where%20the%20browser%20lands%20after%20you%20sign%20in%20to%20Granola%3B%20it%20need%20not%20be%20reachable.%20Defaults%20to%20a%20loopback%20address.%22%7D%5D&config=%7B%22command%22%3A%22npx%22%2C%22args%22%3A%5B%22-y%22%2C%22%40foreverworks%2Fmcp-granola%22%5D%2C%22env%22%3A%7B%22GRANOLA_REDIRECT_URI%22%3A%22%24%7Binput%3Agranola_redirect_uri%7D%22%7D%7D) [![Install in Cursor](https://img.shields.io/badge/Cursor-Install_Server-000000?style=flat-square&logo=cursor&logoColor=white)](https://cursor.com/install-mcp?name=granola&config=eyJjb21tYW5kIjoibnB4IiwiYXJncyI6WyIteSIsIkBmb3JldmVyd29ya3MvbWNwLWdyYW5vbGEiXSwiZW52Ijp7IkdSQU5PTEFfUkVESVJFQ1RfVVJJIjoiJHtlbnY6R1JBTk9MQV9SRURJUkVDVF9VUkl9In19) [![Download for Claude Desktop](https://img.shields.io/badge/Claude_Desktop-Download_Bundle-D97757?style=flat-square&logo=claude&logoColor=white)](https://github.com/foreverworks/mcps/releases/latest/download/mcp-granola.mcpb)
 
+> [!NOTE]
+> `@foreverworks/mcp-granola` is not on npm yet: the buttons and the `npx` commands below work once it is published. Until then, [run it from a clone](#from-a-clone).
+
 With Claude Code:
 
 ```bash

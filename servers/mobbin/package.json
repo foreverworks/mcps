@@ -1,6 +1,7 @@
 {
   "name": "@foreverworks/mcp-mobbin",
   "version": "0.2.0",
+  "private": true,
   "description": "MCP server that bridges Mobbin's own hosted MCP server: one OAuth grant held on the server, Mobbin's design search served to clients that cannot sign in themselves",
   "mcpName": "com.foreverworks/mobbin",
   "mcp": {

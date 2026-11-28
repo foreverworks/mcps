@@ -49,16 +49,8 @@
       "source": "google"
     },
     {
-      "name": "foreverworks-granola",
-      "source": "granola"
-    },
-    {
       "name": "foreverworks-home-assistant",
       "source": "home-assistant"
-    },
-    {
-      "name": "foreverworks-mobbin",
-      "source": "mobbin"
     },
     {
       "name": "foreverworks-notion",
