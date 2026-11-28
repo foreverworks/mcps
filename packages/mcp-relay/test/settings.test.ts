@@ -62,6 +62,7 @@ describe("settingsFrom", () => {
   it.each([
     ["no port", { MCP_HTTP_PORT: "" }, /MCP_HTTP_PORT is not set/],
     ["no tokens", { MCP_HTTP_TOKENS_DIR: "" }, /MCP_HTTP_TOKENS_DIR or MCP_HTTP_TOKEN_FILE/],
+    ["a path of its own", { MCP_HTTP_PATH: "/relay" }, /MCP_HTTP_PATH is set/],
     ["public hosts", { MCP_HTTP_TOKENS_DIR: "", MCP_HTTP_PUBLIC_HOSTS: "relay.example.com" }, /MCP_HTTP_PUBLIC_HOSTS is set/],
     ["a server's own file endpoints", { MCP_HTTP_FILES_INBOX: "/srv/in" }, /configure a server's own file endpoints/],
     ["no upstream", { MCP_RELAY_UPSTREAM: "" }, /MCP_RELAY_UPSTREAM is not set/],

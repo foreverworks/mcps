@@ -1,4 +1,4 @@
-import { type AllowedHost, type ClientTokenFiles, DEFAULT_FILES_MAX_BYTES, FILES_VARIABLES, folderFrom, isLoopbackAddress, type Limits, limitsFrom, listenFrom } from "@foreverworks/mcp-kit";
+import { type AllowedHost, type ClientTokenFiles, DEFAULT_FILES_MAX_BYTES, FILES_VARIABLES, folderFrom, isLoopbackAddress, type Limits, limitsFrom, listenFrom, MCP_PATH } from "@foreverworks/mcp-kit";
 
 /**
  * Where the token the relay presents upstream comes from: one file, whose token
@@ -97,6 +97,7 @@ export const settingsFrom = (env: NodeJS.ProcessEnv): RelaySettings => {
   const listen = listenFrom(env);
   if (listen.kind === "stdio") throw new Error("MCP_HTTP_PORT is not set: a relay listens on a port, where the clients of the server it stands in for connect");
   if (listen.kind === "public") throw new Error("MCP_HTTP_PUBLIC_HOSTS is set: a relay is for clients with a token, because it carries files and holds the token to the server");
+  if (listen.path !== MCP_PATH) throw new Error(`MCP_HTTP_PATH is set: a relay answers on ${MCP_PATH} only, where the clients of the server it stands in for connect`);
   const files = FILES_VARIABLES.filter((name) => env[name]?.trim());
   if (files.length > 0) throw new Error(`${files.join(" and ")} configure a server's own file endpoints; a relay is told its folders by MCP_RELAY_INBOX and MCP_RELAY_OUTBOX`);
   const upstreamTokens = upstreamTokensFrom(env);
