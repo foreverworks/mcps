@@ -5,7 +5,7 @@ import type { z } from "zod";
 
 import type { AnafPort, Receipt } from "../app/ports.js";
 import { looksLikeZip } from "../domain/archive.js";
-import { apiError, fail, OUTCOME_UNKNOWN } from "../domain/errors.js";
+import { apiError, asAppError, fail, OUTCOME_UNKNOWN } from "../domain/errors.js";
 import { flagParams } from "../domain/upload.js";
 import { looksLikePdf } from "../domain/validation.js";
 import { ANAF_PUBLIC, type Endpoints } from "./config.js";
@@ -239,10 +239,19 @@ export const makeAnafApi = (endpoints: () => Promise<Endpoints>, request: Reques
     },
 
     // `cui` is a number on the wire; the CIFs are validated digits by now.
+    // A request in which ANAF knows none of the CIFs is answered HTTP 404 with the usual body (`found` empty,
+    // `notFound` listing them): an answer, not a failure, so it is read as one.
     companies: (cifs, asOf) =>
       paced(async () => {
         const url = ANAF_PUBLIC.vatRegistry;
-        return parsed(companyList, await post(url, { json: cifs.map((cui) => ({ cui: Number(cui), data: asOf })) }), url);
+        try {
+          return parsed(companyList, await post(url, { json: cifs.map((cui) => ({ cui: Number(cui), data: asOf })) }), url);
+        } catch (thrown) {
+          const error = asAppError(thrown);
+          const none = error?.kind === "api" && error.status === 404 ? companyList.safeParse(error.body) : undefined;
+          if (none?.success === true && (none.data.found ?? []).length === 0 && (none.data.notFound ?? []).length > 0) return none.data;
+          throw thrown;
+        }
       }),
   };
 };

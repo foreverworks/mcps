@@ -26,12 +26,12 @@ export const checkHealth = async ({ anaf, tokens, identity, paths, now }: Deps) 
 };
 
 /**
- * A CIF ANAF's registry has no company under, and a document it will not
- * validate: both are answers, and an answer is all a probe is after. What a
- * probe says is only whether ANAF's public host answered, never that a tool
- * will find what a caller asks for.
+ * A document ANAF will not validate, and a registered company's CIF (the
+ * national road infrastructure company's, which the registry publishes): an
+ * answer is all a probe is after. What a probe says is only whether ANAF's
+ * public host answered, never that a tool will find what a caller asks for.
  */
-const PROBE_CIF = "1";
+const PROBE_CIF = "16054368";
 const PROBE_DOCUMENT = "<Invoice/>";
 
 type Probe = { readonly reachable: true } | { readonly reachable: false; readonly error: string };

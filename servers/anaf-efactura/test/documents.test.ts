@@ -355,6 +355,13 @@ describe("the public services, over the wire", () => {
     expect(out.found?.[0]?.inregistrare_scop_Tva?.perioade_TVA).toEqual([{ data_inceput_ScpTVA: "2023-01-01" }]);
     expect(out.notFound).toEqual([7]);
   });
+
+  it("reads ANAF's HTTP 404 for a request in which it knows no CIF as the answer it is, and still fails any other 404", async () => {
+    withFetch(async () => json({ found: [], notFound: [7] }, 404));
+    expect(await api().companies(["7"], "2026-09-30")).toEqual({ found: [], notFound: [7] });
+    withFetch(async () => json({ message: "no such service" }, 404));
+    expect(await errorOf(() => api().companies(["7"], "2026-09-30"))).toMatchObject({ kind: "api", status: 404 });
+  });
 });
 
 describe("a document argument's remedies", () => {
