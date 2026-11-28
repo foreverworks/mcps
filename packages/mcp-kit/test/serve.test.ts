@@ -73,7 +73,7 @@ describe("listenFrom", () => {
     expect(listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_TOKEN_FILE: "/t", MCP_HTTP_PATH: "/bnr" })).toMatchObject({ kind: "http", path: "/bnr" });
   });
 
-  it.each(["bnr", "/", "/bnr/", "//bnr", "/a//b", "/a/../b", "/./a", "/bnr?x=1", "/bnr#top", "/b nr", "https://rates.example.com/bnr"])("refuses MCP_HTTP_PATH %j", (path) => {
+  it.each(["bnr", "/", "/bnr/", "//bnr", "/a//b", "/a/../b", "/./a", "/bnr?x=1", "/bnr#top", "/b nr", "/b%6Er", "/a%2Fb", "https://rates.example.com/bnr"])("refuses MCP_HTTP_PATH %j", (path) => {
     expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_PATH: path })).toThrow(/MCP_HTTP_PATH .* is not a path/);
   });
 
@@ -593,6 +593,34 @@ describe("serve over http, on a path of its own", () => {
     expect((await fetch(`${base()}/bnr/`, { method: "POST", headers, body })).status).toBe(404);
     expect((await fetch(`${base()}/bnr2`, { method: "POST", headers, body })).status).toBe(404);
     expect((await fetch(`${base()}/bnr`, { method: "GET" })).status).toBe(405);
+  });
+});
+
+describe("serve over http, public, for a server that refuses to be public", () => {
+  const register = (server: McpServer): void => {
+    server.registerTool("ping", { description: "answers pong", inputSchema: {} }, async () => ({ content: [{ type: "text" as const, text: "pong" }] }));
+  };
+  const policy = { ping: { access: "read" } } as const;
+  const env = { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com" };
+  const refusal = "its tools reach the operator's account; load only the toolsets that do not (ACCOUNT_TOOLSETS=open).";
+
+  it("refuses a public listener with the server's reason, even under a read ceiling, and never offers the ceiling as the way out", async () => {
+    for (const more of [{}, { MCP_MAX_ACCESS: "read" }]) {
+      const attempt = serve({ name: "keyed", version: "0.0.0", register, policy, env: { ...env, ...more }, publicRefusal: refusal, log: () => undefined });
+      await expect(attempt).rejects.toThrow(`keyed: MCP_HTTP_PUBLIC_HOSTS serves this server with no sign-in, so anyone can call it, and ${refusal}`);
+      await expect(attempt).rejects.not.toThrow(/MCP_MAX_ACCESS/);
+    }
+  });
+
+  it("serves a public listener when the server has no reason to refuse", async () => {
+    const open = await serve({ name: "keyed", version: "0.0.0", register, policy, env, publicRefusal: undefined, log: () => undefined });
+    await open.close();
+  });
+
+  it("does not stop a listener with tokens: the refusal is for a public one", async () => {
+    const served = await serve({ name: "keyed", version: "0.0.0", register, policy, env: { MCP_HTTP_PORT: "0", MCP_HTTP_TOKEN_FILE: "/dev/null" }, publicRefusal: refusal, log: () => undefined }).catch((e: unknown) => e);
+    expect(String(served)).not.toMatch(/no sign-in/);
+    if (typeof served === "object" && served !== null && "close" in served) await (served as { close: () => Promise<void> }).close();
   });
 });
 

@@ -40,6 +40,16 @@ export const toolsetGaps = (offered: readonly string[]): readonly string[] => {
 };
 
 /**
+ * Why a server that loads `loaded` must not be served to anyone with no
+ * sign-in, or undefined when it may: the `records` toolset uses the operator's
+ * own USPTO TSDR API key, and a `read` ceiling does not make that key public.
+ */
+export const publicRefusal = (loaded: readonly Toolset[]): string | undefined =>
+  loaded.includes("records")
+    ? "its case-file tools use the operator's USPTO TSDR API key: serve it publicly only with TRADEMARKS_TOOLSETS=search, which needs none"
+    : undefined;
+
+/**
  * The toolsets TRADEMARKS_TOOLSETS names, and the policy of a server that
  * loads them: `full`'s rules for the tools always loaded and those of the
  * loaded toolsets, nothing else. Throws, stopping the server, when the table

@@ -109,20 +109,20 @@ export const privacyPage = (repository: Repository, site: string, publisher: str
           [
             "Cloudflare",
             [
-              `Requests to the hosted servers pass through <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>, which protects and delivers the service. Cloudflare sees the connection, your address included, and its own privacy policy covers what it does with that. The server receives your address from Cloudflare in a request header.`,
+              `Our hosted deployment sits behind <a href="https://www.cloudflare.com/privacypolicy/">Cloudflare</a>, which protects and delivers the service, so your requests pass through it. Cloudflare sees the connection, your address included, and its own privacy policy covers what it does with that. Our deployment is set up to read your address from the header Cloudflare adds (<code>cf-connecting-ip</code>) for the rate limit below, and for nothing else.`,
             ],
           ],
           [
             "Your address, and the rate limit",
             [
-              "To keep one caller from using up a service everyone shares, the server counts the calls from each address (an IPv6 address counts as its whole /64 network, which one machine usually holds). The counts live in the server's memory only. They are never written to a disk or a log, the server forgets a caller's count within seconds of its last call, and all of them are gone when the service restarts.",
+              "To keep one caller from using up a service everyone shares, the server counts the calls from each address (an IPv6 address counts as its whole /64 network, which one machine usually holds). The counts live in the server's memory only, as an address and a number, and are never written to a disk or a log. A count stops mattering a few seconds after a caller's last call, but the server drops it only when a later call from anyone arrives after that, so on a quiet service an address can stay in memory for longer. All the counts are gone when the service restarts.",
             ],
           ],
           [
             "What is logged",
             [
               "For each call the server writes one line to its log: which server and tool, that the caller was public, whether the call worked or how it failed, and how long it took. It does not log your address, what you asked, the values you typed (a name, a CIF, an invoice) or what came back. When something breaks it also logs the technical error, which names the failure and not your question.",
-              "The log stays on the machine that runs the service, in the system's own rolling log, and is not copied to another service or shared. It is there so we can see that the service works and who it fails for in aggregate, not who you are.",
+              "Our hosted deployment writes this log to the system journal of the machine that runs it, and it is not copied to another service or shared. The journal is there so we can see that the service works and where it fails, not who you are. If you run a server yourself, where its log goes is up to you.",
             ],
           ],
           [

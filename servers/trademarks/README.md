@@ -104,7 +104,8 @@ searched, and the TSDR tools answer a `config` failure, each with the remedy.
 | `TRADEMARKS_TSDR_URL` | no | TSDR's base; unset is `https://tsdrapi.uspto.gov/ts/cd`. |
 
 `TRADEMARKS_TOOLSETS=search` is the server that needs no key at all, so it can be
-hosted for anyone (`MCP_HTTP_PUBLIC_HOSTS`, with `MCP_HTTP_PATH` for a path of
+hosted for anyone (and the only one that may be: with `records` loaded the server
+refuses a public listener, because those tools use your TSDR key) (`MCP_HTTP_PUBLIC_HOSTS`, with `MCP_HTTP_PATH` for a path of
 its own on a shared host; [docs/configuration.md](../../docs/configuration.md#a-public-server-with-no-sign-in)).
 It searches the US, and a search that names the EU says plainly that it was not
 searched and why. Add `TRADEMARKS_SOURCES=uspto` to leave the EU source out too.

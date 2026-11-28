@@ -12,7 +12,7 @@ import { buildDeps } from "../src/composition.js";
 import { instructionsFor } from "../src/mcp/instructions.js";
 import { POLICY } from "../src/mcp/policy.js";
 import { registerAll } from "../src/mcp/register.js";
-import { ALWAYS, loadToolsets, TOOLSET_NAMES, TOOLSET_OF, toolsetGaps } from "../src/mcp/toolsets.js";
+import { ALWAYS, loadToolsets, publicRefusal, TOOLSET_NAMES, TOOLSET_OF, toolsetGaps } from "../src/mcp/toolsets.js";
 import { errorOf, json, UBL_INVOICE, withFetch } from "./fixtures.js";
 
 afterEach(() => vi.unstubAllGlobals());
@@ -123,6 +123,7 @@ describe("registry,documents: the server for anyone, with no grant", () => {
       name: "anaf-efactura",
       version: "test",
       policy,
+      publicRefusal: publicRefusal(mode),
       register: (server) => registerAll(server, deps, loadToolsets(POLICY, PUBLIC).loaded),
       env: { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "mcp.example.com", MCP_HTTP_PATH: "/anaf-efactura" },
       log: () => undefined,
@@ -130,11 +131,46 @@ describe("registry,documents: the server for anyone, with no grant", () => {
     await served.close();
   });
 
-  it("refuses to start for anyone when a tool that files is loaded", async () => {
-    const { policy } = loadToolsets(POLICY, { ANAF_EFACTURA_TOOLSETS: "documents,invoices" });
+  it("refuses to start for anyone when a tool that reaches the grant is loaded, with or without a read ceiling", async () => {
+    const publicEnv = { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "mcp.example.com" };
+    for (const [toolsets, more] of [
+      ["documents,invoices", {}],
+      ["documents,invoices", { MCP_MAX_ACCESS: "read" }],
+      ["authorization", { MCP_MAX_ACCESS: "read" }],
+      [undefined, { MCP_MAX_ACCESS: "read" }],
+    ] as const) {
+      const env = toolsets === undefined ? {} : { ANAF_EFACTURA_TOOLSETS: toolsets };
+      const { policy, mode, loaded } = loadToolsets(POLICY, env);
+      const attempt = serve({
+        name: "anaf-efactura",
+        version: "test",
+        policy,
+        publicRefusal: publicRefusal(mode),
+        register: (server) => registerAll(server, buildDeps({}, { mode }), loaded),
+        env: { ...publicEnv, ...more },
+        log: () => undefined,
+      });
+      await expect(attempt).rejects.toThrow(/can reach a company's ANAF grant: serve it publicly only with ANAF_EFACTURA_TOOLSETS=registry,documents/);
+      await expect(attempt).rejects.not.toThrow(/MCP_MAX_ACCESS/);
+    }
+  });
+
+  it("refuses an outbox for anyone, and serves the grantless toolsets with none", async () => {
+    expect(publicRefusal(loadToolsets(POLICY, PUBLIC).mode)).toBeUndefined();
+    const withOutbox = { ...PUBLIC, ANAF_DOWNLOADS_DIR: "/srv/outbox" };
+    const { policy, mode, loaded } = loadToolsets(POLICY, withOutbox);
+    expect(mode).toEqual({ grantless: true, outbox: true });
     await expect(
-      serve({ name: "anaf-efactura", version: "test", policy, register: (server) => registerAll(server, buildDeps({}), ["documents", "invoices"]), env: { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "mcp.example.com" }, log: () => undefined }),
-    ).rejects.toThrow(/upload_invoice \(money\)/);
+      serve({
+        name: "anaf-efactura",
+        version: "test",
+        policy,
+        publicRefusal: publicRefusal(mode),
+        register: (server) => registerAll(server, buildDeps({}, { mode }), loaded),
+        env: { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "mcp.example.com" },
+        log: () => undefined,
+      }),
+    ).rejects.toThrow(/ANAF_DOWNLOADS_DIR gives it an outbox/);
   });
 
   it("answers health from ANAF's public services, with no credential", async () => {

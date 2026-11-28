@@ -7,7 +7,7 @@ import { buildDeps } from "./composition.js";
 import { instructionsFor } from "./mcp/instructions.js";
 import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
-import { loadToolsets } from "./mcp/toolsets.js";
+import { loadToolsets, publicRefusal } from "./mcp/toolsets.js";
 
 /**
  * MCP server for ANAF e-Factura and e-Transport.
@@ -46,6 +46,7 @@ const main = async (): Promise<void> => {
     ...packageIdentity(import.meta.url),
     instructions: instructionsFor(loaded, mode),
     policy,
+    publicRefusal: publicRefusal(mode),
     register: (server) => registerAll(server, deps, loaded),
   });
 };

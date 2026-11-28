@@ -7,3 +7,5 @@
 A search that names the EU register when no EU source is enabled now says so and where to look by hand, as it already did for Romania and WIPO.
 
 The search side is hosted for anyone, free and with no sign-in, at `https://mcp.foreverworks.com/trademarks`, and the MCP Registry lists that address beside the npm package.
+
+The server refuses to be served to anyone (`MCP_HTTP_PUBLIC_HOSTS`) while the `records` toolset, which uses the operator's TSDR key, is loaded, even under `MCP_MAX_ACCESS=read`.

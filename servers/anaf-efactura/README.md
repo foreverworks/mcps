@@ -174,7 +174,12 @@ asking for a grant. Without a grant it does not offer what needs one:
 and `parse_invoice` no `archive`. With no outbox, `build_invoice` and
 `invoice_pdf` give the file back attached to the answer (the XML as text, the
 PDF as base64) with its size and SHA-256, never a path on the server's disk;
-set `ANAF_DOWNLOADS_DIR` to keep an outbox anyway.
+set `ANAF_DOWNLOADS_DIR` to keep an outbox anyway, on a server that is not public.
+
+Only these grantless toolsets may be served to anyone: the server refuses a
+public listener while any other toolset is loaded, or while `ANAF_DOWNLOADS_DIR`
+gives it an outbox, even under `MCP_MAX_ACCESS=read`, since a read ceiling does
+not make a company's invoices public.
 
 ```bash
 ANAF_EFACTURA_TOOLSETS=registry,documents MCP_HTTP_PORT=8750 \

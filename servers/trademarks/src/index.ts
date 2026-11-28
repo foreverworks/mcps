@@ -5,7 +5,7 @@ import { buildDeps } from "./composition.js";
 import { instructionsFor } from "./mcp/instructions.js";
 import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
-import { loadToolsets } from "./mcp/toolsets.js";
+import { loadToolsets, publicRefusal } from "./mcp/toolsets.js";
 
 /**
  * MCP server for trademark registers. stdio by default, HTTP when
@@ -23,6 +23,7 @@ const main = async (): Promise<void> => {
     ...packageIdentity(import.meta.url),
     instructions: instructionsFor(loaded),
     policy,
+    publicRefusal: publicRefusal(loaded),
     register: (server) => registerAll(server, deps, policy),
   });
 };

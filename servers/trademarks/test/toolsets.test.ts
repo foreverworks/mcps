@@ -4,14 +4,14 @@
  * case-file source. An office with no source says it was not searched, and why.
  * No credential is real and no request leaves the process: fetch is stubbed.
  */
-import { connectInMemory, guard, McpServer } from "@foreverworks/mcp-kit";
+import { connectInMemory, guard, McpServer, serve } from "@foreverworks/mcp-kit";
 import { describe, expect, it } from "vitest";
 
 import { buildDeps } from "../src/composition.js";
 import { instructionsFor } from "../src/mcp/instructions.js";
 import { POLICY } from "../src/mcp/policy.js";
 import { registerAll } from "../src/mcp/register.js";
-import { loadToolsets, TOOLSET_NAMES, toolsetGaps } from "../src/mcp/toolsets.js";
+import { loadToolsets, publicRefusal, TOOLSET_NAMES, toolsetGaps } from "../src/mcp/toolsets.js";
 import { usptoAnswer, usptoDetail } from "./fixtures.js";
 import { noSleep, stubFetch } from "./stubFetch.js";
 
@@ -106,5 +106,35 @@ describe("search: the server for anyone, with no key", () => {
     const health = await call("health");
     expect(health.isError).toBeUndefined();
     expect(health.answer["records"]).toEqual([]);
+  });
+});
+
+describe("serving it to anyone", () => {
+  const publicEnv = { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "mcp.example.com" };
+  const start = (toolsets: string | undefined, more: NodeJS.ProcessEnv = {}) => {
+    const env = toolsets === undefined ? {} : { TRADEMARKS_TOOLSETS: toolsets };
+    const { loaded, policy } = loadToolsets(POLICY, env);
+    return serve({
+      name: "trademarks",
+      version: "test",
+      policy,
+      publicRefusal: publicRefusal(loaded),
+      register: (server) => registerAll(server, buildDeps(env), policy),
+      env: { ...publicEnv, ...more },
+      log: () => undefined,
+    });
+  };
+
+  it("refuses while the case-file tools, which use the operator's TSDR key, are loaded, whatever the ceiling", async () => {
+    for (const [toolsets, more] of [[undefined, {}], [undefined, { MCP_MAX_ACCESS: "read" }], ["search,records", { MCP_MAX_ACCESS: "read" }]] as const) {
+      const attempt = start(toolsets, more);
+      await expect(attempt).rejects.toThrow(/use the operator's USPTO TSDR API key: serve it publicly only with TRADEMARKS_TOOLSETS=search/);
+      await expect(attempt).rejects.not.toThrow(/MCP_MAX_ACCESS/);
+    }
+  });
+
+  it("serves the search toolset", async () => {
+    const served = await start("search");
+    await served.close();
   });
 });

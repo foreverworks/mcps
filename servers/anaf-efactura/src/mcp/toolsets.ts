@@ -79,6 +79,20 @@ export const modeOf = (loaded: readonly Toolset[], env: NodeJS.ProcessEnv): Mode
 };
 
 /**
+ * Why a server run as `mode` must not be served to anyone with no sign-in, or
+ * undefined when it may: with a grant behind it, anyone could read a company's
+ * invoices or file in its name, and a `read` ceiling does not change whose data
+ * that is; with an outbox, a caller could read what other callers' files left
+ * there. Only the toolsets that need no grant, with no outbox, are public data.
+ */
+export const publicRefusal = (mode: Mode): string | undefined =>
+  !mode.grantless
+    ? "its tools can reach a company's ANAF grant: serve it publicly only with ANAF_EFACTURA_TOOLSETS=registry,documents, the toolsets that need none"
+    : mode.outbox
+      ? "ANAF_DOWNLOADS_DIR gives it an outbox other callers' files would land in: leave it unset on a server for anyone, which hands each file back in the answer"
+      : undefined;
+
+/**
  * The toolsets ANAF_EFACTURA_TOOLSETS names (every one when it is unset, blank
  * or `all`), and the policy of a server that loads them: `full`'s rules for the
  * tools always loaded and those of the loaded toolsets, nothing else. Throws,

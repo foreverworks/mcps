@@ -110,7 +110,12 @@ MCP_HTTP_CLIENT_IP_HEADER=cf-connecting-ip npx -y @foreverworks/mcp-bnr
   that has some can still be made public with `MCP_MAX_ACCESS=read`: those
   tools stay listed, say they are disabled, and refuse every call. Read is
   not the same as public, though: a read tool over a mailbox reads that
-  mailbox to anyone. Make public only a server whose data already is.
+  mailbox to anyone. Make public only a server whose data already is. A server
+  whose tools can reach an account or a key of the operator's (anaf-efactura
+  with its grant, trademarks with a TSDR key) refuses a public listener
+  whatever the ceiling, unless it is started with only its toolsets that need
+  neither (`ANAF_EFACTURA_TOOLSETS=registry,documents`,
+  `TRADEMARKS_TOOLSETS=search`); its refusal names them.
 - **It still listens on `127.0.0.1`** (unless `MCP_HTTP_HOST` says otherwise,
   for a proxy in another container). The proxy owns TLS, the firewall
   and anything static the address needs (a privacy page, files under

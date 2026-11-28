@@ -45,8 +45,9 @@ export const MCP_PATH = "/mcp";
 /**
  * MCP_HTTP_PATH: the one path the HTTP listener answers POST on, for a proxy
  * that gives each server its own path on one host (`/bnr`, `/ecb`). It starts
- * with a slash and has no trailing one, no query and no fragment, and no `.`
- * or `..` segment, which a proxy would resolve. A value that is none of that
+ * with a slash and has no trailing one, no query, fragment or `%` escape (a
+ * proxy and this server could decode it differently), and no `.` or `..`
+ * segment, which a proxy would resolve. A value that is none of that
  * is a process that must not start, since a server on the wrong path would
  * answer nothing a client asks.
  */
@@ -55,7 +56,7 @@ export const mcpPathFrom = (env: NodeJS.ProcessEnv): string => {
   if (raw === undefined || raw.trim() === "") return MCP_PATH;
   const path = raw.trim();
   const segments = path.split("/").slice(1);
-  if (!/^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/.test(path) || path === "/" || path.endsWith("/") || segments.some((s) => s === "" || s === "." || s === "..")) {
+  if (!/^\/[A-Za-z0-9._~!$&'()*+,;=:@/-]*$/.test(path) || path === "/" || path.endsWith("/") || segments.some((s) => s === "" || s === "." || s === "..")) {
     throw new Error(`MCP_HTTP_PATH "${raw}" is not a path: write one that starts with a slash and has no trailing one, such as /bnr (the default is ${MCP_PATH})`);
   }
   return path;
@@ -244,6 +245,15 @@ export type ServeOptions = {
   readonly log?: (line: string) => void;
   /** The server's failures and remedies, for a money rule's `resolve` that fails before the tool runs (guard.ts). */
   readonly vocabulary?: ServerVocabulary;
+  /**
+   * Why this server, as it is configured, must not be served to anyone with no
+   * sign-in (MCP_HTTP_PUBLIC_HOSTS), or undefined when it may: for a server
+   * whose tools reach an account or a key of the operator's, which a `read`
+   * ceiling does not make public data. A public listener refuses to start with
+   * it set, and the refusal says this, in place of the hint that a ceiling
+   * would do (serve/public.ts).
+   */
+  readonly publicRefusal?: string | undefined;
 };
 
 export type Served = {
@@ -591,7 +601,10 @@ export const serve = async (options: ServeOptions): Promise<Served> => {
   checkPolicy(options.name, options.register, options.policy);
   const listen = listenFrom(env);
   const settings = options.settings ?? guardSettingsFrom(env);
-  if (listen.kind === "public") checkPublic(options.name, options.policy, settings);
+  if (listen.kind === "public") {
+    if (options.publicRefusal !== undefined) throw new Error(`${options.name}: MCP_HTTP_PUBLIC_HOSTS serves this server with no sign-in, so anyone can call it, and ${options.publicRefusal}`);
+    checkPublic(options.name, options.policy, settings);
+  }
   // A call that waits for an approval must outlive the wait, or the listener answers 504 while a person may still say yes.
   if (settings.approvals !== undefined && listen.kind !== "stdio" && settings.approvals.timeoutSec * 1000 + APPROVAL_MARGIN_MS > limitsFrom(env).timeoutMs) {
     throw new Error(
