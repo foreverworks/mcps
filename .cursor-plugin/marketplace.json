@@ -41,10 +41,6 @@
       "source": "enable-banking"
     },
     {
-      "name": "foreverworks-esanatateamea",
-      "source": "esanatateamea"
-    },
-    {
       "name": "foreverworks-etoll",
       "source": "etoll"
     },

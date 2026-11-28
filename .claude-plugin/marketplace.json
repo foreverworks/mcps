@@ -63,13 +63,6 @@
       "version": "0.1.3"
     },
     {
-      "name": "foreverworks-esanatateamea",
-      "displayName": "eSănătateaMea",
-      "source": "./plugins/esanatateamea",
-      "description": "Read your Romanian health records: insurance, prescriptions, paid care, documents and appointments.",
-      "version": "0.2.0"
-    },
-    {
       "name": "foreverworks-etoll",
       "displayName": "eToll (rovinietă)",
       "source": "./plugins/etoll",
