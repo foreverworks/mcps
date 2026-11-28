@@ -1,7 +1,7 @@
 import { readFile } from "node:fs/promises";
 import { isAbsolute, join, resolve } from "node:path";
 
-import { type FileSource, type InputFiles, inputFilesWith, noteHandedBack, writeFileAtomic } from "@foreverworks/mcp-kit";
+import { type FileSource, handInline, type InputFiles, inputFilesWith, noteHandedBack, writeFileAtomic } from "@foreverworks/mcp-kit";
 
 import type { FilePort } from "../app/ports.js";
 import { numberedName } from "../domain/archive.js";
@@ -44,6 +44,7 @@ const placeFor = async (dir: string, name: string, bytes: Buffer): Promise<{ rea
  * input-file reader, bound to this process's roots (MCP_FILE_ROOTS).
  */
 export const makeFiles = (readInput: InputFiles, layout: () => void = () => undefined): FilePort => ({
+  handInline,
   writeFile: async (dir, name, bytes) => {
     layout();
     const place = await placeFor(dir, name, bytes);

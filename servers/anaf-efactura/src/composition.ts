@@ -1,6 +1,6 @@
 import { epochNow, type HttpOptions, inputFilesFrom, once, type OAuthClient } from "@foreverworks/mcp-kit";
 
-import type { AppIdentity, Clock, Deps } from "./app/ports.js";
+import type { AppIdentity, Clock, Deps, Mode } from "./app/ports.js";
 import { makeAnafApi } from "./infra/anafApi.js";
 import { makeAuthorization } from "./infra/authorization.js";
 import { configError, fail } from "./domain/errors.js";
@@ -11,6 +11,7 @@ import { makePublicRequest, makeRequest } from "./infra/http.js";
 import { anafOAuthClient } from "./infra/oauthClient.js";
 import { resolvePaths } from "./infra/paths.js";
 import { makeSealCheck } from "./infra/seal.js";
+import { FULL_MODE } from "./mcp/toolsets.js";
 import { makeUploadLedger } from "./infra/uploadLedger.js";
 import { SEAL_ORGANIZATION_IDENTIFIER, sealAnchors } from "./infra/sealTrust.js";
 import { readDeclarationXml, readInvoiceXml, viewInvoiceXml } from "./infra/xml.js";
@@ -20,6 +21,8 @@ export type BuildOptions = {
   readonly http?: HttpOptions;
   /** Seconds since the epoch; a test hands in its own. */
   readonly now?: Clock;
+  /** How the loaded toolsets say the server runs (mcp/toolsets.ts); every toolset loaded, with an outbox, when absent. */
+  readonly mode?: Mode;
 };
 
 /**
@@ -33,7 +36,7 @@ export type BuildOptions = {
  * would write beside it, is the tool that needs it answering "config", never a
  * server that did not start.
  */
-export const buildDeps = (env: NodeJS.ProcessEnv, { http = {}, now = epochNow }: BuildOptions = {}): Deps => {
+export const buildDeps = (env: NodeJS.ProcessEnv, { http = {}, now = epochNow, mode = FULL_MODE }: BuildOptions = {}): Deps => {
   const paths = resolvePaths(env);
   const layout = (): void => {
     if (paths.layoutProblem !== undefined) fail(configError(paths.layoutProblem));
@@ -59,6 +62,7 @@ export const buildDeps = (env: NodeJS.ProcessEnv, { http = {}, now = epochNow }:
     files: makeFiles(withOutbox(inputFilesFrom(env), paths.downloadsDir), layout),
     uploads: makeUploadLedger(paths.stateDir),
     paths,
+    mode,
     identity,
     readInvoice: readInvoiceXml,
     viewInvoice: viewInvoiceXml,

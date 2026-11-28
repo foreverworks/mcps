@@ -6,7 +6,14 @@ import { handled } from "../envelope.js";
 import { BUILD_OUTPUT } from "../outputs.js";
 import type { Registrar } from "./types.js";
 
+/**
+ * With no outbox (a server with no grant, run for anyone) there is no folder to
+ * choose and the file comes back attached to the answer, so the folder
+ * argument is not offered and the description says where the file goes.
+ */
 export const registerBuild: Registrar = (server, deps) => {
+  const { save_dir: _folder, ...withoutFolder } = buildInput;
+  const outbox = deps.mode.outbox;
   server.registerTool(
     "build_invoice",
     {
@@ -16,15 +23,19 @@ export const registerBuild: Registrar = (server, deps) => {
         "price, quantity and VAT category, the currency, the payment terms. Totals are computed exactly (each line " +
         "rounded to 2 decimals, VAT once per category and rate), and the draft is checked first: CIF, CNP and IBAN " +
         "check digits, the county and Bucharest sector, the VAT rules per category, CIUS-RO's lengths, every problem " +
-        "named at once. The file goes to the outbox; the answer gives its path, sha256 and totals. Nothing is sent " +
-        "to ANAF: next, validate_invoice with xml: { path }, then upload_invoice with the same path to file it. An " +
-        "invoice in another currency needs vat_exchange_rate (RON per unit), so its VAT is stated in RON too.",
-      inputSchema: buildInput,
+        "named at once. " +
+        (outbox
+          ? "The file goes to the outbox; the answer gives its path, sha256 and totals. Nothing is sent " +
+            "to ANAF: next, validate_invoice with xml: { path }, then upload_invoice with the same path to file it. "
+          : "The XML is attached to the answer as a file, with its sha256 and the totals in the answer; this server keeps no copy. " +
+            "Nothing is sent to ANAF. ") +
+        "An invoice in another currency needs vat_exchange_rate (RON per unit), so its VAT is stated in RON too.",
+      inputSchema: outbox ? buildInput : withoutFolder,
       outputSchema: BUILD_OUTPUT,
     },
     handled(
-      (args: BuildArgs): Promise<OutputOf<typeof BUILD_OUTPUT>> =>
-        buildInvoice(deps, { draft: toDraft(args), fileName: args.file_name, saveDir: args.save_dir }),
+      (args: Omit<BuildArgs, "save_dir"> & { readonly save_dir?: string }): Promise<OutputOf<typeof BUILD_OUTPUT>> =>
+        buildInvoice(deps, { draft: toDraft(args), fileName: args.file_name, saveDir: args.save_dir ?? "" }),
     ),
   );
 };

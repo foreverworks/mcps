@@ -4,6 +4,7 @@ import { apiError, fail, inputError } from "../../domain/errors.js";
 import { parseMessageId } from "../../domain/ids.js";
 import { anafSealVerdict } from "../../domain/seal.js";
 import type { Deps } from "../ports.js";
+import { refuseWithoutGrant } from "./deliver.js";
 import { archiveContents, fetchArchive, outboxArchive } from "./archive.js";
 import { describeRead, type DocumentInput, given, readDocument } from "./inputFiles.js";
 
@@ -24,6 +25,8 @@ export type VerifySignatureArgs = {
  * because the seal's digest is over the invoice's exact bytes.
  */
 const pairOf = async (deps: Deps, args: VerifySignatureArgs) => {
+  if (args.messageId !== "") refuseWithoutGrant(deps, "message_id");
+  if (args.archive !== "") refuseWithoutGrant(deps, "archive");
   const files = given(args.xml) || given(args.signature);
   const sources = [args.messageId !== "", args.archive !== "", files].filter(Boolean).length;
   if (sources !== 1) return fail(inputError("give one of: message_id, archive, or the invoice with its signature (xml and signature, each { path } or { content_base64, sha256 })"));

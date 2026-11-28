@@ -4,8 +4,10 @@ import { packageIdentity, packageVersion, serve } from "@foreverworks/mcp-kit";
 import { healthVerdict } from "./cli/health.js";
 import { refreshVerdict } from "./cli/refresh.js";
 import { buildDeps } from "./composition.js";
+import { instructionsFor } from "./mcp/instructions.js";
 import { POLICY } from "./mcp/policy.js";
 import { registerAll } from "./mcp/register.js";
+import { loadToolsets } from "./mcp/toolsets.js";
 
 /**
  * MCP server for ANAF e-Factura and e-Transport.
@@ -19,14 +21,11 @@ import { registerAll } from "./mcp/register.js";
  *
  *   --health             HELLO with the stored token, and the days left
  *   --refresh [--force]  the daily maintenance refresh (cli/refresh.ts)
+ *
+ * ANAF_EFACTURA_TOOLSETS picks the toolsets it serves (every one by default);
+ * the policy, the tools registered, the instructions and whether the server
+ * needs a grant at all follow from that one list (mcp/toolsets.ts).
  */
-const INSTRUCTIONS =
-  "ANAF's e-Factura and e-Transport for one company: the invoices it received and sent, with their archives, PDFs and contents, " +
-  "ANAF's own validation, the VAT registry, and filing. Start with health: whether the grant works, for which CIF, and for how many" +
-  " more days. To issue an invoice: build_invoice, validate_invoice, then upload_invoice (to a company) or upload_invoice_b2c (to a" +
-  " person), and upload_status. Filing is money, and every filing tool goes to ANAF's test environment unless test is false. When " +
-  "the grant nears its end, refresh_token renews it; if that fails, begin_authorization needs the certificate holder.";
-
 const main = async (): Promise<void> => {
   const argv = process.argv.slice(2);
   const shell = argv.includes("--refresh")
@@ -39,8 +38,16 @@ const main = async (): Promise<void> => {
     console.log(line);
     process.exit(code);
   }
-  const deps = buildDeps(process.env);
-  await serve({ name: "anaf-efactura", version: packageVersion(import.meta.url), ...packageIdentity(import.meta.url), instructions: INSTRUCTIONS, policy: POLICY, register: (server) => registerAll(server, deps) });
+  const { loaded, policy, mode } = loadToolsets(POLICY);
+  const deps = buildDeps(process.env, { mode });
+  await serve({
+    name: "anaf-efactura",
+    version: packageVersion(import.meta.url),
+    ...packageIdentity(import.meta.url),
+    instructions: instructionsFor(loaded, mode),
+    policy,
+    register: (server) => registerAll(server, deps, loaded),
+  });
 };
 
 main().catch((error: unknown) => {

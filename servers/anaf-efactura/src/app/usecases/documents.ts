@@ -5,6 +5,7 @@ import { parseMessageId } from "../../domain/ids.js";
 import { MAX_VALIDATION_BYTES, pdfName, validationTarget, verdictOf } from "../../domain/validation.js";
 import type { Deps } from "../ports.js";
 import { digestsOf, fetchArchive, invoiceInArchive } from "./archive.js";
+import { deliver, noFolderWithoutOutbox, refuseWithoutGrant } from "./deliver.js";
 import { type DocumentInput, given, readDocumentText } from "./inputFiles.js";
 
 const sized = (xml: string): string => {
@@ -47,12 +48,18 @@ const sourceOf = async (deps: Deps, args: InvoicePdfArgs) => {
   }
   const document = await readDocumentText(deps.files.readInput, args.xml);
   if (document !== undefined) return { xml: sized(document.text), name: undefined, filed: false, file: document.read };
-  return fail(inputError("give message_id (a filed invoice), or a document as xml: { path } for a file, or { content_base64, sha256 } from a script"));
+  return fail(
+    inputError(
+      deps.mode.grantless
+        ? "give the invoice as xml: { path } for a file, or { content_base64, sha256 } from a script"
+        : "give message_id (a filed invoice), or a document as xml: { path } for a file, or { content_base64, sha256 } from a script",
+    ),
+  );
 };
 
 /**
  * ANAF's PDF of an invoice, saved to the downloads outbox (or a folder under
- * it) as `<message id>.pdf` or `<invoice number>.pdf` (numbered when that
+ * it; with no outbox, attached to the answer) as `<message id>.pdf` or `<invoice number>.pdf` (numbered when that
  * name holds another file), with the PDF's size, sha256 and md5.
  *
  * A filed invoice is converted WITHOUT validating it again: ANAF validated it
@@ -62,8 +69,10 @@ const sourceOf = async (deps: Deps, args: InvoicePdfArgs) => {
  * why instead of saving anything.
  */
 export const invoicePdf = async (deps: Deps, args: InvoicePdfArgs) => {
+  noFolderWithoutOutbox(deps, args.saveDir);
   const where = resolveSaveDir(deps.paths.downloadsDir, args.saveDir);
   if (!where.ok) return fail(inputError(where.reason));
+  if (args.messageId !== "") refuseWithoutGrant(deps, "message_id");
   const source = await sourceOf(deps, args);
   const { standard, facts } = validationTarget(deps.readInvoice(source.xml));
   const validated = source.filed ? false : args.validate;
@@ -73,7 +82,7 @@ export const invoicePdf = async (deps: Deps, args: InvoicePdfArgs) => {
   if ("refusal" in answer) return { saved: false, standard, validated, invoice: facts, ...from, ...verdictOf(answer.refusal) };
   return {
     saved: true,
-    path: await deps.files.writeFile(where.dir, name, answer.pdf),
+    ...(await deliver(deps, where.dir, name, answer.pdf)),
     bytes: answer.pdf.length,
     ...digestsOf(answer.pdf),
     standard,

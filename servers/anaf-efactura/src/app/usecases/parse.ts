@@ -2,6 +2,7 @@ import { sha256Of } from "@foreverworks/mcp-kit";
 
 import { fail, inputError } from "../../domain/errors.js";
 import type { Deps } from "../ports.js";
+import { refuseWithoutGrant } from "./deliver.js";
 import { archiveContents, outboxArchive } from "./archive.js";
 import { type DocumentInput, given, readDocumentText, utf8Of } from "./inputFiles.js";
 
@@ -14,6 +15,7 @@ export type ParseInvoiceArgs = {
 
 /** The document's text and where it came from: a file read byte-exact, or the one invoice in an archive in the outbox. */
 const sourceOf = async (deps: Deps, args: ParseInvoiceArgs) => {
+  if (args.archive !== "") refuseWithoutGrant(deps, "archive");
   if (given(args.xml) === (args.archive !== "")) {
     return fail(inputError("give one of: xml ({ path } for a file, or { content_base64, sha256 } from a script), or archive (a .zip download_invoice saved)"));
   }

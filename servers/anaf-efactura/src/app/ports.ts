@@ -166,6 +166,8 @@ export type UploadLedgerPort = {
 export type Reservation = { readonly ok: true } | { readonly ok: false; readonly problem: string };
 
 export type FilePort = {
+  /** A file the call hands back inside its result, for a server with no outbox its callers can read (Mode.outbox). */
+  readonly handInline: (name: string, bytes: Buffer) => void;
   readonly writeFile: (dir: string, name: string, bytes: Buffer) => Promise<string>;
   /** A file the use case has already confined to the outbox. */
   readonly readFile: (path: string) => Promise<Buffer>;
@@ -199,6 +201,14 @@ export type AppIdentity = {
 
 export type Clock = () => number;
 
+/** How this server runs, from the toolsets it loads (mcp/toolsets.ts). */
+export type Mode = {
+  /** No toolset that needs the ANAF grant is loaded: nothing reads app.json or the state folder, and a tool does not offer what needs the grant. */
+  readonly grantless: boolean;
+  /** Files a tool makes are saved to an outbox. When false they come back inside the result, and a tool says so. */
+  readonly outbox: boolean;
+};
+
 export type Deps = {
   readonly anaf: AnafPort;
   readonly tokens: TokensPort;
@@ -206,6 +216,7 @@ export type Deps = {
   readonly files: FilePort;
   readonly uploads: UploadLedgerPort;
   readonly paths: Paths;
+  readonly mode: Mode;
   readonly identity: () => Promise<AppIdentity>;
   /** What an invoice XML says about itself; the same reading the confirmation summary uses. */
   readonly readInvoice: (xml: string) => InvoiceReading;

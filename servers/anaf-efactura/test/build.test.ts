@@ -167,11 +167,17 @@ describe("build_invoice, the use case", () => {
     mkdirSync(base.paths.downloadsDir, { recursive: true });
     return { ...base, files: makeFiles(withOutbox(inputFilesWith([]), base.paths.downloadsDir)) };
   };
+  /** build_invoice with an outbox, which answers with the path of what it saved. */
+  const saved = async (deps: Deps, build: ReturnType<typeof args>) => {
+    const out = await buildInvoice(deps, build);
+    if (!("path" in out)) throw new Error("expected a file in the outbox");
+    return out;
+  };
   const args = (raw: unknown, over: { fileName?: string; saveDir?: string } = {}) => ({ draft: toDraft(parseBuildArgs(raw)), fileName: over.fileName ?? "", saveDir: over.saveDir ?? "" });
 
   it("saves the file to the outbox under the invoice number, with its sha256 and totals", async () => {
     const deps = depsWithOutbox();
-    const out = await buildInvoice(deps, args(BUILD_CASES["ron-standard"]));
+    const out = await saved(deps, args(BUILD_CASES["ron-standard"]));
     const bytes = readFileSync(out.path);
     expect(out).toMatchObject({
       path: join(deps.paths.downloadsDir, "EXS-2026-0101.xml"),
@@ -186,9 +192,9 @@ describe("build_invoice, the use case", () => {
 
   it("finds the same file for the same invoice, and never replaces a different one", async () => {
     const deps = depsWithOutbox();
-    const first = await buildInvoice(deps, args(BUILD_CASES["ron-standard"]));
-    expect((await buildInvoice(deps, args(BUILD_CASES["ron-standard"]))).path).toBe(first.path);
-    const changed = await buildInvoice(deps, args({ ...BUILD_CASES["ron-standard"], notes: ["Changed."] }));
+    const first = await saved(deps, args(BUILD_CASES["ron-standard"]));
+    expect((await saved(deps, args(BUILD_CASES["ron-standard"]))).path).toBe(first.path);
+    const changed = await saved(deps, args({ ...BUILD_CASES["ron-standard"], notes: ["Changed."] }));
     expect(changed.path).toBe(join(deps.paths.downloadsDir, "EXS-2026-0101-2.xml"));
     expect(readFileSync(first.path).toString()).toContain("Thank you for your business.");
   });
@@ -201,7 +207,7 @@ describe("build_invoice, the use case", () => {
     const deps = depsWithOutbox();
     expect(builtFileName("EXS 2026/0101")).toBe("EXS-2026-0101.xml");
     expect(builtFileName("../../x.XML")).toBe("x.xml");
-    expect((await buildInvoice(deps, args(BUILD_CASES["storno"], { saveDir: "2026-10", fileName: "storno" }))).path).toBe(
+    expect((await saved(deps, args(BUILD_CASES["storno"], { saveDir: "2026-10", fileName: "storno" }))).path).toBe(
       join(deps.paths.downloadsDir, "2026-10", "storno.xml"),
     );
     expect(await errorOf(() => buildInvoice(deps, args(BUILD_CASES["storno"], { saveDir: "../elsewhere" })))).toMatchObject({ kind: "input" });

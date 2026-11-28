@@ -3,6 +3,7 @@ import { resolveSaveDir, sha256Of } from "@foreverworks/mcp-kit";
 import { fail, inputError } from "../../domain/errors.js";
 import { buildInvoiceXml, draftProblems, type InvoiceDraft, normalDraft } from "../../domain/invoiceBuild.js";
 import type { Deps } from "../ports.js";
+import { deliver, noFolderWithoutOutbox } from "./deliver.js";
 
 export type BuildInvoiceArgs = {
   readonly draft: InvoiceDraft;
@@ -20,7 +21,8 @@ export const builtFileName = (wanted: string): string => {
 
 /**
  * A CIUS-RO invoice built from fields and saved to the outbox, ready for
- * validate_invoice and upload_invoice by the path this answers. Nothing is
+ * validate_invoice and upload_invoice by the path this answers (or, with no
+ * outbox, attached to the answer: deliver.ts). Nothing is
  * sent anywhere: building files nothing.
  *
  * The draft is checked first, every problem named at once; then written by
@@ -33,6 +35,7 @@ export const builtFileName = (wanted: string): string => {
  * (ERRIdentif, which validate_invoice reports too, having no such flag).
  */
 export const buildInvoice = async (deps: Deps, args: BuildInvoiceArgs) => {
+  noFolderWithoutOutbox(deps, args.saveDir);
   const where = resolveSaveDir(deps.paths.downloadsDir, args.saveDir);
   if (!where.ok) return fail(inputError(where.reason));
   const draft = normalDraft(args.draft);
@@ -41,9 +44,9 @@ export const buildInvoice = async (deps: Deps, args: BuildInvoiceArgs) => {
   const { xml, totals } = buildInvoiceXml(draft);
   const bytes = Buffer.from(xml, "utf8");
   const reading = deps.readInvoice(xml);
-  const path = await deps.files.writeFile(where.dir, builtFileName(args.fileName === "" ? draft.number : args.fileName), bytes);
+  const delivery = await deliver(deps, where.dir, builtFileName(args.fileName === "" ? draft.number : args.fileName), bytes);
   return {
-    path,
+    ...delivery,
     bytes: bytes.length,
     sha256: sha256Of(bytes),
     invoice: reading.kind === "invoice" ? reading.facts : fail(inputError(`the built invoice does not read back: ${reading.why}`)),

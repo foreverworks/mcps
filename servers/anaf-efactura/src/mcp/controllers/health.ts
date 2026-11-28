@@ -1,6 +1,6 @@
 import { z } from "zod";
 
-import { checkHealth } from "../../app/usecases/health.js";
+import { healthOf } from "../../app/usecases/health.js";
 import { refreshTokens, tokenStatus } from "../../app/usecases/tokens.js";
 import { handled } from "../envelope.js";
 import type { Registrar } from "./types.js";
@@ -10,15 +10,20 @@ export const registerHealth: Registrar = (server, deps) => {
     "health",
     {
       title: "Health",
-      description:
-        "Check that the integration is alive and say so in detail: the ANAF app it authenticates as, " +
-        "the CIF it defaults to, the roles the grant carries, and how many days are left on each token. " +
-        "Run this before concluding the MCP is broken.",
+      description: deps.mode.grantless
+        ? "Check that ANAF's public services this server relies on answer: the VAT registry and the invoice validation. " +
+          "This server holds no ANAF credential. Run this before concluding the MCP is broken."
+        : "Check that the integration is alive and say so in detail: the ANAF app it authenticates as, " +
+          "the CIF it defaults to, the roles the grant carries, and how many days are left on each token. " +
+          "Run this before concluding the MCP is broken.",
       inputSchema: {},
     },
-    handled(() => checkHealth(deps)),
+    handled(() => healthOf(deps)),
   );
+};
 
+/** The grant's own tools: its expiry, and its renewal. */
+export const registerTokens: Registrar = (server, deps) => {
   server.registerTool(
     "token_status",
     {

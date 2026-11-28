@@ -97,7 +97,7 @@ export const buildInput = {
     .array(z.object({ category: z.enum(VAT_CATEGORIES), code: words(30).optional(), reason: words(300).optional() }))
     .default([])
     .describe("Why a category carries no VAT: required for E (a VATEX-EU code or the law's words); AE, G and O default to VATEX-EU-AE, -G, -O."),
-  file_name: z.string().default("").describe("The file's name in the outbox; by default the invoice number's."),
+  file_name: z.string().default("").describe("The file's name, in the outbox or as attached to the answer; by default the invoice number's."),
   save_dir: z.string().default("").describe("A folder INSIDE the outbox (e.g. \"2026-10\"); empty means the outbox itself."),
 };
 
@@ -121,7 +121,7 @@ const toParty = (p: BuildArgs["buyer"] & { readonly legal_form?: string | undefi
   contact: p.contact,
 });
 
-export const toDraft = (a: BuildArgs): InvoiceDraft => ({
+export const toDraft = (a: Omit<BuildArgs, "save_dir">): InvoiceDraft => ({
   number: a.number,
   issueDate: a.issue_date,
   dueDate: a.due_date,

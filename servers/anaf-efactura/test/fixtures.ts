@@ -16,6 +16,7 @@ import type { DocumentInput } from "../src/app/usecases/inputFiles.js";
 import { type LedgerEntry, refileProblem } from "../src/domain/uploadLedger.js";
 import { asAppError } from "../src/domain/errors.js";
 import type { TokenBundle } from "../src/domain/tokens.js";
+import { FULL_MODE } from "../src/mcp/toolsets.js";
 import { readDeclarationXml, readInvoiceXml, viewInvoiceXml } from "../src/infra/xml.js";
 import { readZip } from "../src/infra/zip.js";
 
@@ -181,7 +182,7 @@ export const fakeDeps = (over: Partial<Deps> = {}): Deps => {
     tokens: tokensStub(),
     authorization: authorizationStub(),
     // The kit's real reader, with no roots: a path is refused unless a test gives it an inbox.
-    files: { writeFile: async (dir, name) => join(dir, name), readFile: async () => Buffer.alloc(0), readInput: inputFilesWith([]) },
+    files: { handInline: () => undefined, writeFile: async (dir, name) => join(dir, name), readFile: async () => Buffer.alloc(0), readInput: inputFilesWith([]) },
     uploads: memoryLedger(),
     paths: {
       config: join(tempDir("credentials"), "app.json"),
@@ -189,6 +190,7 @@ export const fakeDeps = (over: Partial<Deps> = {}): Deps => {
       stateDir,
       downloadsDir: join(stateDir, "invoices"),
     },
+    mode: FULL_MODE,
     identity: async () => ({ appName: "app", clientIdLast4: "abcd", defaultCif: "RO92345672" }),
     readInvoice: readInvoiceXml,
     viewInvoice: viewInvoiceXml,

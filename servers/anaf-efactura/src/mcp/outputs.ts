@@ -171,7 +171,10 @@ const facts = z.strictObject({
 });
 
 export const BUILD_OUTPUT = z.strictObject({
-  path: text.describe("The built file in the outbox: give it to validate_invoice and upload_invoice as xml: { path }"),
+  path: text.optional().describe("The built file in the outbox: give it to validate_invoice and upload_invoice as xml: { path }. Absent when the file is attached to the answer instead"),
+  inline: z.literal(true).optional().describe("The file is attached to the answer, not saved anywhere"),
+  name: text.optional().describe("The attached file's name"),
+  note: text.optional(),
   bytes: z.number().int(),
   sha256: text,
   invoice: facts.describe("The file read back the way upload_invoice reads it for its confirmation line"),
