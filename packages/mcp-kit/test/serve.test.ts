@@ -24,6 +24,7 @@ describe("listenFrom", () => {
       kind: "http",
       port: 3000,
       tokens: { kind: "file", file: "/t", client: "default" },
+      path: "/mcp",
     });
   });
 
@@ -32,6 +33,7 @@ describe("listenFrom", () => {
       kind: "http",
       port: 3000,
       tokens: { kind: "dir", dir: "/run/credentials/x" },
+      path: "/mcp",
     });
   });
 
@@ -52,13 +54,31 @@ describe("listenFrom", () => {
         { name: "rates.example.com", port: 443 },
         { name: "rates.example.org", port: 8443 },
       ],
+      path: "/mcp",
     });
     expect(listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_CLIENT_IP_HEADER: "X-Forwarded-For", MCP_HTTP_TOKENS_DIR: "" })).toEqual({
       kind: "public",
       port: 3000,
       hosts: [{ name: "rates.example.com", port: 443 }],
       clientIpHeader: "x-forwarded-for",
+      path: "/mcp",
     });
+  });
+
+  it("answers on /mcp unless MCP_HTTP_PATH names another path", () => {
+    const env = { MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com" };
+    expect(listenFrom({ ...env, MCP_HTTP_PATH: " " })).toMatchObject({ path: "/mcp" });
+    expect(listenFrom({ ...env, MCP_HTTP_PATH: "/bnr" })).toMatchObject({ kind: "public", path: "/bnr" });
+    expect(listenFrom({ ...env, MCP_HTTP_PATH: "/v1/rates" })).toMatchObject({ path: "/v1/rates" });
+    expect(listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_TOKEN_FILE: "/t", MCP_HTTP_PATH: "/bnr" })).toMatchObject({ kind: "http", path: "/bnr" });
+  });
+
+  it.each(["bnr", "/", "/bnr/", "//bnr", "/a//b", "/a/../b", "/./a", "/bnr?x=1", "/bnr#top", "/b nr", "https://rates.example.com/bnr"])("refuses MCP_HTTP_PATH %j", (path) => {
+    expect(() => listenFrom({ MCP_HTTP_PORT: "3000", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_PATH: path })).toThrow(/MCP_HTTP_PATH .* is not a path/);
+  });
+
+  it("refuses MCP_HTTP_PATH without a listener to configure", () => {
+    expect(() => listenFrom({ MCP_HTTP_PATH: "/bnr" })).toThrow(/MCP_HTTP_PATH is set without MCP_HTTP_PORT/);
   });
 
   it("refuses public hosts with tokens, with file roots, without a port, or listing nothing", () => {
@@ -99,6 +119,7 @@ describe("listenFrom, where it binds", () => {
       kind: "http",
       port: 3000,
       tokens: { kind: "file", file: "/t", client: "default" },
+      path: "/mcp",
       host: "0.0.0.0",
       allowedHosts: [
         { name: "mcp.internal", port: undefined },
@@ -527,6 +548,51 @@ describe("serve over http, public", () => {
     expect(preflight.status).toBe(405);
     expect(preflight.headers.get("access-control-allow-origin")).toBeNull();
     expect((await fetch(url, { method: "GET" })).status).toBe(405);
+  });
+});
+
+describe("serve over http, on a path of its own", () => {
+  const register = (server: McpServer): void => {
+    server.registerTool("ping", { description: "answers pong", inputSchema: {} }, async () => ({ content: [{ type: "text" as const, text: "pong" }] }));
+  };
+  let served: Served;
+  const base = (): string => `http://127.0.0.1:${served.port}`;
+  const startup: string[] = [];
+  const originalError = console.error;
+
+  beforeAll(async () => {
+    console.error = (line: unknown) => void startup.push(String(line));
+    try {
+      served = await serve({
+        name: "rates",
+        version: "0.0.0",
+        register,
+        policy: { ping: { access: "read" } },
+        env: { MCP_HTTP_PORT: "0", MCP_HTTP_PUBLIC_HOSTS: "rates.example.com", MCP_HTTP_PATH: "/bnr" },
+        log: () => undefined,
+      });
+    } finally {
+      console.error = originalError;
+    }
+  });
+
+  afterAll(() => served.close());
+
+  it("serves MCP on that path, and says so at startup", async () => {
+    expect(startup.join("\n")).toContain(`rates: listening on http://127.0.0.1:${served.port}/bnr `);
+    const client = testClient("test-client");
+    await client.connect(new StreamableHTTPClientTransport(new URL(`${base()}/bnr`)));
+    expect(await client.callTool({ name: "ping", arguments: {} })).toMatchObject({ content: [{ type: "text" as const, text: "pong" }] });
+    await client.close();
+  });
+
+  it("answers 404 for the default path and any other, and 405 for a GET on its own", async () => {
+    const body = JSON.stringify({ jsonrpc: "2.0", id: 1, method: "tools/list", params: {} });
+    const headers = { "content-type": "application/json", accept: "application/json, text/event-stream" };
+    expect((await fetch(`${base()}/mcp`, { method: "POST", headers, body })).status).toBe(404);
+    expect((await fetch(`${base()}/bnr/`, { method: "POST", headers, body })).status).toBe(404);
+    expect((await fetch(`${base()}/bnr2`, { method: "POST", headers, body })).status).toBe(404);
+    expect((await fetch(`${base()}/bnr`, { method: "GET" })).status).toBe(405);
   });
 });
 

@@ -41,7 +41,8 @@ Read by `@foreverworks/mcp-kit`, so by every server.
 
 | Variable | Default | Meaning |
 |---|---|---|
-| `MCP_HTTP_PORT` | unset: stdio | Serve Streamable HTTP on `127.0.0.1:<port>/mcp` instead of stdio (or on `MCP_HTTP_HOST`). `0` picks a free port, which the startup line on stderr names. |
+| `MCP_HTTP_PORT` | unset: stdio | Serve Streamable HTTP on `127.0.0.1:<port>/mcp` (the path is `MCP_HTTP_PATH`) instead of stdio (or on `MCP_HTTP_HOST`). `0` picks a free port, which the startup line on stderr names. |
+| `MCP_HTTP_PATH` | `/mcp` | The one path the HTTP listener answers `POST` on, for a proxy that gives each server its own path on one host (`/bnr`, `/ecb`). It starts with a slash, has no trailing slash, query or fragment, and no `.` or `..` segment; anything else stops the start. Any other path gets a 404, and a `GET` on this one a 405. Setting it without `MCP_HTTP_PORT` stops the start. |
 | `MCP_HTTP_HOST` | `127.0.0.1` | The address the HTTP listener binds: an IP address (`0.0.0.0` for every IPv4 interface, `::` for every interface, or one interface's address) or `localhost`, not a name to resolve. For a server in a container, reached over a private network on a published port; [below](#a-server-in-a-container). Any address but a loopback one (`127.x.x.x`, `::1`, `localhost`) needs `MCP_HTTP_ALLOWED_HOSTS` (or `MCP_HTTP_PUBLIC_HOSTS`), or the server refuses to start. |
 | `MCP_HTTP_ALLOWED_HOSTS` | | The `Host` header values the server answers besides `127.0.0.1:<port>` and `localhost:<port>`, separated by commas: `name` for that name on any port (or none), `name:port` for that port only, as the client writes it. A DNS name or an IPv4 address, compared without regard to case. It works with bearer tokens: the Host check stays, and a request still needs its token. Any other `Host` gets a 421. |
 | `MCP_HTTP_TOKENS_DIR` | | A directory of `token-<client>` files, one bearer token per client; other files in it are ignored. The client's name is what the audit line, the rate limit and `MCP_CLIENT_MAX_ACCESS` count. An empty file is a client this deployment does not have. |
@@ -113,7 +114,7 @@ MCP_HTTP_CLIENT_IP_HEADER=cf-connecting-ip npx -y @foreverworks/mcp-bnr
 - **It still listens on `127.0.0.1`** (unless `MCP_HTTP_HOST` says otherwise,
   for a proxy in another container). The proxy owns TLS, the firewall
   and anything static the address needs (a privacy page, files under
-  `/.well-known/`). It forwards `POST /mcp` with the public `Host` it was
+  `/.well-known/`). It forwards `POST /mcp` (or the path `MCP_HTTP_PATH` names, so one host can front several servers) with the public `Host` it was
   reached at, or the loopback one; any other `Host` gets a 421.
 - **Each caller's address has its own rate limit** (`MCP_HTTP_RATE`). Name the
   header your proxy sets in `MCP_HTTP_CLIENT_IP_HEADER`: its last address is

@@ -99,6 +99,7 @@ describe("listenFrom, with the file endpoints", () => {
       kind: "http",
       port: 3000,
       tokens: { kind: "dir", dir: "/d" },
+      path: "/mcp",
       files: { outbox: "/srv/out", maxBytes: DEFAULT_FILES_MAX_BYTES },
     });
     expect(listenFrom({ ...tokens, MCP_HTTP_FILES_INBOX: "/srv/in" })).toMatchObject({ kind: "http", files: { inbox: "/srv/in" } });

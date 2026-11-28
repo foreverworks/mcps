@@ -39,8 +39,27 @@ const REQUEST_TIMEOUT_MS = 30_000;
 /** What a call approved at the last moment still has to run in, beyond the approval wait. */
 const APPROVAL_MARGIN_MS = 120_000;
 
-/** Where the one HTTP route lives. Anything else is a 404. */
+/** Where the one HTTP route lives unless MCP_HTTP_PATH says otherwise. Anything else is a 404. */
 export const MCP_PATH = "/mcp";
+
+/**
+ * MCP_HTTP_PATH: the one path the HTTP listener answers POST on, for a proxy
+ * that gives each server its own path on one host (`/bnr`, `/ecb`). It starts
+ * with a slash and has no trailing one, no query and no fragment, and no `.`
+ * or `..` segment, which a proxy would resolve. A value that is none of that
+ * is a process that must not start, since a server on the wrong path would
+ * answer nothing a client asks.
+ */
+export const mcpPathFrom = (env: NodeJS.ProcessEnv): string => {
+  const raw = env["MCP_HTTP_PATH"];
+  if (raw === undefined || raw.trim() === "") return MCP_PATH;
+  const path = raw.trim();
+  const segments = path.split("/").slice(1);
+  if (!/^\/[A-Za-z0-9._~!$&'()*+,;=:@%/-]*$/.test(path) || path === "/" || path.endsWith("/") || segments.some((s) => s === "" || s === "." || s === "..")) {
+    throw new Error(`MCP_HTTP_PATH "${raw}" is not a path: write one that starts with a slash and has no trailing one, such as /bnr (the default is ${MCP_PATH})`);
+  }
+  return path;
+};
 
 /** Where the tokens come from: a directory of `token-<client>` files, or one file for one client. */
 export type ClientTokenFiles =
@@ -54,14 +73,17 @@ export type ClientTokenFiles =
  */
 export type Where = { readonly host?: string; readonly allowedHosts?: readonly AllowedHost[] };
 
+/** The path the one route answers on (MCP_HTTP_PATH, default `/mcp`). */
+export type Route = { readonly path: string };
+
 /** The file endpoints a server turns on, from MCP_HTTP_FILES_OUTBOX and MCP_HTTP_FILES_INBOX (serve/files.ts). The key is absent when neither is set. */
 export type Files = { readonly files?: FileEndpoints };
 
 export type Listen =
   | { readonly kind: "stdio" }
-  | ({ readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles } & Where & Files)
+  | ({ readonly kind: "http"; readonly port: number; readonly tokens: ClientTokenFiles } & Where & Route & Files)
   /** Anyone may call, with no sign-in, through a proxy that forwards these hosts; callers told apart by `clientIpHeader`, else the connection. */
-  | ({ readonly kind: "public"; readonly port: number; readonly hosts: readonly PublicHost[]; readonly clientIpHeader?: string } & Where);
+  | ({ readonly kind: "public"; readonly port: number; readonly hosts: readonly PublicHost[]; readonly clientIpHeader?: string } & Where & Route);
 
 /**
  * The transport, read from the environment: MCP_HTTP_PORT switches to HTTP, and
@@ -91,7 +113,7 @@ export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
   const publicHosts = env["MCP_HTTP_PUBLIC_HOSTS"]?.trim();
   if (!port) {
     if (publicHosts) throw new Error("MCP_HTTP_PUBLIC_HOSTS is set without MCP_HTTP_PORT: there is no HTTP listener to make public");
-    for (const name of ["MCP_HTTP_HOST", "MCP_HTTP_ALLOWED_HOSTS", ...FILES_VARIABLES]) {
+    for (const name of ["MCP_HTTP_HOST", "MCP_HTTP_ALLOWED_HOSTS", "MCP_HTTP_PATH", ...FILES_VARIABLES]) {
       if (env[name]?.trim()) throw new Error(`${name} is set without MCP_HTTP_PORT: there is no HTTP listener for it to configure`);
     }
     return { kind: "stdio" };
@@ -100,7 +122,7 @@ export const listenFrom = (env: NodeJS.ProcessEnv): Listen => {
   if (!Number.isInteger(parsed) || parsed < 0 || parsed > 65535) {
     throw new Error(`MCP_HTTP_PORT "${port}" is not a port`);
   }
-  const where = whereFrom(env, Boolean(publicHosts));
+  const where = { ...whereFrom(env, Boolean(publicHosts)), path: mcpPathFrom(env) };
   const ipHeader = env["MCP_HTTP_CLIENT_IP_HEADER"]?.trim();
   const tokenSettings = ["MCP_HTTP_TOKENS_DIR", "MCP_HTTP_TOKEN_FILE"].filter((name) => env[name]?.trim());
   if (publicHosts) {
@@ -454,7 +476,7 @@ const ownFilesFor = (files: FileEndpoints | undefined, settings: GuardSettings):
  * with a stream for a call that asks for progress (asksProgress). Plain
  * clients (a script with curl) read one JSON answer.
  */
-const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits, where: Where, files?: FileEndpoints): Promise<Served> => {
+const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Limits, where: Where & Route, files?: FileEndpoints): Promise<Served> => {
   const { options } = runtime;
   const bindAddress = where.host ?? LOOPBACK_ADDRESS;
   const allowedHosts = where.allowedHosts ?? [];
@@ -486,7 +508,7 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
       const limited = hasClientCeiling(runtime.settings, client);
       return serveFile({ files, service: options.name, client, limited, ...(ownFiles === undefined ? {} : { ownFiles }), log: runtime.log, reply, timeoutMs: limits.timeoutMs }, fileRoute, req, res);
     }
-    if (pathnameOf(req.url) !== MCP_PATH) return reply(res, 404, "not found", early);
+    if (pathnameOf(req.url) !== where.path) return reply(res, 404, "not found", early);
     // Also a CORS preflight, answered with no CORS headers: ChatGPT and Claude call from their servers, never from a page.
     if (req.method !== "POST") return reply(res, 405, "stateless server: POST only", early);
 
@@ -550,7 +572,7 @@ const serveHttp = async (runtime: Runtime, port: number, door: Door, limits: Lim
   // stderr, never stdout: the rule every server here keeps, whatever the transport.
   const alsoHosts = allowedHosts.length === 0 ? "" : `, and Host ${allowedHosts.map(allowedHostText).join(", ")}`;
   const alsoFiles = files === undefined ? "" : `; ${describeFiles(files)}`;
-  console.error(`${options.name}: listening on http://${urlHost(bindAddress)}:${bound}${MCP_PATH} ${door.describe}${alsoHosts}${alsoFiles}; ${describeSettings(runtime.settings)}`);
+  console.error(`${options.name}: listening on http://${urlHost(bindAddress)}:${bound}${where.path} ${door.describe}${alsoHosts}${alsoFiles}; ${describeSettings(runtime.settings)}`);
   // Retention of the file folders (MCP_HTTP_FILES_MAX_AGE_MIN): nothing starts unless it is set.
   const sweeping = files === undefined ? undefined : startSweeping(files, { service: options.name, log: runtime.log });
   return {
