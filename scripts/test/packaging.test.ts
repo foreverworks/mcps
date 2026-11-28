@@ -61,6 +61,13 @@ describe("a server's registry entry", () => {
     expect(entry["packages"]).toEqual([expect.not.objectContaining({ environmentVariables: expect.anything() })]);
   });
 
+  it("lists the hosted address as a remote, next to the package, only when package.json names one", () => {
+    expect(serverJson(manifestOf({}))).not.toHaveProperty("remotes");
+    const entry = serverJson(manifestOf({ mcp: { ...MCP, inputs: {}, remote: "https://mcp.example.com/example" } }));
+    expect(entry["remotes"]).toEqual([{ type: "streamable-http", url: "https://mcp.example.com/example" }]);
+    expect(entry["packages"]).toHaveLength(1);
+  });
+
   it("asks for a path as a file path and for a secret as a secret, never as plain text", () => {
     const [npm] = serverJson(manifestOf({ mcp: { ...MCP, inputs } }))["packages"] as readonly { readonly environmentVariables: unknown }[];
     expect(npm?.environmentVariables).toEqual([
@@ -73,6 +80,16 @@ describe("a server's registry entry", () => {
 
 describe("a package.json that cannot make one", () => {
   const problemsOf = (pkg: Readonly<Record<string, unknown>>): readonly string[] => readManifest(repo(pkg), "example").problems;
+
+  it.each([
+    ["http://mcp.example.com/example", "must be an https URL"],
+    ["mcp.example.com/example", "is not a URL"],
+    ["https://mcp.example.com/", "path of its own"],
+    ["https://mcp.example.com/example/", "path of its own"],
+    ["https://mcp.example.com/example?x=1", "no query"],
+  ])("is refused with the hosted address %s", (remote, why) => {
+    expect(problemsOf({ mcp: { ...MCP, inputs: {}, remote } })).toEqual([expect.stringContaining(why)]);
+  });
 
   it("is refused when a secret is declared as plain text", () => {
     expect(problemsOf({ mcp: { ...MCP, inputs: { EXAMPLE_API_KEY: { title: "Key", type: "text", required: true, description: "The key." } } } })).toEqual([

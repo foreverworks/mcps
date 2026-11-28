@@ -201,6 +201,11 @@ and the guard in more depth.
      `file`, `directory`, `text` or `secret`, whether it is `required`, and
      one sentence for the prompt). `scripts/packaging.ts` says what each
      type becomes.
+   - `remote` (optional): the address where the server is also hosted for
+     anyone to connect to, with no install and no sign-in, over HTTPS at a
+     path of its own (`https://mcp.example.com/<server>`). It becomes the
+     registry entry's `remotes`, and the README then has a "Use it hosted"
+     section that gives it.
 
    `npx tsx scripts/check-docs.ts --write` then writes what follows from the
    block: the keywords every server and its audience carry, its `homepage`
@@ -307,6 +312,11 @@ that it is read-only.
 
 **You need** the account and credentials, a phrase each (or "nothing: no account
 and no key"), and any cost or limit a reader must know before investing time.
+
+## Use it hosted                (only for a server also hosted: package.json `mcp.remote`)
+
+The address, how to add it as a custom connector in Claude and in other clients,
+which tools the hosted one has, and that it is rate-limited.
 
 ## What you can ask
 

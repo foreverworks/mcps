@@ -8,7 +8,8 @@
     "audience": "romania",
     "maturity": "stable",
     "tagline": "Look up the National Bank of Romania's rate for any day, and convert amounts to and from RON.",
-    "inputs": {}
+    "inputs": {},
+    "remote": "https://mcp.foreverworks.com/bnr"
   },
   "keywords": [
     "mcp",

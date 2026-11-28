@@ -27,7 +27,8 @@
         "required": false,
         "description": "For EU marks: path of a file holding the EUIPO app's client secret."
       }
-    }
+    },
+    "remote": "https://mcp.foreverworks.com/trademarks"
   },
   "keywords": [
     "mcp",

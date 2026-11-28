@@ -14,6 +14,31 @@ information purposes only" and discourages using them for transactions, so a
 bank or a card will not give you exactly this rate; they are the standard
 reference for statements, bookkeeping and comparisons.
 
+## Use it hosted
+
+Nothing to install: the ECB server is also hosted for anyone, free, with no account and
+no key, at
+
+```
+https://mcp.foreverworks.com/ecb
+```
+
+- **In Claude**: Settings, Connectors, Add custom connector. Give it a name,
+  paste the address and add it.
+- **In Claude Code**: `claude mcp add --transport http ecb https://mcp.foreverworks.com/ecb`.
+- **In other clients** that take a remote MCP server: add the address as a
+  Streamable HTTP server, with no authentication.
+
+The hosted server has every tool below: `health`, `rate`, `convert` and `rates`.
+
+The hosted server is rate-limited for each caller, so it suits a person working
+with an assistant, not bulk lookups: a call over the limit is refused with a 429
+and the seconds to wait. What it sends where, and the rules it is used under, are on the
+[privacy](https://foreverworks.github.io/mcps/privacy/) and
+[terms](https://foreverworks.github.io/mcps/terms/) pages; for a problem, see
+[support](https://foreverworks.github.io/mcps/support/). To install it
+yourself, read on.
+
 ## What you can ask
 
 - "What was the ECB's euro to dollar rate on 14 March 2025?"

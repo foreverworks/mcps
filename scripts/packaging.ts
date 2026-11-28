@@ -16,7 +16,8 @@
  *     "tagline": "Issue and track ...",            one sentence for a stranger (taglineProblems)
  *     "inputs": {                                  what a person sets to install it
  *       "OBLIO_CONFIG": { "title": "Oblio app.json", "type": "file", "required": true, "description": "Path of app.json ..." }
- *     }
+ *     },
+ *     "remote": "https://mcp.example.com/oblio"    optional: where it is also hosted, with no sign-in (remoteProblem)
  *   }
  *
  * and, written from those by `check-docs --write`: its `keywords` (the base
@@ -56,6 +57,13 @@ export const homepageOf = (server: string): string => `${SITE}servers/${server}/
 /** The site's page on what the servers do with a person's data, which a plugin listing links to. */
 export const PRIVACY_PATH = "privacy/";
 export const privacyUrl = `${SITE}${PRIVACY_PATH}`;
+
+/** The pages for the hosted servers beside it: the terms they are used under, and where to get help. */
+export const TERMS_PATH = "terms/";
+export const SUPPORT_PATH = "support/";
+
+/** Where the hosted servers answer: each server's own path under it (`mcp.remote` in its package.json). */
+export const HOSTED_ORIGIN = "https://mcp.foreverworks.com";
 
 /** The npm scope every server is published under, as `mcp-<server>`. */
 const SCOPE = "@foreverworks/";
@@ -191,7 +199,7 @@ export const taglineProblems = (tagline: string): readonly string[] => [
 ];
 
 /** The keys an `mcp` block may have; anything else is a typo or a field nothing reads. */
-const MCP_KEYS = new Set(["title", "audience", "maturity", "tagline", "inputs"]);
+const MCP_KEYS = new Set(["title", "audience", "maturity", "tagline", "inputs", "remote"]);
 
 export const INPUT_TYPES = ["file", "directory", "text", "secret"] as const;
 export type InputType = (typeof INPUT_TYPES)[number];
@@ -229,6 +237,8 @@ export type Manifest = {
   readonly node: string;
   readonly bin: string;
   readonly inputs: readonly Input[];
+  /** Where the server is also hosted for anyone to connect to, with no install: the registry entry's `remotes`. Absent for a server that is not. */
+  readonly remote?: string;
   /**
    * package.json `private`. For a server that ships, the release does not
    * publish it yet, and its README says so; an extras server is always private.
@@ -258,6 +268,24 @@ type PackageJson = {
 
 const isRecord = (value: unknown): value is Readonly<Record<string, unknown>> => typeof value === "object" && value !== null && !Array.isArray(value);
 
+/**
+ * What is wrong with a hosted address: the registry lists it as a remote, and
+ * a client connects to it over HTTPS, at a path of its own with no trailing
+ * slash. Empty when it is fine.
+ */
+export const remoteProblem = (remote: string, server: string): string | undefined => {
+  let url: URL;
+  try {
+    url = new URL(remote);
+  } catch {
+    return `mcp.remote "${remote}" is not a URL`;
+  }
+  if (url.protocol !== "https:") return `mcp.remote "${remote}" must be an https URL`;
+  if (url.search !== "" || url.hash !== "" || url.username !== "" || url.password !== "") return `mcp.remote "${remote}" must have no query, fragment or credentials`;
+  if (url.pathname === "/" || url.pathname.endsWith("/") || remote.endsWith("/")) return `mcp.remote "${remote}" must name a path of its own with no trailing slash, such as /${server}`;
+  return undefined;
+};
+
 /** The registry name a server's package must carry. */
 export const mcpNameOf = (server: string): string => `${NAMESPACE}/${server}`;
 
@@ -286,6 +314,11 @@ export const readManifest = (root: string, server: string): { readonly manifest?
   if (!MATURITIES.includes(maturity as Maturity)) problems.push(`mcp.maturity is ${JSON.stringify(maturity ?? null)}; it must be one of ${MATURITIES.join(", ")}`);
   const tagline = text(mcp?.["tagline"], "mcp.tagline");
   if (tagline !== "") problems.push(...taglineProblems(tagline));
+  const remote = mcp?.["remote"];
+  if (remote !== undefined) {
+    const wrong = typeof remote === "string" ? remoteProblem(remote, server) : "mcp.remote must be a URL";
+    if (wrong !== undefined) problems.push(wrong);
+  }
   const inputs: Input[] = [];
   const declared = mcp?.["inputs"];
   if (!isRecord(declared)) problems.push(`package.json has no mcp.inputs (an empty {} for a server that needs none)`);
@@ -340,6 +373,7 @@ export const readManifest = (root: string, server: string): { readonly manifest?
     node: text(engines?.["node"], "engines.node"),
     bin,
     inputs,
+    ...(typeof remote === "string" ? { remote } : {}),
     private: pkg.private === true,
   };
   return problems.length === 0 ? { manifest, problems } : { problems };
@@ -458,6 +492,7 @@ export const serverJson = (m: Manifest): Readonly<Record<string, unknown>> => ({
       ...(m.inputs.length > 0 ? { environmentVariables: m.inputs.map(registryVariable) } : {}),
     },
   ],
+  ...(m.remote === undefined ? {} : { remotes: [{ type: "streamable-http", url: m.remote }] }),
 });
 
 /** JSON as the repository writes it: two spaces, a final newline. */

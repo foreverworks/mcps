@@ -14,6 +14,31 @@ app's client id and secret with a Trademark Search subscription, which EUIPO
 approves by hand (allow a week or more). Romania's OSIM, WIPO and the other
 national offices are not searched, and every result says so.
 
+## Use it hosted
+
+Nothing to install: the trademark search is also hosted for anyone, free, with no account and
+no key, at
+
+```
+https://mcp.foreverworks.com/trademarks
+```
+
+- **In Claude**: Settings, Connectors, Add custom connector. Give it a name,
+  paste the address and add it.
+- **In Claude Code**: `claude mcp add --transport http trademarks https://mcp.foreverworks.com/trademarks`.
+- **In other clients** that take a remote MCP server: add the address as a
+  Streamable HTTP server, with no authentication.
+
+The hosted server has the search side: `health`, `search_marks` and `get_mark`, for the US register. It does not search the EU register, which needs credentials of its own (every search says so), and it has no `mark_history`, `mark_documents` or `download_mark_documents`, which need a USPTO TSDR API key of your own: for those, install it yourself.
+
+The hosted server is rate-limited for each caller, so it suits a person working
+with an assistant, not bulk lookups: a call over the limit is refused with a 429
+and the seconds to wait. Marks are searched at USPTO's own trademark search, one request per search. What it sends where, and the rules it is used under, are on the
+[privacy](https://foreverworks.github.io/mcps/privacy/) and
+[terms](https://foreverworks.github.io/mcps/terms/) pages; for a problem, see
+[support](https://foreverworks.github.io/mcps/support/). To install it
+yourself, read on.
+
 ## What you can ask
 
 - "Is Turnip already a trademark for software, in the US or the EU?"
@@ -72,10 +97,17 @@ searched, and the TSDR tools answer a `config` failure, each with the remedy.
 | `EUIPO_CLIENT_ID_FILE`, `EUIPO_CLIENT_SECRET_FILE` | for EM | Files holding the EUIPO app's client id and secret (`EUIPO_CLIENT_ID` and `EUIPO_CLIENT_SECRET` for a local run). |
 | `EUIPO_ENVIRONMENT` | no | `production` (unset) or `sandbox`, which holds test data. |
 | `TRADEMARKS_SOURCES` | no | Which sources run, comma-separated: `uspto`, `euipo`, `tsdr`. Unset is all three. |
+| `TRADEMARKS_TOOLSETS` | no | Which tools load, comma-separated: `search` (`search_marks`, `get_mark`) and `records` (`mark_history`, `mark_documents`, `download_mark_documents`), with `health` always there. Unset or `all` loads both; without `records` the TSDR source is not started either. |
 | `TRADEMARKS_OUTBOX_DIR` | no | Where `download_mark_documents` saves its PDFs; default `outbox/` in the state folder. Files are 0640, so a deployment can share the folder with the user's group. |
 | `TRADEMARKS_STATE_DIR` | no | The state folder; the default is in [docs/configuration.md](../../docs/configuration.md). |
 | `TRADEMARKS_USPTO_URL` | no | The USPTO search backend's base; unset is `https://tmsearch.uspto.gov/prod-stage-v1-0-0/`. |
 | `TRADEMARKS_TSDR_URL` | no | TSDR's base; unset is `https://tsdrapi.uspto.gov/ts/cd`. |
+
+`TRADEMARKS_TOOLSETS=search` is the server that needs no key at all, so it can be
+hosted for anyone (`MCP_HTTP_PUBLIC_HOSTS`, with `MCP_HTTP_PATH` for a path of
+its own on a shared host; [docs/configuration.md](../../docs/configuration.md#a-public-server-with-no-sign-in)).
+It searches the US, and a search that names the EU says plainly that it was not
+searched and why. Add `TRADEMARKS_SOURCES=uspto` to leave the EU source out too.
 
 What each tool needs:
 

@@ -11,6 +11,31 @@ annual income declaration, "Declarația unică"). It only reads: no tool writes 
 **You need** nothing: no account and no key. The server reads BNR's public
 XML files at `curs.bnr.ro`.
 
+## Use it hosted
+
+Nothing to install: the BNR server is also hosted for anyone, free, with no account and
+no key, at
+
+```
+https://mcp.foreverworks.com/bnr
+```
+
+- **In Claude**: Settings, Connectors, Add custom connector. Give it a name,
+  paste the address and add it.
+- **In Claude Code**: `claude mcp add --transport http bnr https://mcp.foreverworks.com/bnr`.
+- **In other clients** that take a remote MCP server: add the address as a
+  Streamable HTTP server, with no authentication.
+
+The hosted server has every tool below: `health`, `rate`, `convert`, `rates` and `annual_average`.
+
+The hosted server is rate-limited for each caller, so it suits a person working
+with an assistant, not bulk lookups: a call over the limit is refused with a 429
+and the seconds to wait. What it sends where, and the rules it is used under, are on the
+[privacy](https://foreverworks.github.io/mcps/privacy/) and
+[terms](https://foreverworks.github.io/mcps/terms/) pages; for a problem, see
+[support](https://foreverworks.github.io/mcps/support/). To install it
+yourself, read on.
+
 ## What you can ask
 
 - "What was BNR's euro rate on 14 March 2025?"

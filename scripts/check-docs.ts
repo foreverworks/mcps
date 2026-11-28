@@ -147,10 +147,12 @@ const withInstall = (readme: string, manifest: Manifest | undefined): string => 
 /**
  * A server README's sections, in order (CONTRIBUTING.md, "Writing a server's
  * README"): the required ones always, Money exactly when a tool is `money`,
- * and nothing else at that level, so a reader finds the same thing in the
+ * "Use it hosted" exactly when package.json's `mcp.remote` names a hosted
+ * address (and then it holds that address), and nothing else at that level, so a reader finds the same thing in the
  * same place in every server.
  */
 const SECTIONS: readonly { readonly heading: string; readonly required: boolean }[] = [
+  { heading: "Use it hosted", required: false },
   { heading: "What you can ask", required: true },
   { heading: "Install", required: true },
   { heading: "Configuration", required: true },
@@ -173,7 +175,7 @@ const headingsOf = (readme: string): readonly string[] => {
 };
 
 /** What keeps a README from the template: its title, and its sections and their order. */
-const checkSections = (readme: string, title: string, hasMoney: boolean): readonly string[] => {
+const checkSections = (readme: string, title: string, hasMoney: boolean, remote: string | undefined): readonly string[] => {
   const problems: string[] = [];
   // GitHub links an image to its own file, so the icon's alt text names that link.
   const h1 = `# <img src="icons/icon.svg" width="36" height="36" alt="${title} icon"> ${title} MCP server`;
@@ -196,6 +198,10 @@ const checkSections = (readme: string, title: string, hasMoney: boolean): readon
   const money = found.has(SECTIONS.findIndex((s) => s.heading === "Money"));
   if (hasMoney && !money) problems.push(`README.md has \`money\` tools and no "Money" section`);
   if (!hasMoney && money) problems.push(`README.md has a "Money" section and no \`money\` tool`);
+  const hosted = found.has(SECTIONS.findIndex((s) => s.heading === "Use it hosted"));
+  if (remote !== undefined && !hosted) problems.push(`package.json's mcp.remote names ${remote}, and the README has no "Use it hosted" section`);
+  if (remote === undefined && hosted) problems.push(`README.md has a "Use it hosted" section and package.json has no mcp.remote`);
+  if (remote !== undefined && hosted && !readme.includes(remote)) problems.push(`README.md's "Use it hosted" section does not give ${remote}`);
   return problems;
 };
 
@@ -429,7 +435,7 @@ const checkServer = async (name: string, shared: ReadonlySet<string>, write: boo
   }
   for (const tool of tools.keys()) if (!seen.has(tool)) problems.push(`\`${tool}\` is registered but missing from the README's tool tables`);
   problems.push(...checkChangelog(dir, tools));
-  if (packaging.manifest !== undefined) problems.push(...checkSections(readme, packaging.manifest.title, [...tools.values()].some((t) => t.access === "money")));
+  if (packaging.manifest !== undefined) problems.push(...checkSections(readme, packaging.manifest.title, [...tools.values()].some((t) => t.access === "money"), packaging.manifest.remote));
 
   const documented = documentedIn(readme);
   for (const variable of envReadIn(join(dir, "src"))) {

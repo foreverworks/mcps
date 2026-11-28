@@ -19,6 +19,31 @@ weeks before it would need that person again. Validating, rendering, building
 and reading an invoice, checking a seal and looking up a company need no
 account.
 
+## Use it hosted
+
+Nothing to install: the public part of the e-Factura server is also hosted for anyone, free, with no account and
+no key, at
+
+```
+https://mcp.foreverworks.com/anaf-efactura
+```
+
+- **In Claude**: Settings, Connectors, Add custom connector. Give it a name,
+  paste the address and add it.
+- **In Claude Code**: `claude mcp add --transport http anaf-efactura https://mcp.foreverworks.com/anaf-efactura`.
+- **In other clients** that take a remote MCP server: add the address as a
+  Streamable HTTP server, with no authentication.
+
+The hosted server has only what needs no ANAF account: `health`, `lookup_company` (ANAF's VAT registry), `build_invoice`, `validate_invoice`, `invoice_pdf`, `parse_invoice` and `verify_signature`. It files nothing and cannot read any company's invoices: for those, install it yourself with your own ANAF grant. A hosted server cannot read files from your computer, so `build_invoice` and `invoice_pdf` give the file back attached to the answer, and the tools that take an invoice or a seal (`validate_invoice`, `invoice_pdf`, `parse_invoice`, `verify_signature`) take it as `{ "content_base64": "...", "sha256": "..." }` from a script or an agent that can run one, never as a path.
+
+The hosted server is rate-limited for each caller, so it suits a person working
+with an assistant, not bulk lookups: a call over the limit is refused with a 429
+and the seconds to wait. The CIFs and invoice XML you send go to ANAF's public services. What it sends where, and the rules it is used under, are on the
+[privacy](https://foreverworks.github.io/mcps/privacy/) and
+[terms](https://foreverworks.github.io/mcps/terms/) pages; for a problem, see
+[support](https://foreverworks.github.io/mcps/support/). To install it
+yourself, read on.
+
 ## What you can ask
 
 - "Which invoices did suppliers send us in the last two weeks?"
@@ -76,6 +101,7 @@ In a JSON configuration, the command is `node` and its one argument the full pat
 | `ANAF_CONFIG` | yes | Path of `app.json` (below), which the server only reads. |
 | `ANAF_STATE_DIR` | no | Where the grant, a begun authorization and the ledger of production filings go; the default is in [docs/configuration.md](../../docs/configuration.md). |
 | `ANAF_DOWNLOADS_DIR` | no | The outbox for downloaded archives, PDFs and built invoices; default `<state dir>/invoices`. |
+| `ANAF_EFACTURA_TOOLSETS` | no | Which tools load, comma-separated: `registry`, `documents`, `invoices`, `etransport`, `authorization`; unset or `all` loads every one. [Below](#serving-it-to-anyone). |
 
 `app.json` holds the application you register with ANAF (below):
 
@@ -126,6 +152,35 @@ ANAF calls this registering an application in an OAuth profile; its procedure,
 The grant may do only what both the application's services and the
 certificate holder's SPV rights allow; `health` shows its roles (`EFACTURA`,
 `ETRANSPORT`).
+
+### Serving it to anyone
+
+`ANAF_EFACTURA_TOOLSETS` picks the tools a server loads, with `health` always there.
+`registry` is `lookup_company`; `documents` is `validate_invoice`,
+`invoice_pdf`, `parse_invoice`, `verify_signature` and `build_invoice`;
+`invoices` is the listing, downloading and filing of invoices (`list_invoices`,
+`list_invoices_window`, `download_invoice`, `upload_invoice`,
+`upload_invoice_b2c`, `upload_status`); `etransport` is the three e-Transport
+tools; `authorization` is `token_status`, `refresh_token`,
+`begin_authorization` and `complete_authorization`.
+
+`registry,documents` is the server that needs no ANAF account, so it can be
+hosted for anyone (`MCP_HTTP_PUBLIC_HOSTS`, with `MCP_HTTP_PATH` to give each
+server its own path on one host; [docs/configuration.md](../../docs/configuration.md#a-public-server-with-no-sign-in)):
+it starts with no `app.json` and no state folder, registers only tools that
+read, and its `health` says whether ANAF's public services answer instead of
+asking for a grant. Without a grant it does not offer what needs one:
+`invoice_pdf` and `verify_signature` take no `message_id`, `archive` or `test`,
+and `parse_invoice` no `archive`. With no outbox, `build_invoice` and
+`invoice_pdf` give the file back attached to the answer (the XML as text, the
+PDF as base64) with its size and SHA-256, never a path on the server's disk;
+set `ANAF_DOWNLOADS_DIR` to keep an outbox anyway.
+
+```bash
+ANAF_EFACTURA_TOOLSETS=registry,documents MCP_HTTP_PORT=8750 \
+MCP_HTTP_PUBLIC_HOSTS=mcp.example.com MCP_HTTP_PATH=/anaf-efactura \
+MCP_HTTP_CLIENT_IP_HEADER=cf-connecting-ip npx -y @foreverworks/mcp-anaf-efactura
+```
 
 ### Files in and out
 
