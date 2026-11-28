@@ -4,10 +4,11 @@ import { dirname, join } from "node:path";
 
 import { describe, expect, it } from "vitest";
 
-import { topicsOf } from "../packaging.js";
+import { topicsOf, type Manifest } from "../packaging.js";
 import { checkSite, relativeUrl, resolveHref, type Layout } from "../site/links.js";
 import { githubSlug, renderReadme, sectionsOf } from "../site/markdown.js";
-import { openingOf } from "../site/pages.js";
+import { openingOf, type Repository } from "../site/pages.js";
+import { privacyPage, supportPage, termsPage } from "../site/policies.js";
 
 const REPO = "https://github.com/example/mcps";
 
@@ -189,5 +190,41 @@ describe("the repository's GitHub topics", () => {
     expect(topics.filter((t) => t.startsWith("stable-"))).toHaveLength(10);
     expect(topics.filter((t) => t.startsWith("beta-"))).toHaveLength(5);
     expect(topics).not.toContain("etoll");
+  });
+});
+
+describe("the pages about the hosted servers", () => {
+  const repository: Repository = { url: REPO, name: "mcps", license: "MIT", readme: "", topics: [] };
+  const site = "https://example.github.io/mcps/";
+  const manifest = (server: string, remote?: string) => ({ server, title: server.toUpperCase(), remote }) as unknown as Manifest;
+  const hosted = [manifest("bnr", "https://mcp.foreverworks.com/bnr"), manifest("ecb", "https://mcp.foreverworks.com/ecb"), manifest("oblio")];
+
+  it("name each hosted server and where its questions go, and no server that is not hosted", () => {
+    const html = privacyPage(repository, site, "Example Works", hosted).html;
+    expect(html).toContain("https://mcp.foreverworks.com/bnr");
+    expect(html).toContain("curs.bnr.ro");
+    expect(html).toContain("www.ecb.europa.eu");
+    expect(html).not.toContain("OBLIO");
+    expect(html).toContain("Cloudflare");
+    expect(html).toContain("does not log your address");
+  });
+
+  it("have a terms page and a support page, each linking the other and the repository's issues, and every page's nav links the three", () => {
+    const terms = termsPage(repository, site, "Example Works", hosted);
+    const support = supportPage(repository, site, hosted);
+    expect(terms.path).toBe("terms/");
+    expect(support.path).toBe("support/");
+    expect(terms.html).toContain(`href="../support/"`);
+    expect(support.html).toContain(`href="../terms/"`);
+    expect(support.html).toContain(`${REPO}/issues`);
+    for (const page of [terms, support, privacyPage(repository, site, "Example Works", hosted)]) {
+      for (const name of ["Privacy", "Terms", "Support"]) expect(page.html).toMatch(new RegExp(`<nav aria-label="Site">.*>${name}</a>.*</nav>`));
+      expect(page.html.match(/aria-current="page"/g)).toHaveLength(2);
+    }
+  });
+
+  it("stop the build for a hosted server the privacy page cannot describe, or one hosted elsewhere", () => {
+    expect(() => privacyPage(repository, site, "Example Works", [manifest("mystery", "https://mcp.foreverworks.com/mystery")])).toThrow(/add it to UPSTREAM/);
+    expect(() => termsPage(repository, site, "Example Works", [manifest("bnr", "https://example.com/bnr")])).toThrow(/not under https:\/\/mcp.foreverworks.com/);
   });
 });
