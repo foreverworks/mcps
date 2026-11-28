@@ -7,8 +7,8 @@ import { describe, expect, it } from "vitest";
 
 import { makeHandled } from "../src/envelope.js";
 import { makeErrorKit } from "../src/errors.js";
-import { noteHandedBack, saveToOutbox } from "../src/handedBack.js";
-import { mimeTypeOf, resolveSaveDir, resourceLinkTo } from "../src/outbox.js";
+import { handInline, noteHandedBack, saveToOutbox } from "../src/handedBack.js";
+import { embeddedFile, mimeTypeOf, resolveSaveDir, resourceLinkTo } from "../src/outbox.js";
 
 describe("resolveSaveDir", () => {
   const root = "/srv/outbox/google/work/";
@@ -96,5 +96,40 @@ describe("files handed back", () => {
     expect(a.content.slice(1).map((l) => (l as { name: string }).name)).toEqual(["a.txt"]);
     expect(b.content.slice(1).map((l) => (l as { name: string }).name)).toEqual(["b.txt"]);
     await rm(dir, { recursive: true, force: true });
+  });
+});
+
+describe("files handed back inline", () => {
+  type E = { kind: "broken"; message: string };
+  const kit = makeErrorKit<E>("inline-test");
+  const handled = makeHandled<E>({ asAppError: kit.asAppError, remedyFor: () => "fix it" });
+
+  it("carry UTF-8 text as text and anything else as base64, with the type from the name", () => {
+    expect(embeddedFile("invoice 1.xml", Buffer.from("<a>\u00e9</a>"))).toEqual({
+      type: "resource",
+      resource: { uri: "inline:///invoice%201.xml", mimeType: "application/xml", text: "<a>\u00e9</a>" },
+    });
+    expect(embeddedFile("a.pdf", new Uint8Array([37, 80, 68, 70, 0, 255]))).toEqual({
+      type: "resource",
+      resource: { uri: "inline:///a.pdf", mimeType: "application/pdf", blob: Buffer.from([37, 80, 68, 70, 0, 255]).toString("base64") },
+    });
+    expect(embeddedFile("broken.xml", new Uint8Array([0xff, 0xfe, 0x41]))).toMatchObject({ resource: { blob: expect.any(String) } });
+    expect(embeddedFile("noext", new Uint8Array([1]))).toEqual({ type: "resource", resource: { uri: "inline:///noext", blob: "AQ==" } });
+  });
+
+  it("follow the JSON of the call that handed them back, once each, and only on success", async () => {
+    const ok = await handled(async () => {
+      handInline("a.pdf", new Uint8Array([1, 2, 3]));
+      handInline("a.pdf", new Uint8Array([4, 5]));
+      return { done: true };
+    })();
+    expect(ok.content).toHaveLength(2);
+    expect(ok.content[1]).toEqual({ type: "resource", resource: { uri: "inline:///a.pdf", mimeType: "application/pdf", blob: "BAU=" } });
+    const failed = await handled(async () => {
+      handInline("b.pdf", new Uint8Array([1]));
+      throw new Error("no");
+    })();
+    expect(failed.content).toHaveLength(1);
+    handInline("c.pdf", new Uint8Array([1]));
   });
 });

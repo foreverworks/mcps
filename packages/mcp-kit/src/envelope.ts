@@ -1,6 +1,6 @@
 import { asGuardError, guardRemedy } from "./guardErrors.js";
 import { collectHandedBack } from "./handedBack.js";
-import type { ResourceLink } from "./outbox.js";
+import type { EmbeddedFile, ResourceLink } from "./outbox.js";
 import { asInputFileError, inputFileRemedy } from "./inputFileErrors.js";
 
 /**
@@ -24,8 +24,8 @@ import { asInputFileError, inputFileRemedy } from "./inputFileErrors.js";
  */
 
 export type ToolResult = {
-  /** The JSON, then a link to each file the call handed back (handedBack.ts), on success only. */
-  readonly content: [{ readonly type: "text"; readonly text: string }, ...ResourceLink[]];
+  /** The JSON, then a link to each file the call saved and the content of each it handed back inline (handedBack.ts), on success only. */
+  readonly content: [{ readonly type: "text"; readonly text: string }, ...(ResourceLink | EmbeddedFile)[]];
   readonly isError?: true;
 };
 

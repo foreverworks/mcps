@@ -3,7 +3,7 @@ import { type BigIntStats, lstatSync } from "node:fs";
 
 import { writeFileAtomicWithStats } from "./files.js";
 import { sha256Of } from "./inputFile/bytes.js";
-import { type ResourceLink, resourceLinkTo } from "./outbox.js";
+import { type EmbeddedFile, embeddedFile, type ResourceLink, resourceLinkTo } from "./outbox.js";
 
 /**
  * The files one tool call hands back, so its result can link each one.
@@ -25,7 +25,7 @@ import { type ResourceLink, resourceLinkTo } from "./outbox.js";
  * file was written, not only where: the stats of the file itself, so a file
  * another call puts at the same path before this one ends is not taken for it.
  */
-const calls = new AsyncLocalStorage<Map<string, ResourceLink>>();
+const calls = new AsyncLocalStorage<Map<string, ResourceLink | EmbeddedFile>>();
 
 /** A file a call handed back, as the guard sees it: the size noted, and the file's stats as it was written (undefined when it could not be read). */
 export type HandedBack = { readonly size: number; readonly stats: BigIntStats | undefined };
@@ -55,12 +55,22 @@ export const noteHandedBack = (path: string, size: number, stats?: BigIntStats):
   if (watching !== undefined) watching.set(path, { size, stats: stats ?? statNow(path) });
 };
 
+/**
+ * A file this call hands back inside its result, for a server with no outbox
+ * its callers can read (one hosted for anyone, with nothing on disk): the
+ * result carries it as embedded content (`embeddedFile`) after the JSON. One
+ * per name, the last bytes noted. Outside a call this is a no-op.
+ */
+export const handInline = (name: string, data: string | Uint8Array): void => {
+  calls.getStore()?.set(`inline:${name}`, embeddedFile(name, typeof data === "string" ? Buffer.from(data, "utf8") : data));
+};
+
 /** Runs one call, noting in `into` every file it hands back, whichever envelope links them. */
 export const watchHandedBack = <T>(into: Map<string, HandedBack>, run: () => Promise<T>): Promise<T> => watched.run(into, run);
 
 /** Runs one call, and answers what it returned with the links to the files it handed back, in the order first noted. */
-export const collectHandedBack = async <T>(run: () => Promise<T>): Promise<{ readonly value: T; readonly links: readonly ResourceLink[] }> => {
-  const noted = new Map<string, ResourceLink>();
+export const collectHandedBack = async <T>(run: () => Promise<T>): Promise<{ readonly value: T; readonly links: readonly (ResourceLink | EmbeddedFile)[] }> => {
+  const noted = new Map<string, ResourceLink | EmbeddedFile>();
   const value = await calls.run(noted, run);
   return { value, links: [...noted.values()] };
 };

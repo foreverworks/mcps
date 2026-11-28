@@ -164,8 +164,8 @@ export {
   type UpstreamTool,
   type UpstreamTransportFor,
 } from "./upstream.js";
-export { mimeTypeOf, resolveSaveDir, resourceLinkTo, type ResourceLink, type SaveDir } from "./outbox.js";
-export { collectHandedBack, noteHandedBack, saveToOutbox, type SavedFile } from "./handedBack.js";
+export { embeddedFile, mimeTypeOf, resolveSaveDir, resourceLinkTo, type EmbeddedFile, type ResourceLink, type SaveDir } from "./outbox.js";
+export { collectHandedBack, handInline, noteHandedBack, saveToOutbox, type SavedFile } from "./handedBack.js";
 export {
   callSignal,
   inCall,

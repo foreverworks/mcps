@@ -84,3 +84,37 @@ export const resourceLinkTo = (path: string, size: number): ResourceLink => {
   const mimeType = mimeTypeOf(name);
   return { type: "resource_link", uri: `file:///${segments.map(encodeURIComponent).join("/")}`, name, ...(mimeType === undefined ? {} : { mimeType }), size };
 };
+
+/**
+ * A file handed back inside the result itself, as MCP's embedded `resource`
+ * content, for a server that has no outbox a caller could read: its text when
+ * the file is UTF-8 text a model can read as it is (XML, JSON, CSV), else its
+ * bytes as base64. The `inline:` URI only names it; nothing is fetched there.
+ */
+export type EmbeddedFile = {
+  readonly type: "resource";
+  readonly resource:
+    | { readonly uri: string; readonly mimeType?: string; readonly text: string }
+    | { readonly uri: string; readonly mimeType?: string; readonly blob: string };
+};
+
+/** The types whose bytes are text a model can read as they are. */
+const isTextType = (mimeType: string | undefined): boolean =>
+  mimeType !== undefined && (mimeType.startsWith("text/") || /^application\/(?:xml|json|jsonl)$/.test(mimeType) || mimeType.endsWith("+xml") || mimeType.endsWith("+json"));
+
+const UTF8 = new TextDecoder("utf-8", { fatal: true, ignoreBOM: true });
+
+/** `bytes` as the embedded content a result carries, named `name` (its type from the extension). */
+export const embeddedFile = (name: string, bytes: Uint8Array): EmbeddedFile => {
+  const mimeType = mimeTypeOf(name);
+  const uri = `inline:///${encodeURIComponent(name)}`;
+  const type = mimeType === undefined ? {} : { mimeType };
+  if (isTextType(mimeType)) {
+    try {
+      return { type: "resource", resource: { uri, ...type, text: UTF8.decode(bytes) } };
+    } catch {
+      // Not valid UTF-8 after all: the bytes go as they are.
+    }
+  }
+  return { type: "resource", resource: { uri, ...type, blob: Buffer.from(bytes).toString("base64") } };
+};
