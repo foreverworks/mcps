@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-google@0.2.1"
+        "@foreverworks/mcp-google@0.2.2"
       ],
       "env": {
         "CALENDAR_TIME_ZONE": "${CALENDAR_TIME_ZONE}",

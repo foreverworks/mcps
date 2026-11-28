@@ -1,7 +1,7 @@
 {
   "name": "foreverworks-google",
   "displayName": "Google Workspace",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "Search and work in Gmail, Calendar, Drive, Docs, Sheets and Slides across several Google accounts.",
   "author": {
     "name": "Forever Works",

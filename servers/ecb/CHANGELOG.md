@@ -1,5 +1,18 @@
 # @foreverworks/mcp-ecb
 
+## 0.1.2
+
+### Patch Changes
+
+- 6f9174c: The server is also hosted for anyone, free and with no sign-in, at `https://mcp.foreverworks.com/ecb`, and the MCP Registry lists that address beside the npm package. Every tool is there, rate-limited for each caller. The README says how to add it to Claude and to other clients.
+- Updated dependencies [d672e23]
+- Updated dependencies [8f76786]
+- Updated dependencies [ca27413]
+- Updated dependencies [e68c576]
+- Updated dependencies [6f9174c]
+- Updated dependencies [579dbca]
+  - @foreverworks/mcp-kit@0.4.0
+
 ## 0.1.1
 
 ### Patch Changes

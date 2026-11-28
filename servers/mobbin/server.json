@@ -3,7 +3,7 @@
   "name": "com.foreverworks/mobbin",
   "title": "Mobbin",
   "description": "Search Mobbin's library of app screens and flows from clients that cannot sign in to Mobbin.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/mobbin/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-mobbin",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

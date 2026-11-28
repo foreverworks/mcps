@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-bnr",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "MCP server for the National Bank of Romania's exchange rates: the rate in force on any day, conversions to and from RON, rates over a period, and the yearly averages ANAF converts foreign income at",
   "mcpName": "com.foreverworks/bnr",
   "mcp": {
@@ -54,7 +54,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.3.0",
+    "@foreverworks/mcp-kit": "^0.4.0",
     "zod": "^4.6.7"
   }
 }

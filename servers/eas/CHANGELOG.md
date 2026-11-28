@@ -1,5 +1,17 @@
 # @foreverworks/mcp-eas
 
+## 0.1.4
+
+### Patch Changes
+
+- Updated dependencies [d672e23]
+- Updated dependencies [8f76786]
+- Updated dependencies [ca27413]
+- Updated dependencies [e68c576]
+- Updated dependencies [6f9174c]
+- Updated dependencies [579dbca]
+  - @foreverworks/mcp-kit@0.4.0
+
 ## 0.1.3
 
 ### Patch Changes

@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-ecb",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "MCP server for the European Central Bank's euro exchange rates: the rate in force on any day since 1999, every currency or a window of fixings, and exact conversions between any two currencies, cross rates through the euro included",
   "mcpName": "com.foreverworks/ecb",
   "mcp": {
@@ -54,7 +54,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.3.0",
+    "@foreverworks/mcp-kit": "^0.4.0",
     "zod": "^4.6.7"
   }
 }

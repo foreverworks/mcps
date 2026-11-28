@@ -38,7 +38,7 @@ Claude Code asks for this setting when you enable the plugin; in Cursor, it is s
 
 ## How it runs
 
-The plugin starts the server on your computer with `npx -y @foreverworks/mcp-oblio@0.1.2`: the published npm package, at the exact version this plugin was made for, on Node 22.19 or newer.
+The plugin starts the server on your computer with `npx -y @foreverworks/mcp-oblio@0.1.3`: the published npm package, at the exact version this plugin was made for, on Node 22.19 or newer.
 The server sends requests only to the services its documentation names, from your computer, with the credentials you set above, so each service's own privacy policy covers what it receives.
 Forever Works receives nothing: the server sends no telemetry and needs no account with us. The [privacy page](https://foreverworks.github.io/mcps/privacy/) says more.
 

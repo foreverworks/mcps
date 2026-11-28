@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-anaf-spv@0.1.3"
+        "@foreverworks/mcp-anaf-spv@0.1.4"
       ],
       "env": {
         "ANAF_SPV_USERNAME": "${user_config.anaf_spv_username}",

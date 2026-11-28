@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-esanatateamea",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server for eSănătateaMea, the Romanian health insurance house's patient portal: insurance status, prescriptions, reimbursed services, medical documents, the emergency summary and appointments",
   "mcpName": "com.foreverworks/esanatateamea",
   "mcp": {
@@ -75,7 +75,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.3.0",
+    "@foreverworks/mcp-kit": "^0.4.0",
     "zod": "^4.6.7"
   }
 }

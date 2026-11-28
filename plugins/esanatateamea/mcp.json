@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-esanatateamea@0.1.0"
+        "@foreverworks/mcp-esanatateamea@0.2.0"
       ],
       "env": {
         "ESANATATEAMEA_USERNAME": "${ESANATATEAMEA_USERNAME}",

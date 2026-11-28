@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-anaf-efactura@0.1.2"
+        "@foreverworks/mcp-anaf-efactura@0.2.0"
       ],
       "env": {
         "ANAF_CONFIG": "${ANAF_CONFIG}"

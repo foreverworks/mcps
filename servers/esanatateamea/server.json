@@ -3,7 +3,7 @@
   "name": "com.foreverworks/esanatateamea",
   "title": "eSănătateaMea",
   "description": "Read your Romanian health records: insurance, prescriptions, paid care, documents and appointments.",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "websiteUrl": "https://foreverworks.github.io/mcps/servers/esanatateamea/",
   "repository": {
     "url": "https://github.com/foreverworks/mcps",
@@ -31,7 +31,7 @@
       "registryType": "npm",
       "registryBaseUrl": "https://registry.npmjs.org",
       "identifier": "@foreverworks/mcp-esanatateamea",
-      "version": "0.1.0",
+      "version": "0.2.0",
       "runtimeHint": "npx",
       "transport": {
         "type": "stdio"

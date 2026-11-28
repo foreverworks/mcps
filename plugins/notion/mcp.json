@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-notion@0.1.2"
+        "@foreverworks/mcp-notion@0.1.3"
       ],
       "env": {
         "NOTION_TOKENS_DIR": "${NOTION_TOKENS_DIR}"

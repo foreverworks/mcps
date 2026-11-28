@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-onrc@0.1.3"
+        "@foreverworks/mcp-onrc@0.1.4"
       ]
     }
   }

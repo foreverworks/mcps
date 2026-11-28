@@ -1,5 +1,19 @@
 # @foreverworks/mcp-relay
 
+## 0.1.3
+
+### Patch Changes
+
+- e68c576: A client the server holds to a ceiling (`MCP_CLIENT_MAX_ACCESS`) now gets back the files its own calls hand back: when such a client calls a `read` tool that saves a file and links it, the relay brings the file to your machine as it does for any other client (this needs the server on a version of the kit that serves them). Uploads stay refused for it, and with a token for each client (`MCP_RELAY_UPSTREAM_TOKENS_DIR`) so do links to files another client's calls saved. With one token for everyone (`MCP_RELAY_UPSTREAM_TOKEN_FILE`) the server sees one client, so the relay's clients share each other's saved files, and the warning the relay prints at start for more than one client now says so. The words for each refusal now differ by direction: `the upstream takes no files from alice (403): ...` for an upload, and `the upstream does not give alice this file (403): ...` for a linked file, which also says that a server that restarted, or whose record expired (`MCP_HTTP_FILES_HELD_MAX_AGE_MIN`), has forgotten the call, so calling the tool again brings the file.
+- 6f9174c: The relay refuses to start with `MCP_HTTP_PATH` set: it answers on `/mcp` only, where the clients of the server it stands in for connect.
+- Updated dependencies [d672e23]
+- Updated dependencies [8f76786]
+- Updated dependencies [ca27413]
+- Updated dependencies [e68c576]
+- Updated dependencies [6f9174c]
+- Updated dependencies [579dbca]
+  - @foreverworks/mcp-kit@0.4.0
+
 ## 0.1.2
 
 ### Patch Changes

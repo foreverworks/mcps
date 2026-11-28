@@ -1,5 +1,22 @@
 # @foreverworks/mcp-rag
 
+## 0.5.0
+
+### Minor Changes
+
+- 0f61d8b: `RAG_NAMED_ONLY_COLLECTIONS` names collections, separated by commas, that a `search` reads only when it names them: a search that names no collections leaves them out, as it leaves out snapshots and local-only collections, and lists those it left out under `left_out_named_only` when others remain. Named, they are searched like any other collection, with the configured query provider; indexing, remote embedding and snapshots are unchanged. `health` lists the names under `named_only_collections`, those that match no collection yet under `named_only_unknown`, and entries that are not collection names under `named_only_invalid`, reporting not ok. A collection on both lists is local-only. With the variable unset or empty nothing changes except that `health` shows an empty list.
+- d3dced8: The server can run with no embedding or rerank server at all, everything at Cloudflare Workers AI. Leave `RAG_EMBED_URL`, `RAG_EMBED_MODELS` and `RAG_RERANK_URL` unset and set `RAG_CLOUDFLARE_ACCOUNT_ID` and `RAG_CLOUDFLARE_API_TOKEN_FILE`: chunks, questions and candidate passages are then all embedded and scored there, with `@cf/baai/bge-m3` (1,024 dimensions) and `@cf/baai/bge-reranker-base` by default, or the models `RAG_CLOUDFLARE_MODEL` and `RAG_CLOUDFLARE_RERANK_MODEL` name, a Clef model included. The model reports the identity and dimension it is configured with instead of being asked, so `health`, `create_collection` and finding a collection's model spend nothing at Cloudflare. `RAG_EMBED_IDENTITY` is the `model@revision` a collection built by a local embedding server recorded (`list_collections` shows it as `model`), so that collection is found by this server, searched and indexed further at Workers AI; `RAG_EMBED_DIMENSION` is the length of the vectors, needed only for a model other than the default. With no local endpoint, `RAG_QUERY_PROVIDER` defaults to `cloudflare` and `local` fails every question, naming `RAG_EMBED_URL`; there is no equivalence probe and no local fallback, so a failed request is Workers AI's own error (a spent daily allocation, a timeout) rather than a missing local endpoint, and `RAG_QUERY_TIMEOUT_MS` is the time a question has. `RAG_LOCAL_ONLY_COLLECTIONS` cannot be used in this mode and fails every call that embeds, and `health`, saying why; `local_inference` on `search` is refused. `create_collection` records a new collection at `cloudflare` without a probe, and refuses `embedding_provider: "local"`. A server that has a local embedding endpoint but no `RAG_RERANK_URL` scores candidates at Workers AI when `RAG_QUERY_PROVIDER=cloudflare`. Servers with local endpoints behave as before.
+
+### Patch Changes
+
+- Updated dependencies [d672e23]
+- Updated dependencies [8f76786]
+- Updated dependencies [ca27413]
+- Updated dependencies [e68c576]
+- Updated dependencies [6f9174c]
+- Updated dependencies [579dbca]
+  - @foreverworks/mcp-kit@0.4.0
+
 ## 0.4.0
 
 ### Minor Changes

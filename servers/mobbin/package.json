@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-mobbin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server that bridges Mobbin's own hosted MCP server: one OAuth grant held on the server, Mobbin's design search served to clients that cannot sign in themselves",
   "mcpName": "com.foreverworks/mobbin",
   "mcp": {
@@ -59,7 +59,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.3.0",
+    "@foreverworks/mcp-kit": "^0.4.0",
     "zod": "^4.6.7"
   }
 }

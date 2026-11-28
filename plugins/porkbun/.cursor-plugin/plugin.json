@@ -1,6 +1,6 @@
 {
   "name": "foreverworks-porkbun",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "description": "Register domains and manage DNS, hosting and mail at Porkbun, with every purchase confirmed first.",
   "author": {
     "name": "Forever Works"

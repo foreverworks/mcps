@@ -1,6 +1,6 @@
 {
   "name": "foreverworks-ecb",
-  "version": "0.1.1",
+  "version": "0.1.2",
   "description": "Look up the European Central Bank's euro rate for any day, and convert between any two currencies.",
   "author": {
     "name": "Forever Works"

@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-bitwarden@0.2.2"
+        "@foreverworks/mcp-bitwarden@0.3.0"
       ],
       "env": {
         "BITWARDEN_CLIENT_ID_FILE": "${BITWARDEN_CLIENT_ID_FILE}",

@@ -1,6 +1,6 @@
 {
   "name": "@foreverworks/mcp-granola",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "MCP server that bridges Granola's own hosted MCP server: one OAuth grant held on the server, your meetings, notes and transcripts served read-only to clients that cannot sign in to Granola themselves",
   "mcpName": "com.foreverworks/granola",
   "mcp": {
@@ -60,7 +60,7 @@
     "prepack": "node ../../scripts/prepack.mjs"
   },
   "dependencies": {
-    "@foreverworks/mcp-kit": "^0.3.0",
+    "@foreverworks/mcp-kit": "^0.4.0",
     "zod": "^4.6.7"
   }
 }

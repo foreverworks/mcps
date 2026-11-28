@@ -1,6 +1,6 @@
 {
   "name": "foreverworks-app-stores",
-  "version": "0.1.3",
+  "version": "0.2.0",
   "description": "Read and answer App Store and Google Play reviews, and see TestFlight feedback and crash logs.",
   "author": {
     "name": "Forever Works"

@@ -4,7 +4,7 @@
       "command": "npx",
       "args": [
         "-y",
-        "@foreverworks/mcp-porkbun@0.1.4"
+        "@foreverworks/mcp-porkbun@0.1.5"
       ],
       "env": {
         "PORKBUN_API_KEY_FILE": "${PORKBUN_API_KEY_FILE}",

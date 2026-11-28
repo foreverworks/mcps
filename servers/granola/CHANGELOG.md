@@ -1,5 +1,21 @@
 # @foreverworks/mcp-granola
 
+## 0.2.0
+
+### Minor Changes
+
+- 7552a05: A new server for Granola: your assistant searches and reads your meetings, notes and transcripts (`search_meetings`, `list_meetings`, `get_meetings`, `get_meeting_transcript`, `search_transcripts`, `list_meeting_folders`, `get_meeting_attachment`, `get_account_info`, `list_templates`, `get_agent_brief` and `query_granola_meetings`, all `read`) through Granola's own official MCP server, from clients and scripts that cannot sign in to Granola themselves. The server holds one sign-in to your Granola account and refreshes it by itself, one refresh at a time with the rotated token saved before it is used; `begin_authorization` and `complete_authorization` (`write`) connect the account once, and `refresh_grant` (`write`) proves the refresh works. Granola's tools that change notes or the account are never offered. No tool is `money`. Transcript tools need a paid Granola plan.
+
+### Patch Changes
+
+- Updated dependencies [d672e23]
+- Updated dependencies [8f76786]
+- Updated dependencies [ca27413]
+- Updated dependencies [e68c576]
+- Updated dependencies [6f9174c]
+- Updated dependencies [579dbca]
+  - @foreverworks/mcp-kit@0.4.0
+
 ## 0.1.0
 
 The first release. Your assistant can search and read your Granola meetings,

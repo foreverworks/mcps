@@ -1,6 +1,6 @@
 {
   "name": "foreverworks-enable-banking",
-  "version": "0.1.2",
+  "version": "0.1.3",
   "description": "Read, search and export statements and balances from banks across Europe, without moving money.",
   "author": {
     "name": "Forever Works"

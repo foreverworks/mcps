@@ -1,7 +1,7 @@
 {
   "name": "foreverworks-mobbin",
   "displayName": "Mobbin",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "description": "Search Mobbin's library of app screens and flows from clients that cannot sign in to Mobbin.",
   "author": {
     "name": "Forever Works",

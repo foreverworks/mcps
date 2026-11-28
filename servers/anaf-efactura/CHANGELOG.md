@@ -1,5 +1,25 @@
 # @foreverworks/mcp-anaf-efactura
 
+## 0.2.0
+
+### Minor Changes
+
+- 6f9174c: `ANAF_EFACTURA_TOOLSETS` picks the tools a server loads: `registry`, `documents`, `invoices`, `etransport` and `authorization`, with `health` always there. Unset, every tool loads as before. `registry,documents` needs no ANAF account: the server starts with no `app.json` and no state folder, registers only `read` tools (`lookup_company`, `validate_invoice`, `invoice_pdf`, `parse_invoice`, `verify_signature`, `build_invoice`), and its `health` reports whether ANAF's public services answer. In that mode `validate_invoice`, `invoice_pdf` and `parse_invoice` take the invoice as XML text (`xml`, at most 1,048,576 characters), and `verify_signature` takes `xml` and `signature` as text, since a server with no disk has no other way in; each answer gives the sha256 and size of what arrived, to compare with the source. With a grant, files still go in by path or checked base64 only. `message_id`, `archive` and `test` are not offered, and `build_invoice` and `invoice_pdf` hand the file back attached to the answer, with its size and SHA-256, instead of saving it to an outbox. `ANAF_DOWNLOADS_DIR` keeps an outbox anyway.
+  
+  That subset is hosted for anyone, free and with no sign-in, at `https://mcp.foreverworks.com/anaf-efactura`, and the MCP Registry lists that address beside the npm package.
+  
+  The server refuses to be served to anyone (`MCP_HTTP_PUBLIC_HOSTS`) unless only `registry` and `documents` are loaded and `ANAF_DOWNLOADS_DIR` is unset, even under `MCP_MAX_ACCESS=read`.
+
+### Patch Changes
+
+- Updated dependencies [d672e23]
+- Updated dependencies [8f76786]
+- Updated dependencies [ca27413]
+- Updated dependencies [e68c576]
+- Updated dependencies [6f9174c]
+- Updated dependencies [579dbca]
+  - @foreverworks/mcp-kit@0.4.0
+
 ## 0.1.2
 
 ### Patch Changes

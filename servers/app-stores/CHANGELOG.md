@@ -1,5 +1,21 @@
 # @foreverworks/mcp-app-stores
 
+## 0.2.0
+
+### Minor Changes
+
+- ab2c527: `get_testflight_crash_log` now says why the app died, not just how the log begins. The answer picks out the exception and termination lines, Application Specific Information, the Last Exception Backtrace and the crashed thread's frames, from Apple's text format and from its JSON `.ips` format. Before, it showed the first 40 lines, which in a real report end long before the crashed thread, so a client that could not open the server's outbox could not diagnose anything. `from` and `count` read any other lines of the log.
+
+### Patch Changes
+
+- Updated dependencies [d672e23]
+- Updated dependencies [8f76786]
+- Updated dependencies [ca27413]
+- Updated dependencies [e68c576]
+- Updated dependencies [6f9174c]
+- Updated dependencies [579dbca]
+  - @foreverworks/mcp-kit@0.4.0
+
 ## 0.1.3
 
 ### Patch Changes
